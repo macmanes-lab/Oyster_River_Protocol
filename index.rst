@@ -13,4 +13,17 @@ Oyster River Protocol For Transcriptome Assembly
     - Phone (discouraged): 603-862-4052
     - Office (I'm hiding under my desk): 189 Rudman Hall
 
+2. Archive Reads
 
+::
+
+  gzip *fastq
+
+3. Initial Quality Check
+
+::
+
+  SolexaQA.pl ../right.fq
+  
+
+4.  
