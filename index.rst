@@ -2,9 +2,7 @@
 Oyster River Protocol For Transcriptome Assembly
 ==============================================
 
-0. Description:
-
-    The OR Protocol descripton goes here...
+    The OR Protocol for transcriptome assembly is an actively developed, evidenced based method for optimizing transcriptome assembly. 
 
 --------------------------------------------------
 Contact Information for Professor Matthew MacManes
@@ -20,13 +18,13 @@ Contact Information for Professor Matthew MacManes
 Setup :doc:`aws_setup`
 --------------------------------------------------
 
-2. Archive Reads
+0. Archive Reads
 -----------------------------------
 ::
 
   gzip *fastq
 
-3. Initial Quality Check
+1. Initial Quality Check
 -----------------------------------
 
 ::
@@ -34,7 +32,7 @@ Setup :doc:`aws_setup`
   SolexaQA.pl ../right.fq
   
 
-4. Error Correct
+2. Error Correct
 -----------------------------------
 
 ::
@@ -43,7 +41,7 @@ Setup :doc:`aws_setup`
   -1 ../reads/file_1.fastq \
   -2 ../reads/file_2.fastq
 
-5. Assemble
+3. Assemble
 -----------------------------------
 
 ::
@@ -52,11 +50,11 @@ Setup :doc:`aws_setup`
   --left ../reads/file_1.cor.fastq --right ../reads/file_1.cor.fastq \
   --quality_trimming_params "ILLUMINACLIP:/home/ubuntu/trinityrnaseq/trinity-plugins/Trimmomatic/adapters/TruSeq3-PE-2.fa:2:40:15 LEADING:2   TRAILING:2 MINLEN:25"
 
-6. Quality Check
+4. Quality Check
 -----------------------------------
 
-7. Filter
+5. Filter
 -----------------------------------
 
-8. Report
+6. Report
 -----------------------------------
