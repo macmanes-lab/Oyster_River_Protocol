@@ -15,7 +15,7 @@ Contact Information for Professor Matthew MacManes
     - Office (I'm hiding under my desk): 189 Rudman Hall
 
 --------------------------------------------------
-Setup :doc:`aws_setup`
+ :doc:`aws_setup`
 --------------------------------------------------
 
 0. Archive Reads
