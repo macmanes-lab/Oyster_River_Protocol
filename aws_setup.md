@@ -22,6 +22,14 @@ sudo mount /dev/xvdf /mnt
 sudo chown -R ubuntu:ubuntu /mnt
 ```
 
+### Install SolexaQA
+
+```
+curl -LO http://downloads.sourceforge.net/project/solexaqa/src/SolexaQA%2B%2B_v3.1.4.zip
+unzip SolexaQA%2B%2B_v3.1.4.zip
+cd Linux_x64
+PATH=$PATH:$(pwd)
+
 ### Install Perl Module
 ```
 sudo cpan URI::Escape
