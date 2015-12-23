@@ -1,5 +1,7 @@
 # How to set up AWS machine for assembly
+---
 
+If you are hoping to attempt a Trinity assembly, requirements for RAM = .5 * X million read pairs.  
 
 
 ### Update Software and install things from apt-get
