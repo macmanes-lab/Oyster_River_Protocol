@@ -1,4 +1,4 @@
-# AWS Configure
+# How to set up AWS machine for assembly
 
 
 
