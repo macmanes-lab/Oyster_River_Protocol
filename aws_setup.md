@@ -31,6 +31,7 @@ curl -LO http://downloads.sourceforge.net/project/solexaqa/src/SolexaQA%2B%2B_v3
 unzip SolexaQA%2B%2B_v3.1.4.zip
 cd Linux_x64
 PATH=$PATH:$(pwd)
+```
 
 ### Install Perl Module
 ```
@@ -103,6 +104,7 @@ PATH=$PATH:/home/ubuntu/transrate-1.0.1-linux-x86_64
 
 ### Install BUSCO
 
+```
 cd
 curl -LO http://busco.ezlab.org/files/BUSCO_v1.1b1.tar.gz
 tar -zxf BUSCO_v1.1b1.tar.gz
@@ -142,4 +144,14 @@ git clone https://github.com/trinityrnaseq/trinityrnaseq.git
 cd trinityrnaseq
 make -j6
 PATH:$PATH:$(pwd)
+```
+
+### Install bfc
+
+```
+cd $HOME
+git clone https://github.com/lh3/bfc.git
+cd bfc
+make
+PATH=$PATH:$(pwd)
 ```
