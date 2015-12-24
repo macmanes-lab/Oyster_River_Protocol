@@ -5,7 +5,7 @@ Oyster River Protocol For Transcriptome Assembly
     The OR Protocol for transcriptome assembly is an actively developed, evidenced based method for optimizing transcriptome assembly. 
 
 --------------------------------------------------
-Contact Information for Professor Matthew MacManes
+Contact Information
 --------------------------------------------------
 
     - Gitter (preferred) https://gitter.im/macmanes-lab/Oyster_River_Protocol
@@ -89,7 +89,7 @@ If you have followed the ORP AWS setup protocol, you will have the BUSCO Metazoa
   python3 ~/BUSCO_v1.1b1/BUSCO_v1.1b1.py -m Trans --cpu 16 -l ~/BUSCO_v1.1b1/vertebrata \
   -o assemb_name -g Rcorr_trinity.Trinity.fasta 
 
-You should evaluate your assembly with Transrate, in addition to BUSCO. A Transrate score > .22 is generally thought to be acceptable, though higher scores are usually achievable. There is a good*fasta assembly in the output directory which you may want to use. 
+You should evaluate your assembly with Transrate, in addition to BUSCO. A Transrate score > .22 is generally thought to be acceptable, though higher scores are usually achievable. There is a good*fasta assembly in the output directory which you may want to use as the final assembly, for further filtering [e.g., TPM], or for something else. 
 
 ::
 
@@ -102,7 +102,7 @@ You should evaluate your assembly with Transrate, in addition to BUSCO. A Transr
 -----------------------------------
 Run BUSCO on the good*fasta file which is a product of Transrate. This assembly may be very good. I typically use this one of the number of BUSCOs does not decrease by more than a few precent, reltive to the raw assembly output from Trinity. Use the BUSCO code from above, changing the name of the inout and output. 
 
-In addition to Transrate filtering, it is often good to filter by gene expression. I typically filter out contigs whose expression is less that TMP=1 or TMP=0.5.
+In addition to Transrate filtering, it is often good to filter by gene expression. I typically filter out contigs whose expression is less than TMP=1 or TMP=0.5.
 
 Estimate expression with Kallisto
 
