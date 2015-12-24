@@ -18,18 +18,17 @@ Contact Information for Professor Matthew MacManes
  :doc:`aws_setup`
 --------------------------------------------------
 
-0. Archive Reads
+0. Archive Reads.  
 -----------------------------------
-::
+It is likely a good idea to compress your raw reads and save them elsewhere - like another computer. Computers fail, drives corrupt. Better to NOT lose your data in the process.
 
-  gzip *fastq
 
 1. Initial Quality Check
 -----------------------------------
 
 ::
 
-  SolexaQA++ analysis SRR797058_1.fastq SRR797058_2.fastq
+  SolexaQA++ analysis file_1.fastq file_2.fastq
   
 
 2. Error Correct
