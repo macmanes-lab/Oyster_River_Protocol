@@ -36,8 +36,8 @@ Plot Results using R
 
   qual1 <- read.delim("file_1.fastq.quality")
   qual2 <- read.delim("file_2.fastq.quality")
-  par(mfrow=c(2,1))
   jpeg('qualplot.jpg')
+  par(mfrow=c(2,1))
   boxplot(t(qual1), col='light blue', ylim=c(0,.3), frame.plot=F, outline=F, xaxt = "n", ylab='Probability of nucleotide error', xlab='Nucleotide Position', main='Read1')
   axis(1, at=c(0,10,20,30,40,50,60,70,80,90,100), labels=c(0,10,20,30,40,50,60,70,80,90,100))
   boxplot(t(qual2), col='light blue', ylim=c(0,.3), frame.plot=F, outline=F, xaxt = "n", ylab='Probability of nucleotide error', xlab='Nucleotide Position', main='Read2')
@@ -48,18 +48,24 @@ Plot Results using R
 2. Error Correct
 -----------------------------------
 
+Use RCorrector if you have more than 20 million paired-end reads
+
 ::
 
   perl run_rcorrector.pl -k 31 -t 30 \
-  -1 ../reads/file_1.fastq \
-  -2 ../reads/file_2.fastq
+  -1 file_1.fastq \
+  -2 file_2.fastq
+
+Use bfc if you have less than 20 million paired-end reads
+
+
 
 3. Assemble
 -----------------------------------
 
 ::
 
-  Trinity --seqType fq --max_memory 40G --trimmomatic --CPU 30\
+  Trinity --seqType fq --max_memory 40G --trimmomatic --CPU 30 \
   --left ../reads/file_1.cor.fastq --right ../reads/file_1.cor.fastq \
   --quality_trimming_params "ILLUMINACLIP:/home/ubuntu/trinityrnaseq/trinity-plugins/Trimmomatic/adapters/TruSeq3-PE-2.fa:2:40:15 LEADING:2   TRAILING:2 MINLEN:25"
 
