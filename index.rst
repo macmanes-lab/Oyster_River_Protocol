@@ -82,7 +82,7 @@ Assemble your reads using Trinity. If you have stranded data, make sure to indud
 
 4. Quality Check
 -----------------------------------
-If you have followed the ORP AWS setup protocol, you will have the BUSCO Meetazoa and Vertebrata datasets. If you need something else, you can download from here: www.busco.ezlab.org. You should check your assembly using BUSCO. For most transcriptomes, something like 60-90% complete BUSCOs should be accepted. This might be less (even though your transcriptome is complete) if you are assebling a marine invert or some other 'weird' animal. 
+If you have followed the ORP AWS setup protocol, you will have the BUSCO Metazoa and Vertebrata datasets. If you need something else, you can download from here: http://busco.ezlab.org/. You should check your assembly using BUSCO. For most transcriptomes, something like 60-90% complete BUSCOs should be accepted. This might be less (even though your transcriptome is complete) if you are assebling a marine invert or some other 'weird' organism. 
 
 ::
 
@@ -104,9 +104,35 @@ Run BUSCO on the good*fasta file which is a product of Transrate. This assembly 
 
 In addition to Transrate filtering, it is often good to filter by gene expression. I typically filter out contigs whose expression is less that TMP=1 or TMP=0.5.
 
+Estimate expression with Kallisto
 
+::
+
+  kallisto index -i kallisto.idx Rcorr_trinity.Trinity.fasta
+  kallisto quant -t 32 -i kallisto.idx -o kallisto_orig -b 100 file_1.cor.fastq file_2.cor.fastq
+  
+Estimate expression with Salmon
+
+::
+
+  ~/salmon-0.5.1/bin/salmon index -t Rcorr_trinity.Trinity.fasta -i salmon.idx --type quasi -k 31
+  ~/salmon-0.5.1/bin/salmon quant -p 32 -i transcripts2_index -l MSR -1 file_1.cor.fastq -2 file_2.cor.fastq -o salmon_orig
+
+Pull down transcripts whose TPM > 1. 
+
+::
+
+  awk '1>$5{next}1' kallisto_orig/abundance.tsv | awk '{print $1}' > list
+  awk '1>$3{next}1' salmon_orig/quant.sf | sed  '1,10d' | awk '{print $1}' > list2
+  cat list list2 | sort -u > list_final
+  sed -i ':begin;N;/[ACTGNn-]\n[ACTGNn-]/s/\n//;tbegin;P;D' Rcorr_trinity.Trinity.fasta
+
+  for i in $(cat list_final); 
+     do grep --no-group-separator --max-count=1 -A1 -w  Rcorr_trinity.Trinity.fasta >> Rcorr_highexp.trinity.Trinity.fasta; 
+  done
 
 
 
 6. Report
 -----------------------------------
+Verify the quality of your assembly using content based metrics. Report Transrate score, BUSCO statistics, number of unique transcripts, etc. Do not report meaningless statistics such as N50
