@@ -58,6 +58,13 @@ Use RCorrector if you have more than 20 million paired-end reads
 
 Use bfc if you have less than 20 million paired-end reads
 
+::
+
+  seqtk mergepe file_1.fastq file_2.fastq > inter.fq
+  bfc -s 50m -k31 -t 16 inter.fq > bfc.corr.fq
+  split-paired-reads.py bfc.corr.fq
+  mv bfc.corr.fq.1 bfc.corr.1.fq
+  mv bfc.corr.fq.2 bfc.corr.2.fq
 
 
 3. Assemble
