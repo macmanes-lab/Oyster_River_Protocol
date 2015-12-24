@@ -30,6 +30,20 @@ It is likely a good idea to compress your raw reads and save them elsewhere - li
 
   SolexaQA++ analysis file_1.fastq file_2.fastq
   
+Plot Results using R
+
+::
+
+  qual1 <- read.delim("file_1.fastq.quality")
+  qual2 <- read.delim("file_2.fastq.quality")
+  par(mfrow=c(2,1))
+  jpeg('qualplot.jpg')
+  boxplot(t(qual1), col='light blue', ylim=c(0,.3), frame.plot=F, outline=F, xaxt = "n", ylab='Probability of nucleotide error', xlab='Nucleotide Position', main='Read1')
+  axis(1, at=c(0,10,20,30,40,50,60,70,80,90,100), labels=c(0,10,20,30,40,50,60,70,80,90,100))
+  boxplot(t(qual2), col='light blue', ylim=c(0,.3), frame.plot=F, outline=F, xaxt = "n", ylab='Probability of nucleotide error', xlab='Nucleotide Position', main='Read2')
+  axis(1, at=c(0,10,20,30,40,50,60,70,80,90,100), labels=c(0,10,20,30,40,50,60,70,80,90,100))
+  dev.off()
+
 
 2. Error Correct
 -----------------------------------
