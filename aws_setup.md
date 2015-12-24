@@ -12,7 +12,7 @@ sudo apt-get update && sudo apt-get -y upgrade
 sudo apt-get -y install cmake sparsehash valgrind libboost-atomic1.55-dev libibnetdisc-dev ruby-full gsl-bin \
       libgsl0-dev libgsl0ldbl libboost1.55-all-dev libboost1.55-dbg subversion tmux git curl bowtie \
       libncurses5-dev samtools gcc make g++ python-dev unzip dh-autoreconf default-jre python-pip zlib1g-dev \
-      hmmer cmake libhdf5-dev
+      hmmer cmake libhdf5-dev r-base
 
 ```
 
