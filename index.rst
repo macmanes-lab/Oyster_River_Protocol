@@ -69,18 +69,37 @@ Use bfc if you have less than 20 million paired-end reads
 
 3. Assemble
 -----------------------------------
+Assemble your reads using Trinity. If you have stranded data, make sure to indude the ``--SS_lib_type RF`` tag, assuming that is the right orientation (If you're using the standard TruSeq kit, it probably is). Also, you may need to adjust the ``--CPU`` and ``--max_memory`` settings. Change the name of the input reads to match your read names. 
 
 ::
 
   Trinity --seqType fq --max_memory 40G --trimmomatic --CPU 30 \
-  --left ../reads/file_1.cor.fastq --right ../reads/file_1.cor.fastq \
+  --left file_1.cor.fastq --right file_2.cor.fastq --output Rcorr_trinity \
   --quality_trimming_params "ILLUMINACLIP:/home/ubuntu/trinityrnaseq/trinity-plugins/Trimmomatic/adapters/TruSeq3-PE-2.fa:2:40:15 LEADING:2   TRAILING:2 MINLEN:25"
 
 4. Quality Check
 -----------------------------------
+If you have followed the ORP AWS setup protocol, you will have the BUSCO Meetazoa and Vertebrata datasets. If you need something else, you can download from here: www.busco.ezlab.org. You should check your assembly using BUSCO. For most transcriptomes, something like 60-90% complete BUSCOs should be accepted. This might be less (even though your transcriptome is complete) if you are assebling a marine invert or some other 'weird' animal. 
+
+::
+
+  python3 ~/BUSCO_v1.1b1/BUSCO_v1.1b1.py -o assemb_name -g Rcorr_trinity.Trinity.fasta -m Trans --cpu 16 -l ~/BUSCO_v1.1b1/vertebrata
+
+You should evaluate your assembly with Transrate, in addition to BUSCO. A Transrate score > .22 is generally thought to be acceptable, though higher scores are usually achievable. There is a good*fasta assembly in the output directory which you may want to use. 
+
+::
+
+  transrate -o assemb_name -a Rcorr_trinity.Trinity.fasta --left file_1.cor.fastq --right file_2.cor.fastq -t 16
 
 5. Filter
 -----------------------------------
+Run BUSCO on the good*fasta file which is a product of Transrate. This assembly may be very good. I typically use this one of the number of BUSCOs does not decrease by more than a few precent, reltive to the raw assembly output from Trinity. Use the BUSCO code from above, changing the name of the inout and output. 
+
+In addition to Transrate filtering, it is often good to filter by gene expression. I typically filter out contigs whose expression is less that TMP=1 or TMP=0.5.
+
+
+
+
 
 6. Report
 -----------------------------------
