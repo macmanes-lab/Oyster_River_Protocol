@@ -34,7 +34,8 @@ Plot Results using R
 
 ::
 
-  R
+  R #this opens R on your AWS machine
+  
   qual1 <- read.delim("file_1.fastq.quality")
   qual2 <- read.delim("file_2.fastq.quality")
   jpeg('qualplot.jpg')
@@ -85,13 +86,17 @@ If you have followed the ORP AWS setup protocol, you will have the BUSCO Meetazo
 
 ::
 
-  python3 ~/BUSCO_v1.1b1/BUSCO_v1.1b1.py -o assemb_name -g Rcorr_trinity.Trinity.fasta -m Trans --cpu 16 -l ~/BUSCO_v1.1b1/vertebrata
+  python3 ~/BUSCO_v1.1b1/BUSCO_v1.1b1.py -m Trans --cpu 16 -l ~/BUSCO_v1.1b1/vertebrata \
+  -o assemb_name -g Rcorr_trinity.Trinity.fasta 
 
 You should evaluate your assembly with Transrate, in addition to BUSCO. A Transrate score > .22 is generally thought to be acceptable, though higher scores are usually achievable. There is a good*fasta assembly in the output directory which you may want to use. 
 
 ::
 
-  transrate -o assemb_name -a Rcorr_trinity.Trinity.fasta --left file_1.cor.fastq --right file_2.cor.fastq -t 16
+  transrate -o assemb_name -t 16 \
+  -a Rcorr_trinity.Trinity.fasta \
+  --left file_1.cor.fastq \
+  --right file_2.cor.fastq
 
 5. Filter
 -----------------------------------
