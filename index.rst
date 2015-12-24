@@ -38,7 +38,7 @@ Plot Results using R
   qual1 <- read.delim("file_1.fastq.quality")
   qual2 <- read.delim("file_2.fastq.quality")
   jpeg('qualplot.jpg')
-  par(mfrow=c(2,1))
+  par(mfrow=c(1,2))
   boxplot(t(qual1), col='light blue', ylim=c(0,.4), frame.plot=F, outline=F, xaxt = "n", ylab='Probability of nucleotide error', xlab='Nucleotide Position', main='Read1')
   axis(1, at=c(0,10,20,30,40,50,60,70,80,90,100), labels=c(0,10,20,30,40,50,60,70,80,90,100))
   boxplot(t(qual2), col='light blue', ylim=c(0,.4), frame.plot=F, outline=F, xaxt = "n", ylab='Probability of nucleotide error', xlab='Nucleotide Position', main='Read2')
