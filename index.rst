@@ -29,7 +29,7 @@ Contact Information for Professor Matthew MacManes
 
 ::
 
-  SolexaQA.pl ../right.fq
+  SolexaQA++ analysis SRR797058_1.fastq SRR797058_2.fastq
   
 
 2. Error Correct
