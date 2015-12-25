@@ -48,6 +48,15 @@ Plot Results using R
   quit()
   n
 
+.. image:: qualplot.jpg
+   :height: 200px
+   :width: 400 px
+   :scale: 50 %
+   :alt: this is a plot of 2 Illumina read datasets
+   :target:http://i.imgur.com/Gls1INT.jpg
+   :align: right
+
+
 2. Error Correct
 -----------------------------------
 
