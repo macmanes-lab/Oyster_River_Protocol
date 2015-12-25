@@ -49,7 +49,7 @@ Plot Results using R
   n
 
 .. image:: qualplot.jpg
-   :height: 300px
+   :height: 200px
    :width: 800 px
    :scale: 100 %
    :alt: this is a plot of 2 Illumina read datasets
