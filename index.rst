@@ -53,7 +53,6 @@ Plot Results using R
    :width: 400 px
    :scale: 50 %
    :alt: this is a plot of 2 Illumina read datasets
-   :target:http://i.imgur.com/Gls1INT.jpg
    :align: right
 
 
