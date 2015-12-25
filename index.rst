@@ -51,9 +51,9 @@ Plot Results using R
 .. image:: qualplot.jpg
    :height: 200px
    :width: 400 px
-   :scale: 50 %
+   :scale: 100 %
    :alt: this is a plot of 2 Illumina read datasets
-   :align: right
+   :align: left
 
 
 2. Error Correct
