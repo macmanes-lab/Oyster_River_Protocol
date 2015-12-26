@@ -130,13 +130,13 @@ Pull down transcripts whose TPM > 1.
 
 ::
 
-  awk '1>$5{next}1' kallisto_orig/abundance.tsv | awk '{print $1}' > list
-  awk '1>$3{next}1' salmon_orig/quant.sf | sed  '1,10d' | awk '{print $1}' > list2
-  cat list list2 | sort -u > list_final
+  awk '1>$5{next}1' kallisto_orig/abundance.tsv | awk '{print $1}' > kallist
+  awk '1>$3{next}1' salmon_orig/quant.sf | sed  '1,10d' | awk '{print $1}' > salist
+  cat kallist salist | sort -u > uniq_list
   sed -i ':begin;N;/[ACTGNn-]\n[ACTGNn-]/s/\n//;tbegin;P;D' Rcorr_trinity.Trinity.fasta
 
-  for i in $(cat list_final); 
-     do grep --no-group-separator --max-count=1 -A1 -w  Rcorr_trinity.Trinity.fasta >> Rcorr_highexp.trinity.Trinity.fasta; 
+  for i in $(cat uniq_list); 
+     do grep --no-group-separator --max-count=1 -A1 -w $i Rcorr_trinity.Trinity.fasta >> Rcorr_highexp.trinity.Trinity.fasta; 
   done
 
 
