@@ -80,7 +80,7 @@ Use bfc if you have less than 20 million paired-end reads
 
 3. Assemble
 -----------------------------------
-Assemble your reads using Trinity. If you have stranded data, make sure to indude the ``--SS_lib_type RF`` tag, assuming that is the right orientation (If you're using the standard TruSeq kit, it probably is). Also, you may need to adjust the ``--CPU`` and ``--max_memory`` settings. Change the name of the input reads to match your read names. 
+Assemble your reads using Trinity. If you have stranded data, make sure to iclude the ``--SS_lib_type RF`` tag, assuming that is the right orientation (If you're using the standard TruSeq kit, it probably is). Also, you may need to adjust the ``--CPU`` and ``--max_memory`` settings. Change the name of the input reads to match your read names. 
 
 ::
 
@@ -90,14 +90,14 @@ Assemble your reads using Trinity. If you have stranded data, make sure to indud
 
 4. Quality Check
 -----------------------------------
-If you have followed the ORP AWS setup protocol, you will have the BUSCO Metazoa and Vertebrata datasets. If you need something else, you can download from here: http://busco.ezlab.org/. You should check your assembly using BUSCO. For most transcriptomes, something like 60-90% complete BUSCOs should be accepted. This might be less (even though your transcriptome is complete) if you are assebling a marine invert or some other 'weird' organism. 
+If you have followed the ORP AWS setup protocol, you will have the BUSCO Metazoa and Vertebrata datasets. If you need something else, you can download from here: http://busco.ezlab.org/. You should check your assembly using BUSCO. For most transcriptomes, something like 60-90% complete BUSCOs should be accepted. This might be less (even though your transcriptome is complete) if you are assembling a marine invert or some other 'weird' organism. 
 
 ::
 
   python3 ~/BUSCO_v1.1b1/BUSCO_v1.1b1.py -m Trans --cpu 16 -l ~/BUSCO_v1.1b1/vertebrata \
   -o assemb_name -g Rcorr_trinity.Trinity.fasta 
 
-You should evaluate your assembly with Transrate, in addition to BUSCO. A Transrate score > .22 is generally thought to be acceptable, though higher scores are usually achievable. There is a good*fasta assembly in the output directory which you may want to use as the final assembly, for further filtering [e.g., TPM], or for something else. 
+You should evaluate your assembly with Transrate, in addition to BUSCO. A Transrate score > .22 is generally thought to be acceptable, though higher scores are usually achievable. There is a ``good*fasta`` assembly in the output directory which you may want to use as the final assembly, for further filtering [e.g., TPM], or for something else. 
 
 ::
 
@@ -108,9 +108,12 @@ You should evaluate your assembly with Transrate, in addition to BUSCO. A Transr
 
 5. Filter
 -----------------------------------
-Run BUSCO on the good*fasta file which is a product of Transrate. This assembly may be very good. I typically use this one of the number of BUSCOs does not decrease by more than a few precent, reltive to the raw assembly output from Trinity. Use the BUSCO code from above, changing the name of the inout and output. 
 
-In addition to Transrate filtering, it is often good to filter by gene expression. I typically filter out contigs whose expression is less than TMP=1 or TMP=0.5.
+In general, for low coverage datasets (less than 20 million reads), filtering based on expression, using TMP=1 as a threshold performs well, with Transrate filtering being too aggressive. With higher coverage data (more than 60 million reads) Transrate filtering may be worthwhile, as may expression filtering using a threshold of TMP=0.5. 
+
+To do the filtering, run BUSCO on the ``good*fasta`` file which is a product of Transrate. This assembly may be very good. I typically use this one if the number of BUSCOs does not decrease by more than a few precent, relative to the raw assembly output from Trinity. Use the BUSCO code from above, changing the name of the input and output. In addition to Transrate filtering (of as an alternative), it is often good to filter by gene expression. I typically filter out contigs whose expression is less than TMP=1 or TMP=0.5.
+
+
 
 Estimate expression with Kallisto
 
