@@ -142,15 +142,15 @@ Pull down transcripts whose TPM > 1.
      do grep --no-group-separator --max-count=1 -A1 -w $i Rcorr_trinity.Trinity.fasta >> Rcorr_highexp.trinity.Trinity.fasta; 
   done
 
-6. Annotate transcriptome  
+6. Annotate  
 -----------------------------------
 I have taken a liking to using dammit! (http://dammit.readthedocs.org/en/latest/). 
 
 ::
 
-mkdir /mnt/dammit/ $$ cd /mnt/dammit
-dammit databases --install --database-dir /mnt/dammit --full --busco-group metazoa
-dammit annotate assembly.fasta --busco-group metazoa --n_threads 36 --database-dir /mnt/dammit/
+  mkdir /mnt/dammit/ $$ cd /mnt/dammit
+  dammit databases --install --database-dir /mnt/dammit --full --busco-group metazoa
+  dammit annotate assembly.fasta --busco-group metazoa --n_threads 36 --database-dir /mnt/dammit/
 
 
 7. Report
