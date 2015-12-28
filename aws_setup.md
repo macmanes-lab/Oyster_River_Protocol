@@ -12,7 +12,8 @@ sudo apt-get update && sudo apt-get -y upgrade
 sudo apt-get -y install cmake sparsehash valgrind libboost-atomic1.55-dev libibnetdisc-dev ruby-full gsl-bin \
       libgsl0-dev libgsl0ldbl libboost1.55-all-dev libboost1.55-dbg subversion tmux git curl bowtie \
       libncurses5-dev samtools gcc make g++ python-dev unzip dh-autoreconf default-jre python-pip zlib1g-dev \
-      hmmer cmake libhdf5-dev r-base
+      hmmer cmake libhdf5-dev r-base pkg-config libpng12-dev libfreetype6-dev python-sklearn build-essential \
+      libsm6 libxrender1 libfontconfig1 liburi-escape-xs-perl emboss liburi-perl infernal python-pip python-dev python-numpy
 
 ```
 
@@ -26,12 +27,45 @@ sudo chown -R ubuntu:ubuntu /mnt
 
 ### Install SolexaQA
 
+
 ```
 curl -LO http://downloads.sourceforge.net/project/solexaqa/src/SolexaQA%2B%2B_v3.1.4.zip
 unzip SolexaQA%2B%2B_v3.1.4.zip
 cd Linux_x64
 PATH=$PATH:$(pwd)
 ```
+
+### Install Transdecoder
+
+```
+cd
+curl -LO https://github.com/TransDecoder/TransDecoder/archive/2.0.1.tar.gz
+tar -xvzf 2.0.1.tar.gz
+cd TransDecoder-2.0.1; make
+export PATH=$PATH:$HOME/TransDecoder-2.0.1
+```
+
+### Install LAST
+
+```
+cd
+curl -LO http://last.cbrc.jp/last-658.zip
+unzip last-658.zip
+cd last-658
+make
+export PATH=$PATH:$HOME/last-658/src
+```
+
+### Install dammit!
+
+```
+sudo gem install crb-blast
+sudo pip install -U setuptools
+sudo pip install numpy --upgrade
+sudo pip install matplotlib --upgrade
+sudo pip install dammit
+```
+
 
 ### Install Perl Module
 ```
