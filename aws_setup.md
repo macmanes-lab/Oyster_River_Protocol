@@ -178,7 +178,7 @@ cd
 git clone https://github.com/trinityrnaseq/trinityrnaseq.git
 cd trinityrnaseq
 make -j6
-PATH:$PATH:$(pwd)
+PATH=$PATH:$(pwd)
 ```
 
 ### Install bfc
@@ -189,4 +189,11 @@ git clone https://github.com/lh3/bfc.git
 cd bfc
 make
 PATH=$PATH:$(pwd)
+```
+
+### Add all these things to the permanent path
+
+```
+echo PATH=$PATH >> ~/.profile
+source ~/.profile
 ```
