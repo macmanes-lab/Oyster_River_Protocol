@@ -102,7 +102,7 @@ sudo pip install khmer
 ### Install Kallisto
 
 ```
-cd $HOME
+cd
 git clone https://github.com/pachterlab/kallisto.git
 cd kallisto
 mkdir build
@@ -116,7 +116,7 @@ sudo make install
 ### Install Salmon
 
 ```
-cd $HOME
+cd
 curl -LO https://github.com/COMBINE-lab/salmon/archive/v0.5.1.tar.gz
 tar -zxf v0.5.1.tar.gz
 cd salmon-0.5.1/
@@ -125,6 +125,7 @@ cd build
 cmake -DCMAKE_C_COMPILER=$(which gcc-4.9) -DCMAKE_CXX_COMPILER=$(which g++-4.9) ..
 make -j6
 sudo make all install
+export LD_LIBRARY_PATH=/home/ubuntu/salmon-0.5.1/lib
 ```
 
 ### Install Transrate
