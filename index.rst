@@ -84,9 +84,10 @@ Assemble your reads using Trinity. If you have stranded data, make sure to iclud
 
 ::
 
-  Trinity --seqType fq --max_memory 40G --trimmomatic --CPU 30 \
-  --left file_1.cor.fastq --right file_2.cor.fastq --output Rcorr_trinity \
-  --quality_trimming_params "ILLUMINACLIP:/home/ubuntu/trinityrnaseq/trinity-plugins/Trimmomatic/adapters/TruSeq3-PE-2.fa:2:40:15 LEADING:2   TRAILING:2 MINLEN:25"
+  Trinity --seqType fq --max_memory 40G --trimmomatic --CPU 30 --full_cleanup --output Rcorr_trinity \
+  --left file_1.cor.fastq \
+  --right file_2.cor.fastq \
+  --quality_trimming_params "ILLUMINACLIP:/home/ubuntu/trinityrnaseq/trinity-plugins/Trimmomatic/adapters/TruSeq3-PE-2.fa:2:40:15 LEADING:2 TRAILING:2 MINLEN:25"
 
 4. Quality Check
 -----------------------------------
