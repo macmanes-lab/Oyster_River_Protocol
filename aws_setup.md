@@ -191,6 +191,16 @@ make
 PATH=$PATH:$(pwd)
 ```
 
+###Install RCorrector
+
+```
+cd
+git clone https://github.com/mourisl/Rcorrector.git
+cd Rcorrector
+make
+PATH=$PATH:$(pwd)
+```
+
 ### Add all these things to the permanent path
 
 ```
