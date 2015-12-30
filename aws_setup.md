@@ -43,7 +43,8 @@ PATH=$PATH:$(pwd)
 cd
 curl -LO https://github.com/TransDecoder/TransDecoder/archive/2.0.1.tar.gz
 tar -xvzf 2.0.1.tar.gz
-cd TransDecoder-2.0.1; make
+cd TransDecoder-2.0.1
+make -j6
 export PATH=$PATH:$HOME/TransDecoder-2.0.1
 ```
 
