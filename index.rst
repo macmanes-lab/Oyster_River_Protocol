@@ -8,11 +8,14 @@ Oyster River Protocol For Transcriptome Assembly
 Contact Information
 --------------------------------------------------
 
-    - Gitter (preferred) https://gitter.im/macmanes-lab/Oyster_River_Protocol
+    - Gitter (preferred) |ImageLink|_
     - Email (good): Matthew.MacManes@unh.edu
     - Twitter (good):  `@macmanes <http://twitter.com/macmanes>`_
     - Phone (discouraged): 603-862-4052
     - Office (I'm hiding under my desk): 189 Rudman Hall
+
+.. |ImageLink| image:: https://badges.gitter.im/macmanes-lab/Oyster_River_Protocol.svg
+.. _ImageLink: https://gitter.im/macmanes-lab/Oyster_River_Protocol
 
 --------------------------------------------------
  :doc:`aws_setup`
