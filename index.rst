@@ -10,7 +10,7 @@ Contact Information
 
     - Gitter (preferred) https://gitter.im/macmanes-lab/Oyster_River_Protocol
     - Email (good): Matthew.MacManes@unh.edu
-    - Twitter (good): @macmanes
+    - Twitter (good):  `@macmanes <http://twitter.com/macmanes>`_
     - Phone (discouraged): 603-862-4052
     - Office (I'm hiding under my desk): 189 Rudman Hall
 
