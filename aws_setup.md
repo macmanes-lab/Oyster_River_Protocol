@@ -194,7 +194,7 @@ make
 PATH=$PATH:$(pwd)
 ```
 
-###Install RCorrector
+### Install RCorrector
 
 ```
 cd
@@ -208,5 +208,7 @@ PATH=$PATH:$(pwd)
 
 ```
 echo PATH=$PATH >> ~/.profile
+echo export AUGUSTUS_CONFIG_PATH=/home/ubuntu/augustus-3.0.2/config/ >> ~/.profile
+echo export LD_LIBRARY_PATH=/home/ubuntu/salmon-0.5.1/lib >> ~/.profile
 source ~/.profile
 ```
