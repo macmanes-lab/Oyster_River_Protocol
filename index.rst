@@ -14,7 +14,6 @@ Contact Information
     - Phone (discouraged): 603-862-4052
     - Office (I'm hiding under my desk): 189 Rudman Hall
 |
-
 Some method you'd like me to benchmark, file an `issue <https://github.com/macmanes-lab/Oyster_River_Protocol/issues>`_
 
 .. |ImageLink| image:: https://badges.gitter.im/macmanes-lab/Oyster_River_Protocol.svg
