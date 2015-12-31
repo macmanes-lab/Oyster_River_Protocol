@@ -83,7 +83,11 @@ Use bfc if you have *less* than 20 million paired-end reads
   mv bfc.corr.fq.2 bfc.corr.2.fq
 
 
-3. Assemble
+3. Aggressive adapter trimming - gentle quality trimming. 
+-----------------------------------
+One should aggressively hunt down adapter seqeunces and get rid of them. In contrast, gently trim low quality nucleotides. Any more will cause a significant decrease on asembly completeness, as per http://journal.frontiersin.org/article/10.3389/fgene.2014.00013/. I typically do both these steps from within Trinity (using Trimmomatic), but one could do trimming as an independent process if desired. 
+
+4. Assemble
 -----------------------------------
 Assemble your reads using Trinity. If you have stranded data, make sure to iclude the ``--SS_lib_type RF`` tag, assuming that is the right orientation (If you're using the standard TruSeq kit, it probably is). Also, you may need to adjust the ``--CPU`` and ``--max_memory`` settings. Change the name of the input reads to match your read names. 
 
@@ -94,7 +98,7 @@ Assemble your reads using Trinity. If you have stranded data, make sure to iclud
   --right file_2.cor.fastq \
   --quality_trimming_params "ILLUMINACLIP:/home/ubuntu/trinityrnaseq/trinity-plugins/Trimmomatic/adapters/TruSeq3-PE-2.fa:2:40:15 LEADING:2 TRAILING:2 MINLEN:25"
 
-4. Quality Check
+5. Quality Check
 -----------------------------------
 If you have followed the ORP AWS setup protocol, you will have the BUSCO Metazoa and Vertebrata datasets. If you need something else, you can download from here: http://busco.ezlab.org/. You should check your assembly using BUSCO. For most transcriptomes, something like 60-90% complete BUSCOs should be accepted. This might be less (even though your transcriptome is complete) if you are assembling a marine invert or some other 'weird' organism. 
 
@@ -112,7 +116,7 @@ You should evaluate your assembly with Transrate, in addition to BUSCO. A Transr
   --left file_1.cor.fastq \
   --right file_2.cor.fastq
 
-5. Filter
+6. Filter
 -----------------------------------
 
 Filtering is the process through which you aim to maximize the Transrate score, which assays structural integrity, while preserving the BUSCO score, which assays genic completeness. At some level this is a trade off. Some people may require a structually accurate assembly and not care so much abot completeness. Others, dare I say most, are interested in completeness - reconstructing everything possible - and care less about structure. 
@@ -149,7 +153,7 @@ Pull down transcripts whose TPM > 1.
      do grep --no-group-separator --max-count=1 -A1 -w $i Rcorr_trinity.Trinity.fasta >> Rcorr_highexp.trinity.Trinity.fasta; 
   done
 
-6. Annotate  
+7. Annotate  
 -----------------------------------
 I have taken a liking to using dammit! (http://dammit.readthedocs.org/en/latest/). 
 
@@ -160,6 +164,6 @@ I have taken a liking to using dammit! (http://dammit.readthedocs.org/en/latest/
   dammit annotate assembly.fasta --busco-group metazoa --n_threads 36 --database-dir /mnt/dammit/
 
 
-7. Report
+8. Report
 -----------------------------------
 Verify the quality of your assembly using content based metrics. Report Transrate score, BUSCO statistics, number of unique transcripts, etc. Do not report meaningless statistics such as N50
