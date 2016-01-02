@@ -83,7 +83,7 @@ Use bfc if you have *less* than 20 million paired-end reads
   mv bfc.corr.fq.2 bfc.corr.2.fq
 
 
-3. Aggressive adapter trimming - gentle quality trimming. 
+3. Aggressive adapter & gentle quality trimming. 
 -----------------------------------
 One should aggressively hunt down adapter seqeunces and get rid of them. In contrast, gently trim low quality nucleotides. Any more will cause a significant decrease on asembly completeness, as per http://journal.frontiersin.org/article/10.3389/fgene.2014.00013/. I typically do both these steps from within Trinity (using Trimmomatic), but one could do trimming as an independent process if desired. 
 
