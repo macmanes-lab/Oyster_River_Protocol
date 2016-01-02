@@ -2,7 +2,7 @@
 Oyster River Protocol For Transcriptome Assembly
 ==============================================
 
-    The OR Protocol for transcriptome assembly is an actively developed, evidenced based method for optimizing transcriptome assembly. 
+    The OR Protocol for transcriptome assembly is an actively developed, evidenced based method for optimizing transcriptome assembly. The preprint corresponding to this protocol is here: http://biorxiv.org/content/early/2015/12/30/035642
 
 --------------------------------------------------
 Contact Information
@@ -14,7 +14,7 @@ Contact Information
     - Phone (discouraged): 603-862-4052
     - Office (I'm hiding under my desk): 189 Rudman Hall
 
-Some method you'd like me to benchmark, file an `issue <https://github.com/macmanes-lab/Oyster_River_Protocol/issues>`_
+Some method you'd like me to benchmark? File an `issue <https://github.com/macmanes-lab/Oyster_River_Protocol/issues>`_
 
 .. |ImageLink| image:: https://badges.gitter.im/macmanes-lab/Oyster_River_Protocol.svg
 .. _ImageLink: https://gitter.im/macmanes-lab/Oyster_River_Protocol
@@ -72,7 +72,7 @@ Use RCorrector if you have *more* than 20 million paired-end reads
   -1 file_1.fastq \
   -2 file_2.fastq
 
-Use bfc if you have *less* than 20 million paired-end reads. If you are using Illumia fastQ format 1.8 or later, :doc:`read this <bfc_pairing>` before attempting BFC correction
+Use bfc if you have *less* than 20 million paired-end reads. If you are using Illumina fastQ format 1.8 or later, :doc:`read this <bfc_pairing>` before attempting BFC correction
 
 ::
 
