@@ -72,7 +72,7 @@ Use RCorrector if you have *more* than 20 million paired-end reads
   -1 file_1.fastq \
   -2 file_2.fastq
 
-Use bfc if you have *less* than 20 million paired-end reads. **If you are using Illumia fastQ format 1.8 or later, :doc:`read this <bfc_pairing>`_ before attempting BFC correction**
+Use bfc if you have *less* than 20 million paired-end reads. If you are using Illumia fastQ format 1.8 or later, :doc:`read this <bfc_pairing>`_ before attempting BFC correction
 
 ::
 
