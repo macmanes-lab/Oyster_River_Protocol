@@ -131,14 +131,14 @@ Estimate expression with Kallisto
 ::
 
   kallisto index -i kallisto.idx Rcorr_trinity.Trinity.fasta
-  kallisto quant -t 32 -i kallisto.idx -o kallisto_orig -b 100 file_1.cor.fastq file_2.cor.fastq
+  kallisto quant -t 32 -i kallisto.idx -o kallisto_orig file_1.cor.fastq file_2.cor.fastq
   
 Estimate expression with Salmon
 
 ::
 
   ~/salmon-0.5.1/bin/salmon index -t Rcorr_trinity.Trinity.fasta -i salmon.idx --type quasi -k 31
-  ~/salmon-0.5.1/bin/salmon quant -p 32 -i salmon.idx -l MSR -1 file_1.cor.fastq -2 file_2.cor.fastq -o salmon_orig
+  ~/salmon-0.5.1/bin/salmon quant -p 32 -i salmon.idx -l IU -1 file_1.cor.fastq -2 file_2.cor.fastq -o salmon_orig
 
 Pull down transcripts whose TPM > 1. 
 
