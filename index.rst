@@ -104,7 +104,7 @@ If you have followed the ORP AWS setup protocol, you will have the BUSCO Metazoa
 
 ::
 
-  python3 ~/BUSCO_v1.1b1/BUSCO_v1.1b1.py -m Trans --cpu 16 -l ~/BUSCO_v1.1b1/vertebrata \
+  python3 ~/BUSCO_v1.1b1/BUSCO_v1.1b1.py -m trans --cpu 16 -l ~/BUSCO_v1.1b1/vertebrata \
   -o assemb_name -in Rcorr_trinity.Trinity.fasta 
 
 You should evaluate your assembly with Transrate, in addition to BUSCO. A Transrate score > .22 is generally thought to be acceptable, though higher scores are usually achievable. There is a ``good*fasta`` assembly in the output directory which you may want to use as the final assembly, for further filtering [e.g., TPM], or for something else. 
