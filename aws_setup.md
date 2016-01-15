@@ -153,15 +153,6 @@ curl -LO http://busco.ezlab.org/files/metazoa_buscos.tar.gz
 curl -LO http://busco.ezlab.org/files/vertebrata_buscos.tar.gz
 tar -zxf vertebrata_buscos.tar.gz
 tar -zxf metazoa_buscos.tar.gz
-
-
-cd
-curl -LO http://bioinf.uni-greifswald.de/augustus/binaries/old/augustus-3.0.2.tar.gz
-tar -zxf augustus-3.0.2.tar.gz
-cd augustus-3.0.2/
-make
-PATH=$PATH:$(pwd)/bin:$(pwd)/scripts
-export AUGUSTUS_CONFIG_PATH=/home/ubuntu/augustus-3.0.2/config/
 ```
 
 ### Install BLAST
@@ -208,7 +199,6 @@ PATH=$PATH:$(pwd)
 
 ```
 echo PATH=$PATH >> ~/.profile
-echo export AUGUSTUS_CONFIG_PATH=/home/ubuntu/augustus-3.0.2/config/ >> ~/.profile
 echo export LD_LIBRARY_PATH=/home/ubuntu/salmon-0.5.1/lib >> ~/.profile
 source ~/.profile
 ```
