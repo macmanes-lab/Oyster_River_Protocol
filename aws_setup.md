@@ -120,15 +120,15 @@ sudo make install
 
 ```
 cd
-curl -LO https://github.com/COMBINE-lab/salmon/archive/v0.5.1.tar.gz
-tar -zxf v0.5.1.tar.gz
-cd salmon-0.5.1/
+curl -LO https://github.com/COMBINE-lab/salmon/archive/v0.6.0.tar.gz
+tar -zxf v0.6.0.tar.gz && rm v0.6.0.tar.gz
+cd salmon-0.6.0/
 mkdir build
 cd build
-cmake -DCMAKE_C_COMPILER=$(which gcc-4.9) -DCMAKE_CXX_COMPILER=$(which g++-4.9) ..
+cmake ..
 make -j6
 sudo make all install
-export LD_LIBRARY_PATH=/home/ubuntu/salmon-0.5.1/lib
+export LD_LIBRARY_PATH=/home/ubuntu/salmon-0.6.0/lib
 ```
 
 ### Install Transrate
@@ -194,6 +194,41 @@ cd Rcorrector
 make
 PATH=$PATH:$(pwd)
 ```
+
+### Install TransFuse
+
+```
+sudo gem install transfuse
+```
+
+### Install Boost (this takes 15 minutes to install)
+
+```
+cd
+curl -LO http://downloads.sourceforge.net/project/boost/boost/1.61.0/boost_1_61_0.tar.bz2
+tar -jxf boost_1_61_0.tar.bz2
+cd boost_1_61_0/
+./bootstrap.sh --prefix=/home/ubuntu/boost/
+./b2 install
+```
+
+### Install BinPacker
+```
+cd
+git clone https://github.com/macmanes-lab/BinPacker.git
+cd BinPacker
+
+#### Change install.sh (this will not be necessary if following instructions on AWS)
+#### change line to ./configure --with-boost=/home/ubuntu/boost/
+#### save file
+
+sh install.sh
+```
+
+
+
+
+
 
 ### Add all these things to the permanent path
 
