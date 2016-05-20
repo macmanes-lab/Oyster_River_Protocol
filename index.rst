@@ -87,6 +87,12 @@ Use bfc if you have *less* than 20 million paired-end reads. If you are using Il
 -----------------------------------
 One should aggressively hunt down adapter seqeunces and get rid of them. In contrast, gently trim low quality nucleotides. Any more will cause a significant decrease on asembly completeness, as per http://journal.frontiersin.org/article/10.3389/fgene.2014.00013/. I typically do both these steps from within Trinity (using Trimmomatic), but one could do trimming as an independent process if desired. 
 
+::
+
+  skewer -l 25 -m pe -o skewer.20M.rcorr --mean-quality 2 --end-quality 2 -t 30 \
+  -x /share/trinityrnaseq/trinity-plugins/Trimmomatic/adapters/TruSeq2-PE.fa \
+  file_1.cor.fastq file_2.cor.fastq
+
 4. Assemble
 -----------------------------------
 Assemble your reads using Trinity and BinPacker. If you have stranded data, make sure to iclude the ``--SS_lib_type RF`` tag, assuming that is the right orientation (If you're using the standard TruSeq kit, it probably is). Also, you may need to adjust the ``--CPU`` and ``--max_memory`` settings. Change the name of the input reads to match your read names. 
@@ -94,8 +100,8 @@ Assemble your reads using Trinity and BinPacker. If you have stranded data, make
 ::
 
   Trinity --seqType fq --max_memory 40G --trimmomatic --CPU 30 --output Rcorr_trinity \
-  --left file_1.cor.fastq \
-  --right file_2.cor.fastq \
+  --left skewer.20M.rcorr/.cor.fastq \
+  --right skewer.20M.rcorr/file_2.cor.fastq \
   --quality_trimming_params "ILLUMINACLIP:/home/ubuntu/trinityrnaseq/trinity-plugins/Trimmomatic/adapters/TruSeq3-PE-2.fa:2:40:15 LEADING:2 TRAILING:2 MINLEN:25"
 
 ::
