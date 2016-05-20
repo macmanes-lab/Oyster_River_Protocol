@@ -89,8 +89,8 @@ One should aggressively hunt down adapter seqeunces and get rid of them. In cont
 
 ::
 
-  skewer -l 25 -m pe -o skewer.20M.rcorr --mean-quality 2 --end-quality 2 -t 30 \
-  -x /share/trinityrnaseq/trinity-plugins/Trimmomatic/adapters/TruSeq2-PE.fa \
+  skewer -l 25 -m pe -o skewer --mean-quality 2 --end-quality 2 -t 30 \
+  -x /home/ubuntu/skewer/TruSeq3-PE.fa \
   file_1.cor.fastq file_2.cor.fastq
 
 4. Assemble
@@ -100,15 +100,15 @@ Assemble your reads using Trinity and BinPacker. If you have stranded data, make
 ::
 
   Trinity --seqType fq --max_memory 40G --trimmomatic --CPU 30 --output Rcorr_trinity \
-  --left skewer.20M.rcorr/.cor.fastq \
-  --right skewer.20M.rcorr/file_2.cor.fastq \
+  --left skewer-trimmed-pair1.fastq \
+  --right skewer-trimmed-pair2.fastq \
   --quality_trimming_params "ILLUMINACLIP:/home/ubuntu/trinityrnaseq/trinity-plugins/Trimmomatic/adapters/TruSeq3-PE-2.fa:2:40:15 LEADING:2 TRAILING:2 MINLEN:25"
 
 ::
 
   BinPacker -d -q -s fq -p pair -m RF -k 25 -g 200 -o Rcorr_binpacker \
-  -l Rcorr_trinity/file_1.cor.fastq.P.qtrim \
-  -r Rcorr_trinity/file_2.cor.fastq.P.qtrim
+  -l skewer-trimmed-pair1.fastq \
+  -r skewer-trimmed-pair2.fastq
 
 
 5. TransFuse Merge Assemblies
@@ -118,8 +118,8 @@ Each Assembler will reconstruct a slightly different set of _true_ transcript. T
 ::
 
   transfuse -t 40 -i 0.98 -o transfuse \
-  -l file_1.cor.fastq \
-  -r file_1.cor.fastq \
+  -l skewer-trimmed-pair1.fastq \
+  -r skewer-trimmed-pair2.fastq \
   -a Rcorr_binpacker/BinPacker.fa,Rcorr_trinity/Trinity.fasta
 
 
@@ -138,8 +138,8 @@ You should evaluate your assembly with Transrate, in addition to BUSCO. A Transr
 
   transrate -o assemb_name -t 16 \
   -a Rcorr_trinity.Trinity.fasta \
-  --left file_1.cor.fastq \
-  --right file_2.cor.fastq
+  --left skewer-trimmed-pair1.fastq \
+  --right skewer-trimmed-pair2.fastq
 
 7. Filter
 -----------------------------------
@@ -156,14 +156,14 @@ Estimate expression with Kallisto
 ::
 
   kallisto index -i kallisto.idx Rcorr_trinity.Trinity.fasta
-  kallisto quant -t 32 -i kallisto.idx -o kallisto_orig file_1.cor.fastq file_2.cor.fastq
+  kallisto quant -t 32 -i kallisto.idx -o kallisto_orig skewer-trimmed-pair1.fastq skewer-trimmed-pair2.fastq
   
 Estimate expression with Salmon
 
 ::
 
   ~/salmon-0.5.1/bin/salmon index -t Rcorr_trinity.Trinity.fasta -i salmon.idx --type quasi -k 31
-  ~/salmon-0.5.1/bin/salmon quant -p 32 -i salmon.idx -l IU -1 file_1.cor.fastq -2 file_2.cor.fastq -o salmon_orig
+  ~/salmon-0.5.1/bin/salmon quant -p 32 -i salmon.idx -l IU -1 skewer-trimmed-pair1.fastq skewer-trimmed-pair2.fastq -o salmon_orig
 
 Pull down transcripts whose TPM > 1. 
 
