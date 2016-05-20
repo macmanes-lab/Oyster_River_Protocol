@@ -89,16 +89,35 @@ One should aggressively hunt down adapter seqeunces and get rid of them. In cont
 
 4. Assemble
 -----------------------------------
-Assemble your reads using Trinity. If you have stranded data, make sure to iclude the ``--SS_lib_type RF`` tag, assuming that is the right orientation (If you're using the standard TruSeq kit, it probably is). Also, you may need to adjust the ``--CPU`` and ``--max_memory`` settings. Change the name of the input reads to match your read names. 
+Assemble your reads using Trinity and BinPacker. If you have stranded data, make sure to iclude the ``--SS_lib_type RF`` tag, assuming that is the right orientation (If you're using the standard TruSeq kit, it probably is). Also, you may need to adjust the ``--CPU`` and ``--max_memory`` settings. Change the name of the input reads to match your read names. 
 
 ::
 
-  Trinity --seqType fq --max_memory 40G --trimmomatic --CPU 30 --full_cleanup --output Rcorr_trinity \
+  Trinity --seqType fq --max_memory 40G --trimmomatic --CPU 30 --output Rcorr_trinity \
   --left file_1.cor.fastq \
   --right file_2.cor.fastq \
   --quality_trimming_params "ILLUMINACLIP:/home/ubuntu/trinityrnaseq/trinity-plugins/Trimmomatic/adapters/TruSeq3-PE-2.fa:2:40:15 LEADING:2 TRAILING:2 MINLEN:25"
 
-5. Quality Check
+::
+
+  BinPacker -d -q -s fq -p pair -m RF -k 25 -g 200 -o Rcorr_binpacker \
+  -l Rcorr_trinity/file_1.cor.fastq.P.qtrim \
+  -r Rcorr_trinity/file_2.cor.fastq.P.qtrim
+
+
+5. TransFuse Merge Assemblies
+----------------------------------
+Each Assembler will reconstruct a slightly different set of _true_ transcript. TransFuse will take them both and merge them together
+
+::
+
+  transfuse -t 40 -i 0.98 -o transfuse \
+  -l file_1.cor.fastq \
+  -r file_1.cor.fastq \
+  -a Rcorr_binpacker/BinPacker.fa,Rcorr_trinity/Trinity.fasta
+
+
+6. Quality Check
 -----------------------------------
 If you have followed the ORP AWS setup protocol, you will have the BUSCO Metazoa and Vertebrata datasets. If you need something else, you can download from here: http://busco.ezlab.org/. You should check your assembly using BUSCO. For most transcriptomes, something like 60-90% complete BUSCOs should be accepted. This might be less (even though your transcriptome is complete) if you are assembling a marine invert or some other 'weird' organism. 
 
@@ -116,7 +135,7 @@ You should evaluate your assembly with Transrate, in addition to BUSCO. A Transr
   --left file_1.cor.fastq \
   --right file_2.cor.fastq
 
-6. Filter
+7. Filter
 -----------------------------------
 
 Filtering is the process through which you aim to maximize the Transrate score, which assays structural integrity, while preserving the BUSCO score, which assays genic completeness. At some level this is a trade off. Some people may require a structually accurate assembly and not care so much abot completeness. Others, dare I say most, are interested in completeness - reconstructing everything possible - and care less about structure. 
@@ -149,11 +168,9 @@ Pull down transcripts whose TPM > 1.
   cat kallist salist | sort -u > uniq_list
   sed -i ':begin;N;/[ACTGNn-]\n[ACTGNn-]/s/\n//;tbegin;P;D' Rcorr_trinity.Trinity.fasta
 
-  for i in $(cat uniq_list); 
-     do grep --no-group-separator --max-count=1 -A1 -w $i Rcorr_trinity.Trinity.fasta >> Rcorr_highexp.trinity.Trinity.fasta; 
-  done
+  python filter.py Rcorr_trinity.Trinity.fasta uniq.list > Highexp.fasta
 
-7. Annotate  
+8. Annotate  
 -----------------------------------
 I have taken a liking to using dammit! (http://dammit.readthedocs.org/en/latest/). 
 
@@ -164,6 +181,6 @@ I have taken a liking to using dammit! (http://dammit.readthedocs.org/en/latest/
   dammit annotate assembly.fasta --busco-group metazoa --n_threads 36 --database-dir /mnt/dammit/ --full
 
 
-8. Report
+9. Report
 -----------------------------------
 Verify the quality of your assembly using content based metrics. Report Transrate score, BUSCO statistics, number of unique transcripts, etc. Do not report meaningless statistics such as N50
