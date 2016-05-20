@@ -11,7 +11,7 @@ These instructions work with a standard Ubuntu 14.04 machine available on AWS. S
 ```
 sudo apt-get update && sudo apt-get -y upgrade
 
-sudo apt-get -y install cmake sparsehash valgrind libboost-atomic1.55-dev libibnetdisc-dev ruby-full gsl-bin \
+sudo apt-get -y install cmake sparsehash valgrind libboost-atomic1.55-dev libibnetdisc-dev gsl-bin \
       libgsl0-dev libgsl0ldbl libboost1.55-all-dev libboost1.55-dbg subversion tmux git curl bowtie \
       libncurses5-dev samtools gcc make g++ python-dev unzip dh-autoreconf default-jre python-pip zlib1g-dev \
       hmmer libhdf5-dev r-base pkg-config libpng12-dev libfreetype6-dev python-sklearn build-essential \
@@ -27,8 +27,15 @@ sudo mount /dev/xvdf /mnt
 sudo chown -R ubuntu:ubuntu /mnt
 ```
 
-### Install SolexaQA
+### Install Ruby 2.x
 
+```
+wget https://keybase.io/mpapis/key.asc
+gpg --import key.asc
+\curl -sSL https://get.rvm.io | bash -s stable --ruby
+```
+
+### Install SolexaQA
 
 ```
 curl -LO http://downloads.sourceforge.net/project/solexaqa/src/SolexaQA%2B%2B_v3.1.4.zip
@@ -198,19 +205,9 @@ PATH=$PATH:$(pwd)
 ### Install TransFuse
 
 ```
-sudo gem install transfuse
+gem install transfuse
 ```
 
-### Install Boost (this takes 15 minutes to install)
-
-```
-cd
-curl -LO http://downloads.sourceforge.net/project/boost/boost/1.61.0/boost_1_61_0.tar.bz2
-tar -jxf boost_1_61_0.tar.bz2
-cd boost_1_61_0/
-./bootstrap.sh --prefix=/home/ubuntu/boost/
-./b2 install
-```
 
 ### Install BinPacker
 ```
@@ -234,6 +231,6 @@ sh install.sh
 
 ```
 echo PATH=$PATH >> ~/.profile
-echo export LD_LIBRARY_PATH=/home/ubuntu/salmon-0.5.1/lib >> ~/.profile
+echo export LD_LIBRARY_PATH=/home/ubuntu/salmon-0.6.0/lib >> ~/.profile
 source ~/.profile
 ```
