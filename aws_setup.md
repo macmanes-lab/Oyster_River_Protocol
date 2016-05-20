@@ -29,6 +29,7 @@ sudo chown -R ubuntu:ubuntu /mnt
 
 ### Install Adapter seqs and a few utility scripts
 
+```
 cd && mkdir share && cd share
 curl -LO https://raw.githubusercontent.com/macmanes-lab/general/master/filter.py
 curl -LO https://s3.amazonaws.com/gen711/TruSeq3-PE.fa
