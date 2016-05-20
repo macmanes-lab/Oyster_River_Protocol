@@ -63,6 +63,18 @@ make -j6
 export PATH=$PATH:$HOME/TransDecoder-2.0.1
 ```
 
+### Install Vsearch
+
+```
+cd
+git clone https://github.com/torognes/vsearch.git
+cd vsearch
+sh autogen.sh
+./configure
+make -j4
+PATH=$PATH:$(pwd)/bin
+```
+
 ### Install LAST
 
 ```
