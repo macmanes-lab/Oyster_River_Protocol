@@ -66,6 +66,17 @@ make
 export PATH=$PATH:$HOME/last-658/src
 ```
 
+### Install Skewer
+
+```
+cd $HOME
+git clone https://github.com/relipmoc/skewer.git
+cd skewer
+make
+PATH=$PATH:$(pwd)
+curl -LO https://s3.amazonaws.com/gen711/TruSeq3-PE.fa
+```
+
 ### Install dammit!
 
 ```
