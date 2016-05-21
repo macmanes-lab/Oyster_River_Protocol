@@ -170,11 +170,10 @@ Pull down transcripts whose TPM > 1.
 ::
 
   awk '1>$5{next}1' kallisto_orig/abundance.tsv | awk '{print $1}' > kallist
-  awk '1>$3{next}1' salmon_orig/quant.sf | sed  '1,10d' | awk '{print $1}' > salist
+  awk '1>$4{next}1' salmon_orig/quant.sf | sed  '1,10d' | awk '{print $1}' > salist
   cat kallist salist | sort -u > uniq_list
-  sed -i ':begin;N;/[ACTGNn-]\n[ACTGNn-]/s/\n//;tbegin;P;D' Rcorr_trinity.Trinity.fasta
 
-  python filter.py Rcorr_trinity.Trinity.fasta uniq.list > Highexp.fasta
+  python filter.py Rcorr_trinity.Trinity.fasta uniq_list > Highexp.fasta
 
 8. Annotate  
 -----------------------------------
