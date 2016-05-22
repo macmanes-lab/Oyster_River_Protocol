@@ -15,7 +15,7 @@ sudo apt-get -y install cmake sparsehash valgrind libboost-atomic1.55-dev libibn
       libgsl0-dev libgsl0ldbl libboost1.55-all-dev libboost1.55-dbg subversion tmux git curl \
       libncurses5-dev samtools gcc make g++ python-dev unzip dh-autoreconf default-jre python-pip zlib1g-dev \
       hmmer libhdf5-dev r-base pkg-config libpng12-dev libfreetype6-dev python-sklearn build-essential \
-      libsm6 libxrender1 libfontconfig1 liburi-escape-xs-perl biopython liburi-perl infernal python-numpy
+      libsm6 libxrender1 libfontconfig1 liburi-escape-xs-perl emboss python-biopython liburi-perl infernal python-numpy
 
 ```
 
@@ -40,6 +40,7 @@ PATH=$PATH:$(pwd)
 ### Install Ruby 2.x
 
 ```
+cd
 wget https://keybase.io/mpapis/key.asc
 gpg --import key.asc
 \curl -sSL https://get.rvm.io | bash -s stable --ruby
