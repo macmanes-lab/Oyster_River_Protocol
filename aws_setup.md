@@ -266,5 +266,6 @@ sh install.sh
 ```
 echo PATH=$PATH >> ~/.profile
 echo export LD_LIBRARY_PATH=/home/ubuntu/salmon-0.6.0/lib >> ~/.profile
+echo source /home/ubuntu/.rvm/scripts/rvm >> ~/.profile
 source ~/.profile
 ```
