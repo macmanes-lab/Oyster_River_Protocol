@@ -12,7 +12,7 @@ These instructions work with a standard Ubuntu 14.04 machine available on AWS. S
 sudo apt-get update && sudo apt-get -y upgrade
 
 sudo apt-get -y install cmake sparsehash valgrind libboost-atomic1.55-dev libibnetdisc-dev gsl-bin \
-      libgsl0-dev libgsl0ldbl libboost1.55-all-dev libboost1.55-dbg subversion tmux git curl \
+      libgsl0-dev libgsl0ldbl libboost1.55-all-dev libboost1.55-dbg subversion tmux git curl parallel \
       libncurses5-dev samtools gcc make g++ python-dev unzip dh-autoreconf default-jre python-pip zlib1g-dev \
       hmmer libhdf5-dev r-base pkg-config libpng12-dev libfreetype6-dev python-sklearn build-essential \
       libsm6 libxrender1 libfontconfig1 liburi-escape-xs-perl emboss python-biopython liburi-perl infernal python-numpy
