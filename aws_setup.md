@@ -103,7 +103,7 @@ curl -LO https://s3.amazonaws.com/gen711/TruSeq3-PE.fa
 ### Install dammit!
 
 ```
-sudo gem install crb-blast
+gem install crb-blast
 sudo pip install -U setuptools
 sudo pip install numpy --upgrade
 sudo pip install matplotlib --upgrade
