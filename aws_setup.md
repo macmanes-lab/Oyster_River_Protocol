@@ -176,9 +176,9 @@ export LD_LIBRARY_PATH=/home/ubuntu/salmon-0.6.0/lib
 
 ```
 cd
-curl -LO https://bintray.com/artifact/download/blahah/generic/transrate-1.0.1-linux-x86_64.tar.gz
-tar -zxf transrate-1.0.1-linux-x86_64.tar.gz
-PATH=$PATH:/home/ubuntu/transrate-1.0.1-linux-x86_64:/home/ubuntu/transrate-1.0.1-linux-x86_64/bin
+curl -LO https://bintray.com/artifact/download/blahah/generic/transrate-1.0.3-linux-x86_64.tar.gz
+tar -zxf transrate-1.0.3-linux-x86_64.tar.gz
+PATH=$PATH:/home/ubuntu/transrate-1.0.3-linux-x86_64:/home/ubuntu/transrate-1.0.3-linux-x86_64/bin
 ```
 
 ### Install BUSCO
