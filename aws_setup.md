@@ -1,7 +1,7 @@
 # How to set up AWS machine for assembly
 ---
 
-If you are hoping to attempt a Trinity assembly, requirements for RAM = .5 * X million read pairs. For instance, to assemble 40 million paired-end reads using Trinity, you'll need a minimum of 20Gb of RAM.
+If you are hoping to attempt a Trinity assembly, requirements for RAM = .5 * X million read pairs. For instance, to assemble 40 million paired-end reads using Trinity, you'll need a minimum of 20Gb of RAM. For BinPacker, you'll need substantially more, maybe as much as 2 * X million read pairs. 
 
 These instructions work with a standard Ubuntu 14.04 machine available on AWS. Similar instructions should work for people on their own workstations, especially if you have `sudo` privileges. 
 
