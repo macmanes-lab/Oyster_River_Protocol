@@ -37,6 +37,11 @@ curl -LO https://s3.amazonaws.com/gen711/TruSeq3-PE.fa
 PATH=$PATH:$(pwd)
 ```
 
+### Install Perl Module
+```
+sudo cpan URI::Escape
+```
+
 ### Install Ruby 2.x
 
 ```
@@ -67,18 +72,29 @@ PATH=$PATH:$(pwd)
 curl -LO https://s3.amazonaws.com/gen711/TruSeq3-PE.fa
 ```
 
+### Install bfc
+You don't need this is you're using Rcorrector
 
-
-### Install Perl Module
 ```
-sudo cpan URI::Escape
+cd $HOME
+git clone https://github.com/lh3/bfc.git
+cd bfc
+make
+PATH=$PATH:$(pwd)
 ```
 
+### Install RCorrector
+You don't need this is you're using bfc
 
+```
+cd
+git clone https://github.com/mourisl/Rcorrector.git
+cd Rcorrector
+make
+PATH=$PATH:$(pwd)
+```
 
 ### Install BLAST
-
-
 ```
 cd
 curl -LO ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.3.0+-x64-linux.tar.gz
@@ -96,33 +112,6 @@ make -j6
 PATH=$PATH:$(pwd)
 ```
 
-### Install bfc
-
-```
-cd $HOME
-git clone https://github.com/lh3/bfc.git
-cd bfc
-make
-PATH=$PATH:$(pwd)
-```
-
-### Install RCorrector
-
-```
-cd
-git clone https://github.com/mourisl/Rcorrector.git
-cd Rcorrector
-make
-PATH=$PATH:$(pwd)
-```
-
-### Install TransFuse
-
-```
-gem install transfuse
-```
-
-
 ### Install BinPacker
 ```
 cd
@@ -134,6 +123,26 @@ cd BinPacker
 #### save file
 
 sh install.sh
+```
+
+
+### Install Vsearch
+
+```
+cd
+git clone https://github.com/torognes/vsearch.git
+cd vsearch
+sh autogen.sh
+./configure
+make -j4
+PATH=$PATH:$(pwd)/bin
+```
+
+
+### Install TransFuse
+
+```
+gem install transfuse
 ```
 
 ### Install Kallisto
@@ -148,7 +157,6 @@ cmake ..
 make
 sudo make install
 ```
-
 
 ### Install Salmon
 
@@ -201,17 +209,6 @@ make -j6
 export PATH=$PATH:$HOME/TransDecoder-2.0.1
 ```
 
-### Install Vsearch
-
-```
-cd
-git clone https://github.com/torognes/vsearch.git
-cd vsearch
-sh autogen.sh
-./configure
-make -j4
-PATH=$PATH:$(pwd)/bin
-```
 
 ### Install LAST
 
