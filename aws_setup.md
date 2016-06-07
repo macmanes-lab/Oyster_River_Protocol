@@ -11,7 +11,7 @@ These instructions work with a standard Ubuntu 14.04 machine available on AWS. S
 ```
 sudo apt-get update && sudo apt-get -y upgrade
 
-sudo apt-get -y install cmake sparsehash valgrind libboost-atomic1.55-dev libibnetdisc-dev gsl-bin \
+sudo apt-get -y install cmake sparsehash valgrind libboost-atomic1.55-dev libibnetdisc-dev gsl-bin bowtie \
       libgsl0-dev libgsl0ldbl libboost1.55-all-dev libboost1.55-dbg subversion tmux git curl parallel \
       libncurses5-dev samtools gcc make g++ python-dev unzip dh-autoreconf default-jre python-pip zlib1g-dev \
       hmmer libhdf5-dev r-base pkg-config libpng12-dev libfreetype6-dev python-sklearn build-essential \
@@ -55,39 +55,6 @@ cd Linux_x64
 PATH=$PATH:$(pwd)
 ```
 
-### Install Transdecoder
-
-```
-cd
-curl -LO https://github.com/TransDecoder/TransDecoder/archive/2.0.1.tar.gz
-tar -xvzf 2.0.1.tar.gz
-cd TransDecoder-2.0.1
-make -j6
-export PATH=$PATH:$HOME/TransDecoder-2.0.1
-```
-
-### Install Vsearch
-
-```
-cd
-git clone https://github.com/torognes/vsearch.git
-cd vsearch
-sh autogen.sh
-./configure
-make -j4
-PATH=$PATH:$(pwd)/bin
-```
-
-### Install LAST
-
-```
-cd
-curl -LO http://last.cbrc.jp/last-658.zip
-unzip last-658.zip
-cd last-658
-make
-export PATH=$PATH:$HOME/last-658/src
-```
 
 ### Install Skewer
 
@@ -100,15 +67,6 @@ PATH=$PATH:$(pwd)
 curl -LO https://s3.amazonaws.com/gen711/TruSeq3-PE.fa
 ```
 
-### Install dammit!
-
-```
-gem install crb-blast
-sudo pip install -U setuptools
-sudo pip install numpy --upgrade
-sudo pip install matplotlib --upgrade
-sudo pip install dammit
-```
 
 
 ### Install Perl Module
@@ -116,85 +74,7 @@ sudo pip install dammit
 sudo cpan URI::Escape
 ```
 
-### Install seqtk
 
-```
-cd $HOME
-git clone https://github.com/lh3/seqtk.git
-cd seqtk
-make -j4
-PATH=$PATH:$(pwd)
-```
-
-### Install bwa
-
-```
-cd $HOME
-git clone https://github.com/lh3/bwa.git
-cd bwa
-make -j4
-PATH=$PATH:$(pwd)
-```
-
-### Install khmer
-
-```
-sudo easy_install -U setuptools
-sudo pip install khmer
-```
-
-### Install Kallisto
-
-```
-cd
-git clone https://github.com/pachterlab/kallisto.git
-cd kallisto
-mkdir build
-cd build
-cmake ..
-make
-sudo make install
-```
-
-
-### Install Salmon
-
-```
-cd
-curl -LO https://github.com/COMBINE-lab/salmon/archive/v0.6.0.tar.gz
-tar -zxf v0.6.0.tar.gz && rm v0.6.0.tar.gz
-cd salmon-0.6.0/
-mkdir build
-cd build
-cmake ..
-make -j6
-sudo make all install
-export LD_LIBRARY_PATH=/home/ubuntu/salmon-0.6.0/lib
-```
-
-### Install Transrate
-
-```
-cd
-curl -LO https://bintray.com/artifact/download/blahah/generic/transrate-1.0.3-linux-x86_64.tar.gz
-tar -zxf transrate-1.0.3-linux-x86_64.tar.gz
-PATH=$PATH:/home/ubuntu/transrate-1.0.3-linux-x86_64:/home/ubuntu/transrate-1.0.3-linux-x86_64/bin
-```
-
-### Install BUSCO
-
-```
-cd
-curl -LO http://busco.ezlab.org/files/BUSCO_v1.1b1.tar.gz
-tar -zxf BUSCO_v1.1b1.tar.gz
-cd BUSCO_v1.1b1
-chmod +x BUSCO_v1.1b1.py
-PATH=$PATH:$(pwd)
-curl -LO http://busco.ezlab.org/files/metazoa_buscos.tar.gz
-curl -LO http://busco.ezlab.org/files/vertebrata_buscos.tar.gz
-tar -zxf vertebrata_buscos.tar.gz
-tar -zxf metazoa_buscos.tar.gz
-```
 
 ### Install BLAST
 
@@ -256,7 +136,103 @@ cd BinPacker
 sh install.sh
 ```
 
+### Install Kallisto
 
+```
+cd
+git clone https://github.com/pachterlab/kallisto.git
+cd kallisto
+mkdir build
+cd build
+cmake ..
+make
+sudo make install
+```
+
+
+### Install Salmon
+
+```
+cd
+curl -LO https://github.com/COMBINE-lab/salmon/archive/v0.6.0.tar.gz
+tar -zxf v0.6.0.tar.gz && rm v0.6.0.tar.gz
+cd salmon-0.6.0/
+mkdir build
+cd build
+cmake ..
+make -j6
+sudo make all install
+export LD_LIBRARY_PATH=/home/ubuntu/salmon-0.6.0/lib
+```
+
+### Install Transrate
+
+```
+cd
+curl -LO https://bintray.com/artifact/download/blahah/generic/transrate-1.0.3-linux-x86_64.tar.gz
+tar -zxf transrate-1.0.3-linux-x86_64.tar.gz
+PATH=$PATH:/home/ubuntu/transrate-1.0.3-linux-x86_64:/home/ubuntu/transrate-1.0.3-linux-x86_64/bin
+```
+
+### Install BUSCO
+
+```
+cd
+curl -LO http://busco.ezlab.org/files/BUSCO_v1.1b1.tar.gz
+tar -zxf BUSCO_v1.1b1.tar.gz
+cd BUSCO_v1.1b1
+chmod +x BUSCO_v1.1b1.py
+PATH=$PATH:$(pwd)
+curl -LO http://busco.ezlab.org/files/metazoa_buscos.tar.gz
+curl -LO http://busco.ezlab.org/files/vertebrata_buscos.tar.gz
+tar -zxf vertebrata_buscos.tar.gz
+tar -zxf metazoa_buscos.tar.gz
+```
+
+
+### Install Transdecoder
+
+```
+cd
+curl -LO https://github.com/TransDecoder/TransDecoder/archive/2.0.1.tar.gz
+tar -xvzf 2.0.1.tar.gz
+cd TransDecoder-2.0.1
+make -j6
+export PATH=$PATH:$HOME/TransDecoder-2.0.1
+```
+
+### Install Vsearch
+
+```
+cd
+git clone https://github.com/torognes/vsearch.git
+cd vsearch
+sh autogen.sh
+./configure
+make -j4
+PATH=$PATH:$(pwd)/bin
+```
+
+### Install LAST
+
+```
+cd
+curl -LO http://last.cbrc.jp/last-658.zip
+unzip last-658.zip
+cd last-658
+make
+export PATH=$PATH:$HOME/last-658/src
+```
+
+### Install dammit!
+
+```
+gem install crb-blast
+sudo pip install -U setuptools
+sudo pip install numpy --upgrade
+sudo pip install matplotlib --upgrade
+sudo pip install dammit
+```
 
 
 
