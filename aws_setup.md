@@ -186,10 +186,10 @@ PATH=$PATH:/home/ubuntu/transrate-1.0.3-linux-x86_64:/home/ubuntu/transrate-1.0.
 
 ```
 cd
-curl -LO http://busco.ezlab.org/files/BUSCO_v1.1b1.tar.gz
-tar -zxf BUSCO_v1.1b1.tar.gz
-cd BUSCO_v1.1b1
-chmod +x BUSCO_v1.1b1.py
+curl -LO http://busco.ezlab.org/files/BUSCO_v1.2.tar.gz
+tar -zxf BUSCO_v1.2.tar.gz
+cd BUSCO_v1.2
+chmod +x BUSCO_v1.2.py
 PATH=$PATH:$(pwd)
 curl -LO http://busco.ezlab.org/files/metazoa_buscos.tar.gz
 curl -LO http://busco.ezlab.org/files/vertebrata_buscos.tar.gz
