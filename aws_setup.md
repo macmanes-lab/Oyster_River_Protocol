@@ -97,9 +97,9 @@ PATH=$PATH:$(pwd)
 ### Install BLAST
 ```
 cd
-curl -LO ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.3.0+-x64-linux.tar.gz
-tar -zxf ncbi-blast-2.3.0+-x64-linux.tar.gz
-PATH=$PATH:/home/ubuntu/ncbi-blast-2.3.0+/bin
+curl -LO ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.4.0+-x64-linux.tar.gz
+tar -zxf ncbi-blast-2.4.0+-x64-linux.tar.gz
+PATH=$PATH:/home/ubuntu/ncbi-blast-2.4.0+/bin
 ```
 
 ### Install Trinity
