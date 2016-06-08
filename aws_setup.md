@@ -202,11 +202,11 @@ tar -zxf metazoa_buscos.tar.gz
 
 ```
 cd
-curl -LO https://github.com/TransDecoder/TransDecoder/archive/2.0.1.tar.gz
-tar -xvzf 2.0.1.tar.gz
-cd TransDecoder-2.0.1
+curl -LO https://github.com/TransDecoder/TransDecoder/archive/v3.0.0.tar.gz
+tar -xvzf v3.0.0.tar.gz
+cd TransDecoder-3.0.0
 make -j6
-export PATH=$PATH:$HOME/TransDecoder-2.0.1
+export PATH=$PATH:$HOME/TransDecoder-3.0.0
 ```
 
 
