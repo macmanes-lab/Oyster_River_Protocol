@@ -16,19 +16,30 @@ READ1=
 READ2=
 L = $(basename ${READ1} .fastq)
 R = $(basename ${READ2} .fastq)
+BUSCO ?= ${shell which BUSCO_v1.22.py}
+BUSCODIR := $(dir $(firstword $(BUSCO)))
+ASSEMBLY=
+LINEAGE=
+BUSCOUT := BUSCO_$(basename ${ASSEMBLY} .fasta)
+
 
 
 all: prep main
 prep: setup run_scripts
 main: run_rcorrector run_skewer rcorr_trinity rcorr_binpacker transfuse
+report:busco.done transrate.done report
+busco:busco.done
+transrate:transrate.done
 
 .DELETE_ON_ERROR:
+.PHONY:report
 
 setup:
 	mkdir -p ${DIR}/scripts
 	mkdir -p ${DIR}/reads
 	mkdir -p ${DIR}/assemblies
 	mkdir -p ${DIR}/rcorr
+	mkdir -p ${DIR}/reports
 
 run_scripts:
 	@echo Downloading Scripts
@@ -54,4 +65,24 @@ rcorr_binpacker:
 
 transfuse:
 	cd ${DIR}/assemblies && \
-	transfuse -t $(CPU) -i 0.98 -o transfuse -l ${DIR}/rcorr/skewer-trimmed-pair1.fastq -r ${DIR}/rcorr/skewer-trimmed-pair2.fastq -a Rcorr_binpacker/BinPacker.fa,trinity_rcorr31/Trinity.fasta
+	transfuse -t $(CPU) -i 0.98 -o transfuse -l ${DIR}/rcorr/skewer-trimmed-pair1.fastq -r ${DIR}/rcorr/skewer-trimmed-pair2.fastq -a Rcorr_binpacker/BinPacker.fa,trinity_rcorr31.Trinity.fasta
+
+busco.done:
+    cd ${DIR}/reports && \
+    python3 ${BUSCODIR}BUSCO_v1.22.py -in ${DIR}/assemblies/${ASSEMBLY} -m trans --cpu $(CPU) -l ${BUSCODIR}${LINEAGE} -o ${BUSCOUT} && \
+    touch busco.done
+
+transrate.done:
+    cd ${DIR}/reports && \
+    transrate -o transrate_${basename ${ASSEMBLY} .fasta}  -a ${DIR}/assemblies/${ASSEMBLY} --left ${DIR}/rcorr/skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/skewer-trimmed-pair2.fastq -t $(CPU) && \
+    touch transrate.done
+
+report:
+    printf "\n\n*****  QUALITY REPORT FOR: ${ASSEMBLY} **** \n\n"
+    printf "*****  BUSCO SCORE ~~~~~>           " | tee qualreport.${basename ${ASSEMBLY} .fasta}
+    cat $$(find run_${BUSCOUT} -name short*) | sed -n 5p  | tee -a qualreport.${basename ${ASSEMBLY} .fasta}
+    printf "*****  TRANSRATE SCORE ~~~~~>           " | tee -a qualreport.${basename ${ASSEMBLY} .fasta}
+    cat $$(find transrate_${basename ${ASSEMBLY} .fasta} -name assemblies.csv) | awk -F , '{print $$41}' | sed -n 2p | tee -a qualreport.${basename ${ASSEMBLY} .fasta}
+    printf "*****  TRANSRATE OPTIMAL SCORE ~~~~~>   " | tee -a qualreport.${basename ${ASSEMBLY} .fasta}
+    cat $$(find transrate_${basename ${ASSEMBLY} .fasta} -name assemblies.csv) | awk -F , '{print $$42}' | sed -n 2p | tee -a qualreport.${basename ${ASSEMBLY} .fasta}
+    printf " \n\n"
