@@ -35,11 +35,11 @@ run_scripts:
 
 run_rcorrector:
 	cd ${DIR}/rcorr && \
-	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 55 -1 ${READ1} -2 ${READ2}
+	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 55 -1 ${DIR}/reads/${READ1} -2 ${DIR}/reads/${READ2}
 
 run_skewer:
-	L=$$(basename SRR2141210_1.fastq .fastq)
-	R=$$(basename SRR2141210_2.fastq .fastq)
+	L=$$(basename ${READ1} .fastq)
+	R=$$(basename ${READ2} .fastq)
 	cd ${DIR}/rcorr && \
 	skewer -l 25 -m pe -o skewer --mean-quality 2 --end-quality 2 -t $(CPU) -x ${DIR}/scripts/barcodes.fa ${DIR}/rcorr/$$L.cor.fq ${DIR}/rcorr/$$R.cor.fq
 
