@@ -46,11 +46,11 @@ run_skewer:
 
 rcorr_trinity:
 	cd ${DIR}/assemblies && \
-	Trinity --seqType fq --output ${SAMP}M.trinity_rcorr55 --max_memory 50G --left ${DIR}/rcorr/skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/skewer-trimmed-pair2.fastq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup --quality_trimming_params
+	Trinity --seqType fq --output ${SAMP}M.trinity_rcorr55 --max_memory 50G --left ${DIR}/rcorr/skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/skewer-trimmed-pair2.fastq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup
 
 rcorr_binpacker:
 	cd ${DIR}/assemblies && \
-	BinPacker -d -q -s fq -p pair -m RF -k 25 -g 200 -o Rcorr_binpacker -l ${DIR}/rcorr/skewer-trimmed-pair1.fastq -r ${DIR}/rcorr/skewer-trimmed-pair2.fastq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup --quality_trimming_params
+	BinPacker -d -q -s fq -p pair -m RF -k 25 -g 200 -o Rcorr_binpacker -l ${DIR}/rcorr/skewer-trimmed-pair1.fastq -r ${DIR}/rcorr/skewer-trimmed-pair2.fastq
 
 transfuse:
 	cd ${DIR}/assemblies && \
