@@ -61,7 +61,7 @@ rcorr_trinity:
 
 rcorr_binpacker:
 	cd ${DIR}/assemblies && \
-	BinPacker -d -q -s fq -p pair -m RF -k 25 -g 200 -o Rcorr_binpacker -l ${DIR}/rcorr/skewer-trimmed-pair1.fastq -r ${DIR}/rcorr/skewer-trimmed-pair2.fastq
+	BinPacker -d -q -s fq -p pair -m RF -k 25 -g 200 -l ${DIR}/rcorr/skewer-trimmed-pair1.fastq -r ${DIR}/rcorr/skewer-trimmed-pair2.fastq
 
 transfuse:
 	cd ${DIR}/assemblies && \
