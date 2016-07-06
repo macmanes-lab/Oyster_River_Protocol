@@ -33,19 +33,19 @@ scripts:
 	curl -LO https://raw.githubusercontent.com/macmanes-lab/general/master/filter.py && \
 	wget https://raw.githubusercontent.com/macmanes/read_error_corr/master/barcodes.fa
 
-run_rcorrector:
+run_rcorrector:${READ1} ${READ2}
 	cd ${DIR}/rcorr && \
 	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 55 -1 ${READ1} -2 ${READ2}
 
-run_skewer:
+run_skewer:${READ1}.cor.fastq ${READ2}.cor.fastq
 	cd ${DIR}/rcorr && \
 	skewer -l 25 -m pe -o skewer --mean-quality 2 --end-quality 2 -t $(CPU) -x ${DIR}/scripts/barcodes.fa ${READ1}.cor.fastq ${READ2}.cor.fastq
 
-rcorr_trinity:
+rcorr_trinity:${DIR}/rcorr/skewer-trimmed-pair1.fastq ${DIR}/rcorr/skewer-trimmed-pair2.fastq
 	cd ${DIR}/assemblies && \
 	Trinity --seqType fq --output ${SAMP}M.trinity_rcorr55 --max_memory 50G --left ${DIR}/rcorr/skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/skewer-trimmed-pair2.fastq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup --quality_trimming_params
 
-rcorr_binpacker:
+rcorr_binpacker:${DIR}/rcorr/skewer-trimmed-pair1.fastq ${DIR}/rcorr/skewer-trimmed-pair2.fastq
 	cd ${DIR}/assemblies && \
 	BinPacker -d -q -s fq -p pair -m RF -k 25 -g 200 -o Rcorr_binpacker -l ${DIR}/rcorr/skewer-trimmed-pair1.fastq -r ${DIR}/rcorr/skewer-trimmed-pair2.fastq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup --quality_trimming_params
 
