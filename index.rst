@@ -99,10 +99,9 @@ Assemble your reads using Trinity and BinPacker. If you have stranded data, make
 
 ::
 
-  Trinity --seqType fq --max_memory 40G --trimmomatic --CPU 30 --output Rcorr_trinity \
+  Trinity --seqType fq --max_memory 40G --CPU 30 --output Rcorr_trinity \
   --left skewer-trimmed-pair1.fastq \
-  --right skewer-trimmed-pair2.fastq \
-  --quality_trimming_params "ILLUMINACLIP:/home/ubuntu/trinityrnaseq/trinity-plugins/Trimmomatic/adapters/TruSeq3-PE-2.fa:2:40:15 LEADING:2 TRAILING:2 MINLEN:25"
+  --right skewer-trimmed-pair2.fastq
 
 ::
 
