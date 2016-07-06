@@ -35,7 +35,7 @@ run_scripts:
 
 run_rcorrector:
 	cd ${DIR}/rcorr && \
-	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 55 -1 ${DIR}/reads/${READ1} -2 ${DIR}/reads/${READ2}
+	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 31 -1 ${DIR}/reads/${READ1} -2 ${DIR}/reads/${READ2}
 
 run_skewer:
 	L=$$(basename ${READ1} .fastq)
