@@ -14,6 +14,9 @@ RCORR ?= ${shell which rcorrector}
 RCORRDIR := $(dir $(firstword $(RCORR)))
 READ1=
 READ2=
+L = $(basename ${READ1} .fastq)
+R = $(basename ${READ2} .fastq)
+
 
 all: prep main
 prep: setup run_scripts
@@ -38,10 +41,8 @@ run_rcorrector:
 	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 31 -1 ${DIR}/reads/${READ1} -2 ${DIR}/reads/${READ2}
 
 run_skewer:
-	L=$$(basename ${READ1} .fastq)
-	R=$$(basename ${READ2} .fastq)
 	cd ${DIR}/rcorr && \
-	skewer -l 25 -m pe -o skewer --mean-quality 2 --end-quality 2 -t $(CPU) -x ${DIR}/scripts/barcodes.fa ${DIR}/rcorr/$$L.cor.fq ${DIR}/rcorr/$$R.cor.fq
+	skewer -l 25 -m pe -o skewer --mean-quality 2 --end-quality 2 -t $(CPU) -x ${DIR}/scripts/barcodes.fa ${DIR}/rcorr/$(join ${L},.cor.fq) ${DIR}/rcorr/$(join ${R},.cor.fq)
 
 rcorr_trinity:
 	cd ${DIR}/assemblies && \
