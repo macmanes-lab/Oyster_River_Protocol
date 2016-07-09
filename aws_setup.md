@@ -32,7 +32,7 @@ sudo chown -R ubuntu:ubuntu /mnt
 ```
 cd && mkdir share && cd share
 curl -LO https://raw.githubusercontent.com/macmanes-lab/general/master/filter.py
-chmox +x filter.py
+chmod +x filter.py
 curl -LO https://s3.amazonaws.com/gen711/TruSeq3-PE.fa
 PATH=$PATH:$(pwd)
 ```
