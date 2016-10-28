@@ -3,7 +3,7 @@
 
 If you are hoping to attempt a Trinity assembly, requirements for RAM = .5 * X million read pairs. For instance, to assemble 40 million paired-end reads using Trinity, you'll need a minimum of 20Gb of RAM. For BinPacker, you'll need substantially more, maybe as much as 2 * X million read pairs. 
 
-These instructions work with a standard Ubuntu 14.04 machine available on AWS. Similar instructions should work for people on their own workstations, especially if you have `sudo` privileges. 
+These instructions work with a standard Ubuntu 16.04 (for instance, ami-2ef48339) machine available on AWS. Similar instructions should work for people on their own workstations, especially if you have `sudo` privileges. 
 
 
 ### Update Software and install things from apt-get
@@ -138,6 +138,8 @@ gem install crb-blast
 pip install -U setuptools
 pip install pandas
 pip install dammit
+sed -i 's/BUSCO_v1.1b1/BUSCO/' /home/linuxbrew/.linuxbrew/lib/python2.7/site-packages/dammit/dependencies.py
+sed -i 's/BUSCO_v1.1b1/BUSCO/' /home/linuxbrew/.linuxbrew/lib/python2.7/site-packages/dammit/tasks.py
 ```
 
 
