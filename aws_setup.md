@@ -11,11 +11,7 @@ These instructions work with a standard Ubuntu 14.04 machine available on AWS. S
 ```
 sudo apt-get update && sudo apt-get -y upgrade
 
-sudo apt-get -y install cmake sparsehash valgrind libboost-atomic1.55-dev libibnetdisc-dev gsl-bin bowtie \
-      libgsl0-dev libgsl0ldbl libboost1.55-all-dev libboost1.55-dbg subversion tmux git curl parallel \
-      libncurses5-dev samtools gcc make g++ python-dev unzip dh-autoreconf default-jre python-pip zlib1g-dev \
-      hmmer libhdf5-dev r-base pkg-config libpng12-dev libfreetype6-dev python-sklearn build-essential \
-      libsm6 libxrender1 libfontconfig1 liburi-escape-xs-perl emboss python-biopython liburi-perl infernal python-numpy
+sudo apt-get -y install build-essential git python-pip python-numpy python-matplotlib
 
 ```
 
@@ -42,13 +38,26 @@ PATH=$PATH:$(pwd)
 sudo cpan URI::Escape
 ```
 
-### Install Ruby 2.x
+### Install Ruby and LinuxBrew
 
 ```
 cd
 wget https://keybase.io/mpapis/key.asc
 gpg --import key.asc
 \curl -sSL https://get.rvm.io | bash -s stable --ruby
+source /home/ubuntu/.rvm/scripts/rvm
+
+
+sudo mkdir /home/linuxbrew
+sudo chown $USER:$USER /home/linuxbrew
+git clone https://github.com/Linuxbrew/brew.git /home/linuxbrew/.linuxbrew
+echo 'export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"' >> ~/.profile
+echo 'export MANPATH="/home/linuxbrew/.linuxbrew/share/man:$MANPATH"' >> ~/.profile
+echo 'export INFOPATH="/home/linuxbrew/.linuxbrew/share/info:$INFOPATH"' >> ~/.profile
+source ~/.profile
+brew tap homebrew/science
+brew update
+brew doctor
 ```
 
 ### Install SolexaQA
@@ -61,55 +70,21 @@ PATH=$PATH:$(pwd)
 ```
 
 
-### Install Skewer
+### Install Software (gcc skewer seqtk python jellyfish bfc rcorrector trinity BLAST)
 
 ```
-cd $HOME
-git clone https://github.com/relipmoc/skewer.git
-cd skewer
-make
-PATH=$PATH:$(pwd)
-curl -LO https://s3.amazonaws.com/gen711/TruSeq3-PE.fa
+brew install gcc skewer seqtk python jellyfish bfc rcorrector \
+trinity --without-express vsearch salmon kallisto transdecoder last
 ```
 
-### Install bfc
-You don't need this is you're using Rcorrector
 
-```
-cd $HOME
-git clone https://github.com/lh3/bfc.git
-cd bfc
-make
-PATH=$PATH:$(pwd)
-```
-
-### Install RCorrector
-You don't need this is you're using bfc
-
-```
-cd
-git clone https://github.com/mourisl/Rcorrector.git
-cd Rcorrector
-make
-PATH=$PATH:$(pwd)
-```
 
 ### Install BLAST
 ```
 cd
-curl -LO ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.4.0+-x64-linux.tar.gz
-tar -zxf ncbi-blast-2.4.0+-x64-linux.tar.gz
-PATH=$PATH:/home/ubuntu/ncbi-blast-2.4.0+/bin
-```
-
-### Install Trinity
-
-```
-cd
-git clone https://github.com/trinityrnaseq/trinityrnaseq.git
-cd trinityrnaseq
-make -j6
-PATH=$PATH:$(pwd)
+curl -LO ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.5.0+-x64-linux.tar.gz
+tar -zxf ncbi-blast-2.5.0+-x64-linux.tar.gz
+PATH=$PATH:/home/ubuntu/ncbi-blast-2.5.0+/bin
 ```
 
 ### Install BinPacker
@@ -125,53 +100,12 @@ cd BinPacker
 sh install.sh
 ```
 
-
-### Install Vsearch
-
-```
-cd
-git clone https://github.com/torognes/vsearch.git
-cd vsearch
-sh autogen.sh
-./configure
-make -j4
-PATH=$PATH:$(pwd)/bin
-```
-
-
 ### Install TransFuse
 
 ```
 gem install transfuse
 ```
 
-### Install Kallisto
-
-```
-cd
-git clone https://github.com/pachterlab/kallisto.git
-cd kallisto
-mkdir build
-cd build
-cmake ..
-make
-sudo make install
-```
-
-### Install Salmon
-
-```
-cd
-curl -LO https://github.com/COMBINE-lab/salmon/archive/v0.6.0.tar.gz
-tar -zxf v0.6.0.tar.gz && rm v0.6.0.tar.gz
-cd salmon-0.6.0/
-mkdir build
-cd build
-cmake ..
-make -j6
-sudo make all install
-export LD_LIBRARY_PATH=/home/ubuntu/salmon-0.6.0/lib
-```
 
 ### Install Transrate
 
@@ -186,44 +120,21 @@ PATH=$PATH:/home/ubuntu/transrate-1.0.3-linux-x86_64:/home/ubuntu/transrate-1.0.
 
 ```
 cd
-curl -LO http://busco.ezlab.org/files/BUSCO_v1.22.tar.gz
-tar -zxf BUSCO_v1.22.tar.gz
-cd BUSCO_v1.2
-chmod +x BUSCO_v1.22.py
+git clone https://gitlab.com/ezlab/busco.git
+cd busco
 PATH=$PATH:$(pwd)
-curl -LO http://busco.ezlab.org/files/metazoa_buscos.tar.gz
-curl -LO http://busco.ezlab.org/files/vertebrata_buscos.tar.gz
-tar -zxf vertebrata_buscos.tar.gz
-tar -zxf metazoa_buscos.tar.gz
+wget http://cegg.unige.ch/pub/BUSCO2/mammalia_odb9.tar.gz && tar -zxf mammalia_odb9.tar.gz
+wget http://cegg.unige.ch/pub/BUSCO2/eukaryota_odb9.tar.gz && eukaryota_odb9.tar.gz
+wget http://cegg.unige.ch/pub/BUSCO2/metazoa_odb9.tar.gz && metazoa_odb9.tar.gz
 ```
 
 
-### Install Transdecoder
 
-```
-cd
-curl -LO https://github.com/TransDecoder/TransDecoder/archive/v3.0.0.tar.gz
-tar -xvzf v3.0.0.tar.gz
-cd TransDecoder-3.0.0
-make -j6
-export PATH=$PATH:$HOME/TransDecoder-3.0.0
-```
-
-
-### Install LAST
-
-```
-cd
-curl -LO http://last.cbrc.jp/last-658.zip
-unzip last-658.zip
-cd last-658
-make
-export PATH=$PATH:$HOME/last-658/src
-```
 
 ### Install dammit!
 
 ```
+sudo apt-get install python-pip
 gem install crb-blast
 sudo pip install -U setuptools
 sudo pip install numpy --upgrade
