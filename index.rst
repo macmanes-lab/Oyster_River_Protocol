@@ -68,7 +68,7 @@ Use RCorrector if you have *more* than 20 million paired-end reads
 
 ::
 
-  perl run_rcorrector.pl -k 31 -t 30 \
+  run_rcorrector.pl -k 31 -t 30 \
   -1 file_1.fastq \
   -2 file_2.fastq
 
