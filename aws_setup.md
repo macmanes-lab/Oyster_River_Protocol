@@ -9,7 +9,7 @@ These instructions work with a standard Ubuntu 14.04 machine available on AWS. S
 ### Update Software and install things from apt-get
 
 ```
-sudo apt-get update && sudo apt-get -y upgrade
+sudo apt-get update && sudo apt-get -y upgrade && sudo apt-get -y dist-upgrade
 
 sudo apt-get -y install build-essential git python-pip python-numpy python-matplotlib
 
@@ -73,7 +73,7 @@ PATH=$PATH:$(pwd)
 ### Install Software (gcc skewer seqtk python jellyfish bfc rcorrector trinity BLAST)
 
 ```
-brew install gcc skewer seqtk python jellyfish bfc rcorrector \
+brew install skewer seqtk python jellyfish bfc rcorrector hmmer infernal \
 trinity --without-express vsearch salmon kallisto transdecoder last
 ```
 
@@ -134,12 +134,10 @@ wget http://cegg.unige.ch/pub/BUSCO2/metazoa_odb9.tar.gz && metazoa_odb9.tar.gz
 ### Install dammit!
 
 ```
-sudo apt-get install python-pip
 gem install crb-blast
-sudo pip install -U setuptools
-sudo pip install numpy --upgrade
-sudo pip install matplotlib --upgrade
-sudo pip install dammit
+pip install -U setuptools
+pip install pandas
+pip install dammit
 ```
 
 
