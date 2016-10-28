@@ -90,7 +90,7 @@ One should aggressively hunt down adapter seqeunces and get rid of them. In cont
 ::
 
   skewer -l 25 -m pe -o skewer --mean-quality 2 --end-quality 2 -t 30 \
-  -x /home/ubuntu/skewer/TruSeq3-PE.fa \
+  -x /home/ubuntu/share/TruSeq3-PE.fa \
   file_1.cor.fastq file_2.cor.fastq
 
 4. Assemble
