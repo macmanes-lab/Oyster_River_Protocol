@@ -99,7 +99,7 @@ Assemble your reads using Trinity and BinPacker. If you have stranded data, make
 
 ::
 
-  Trinity --seqType fq --max_memory 40G --CPU 30 --output Rcorr_trinity \
+  Trinity --seqType fq --max_memory 10G --CPU 16 --output Rcorr_trinity --full_cleanup \
   --left skewer-trimmed-pair1.fastq \
   --right skewer-trimmed-pair2.fastq
 
