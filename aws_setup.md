@@ -125,8 +125,8 @@ git clone https://gitlab.com/ezlab/busco.git
 cd busco
 PATH=$PATH:$(pwd)
 wget http://cegg.unige.ch/pub/BUSCO2/mammalia_odb9.tar.gz && tar -zxf mammalia_odb9.tar.gz
-wget http://cegg.unige.ch/pub/BUSCO2/eukaryota_odb9.tar.gz && eukaryota_odb9.tar.gz
-wget http://cegg.unige.ch/pub/BUSCO2/metazoa_odb9.tar.gz && metazoa_odb9.tar.gz
+wget http://cegg.unige.ch/pub/BUSCO2/eukaryota_odb9.tar.gz && tar -zxf eukaryota_odb9.tar.gz
+wget http://cegg.unige.ch/pub/BUSCO2/metazoa_odb9.tar.gz && tar -zxf metazoa_odb9.tar.gz
 ```
 
 
