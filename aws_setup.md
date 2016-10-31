@@ -70,10 +70,10 @@ PATH=$PATH:$(pwd)
 ```
 
 
-### Install Software (gcc skewer seqtk python jellyfish bfc rcorrector trinity BLAST)
+### Install Software (gcc skewer seqtk python jellyfish bfc rcorrector trinity LAST TransDecoder vsearch salmon kallisto)
 
 ```
-brew install skewer seqtk python jellyfish bfc rcorrector hmmer infernal \
+brew install gcc skewer seqtk python jellyfish bfc rcorrector hmmer infernal \
 trinity --without-express vsearch salmon kallisto transdecoder last
 ```
 
@@ -98,6 +98,7 @@ cd BinPacker
 #### save file
 
 sh install.sh
+PATH=$PATH:$(pwd)
 ```
 
 ### Install TransFuse
