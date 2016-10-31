@@ -74,7 +74,7 @@ PATH=$PATH:$(pwd)
 
 ```
 brew install gcc skewer seqtk python jellyfish bfc rcorrector hmmer infernal \
-trinity --without-express vsearch salmon kallisto transdecoder last
+trinity --without-express vsearch salmon kallisto transdecoder last parallel
 ```
 
 
@@ -141,6 +141,7 @@ pip install pandas
 pip install dammit
 sed -i 's/BUSCO_v1.1b1/BUSCO/' /home/linuxbrew/.linuxbrew/lib/python2.7/site-packages/dammit/dependencies.py
 sed -i 's/BUSCO_v1.1b1/BUSCO/' /home/linuxbrew/.linuxbrew/lib/python2.7/site-packages/dammit/tasks.py
+sed -i 's_-in_--in_' /home/linuxbrew/.linuxbrew/lib/python2.7/site-packages/dammit/tasks.py
 ```
 
 
