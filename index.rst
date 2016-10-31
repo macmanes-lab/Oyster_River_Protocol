@@ -180,9 +180,9 @@ I have taken a liking to using dammit! (http://dammit.readthedocs.org/en/latest/
 
 ::
 
-  mkdir /mnt/dammit/ && cd /mnt/dammit
-  dammit databases --install --database-dir /mnt/dammit --full --busco-group metazoa
-  dammit annotate assembly.fasta --busco-group metazoa --n_threads 36 --database-dir /mnt/dammit/ --full
+  mkdir ~/dammit/ && cd ~/dammit
+  dammit databases --install --database-dir ~/dammit --full --busco-group metazoa
+  dammit annotate assembly.fasta --busco-group metazoa --n_threads 36 --database-dir ~/dammit/ --full
 
 
 9. Report
