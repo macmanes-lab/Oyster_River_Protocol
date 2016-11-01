@@ -91,6 +91,12 @@ PATH=$PATH:/home/ubuntu/ncbi-blast-2.5.0+/bin
 
 ```
 gem install transfuse
+
+#or
+
+curl -LO https://github.com/cboursnell/transfuse/releases/download/v0.5.0/transfuse-0.5.0-linux-x86_64.tar.gz
+tar -zxf transfuse-0.5.0-linux-x86_64.tar.gz
+PATH=$PATH:/home/ubuntu/transfuse-0.5.0-linux-x86_64/
 ```
 
 
