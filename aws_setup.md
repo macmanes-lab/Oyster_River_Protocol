@@ -70,11 +70,11 @@ PATH=$PATH:$(pwd)
 ```
 
 
-### Install Software (gcc skewer seqtk python jellyfish bfc rcorrector trinity LAST TransDecoder vsearch salmon kallisto)
+### Install Software (gcc skewer seqtk python jellyfish bfc rcorrector trinity LAST TransDecoder vsearch salmon kallisto, etc..)
 
 ```
 brew install gcc skewer seqtk python jellyfish bfc rcorrector hmmer infernal \
-trinity --without-express vsearch salmon kallisto transdecoder last parallel
+trinity --without-express vsearch salmon kallisto transdecoder last parallel spades
 ```
 
 
@@ -87,7 +87,7 @@ tar -zxf ncbi-blast-2.5.0+-x64-linux.tar.gz
 PATH=$PATH:/home/ubuntu/ncbi-blast-2.5.0+/bin
 ```
 
-### Install BinPacker
+### Install BinPacker - Caution - BinPacker seems to be broken (1Nov16)
 ```
 cd
 git clone https://github.com/macmanes-lab/BinPacker.git
