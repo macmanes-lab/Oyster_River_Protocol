@@ -105,9 +105,11 @@ Assemble your reads using Trinity and BinPacker. If you have stranded data, make
 
 ::
 
-  BinPacker -d -q -s fq -p pair -m RF -k 25 -g 200 -o Rcorr_binpacker \
-  -l skewer-trimmed-pair1.fastq \
-  -r skewer-trimmed-pair2.fastq
+  /share/SPAdes-3.9.0/bin/rnaspades.py -o Rcorr_spades \
+  --only-assembler --threads 16 --memory 20 \
+  -1 skewer-trimmed-pair1.fastq \
+  -2 skewer-trimmed-pair2.fastq
+
 
 
 5. TransFuse Merge Assemblies
