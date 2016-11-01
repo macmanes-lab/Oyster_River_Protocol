@@ -11,7 +11,7 @@ These instructions work with a standard Ubuntu 16.04 (for instance, ami-2ef48339
 ```
 sudo apt-get update && sudo apt-get -y upgrade && sudo apt-get -y dist-upgrade
 
-sudo apt-get -y install build-essential git python-pip python-numpy python-matplotlib
+sudo apt-get -y install build-essential git python-pip python-numpy python-matplotlib  
 
 ```
 
@@ -73,7 +73,7 @@ PATH=$PATH:$(pwd)
 ### Install Software (gcc skewer seqtk python jellyfish bfc rcorrector trinity LAST TransDecoder vsearch salmon kallisto, etc..)
 
 ```
-brew install gcc skewer seqtk python jellyfish bfc rcorrector hmmer infernal \
+brew install gcc skewer seqtk python jellyfish bfc rcorrector hmmer infernal quorum \
 trinity --without-express vsearch salmon kallisto transdecoder last parallel spades
 ```
 
@@ -87,18 +87,12 @@ tar -zxf ncbi-blast-2.5.0+-x64-linux.tar.gz
 PATH=$PATH:/home/ubuntu/ncbi-blast-2.5.0+/bin
 ```
 
-### Install BinPacker - Caution - BinPacker seems to be broken (1Nov16)
+### Install Shannon
 ```
 cd
-git clone https://github.com/macmanes-lab/BinPacker.git
-cd BinPacker
-
-#### Change install.sh (this will not be necessary if following instructions on AWS)
-#### change line to ./configure --with-boost=/home/ubuntu/boost/
-#### save file
-
-sh install.sh
-PATH=$PATH:$(pwd)
+git clone https://github.com/sreeramkannan/Shannon.git
+cd Shannon
+make
 ```
 
 ### Install TransFuse
