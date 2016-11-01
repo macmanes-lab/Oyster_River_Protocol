@@ -87,14 +87,6 @@ tar -zxf ncbi-blast-2.5.0+-x64-linux.tar.gz
 PATH=$PATH:/home/ubuntu/ncbi-blast-2.5.0+/bin
 ```
 
-### Install Shannon
-```
-cd
-git clone https://github.com/sreeramkannan/Shannon.git
-cd Shannon
-make
-```
-
 ### Install TransFuse
 
 ```
