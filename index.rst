@@ -105,7 +105,7 @@ Assemble your reads using Trinity and BinPacker. If you have stranded data, make
 
 ::
 
-  /share/SPAdes-3.9.0/bin/rnaspades.py -o Rcorr_spades \
+  spades.py -o Rcorr_spades --rna \
   --only-assembler --threads 16 --memory 20 \
   -1 skewer-trimmed-pair1.fastq \
   -2 skewer-trimmed-pair2.fastq
