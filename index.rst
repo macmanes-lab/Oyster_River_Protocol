@@ -174,7 +174,7 @@ Pull down transcripts whose TPM > 1.
   awk '1>$4{next}1' salmon_orig/quant.sf | sed  '1,10d' | awk '{print $1}' > salist
   cat kallist salist | sort -u > uniq_list
 
-  python filter.py transfuse.fasta uniq_list > Highexp.fasta
+  python ~/share/filter.py transfuse.fasta uniq_list > Highexp.fasta
 
 8. Annotate  
 -----------------------------------
