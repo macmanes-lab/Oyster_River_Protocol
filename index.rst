@@ -164,7 +164,7 @@ Estimate expression with Salmon
 ::
 
   salmon index -t transfuse.fasta -i salmon.idx --type quasi -k 31
-  salmon quant -p 32 -i salmon.idx -l IU -1 skewer-trimmed-pair1.fastq skewer-trimmed-pair2.fastq -o salmon_orig
+  salmon quant -p 32 -i salmon.idx --seqBias --gcBias -l a -1 skewer-trimmed-pair1.fastq -2 skewer-trimmed-pair2.fastq -o salmon_orig
 
 Pull down transcripts whose TPM > 1. 
 
