@@ -74,10 +74,17 @@ PATH=$PATH:$(pwd)
 
 ```
 brew install gcc skewer seqtk python jellyfish bfc rcorrector hmmer infernal quorum \
-trinity --without-express vsearch salmon kallisto transdecoder last parallel spades
+trinity --without-express vsearch salmon transdecoder last parallel spades
 ```
 
+### Install Kallisto
 
+```
+cd
+curl -LO https://github.com/pachterlab/kallisto/releases/download/v0.43.0/kallisto_linux-v0.43.0.tar.gz
+tar -zxf kallisto_linux-v0.43.0.tar.gz
+PATH=$PATH:/home/ubuntu/kallisto_linux-v0.43.0/
+```
 
 ### Install BLAST
 ```
