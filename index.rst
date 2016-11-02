@@ -131,7 +131,7 @@ If you have followed the ORP AWS setup protocol, you will have the BUSCO Metazoa
 ::
 
   BUSCO.py -m tran --cpu 16 -l ~/busco/eukaryota_odb9 \
-  -o assemb_name -in transfuse.fasta 
+  -o assemb_name -i transfuse.fasta 
 
 You should evaluate your assembly with Transrate, in addition to BUSCO. A Transrate score > .22 is generally thought to be acceptable, though higher scores are usually achievable. There is a ``good*fasta`` assembly in the output directory which you may want to use as the final assembly, for further filtering [e.g., TPM], or for something else. 
 
