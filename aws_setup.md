@@ -143,7 +143,7 @@ sed -i 's_-in_--in_' /home/linuxbrew/.linuxbrew/lib/python2.7/site-packages/damm
 
 ```
 echo PATH=$PATH >> ~/.profile
-echo export LD_LIBRARY_PATH=/home/ubuntu/salmon-0.6.0/lib >> ~/.profile
+echo export LD_LIBRARY_PATH=/home/linuxbrew/.linuxbrew/Cellar/salmon/0.7.2/lib >> ~/.profile
 echo source /home/ubuntu/.rvm/scripts/rvm >> ~/.profile
 source ~/.profile
 ```
