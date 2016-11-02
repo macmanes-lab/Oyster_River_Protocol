@@ -38,6 +38,12 @@ PATH=$PATH:$(pwd)
 sudo cpan URI::Escape
 ```
 
+### Install BioPython
+
+```
+pip install biopython
+```
+
 ### Install Ruby and LinuxBrew
 
 ```
