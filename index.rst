@@ -118,7 +118,7 @@ Each Assembler will reconstruct a slightly different set of _true_ transcript. T
 
 ::
 
-  transfuse -t 16 -i 0.98 -o transfuse \
+  transfuse -t 16 -i 0.98 -o transfuse.fasta \
   -l skewer-trimmed-pair1.fastq \
   -r skewer-trimmed-pair2.fastq \
   -a /home/ubuntu/Rcorr_spades/transcripts.fasta,Rcorr_trinity.Trinity.fasta
@@ -130,15 +130,15 @@ If you have followed the ORP AWS setup protocol, you will have the BUSCO Metazoa
 
 ::
 
-  BUSCO.py -m trans --cpu 16 -l ~/busco/vertebrata_odb9 \
-  -o assemb_name -in Rcorr_trinity.Trinity.fasta 
+  BUSCO.py -m tran --cpu 16 -l ~/busco/eukaryota_odb9 \
+  -o assemb_name -in transfuse.fasta 
 
 You should evaluate your assembly with Transrate, in addition to BUSCO. A Transrate score > .22 is generally thought to be acceptable, though higher scores are usually achievable. There is a ``good*fasta`` assembly in the output directory which you may want to use as the final assembly, for further filtering [e.g., TPM], or for something else. 
 
 ::
 
   transrate -o assemb_name -t 16 \
-  -a Rcorr_trinity.Trinity.fasta \
+  -a transfuse.fasta \
   --left skewer-trimmed-pair1.fastq \
   --right skewer-trimmed-pair2.fastq
 
@@ -156,14 +156,14 @@ Estimate expression with Kallisto
 
 ::
 
-  kallisto index -i kallisto.idx Rcorr_trinity.Trinity.fasta
+  kallisto index -i kallisto.idx transfuse.fasta
   kallisto quant -t 32 -i kallisto.idx -o kallisto_orig skewer-trimmed-pair1.fastq skewer-trimmed-pair2.fastq
   
 Estimate expression with Salmon
 
 ::
 
-  salmon index -t Rcorr_trinity.Trinity.fasta -i salmon.idx --type quasi -k 31
+  salmon index -t transfuse.fasta -i salmon.idx --type quasi -k 31
   salmon quant -p 32 -i salmon.idx -l IU -1 skewer-trimmed-pair1.fastq skewer-trimmed-pair2.fastq -o salmon_orig
 
 Pull down transcripts whose TPM > 1. 
@@ -174,7 +174,7 @@ Pull down transcripts whose TPM > 1.
   awk '1>$4{next}1' salmon_orig/quant.sf | sed  '1,10d' | awk '{print $1}' > salist
   cat kallist salist | sort -u > uniq_list
 
-  python filter.py Rcorr_trinity.Trinity.fasta uniq_list > Highexp.fasta
+  python filter.py transfuse.fasta uniq_list > Highexp.fasta
 
 8. Annotate  
 -----------------------------------
@@ -184,7 +184,7 @@ I have taken a liking to using dammit! (http://dammit.readthedocs.org/en/latest/
 
   mkdir ~/dammit/ && cd ~/dammit
   dammit databases --install --database-dir ~/dammit --full --busco-group metazoa
-  dammit annotate assembly.fasta --busco-group metazoa --n_threads 36 --database-dir ~/dammit/ --full
+  dammit annotate Highexp.fasta --busco-group metazoa --n_threads 36 --database-dir ~/dammit/ --full
 
 
 9. Report
