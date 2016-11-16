@@ -121,7 +121,7 @@ Each Assembler will reconstruct a slightly different set of _true_ transcript. T
   transfuse -t 16 -i 0.98 -o transfuse.fasta \
   -l skewer-trimmed-pair1.fastq \
   -r skewer-trimmed-pair2.fastq \
-  -a /home/ubuntu/Rcorr_spades/transcripts.fasta,Rcorr_trinity.Trinity.fasta
+  -a Rcorr_spades/transcripts.fasta,Rcorr_trinity.Trinity.fasta
 
 
 6. Quality Check
