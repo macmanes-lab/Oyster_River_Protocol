@@ -23,8 +23,8 @@ LINEAGE=
 BUSCOUT := BUSCO_$(basename ${ASSEMBLY} .fasta)
 
 
-
-all: prep main
+subsamp_reads:${SAMP}.subsamp_1.fastq ${SAMP}.subsamp_2.fastq
+all: subsamp_reads main
 prep: setup run_scripts
 main: run_rcorrector run_skewer rcorr_trinity rcorr_spades rcorr_shannon transfuse
 report:busco.done transrate.done report
@@ -47,13 +47,18 @@ run_scripts:
 	curl -LO https://raw.githubusercontent.com/macmanes-lab/general/master/filter.py && \
 	wget https://raw.githubusercontent.com/macmanes/read_error_corr/master/barcodes.fa
 
+${SAMP}.subsamp_1.fastq ${SAMP}.subsamp_2.fastq:
+	cd ${DIR}/reads && \
+	seqtk sample -s102340 ${READ1} ${SAMP}000000 | sed 's_ H_-H_g' > ${SAMP}.subsamp_1.fastq && \
+	seqtk sample -s102340 ${READ2} ${SAMP}000000 | sed 's_ H_-H_g' > ${SAMP}.subsamp_2.fastq
+
 run_rcorrector:
 	cd ${DIR}/rcorr && \
-	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 31 -1 ${DIR}/reads/${READ1} -2 ${DIR}/reads/${READ2}
+	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 31 -1 ${DIR}/reads/${SAMP}.subsamp_1.fastq -2 ${DIR}/reads/${SAMP}.subsamp_2.fastq
 
 run_skewer:
 	cd ${DIR}/rcorr && \
-	skewer -l 25 -m pe -o skewer --mean-quality 2 --end-quality 2 -t $(CPU) -x ${DIR}/scripts/barcodes.fa ${DIR}/rcorr/$(join ${L},.cor.fq) ${DIR}/rcorr/$(join ${R},.cor.fq)
+	skewer -l 25 -m pe -o skewer --mean-quality 2 --end-quality 2 -t $(CPU) -x ${DIR}/scripts/barcodes.fa ${DIR}/rcorr/$(join ${L},.cor.fq.gz) ${DIR}/rcorr/$(join ${R},.cor.fq.gz)
 
 rcorr_trinity:
 	cd ${DIR}/assemblies && \
