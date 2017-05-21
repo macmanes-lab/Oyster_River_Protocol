@@ -15,8 +15,6 @@ RCORR ?= ${shell which rcorrector}
 RCORRDIR := $(dir $(firstword $(RCORR)))
 READ1=
 READ2=
-L = $(basename ${READ1} .fastq)
-R = $(basename ${READ2} .fastq)
 BUSCO ?= ${shell which run_BUSCO.py}
 BUSCODIR := $(dir $(firstword $(BUSCO)))
 ASSEMBLY=
@@ -54,8 +52,8 @@ subsamp_reads:
 run_rcorrector:
 	cd ${DIR}/rcorr && \
 	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 31 -1 ${DIR}/reads/${SAMP}.subsamp_1.fastq -2 ${DIR}/reads/${SAMP}.subsamp_2.fastq
-	awk -F 'l:' '{print $1}' ${DIR}/rcorr/${SAMP}.subsamp_1.cor.fq > tmp && mv tmp ${DIR}/rcorr/${SAMP}.subsamp_1.cor.fq
-	awk -F 'l:' '{print $1}' ${DIR}/rcorr/${SAMP}.subsamp_2.cor.fq > tmp && mv tmp ${DIR}/rcorr/${SAMP}.subsamp_2.cor.fq
+	awk -F 'l:' '{print $$1}' ${DIR}/rcorr/${SAMP}.subsamp_1.cor.fq > tmp && mv tmp ${DIR}/rcorr/${SAMP}.subsamp_1.cor.fq
+	awk -F 'l:' '{print $$1}' ${DIR}/rcorr/${SAMP}.subsamp_2.cor.fq > tmp && mv tmp ${DIR}/rcorr/${SAMP}.subsamp_2.cor.fq
 
 run_skewer:
 	cd ${DIR}/rcorr && \
