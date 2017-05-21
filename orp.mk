@@ -6,6 +6,7 @@ SHELL=/bin/bash -o pipefail
 #
 #	for i in 1 2 5 10 20 40 60 80 100; do ./orp.mk prep main SAMP=$i CPU=24; done
 #
+#requires GAWK >4.1
 
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
@@ -23,7 +24,6 @@ LINEAGE=
 BUSCOUT := BUSCO_$(basename ${ASSEMBLY} .fasta)
 
 
-subsamp_reads:${SAMP}.subsamp_1.fastq ${SAMP}.subsamp_2.fastq
 prep: setup run_scripts
 main: subsamp_reads run_rcorrector run_skewer rcorr_trinity rcorr_spades rcorr_shannon transfuse
 report:busco.done transrate.done report
@@ -46,14 +46,16 @@ run_scripts:
 	curl -LO https://raw.githubusercontent.com/macmanes-lab/general/master/filter.py && \
 	wget https://raw.githubusercontent.com/macmanes/read_error_corr/master/barcodes.fa
 
-${SAMP}.subsamp_1.fastq ${SAMP}.subsamp_2.fastq:
+subsamp_reads:
 	cd ${DIR}/reads && \
-	seqtk sample -s102340 ${READ1} ${SAMP}000000 | sed 's:\(.*\).1 \(.*\)\( length=.*\):\1-\2:g' > ${SAMP}.subsamp_1.fastq && \
-	seqtk sample -s102340 ${READ2} ${SAMP}000000 | sed 's:\(.*\).2 \(.*\)\( length=.*\):\1-\2:g' > ${SAMP}.subsamp_2.fastq
+	seqtk sample -s102340 ${READ1} ${SAMP}000000 > ${SAMP}.subsamp_1.fastq && \
+	seqtk sample -s102340 ${READ2} ${SAMP}000000 > ${SAMP}.subsamp_2.fastq
 
 run_rcorrector:
 	cd ${DIR}/rcorr && \
 	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 31 -1 ${DIR}/reads/${SAMP}.subsamp_1.fastq -2 ${DIR}/reads/${SAMP}.subsamp_2.fastq
+	awk -F 'l:' '{print $1}' ${DIR}/rcorr/${SAMP}.subsamp_1.cor.fq > tmp && mv tmp ${DIR}/rcorr/${SAMP}.subsamp_1.cor.fq
+	awk -F 'l:' '{print $1}' ${DIR}/rcorr/${SAMP}.subsamp_2.cor.fq > tmp && mv tmp ${DIR}/rcorr/${SAMP}.subsamp_2.cor.fq
 
 run_skewer:
 	cd ${DIR}/rcorr && \
