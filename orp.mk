@@ -24,9 +24,8 @@ BUSCOUT := BUSCO_$(basename ${ASSEMBLY} .fasta)
 
 
 subsamp_reads:${SAMP}.subsamp_1.fastq ${SAMP}.subsamp_2.fastq
-all: subsamp_reads main
 prep: setup run_scripts
-main: run_rcorrector run_skewer rcorr_trinity rcorr_spades rcorr_shannon transfuse
+main: subsamp_reads run_rcorrector run_skewer rcorr_trinity rcorr_spades rcorr_shannon transfuse
 report:busco.done transrate.done report
 busco:busco.done
 transrate:transrate.done
@@ -58,7 +57,7 @@ run_rcorrector:
 
 run_skewer:
 	cd ${DIR}/rcorr && \
-	skewer -l 25 -m pe -o skewer --mean-quality 2 --end-quality 2 -t $(CPU) -x ${DIR}/scripts/barcodes.fa ${DIR}/rcorr/$(join ${L},.cor.fq.gz) ${DIR}/rcorr/$(join ${R},.cor.fq.gz)
+	skewer -l 25 -m pe -o skewer --mean-quality 2 --end-quality 2 -t $(CPU) -x ${DIR}/scripts/barcodes.fa ${DIR}/rcorr/${SAMP}.subsamp_1.cor.fq ${DIR}/rcorr/${SAMP}.subsamp_2.cor.fq
 
 rcorr_trinity:
 	cd ${DIR}/assemblies && \
