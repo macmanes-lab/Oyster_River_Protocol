@@ -4,7 +4,7 @@ SHELL=/bin/bash -o pipefail
 
 #USAGE:
 #
-#	for i in 1 2 5 10 20 40 60 80 100; do ./correct.mk main SAMP=$i CPU=36; done
+#	for i in 1 2 5 10 20 40 60 80 100; do ./orp.mk prep main SAMP=$i CPU=24; done
 #
 
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
@@ -16,7 +16,7 @@ READ1=
 READ2=
 L = $(basename ${READ1} .fastq)
 R = $(basename ${READ2} .fastq)
-BUSCO ?= ${shell which BUSCO_v1.22.py}
+BUSCO ?= ${shell which run_BUSCO.py}
 BUSCODIR := $(dir $(firstword $(BUSCO)))
 ASSEMBLY=
 LINEAGE=
@@ -26,7 +26,7 @@ BUSCOUT := BUSCO_$(basename ${ASSEMBLY} .fasta)
 
 all: prep main
 prep: setup run_scripts
-main: run_rcorrector run_skewer rcorr_trinity rcorr_binpacker transfuse
+main: run_rcorrector run_skewer rcorr_trinity rcorr_spades rcorr_shannon transfuse
 report:busco.done transrate.done report
 busco:busco.done
 transrate:transrate.done
@@ -59,13 +59,20 @@ rcorr_trinity:
 	cd ${DIR}/assemblies && \
 	Trinity --seqType fq --output trinity_rcorr31 --max_memory 50G --left ${DIR}/rcorr/skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/skewer-trimmed-pair2.fastq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup
 
-rcorr_binpacker:
+rcorr_spades:
 	cd ${DIR}/assemblies && \
-	BinPacker -d -q -s fq -p pair -m RF -k 25 -g 200 -l ${DIR}/rcorr/skewer-trimmed-pair1.fastq -r ${DIR}/rcorr/skewer-trimmed-pair2.fastq
+	rnaspades.py -o Rcorr_spades_k75 --threads $(CPU) --memory 100 -k 75 -1 ${DIR}/rcorr/skewer-trimmed-pair1.fastq -2 ${DIR}/rcorr/skewer-trimmed-pair2.fastq
+	rnaspades.py -o Rcorr_spades_k55 --threads $(CPU) --memory 100 -k 55 -1 ${DIR}/rcorr/skewer-trimmed-pair1.fastq -2 ${DIR}/rcorr/skewer-trimmed-pair2.fastq
+	mv Rcorr_spades_k55/transcripts.fasta Rcorr_spades_k55/transcripts55.fasta
+	mv Rcorr_spades_k75/transcripts.fasta Rcorr_spades_k75/transcripts75.fasta
+
+rcorr_shannon:
+	cd ${DIR}/assemblies && \
+	shannon.py -o shannon --left ${DIR}/rcorr/skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/skewer-trimmed-pair2.fastq -p $(CPU) -K 75
 
 transfuse:
 	cd ${DIR}/assemblies && \
-	transfuse -t $(CPU) -i 0.98 -o transfuse -l ${DIR}/rcorr/skewer-trimmed-pair1.fastq -r ${DIR}/rcorr/skewer-trimmed-pair2.fastq -a Rcorr_binpacker/BinPacker.fa,trinity_rcorr31.Trinity.fasta
+	transfuse -t $(CPU) -i 0.98 -o transfuse -l ${DIR}/rcorr/skewer-trimmed-pair1.fastq -r ${DIR}/rcorr/skewer-trimmed-pair2.fastq -a Rcorr_spades_k75/transcripts75.fasta,Rcorr_spades_k55/transcripts55.fasta,trinity_rcorr31.Trinity.fasta,shannon/shannon.fasta
 
 busco.done:
 	cd ${DIR}/reports && \
