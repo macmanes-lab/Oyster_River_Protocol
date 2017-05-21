@@ -48,8 +48,8 @@ run_scripts:
 
 ${SAMP}.subsamp_1.fastq ${SAMP}.subsamp_2.fastq:
 	cd ${DIR}/reads && \
-	seqtk sample -s102340 ${READ1} ${SAMP}000000 | sed  's:\(.*\).1 \(.*\)\( length=.*\):\1-\2:g' > ${SAMP}.subsamp_1.fastq && \
-	seqtk sample -s102340 ${READ2} ${SAMP}000000 | sed  's:\(.*\).1 \(.*\)\( length=.*\):\1-\2:g' > ${SAMP}.subsamp_2.fastq
+	seqtk sample -s102340 ${READ1} ${SAMP}000000 | sed 's:\(.*\).1 \(.*\)\( length=.*\):\1-\2:g' > ${SAMP}.subsamp_1.fastq && \
+	seqtk sample -s102340 ${READ2} ${SAMP}000000 | sed 's:\(.*\).2 \(.*\)\( length=.*\):\1-\2:g' > ${SAMP}.subsamp_2.fastq
 
 run_rcorrector:
 	cd ${DIR}/rcorr && \
