@@ -6,7 +6,6 @@ SHELL=/bin/bash -o pipefail
 #
 #	for i in 1 2 5 10 20 40 60 80 100; do ./orp.mk prep main SAMP=$i CPU=24; done
 #
-#requires GAWK >4.1
 
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
@@ -72,7 +71,7 @@ rcorr_spades:
 
 rcorr_shannon:
 	cd ${DIR}/assemblies && \
-	python $(which shannon.py) -o shannon --left ${DIR}/rcorr/skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/skewer-trimmed-pair2.fastq -p $(CPU) -K 75
+	python $$(which shannon.py) -o shannon --left ${DIR}/rcorr/skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/skewer-trimmed-pair2.fastq -p $(CPU) -K 75
 
 transfuse:
 	cd ${DIR}/assemblies && \
