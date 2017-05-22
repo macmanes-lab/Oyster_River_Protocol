@@ -53,8 +53,7 @@ run_rcorrector:
 	cd ${DIR}/rcorr && \
 	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 31 -1 ${DIR}/reads/${SAMP}.subsamp_1.fastq -2 ${DIR}/reads/${SAMP}.subsamp_2.fastq && \
 	awk -F 'l:' '{print $$1}' ${DIR}/rcorr/${SAMP}.subsamp_1.cor.fq | sed 's_ __g' > tmp && mv tmp ${DIR}/rcorr/${SAMP}.subsamp_1.cor.fq && \
-	awk -F 'l:' '{print $$1}' ${DIR}/rcorr/${SAMP}.subsamp_2.cor.fq | sed 's_ __g' > tmp && mv tmp ${DIR}/rcorr/${SAMP}.subsamp_2.cor.fq && \
-  rm tmp
+	awk -F 'l:' '{print $$1}' ${DIR}/rcorr/${SAMP}.subsamp_2.cor.fq | sed 's_ __g' > tmp && mv tmp ${DIR}/rcorr/${SAMP}.subsamp_2.cor.fq
 
 run_skewer:
 	cd ${DIR}/rcorr && \
