@@ -72,7 +72,7 @@ rcorr_spades:
 
 rcorr_shannon:
 	cd ${DIR}/assemblies && \
-	shannon.py -o shannon --left ${DIR}/rcorr/skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/skewer-trimmed-pair2.fastq -p $(CPU) -K 75
+	python $(which shannon.py) -o shannon --left ${DIR}/rcorr/skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/skewer-trimmed-pair2.fastq -p $(CPU) -K 75
 
 transfuse:
 	cd ${DIR}/assemblies && \
