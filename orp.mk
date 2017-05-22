@@ -51,23 +51,23 @@ subsamp_reads:
 
 run_rcorrector:
 	cd ${DIR}/rcorr && \
-	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 31 -1 ${DIR}/reads/${SAMP}.subsamp_1.fastq -2 ${DIR}/reads/${SAMP}.subsamp_2.fastq
-	awk -F 'l:' '{print $$1}' ${DIR}/rcorr/${SAMP}.subsamp_1.cor.fq > tmp && mv tmp ${DIR}/rcorr/${SAMP}.subsamp_1.cor.fq
-	awk -F 'l:' '{print $$1}' ${DIR}/rcorr/${SAMP}.subsamp_2.cor.fq > tmp && mv tmp ${DIR}/rcorr/${SAMP}.subsamp_2.cor.fq
-
+	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 31 -1 ${DIR}/reads/${SAMP}.subsamp_1.fastq -2 ${DIR}/reads/${SAMP}.subsamp_2.fastq && \
+	awk -F 'l:' '{print $$1}' ${DIR}/rcorr/${SAMP}.subsamp_1.cor.fq | sed 's_ __g' > tmp && mv tmp ${DIR}/rcorr/${SAMP}.subsamp_1.cor.fq && \
+	awk -F 'l:' '{print $$1}' ${DIR}/rcorr/${SAMP}.subsamp_2.cor.fq | sed 's_ __g' > tmp && mv tmp ${DIR}/rcorr/${SAMP}.subsamp_2.cor.fq
+  rm tmp
 run_skewer:
 	cd ${DIR}/rcorr && \
 	skewer -l 25 -m pe -o skewer --mean-quality 2 --end-quality 2 -t $(CPU) -x ${DIR}/scripts/barcodes.fa ${DIR}/rcorr/${SAMP}.subsamp_1.cor.fq ${DIR}/rcorr/${SAMP}.subsamp_2.cor.fq
 
 rcorr_trinity:
 	cd ${DIR}/assemblies && \
-	Trinity --seqType fq --output trinity_rcorr31 --max_memory 50G --left ${DIR}/rcorr/skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/skewer-trimmed-pair2.fastq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup
+	Trinity --no_normalize_reads --seqType fq --output trinity_rcorr31 --max_memory 50G --left ${DIR}/rcorr/skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/skewer-trimmed-pair2.fastq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup
 
 rcorr_spades:
 	cd ${DIR}/assemblies && \
-	rnaspades.py -o Rcorr_spades_k75 --threads $(CPU) --memory 100 -k 75 -1 ${DIR}/rcorr/skewer-trimmed-pair1.fastq -2 ${DIR}/rcorr/skewer-trimmed-pair2.fastq
-	rnaspades.py -o Rcorr_spades_k55 --threads $(CPU) --memory 100 -k 55 -1 ${DIR}/rcorr/skewer-trimmed-pair1.fastq -2 ${DIR}/rcorr/skewer-trimmed-pair2.fastq
-	mv Rcorr_spades_k55/transcripts.fasta Rcorr_spades_k55/transcripts55.fasta
+	rnaspades.py -o Rcorr_spades_k75 --threads $(CPU) --memory 100 -k 75 -1 ${DIR}/rcorr/skewer-trimmed-pair1.fastq -2 ${DIR}/rcorr/skewer-trimmed-pair2.fastq && \
+	rnaspades.py -o Rcorr_spades_k55 --threads $(CPU) --memory 100 -k 55 -1 ${DIR}/rcorr/skewer-trimmed-pair1.fastq -2 ${DIR}/rcorr/skewer-trimmed-pair2.fastq && \
+	mv Rcorr_spades_k55/transcripts.fasta Rcorr_spades_k55/transcripts55.fasta && \
 	mv Rcorr_spades_k75/transcripts.fasta Rcorr_spades_k75/transcripts75.fasta
 
 rcorr_shannon:
