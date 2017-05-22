@@ -19,6 +19,7 @@ BUSCODIR := $(dir $(firstword $(BUSCO)))
 ASSEMBLY=
 LINEAGE=
 BUSCOUT := BUSCO_$(basename ${ASSEMBLY} .fasta)
+BUSCODB :=
 
 
 prep: setup run_scripts
@@ -79,7 +80,7 @@ transfuse:
 
 busco.done:
 	cd ${DIR}/reports && \
-	python3 ${BUSCODIR}BUSCO_v1.22.py -in ${DIR}/assemblies/${ASSEMBLY} -m trans --cpu $(CPU) -l ${BUSCODIR}${LINEAGE} -o ${BUSCOUT} && \
+	python3 $(which run_BUSCO.py) -in ${DIR}/assemblies/${ASSEMBLY} -m trans --cpu $(CPU) -l ${BUSCODB}${LINEAGE} -o ${BUSCOUT} && \
 	touch busco.done
 
 transrate.done:
