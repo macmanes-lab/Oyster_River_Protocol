@@ -60,22 +60,22 @@ run_skewer:
 
 rcorr_trinity:
 	cd ${DIR}/assemblies && \
-	Trinity --no_normalize_reads --seqType fq --output trinity_rcorr31 --max_memory 50G --left ${DIR}/rcorr/skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/skewer-trimmed-pair2.fastq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup
+	Trinity --no_normalize_reads --seqType fq --output ${SAMP}.trinity --max_memory 50G --left ${DIR}/rcorr/skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/skewer-trimmed-pair2.fastq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup
 
 rcorr_spades:
 	cd ${DIR}/assemblies && \
-	rnaspades.py -o Rcorr_spades_k75 --threads $(CPU) --memory 100 -k 75 -1 ${DIR}/rcorr/skewer-trimmed-pair1.fastq -2 ${DIR}/rcorr/skewer-trimmed-pair2.fastq && \
-	rnaspades.py -o Rcorr_spades_k55 --threads $(CPU) --memory 100 -k 55 -1 ${DIR}/rcorr/skewer-trimmed-pair1.fastq -2 ${DIR}/rcorr/skewer-trimmed-pair2.fastq && \
-	mv Rcorr_spades_k55/transcripts.fasta Rcorr_spades_k55/transcripts55.fasta && \
-	mv Rcorr_spades_k75/transcripts.fasta Rcorr_spades_k75/transcripts75.fasta
+	rnaspades.py -o ${SAMP}.spades_k75 --threads $(CPU) --memory 100 -k 75 -1 ${DIR}/rcorr/skewer-trimmed-pair1.fastq -2 ${DIR}/rcorr/skewer-trimmed-pair2.fastq && \
+	rnaspades.py -o ${SAMP}.spades_k55 --threads $(CPU) --memory 100 -k 55 -1 ${DIR}/rcorr/skewer-trimmed-pair1.fastq -2 ${DIR}/rcorr/skewer-trimmed-pair2.fastq && \
+	mv ${SAMP}.spades_k55/transcripts.fasta ${SAMP}.spades_k55/${SAMP}.transcripts55.fasta && \
+	mv ${SAMP}.spades_k75/transcripts.fasta ${SAMP}.spades_k75/${SAMP}.transcripts75.fasta
 
 rcorr_shannon:
 	cd ${DIR}/assemblies && \
-	python $$(which shannon.py) -o shannon --left ${DIR}/rcorr/skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/skewer-trimmed-pair2.fastq -p $(CPU) -K 75
+	python $$(which shannon.py) -o ${SAMP}.shannon --left ${DIR}/rcorr/skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/skewer-trimmed-pair2.fastq -p $(CPU) -K 75
 
 transfuse:
 	cd ${DIR}/assemblies && \
-	transfuse -t $(CPU) -i 0.98 -o transfuse -l ${DIR}/rcorr/skewer-trimmed-pair1.fastq -r ${DIR}/rcorr/skewer-trimmed-pair2.fastq -a Rcorr_spades_k75/transcripts75.fasta,Rcorr_spades_k55/transcripts55.fasta,trinity_rcorr31.Trinity.fasta,shannon/shannon.fasta
+	transfuse -t $(CPU) -i 0.98 -o ${SAMP}.transfuse -l ${DIR}/rcorr/skewer-trimmed-pair1.fastq -r ${DIR}/rcorr/skewer-trimmed-pair2.fastq -a ${SAMP}.spades_k55/${SAMP}.transcripts55.fasta,${SAMP}.spades_k75/${SAMP}.transcripts75.fasta,${SAMP}.trinity.Trinity.fasta,shannon/${SAMP}.shannon.fasta
 
 busco.done:
 	cd ${DIR}/reports && \
