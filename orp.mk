@@ -59,7 +59,7 @@ run_skewer:
 	cd ${DIR}/rcorr && \
 	skewer -l 25 -m pe -o skewer --mean-quality 2 --end-quality 2 -t $(CPU) -x ${DIR}/scripts/barcodes.fa ${DIR}/rcorr/${SAMP}.subsamp_1.cor.fq ${DIR}/rcorr/${SAMP}.subsamp_2.cor.fq && \
 	mv ${DIR}/rcorr/skewer-trimmed-pair1.fastq ${DIR}/rcorr/${SAMP}.skewer-trimmed-pair1.fastq && \
-	mv ${DIR}/rcorr/skewer-trimmed-pair1.fastq ${DIR}/rcorr/${SAMP}.skewer-trimmed-pair2.fastq
+	mv ${DIR}/rcorr/skewer-trimmed-pair2.fastq ${DIR}/rcorr/${SAMP}.skewer-trimmed-pair2.fastq
 rcorr_trinity:
 	cd ${DIR}/assemblies && \
 	Trinity --no_normalize_reads --seqType fq --output ${SAMP}.trinity --max_memory 50G --left ${DIR}/rcorr/${SAMP}.skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/${SAMP}.skewer-trimmed-pair2.fastq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup
