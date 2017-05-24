@@ -80,7 +80,7 @@ rcorr_shannon:
 
 transfuse:
 	cd ${DIR}/assemblies && \
-	transfuse -t $(CPU) -i 0.98 -o ${SAMP}.transfuse -l ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair1.fastq -r ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair2.fastq -a ${DATASET}.${SAMP}.transcripts55.fasta,${DATASET}.${SAMP}.transcripts75.fasta,${DATASET}.${SAMP}.trinity.Trinity.fasta,${DATASET}.${SAMP}.shannon.fasta
+	transfuse -t $(CPU) -i 0.98 -o ${DATASET}.${SAMP}.transfuse.fasta -l ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair1.fastq -r ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair2.fastq -a ${DATASET}.${SAMP}.transcripts55.fasta,${DATASET}.${SAMP}.transcripts75.fasta,${DATASET}.${SAMP}.trinity.Trinity.fasta,${DATASET}.${SAMP}.shannon.fasta
 
 busco.done:
 	cd ${DIR}/reports && \
