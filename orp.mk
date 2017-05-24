@@ -62,7 +62,7 @@ run_skewer:
 
 rcorr_trinity:
 	cd ${DIR}/assemblies && \
-	Trinity --no_normalize_reads --seqType fq --output ${SAMP}.trinity --max_memory 50G --left ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair2.fastq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup
+	Trinity --no_normalize_reads --seqType fq --output ${DATASET}.${SAMP}.trinity --max_memory 50G --left ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair2.fastq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup
 
 rcorr_spades:
 	cd ${DIR}/assemblies && \
@@ -80,7 +80,7 @@ rcorr_shannon:
 
 transfuse:
 	cd ${DIR}/assemblies && \
-	transfuse -t $(CPU) -i 0.98 -o ${SAMP}.transfuse -l ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair1.fastq -r ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair2.fastq -a ${DATASET}.${SAMP}.transcripts55.fasta,${DATASET}.${SAMP}.transcripts75.fasta,${SAMP}.trinity.Trinity.fasta,${DATASET}.${SAMP}.fasta
+	transfuse -t $(CPU) -i 0.98 -o ${SAMP}.transfuse -l ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair1.fastq -r ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair2.fastq -a ${DATASET}.${SAMP}.transcripts55.fasta,${DATASET}.${SAMP}.transcripts75.fasta,${DATASET}.${SAMP}.trinity.Trinity.fasta,${DATASET}.${SAMP}.fasta
 
 busco.done:
 	cd ${DIR}/reports && \
