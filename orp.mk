@@ -30,7 +30,7 @@ busco:busco.done
 transrate:transrate.done
 
 .DELETE_ON_ERROR:
-.PHONY:report
+.PHONY:report transfuse
 
 setup:
 	mkdir -p ${DIR}/scripts
