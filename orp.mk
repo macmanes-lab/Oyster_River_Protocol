@@ -16,10 +16,10 @@ READ1=
 READ2=
 BUSCO ?= ${shell which run_BUSCO.py}
 BUSCODIR := $(dir $(firstword $(BUSCO)))
-DATASET := $(basename ${READ1} _1.fastq.gz)
+DATASET := $(shell basename ${READ1} _1.fastq.gz)
 ASSEMBLY=
 LINEAGE=
-BUSCOUT := BUSCO_$(basename ${ASSEMBLY} .fasta)
+BUSCOUT := BUSCO_$(shell basename ${ASSEMBLY} .fasta)
 BUSCODB :=
 
 
