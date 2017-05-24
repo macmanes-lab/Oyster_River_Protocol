@@ -16,6 +16,7 @@ READ1=
 READ2=
 BUSCO ?= ${shell which run_BUSCO.py}
 BUSCODIR := $(dir $(firstword $(BUSCO)))
+DATASET := BUSCO_$(basename ${READ1} _1.fastq.gz)
 ASSEMBLY=
 LINEAGE=
 BUSCOUT := BUSCO_$(basename ${ASSEMBLY} .fasta)
@@ -46,41 +47,40 @@ run_scripts:
 
 subsamp_reads:
 	cd ${DIR}/reads && \
-	seqtk sample -s102340 ${READ1} ${SAMP}000000 > ${SAMP}.subsamp_1.fastq && \
-	seqtk sample -s102340 ${READ2} ${SAMP}000000 > ${SAMP}.subsamp_2.fastq
+	seqtk sample -s102340 ${READ1} ${SAMP}000000 > ${DATASET}.${SAMP}.subsamp_1.fastq && \
+	seqtk sample -s102340 ${READ2} ${SAMP}000000 > ${DATASET}.${SAMP}.subsamp_2.fastq
 
 run_rcorrector:
 	cd ${DIR}/rcorr && \
-	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 31 -1 ${DIR}/reads/${SAMP}.subsamp_1.fastq -2 ${DIR}/reads/${SAMP}.subsamp_2.fastq && \
-	awk -F 'l:' '{print $$1}' ${DIR}/rcorr/${SAMP}.subsamp_1.cor.fq | sed 's_ __g' > tmp && mv tmp ${DIR}/rcorr/${SAMP}.subsamp_1.cor.fq && \
-	awk -F 'l:' '{print $$1}' ${DIR}/rcorr/${SAMP}.subsamp_2.cor.fq | sed 's_ __g' > tmp && mv tmp ${DIR}/rcorr/${SAMP}.subsamp_2.cor.fq
+	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 31 -1 ${DIR}/reads/${DATASET}.${SAMP}.subsamp_1.fastq -2 ${DIR}/reads/${DATASET}.${SAMP}.subsamp_2.fastq && \
+	awk -F 'l:' '{print $$1}' ${DIR}/rcorr/${DATASET}.${SAMP}.subsamp_1.cor.fq | sed 's_ __g' > tmp && mv tmp ${DIR}/rcorr/${DATASET}.${SAMP}.subsamp_1.cor.fq && \
+	awk -F 'l:' '{print $$1}' ${DIR}/rcorr/${DATASET}.${SAMP}.subsamp_2.cor.fq | sed 's_ __g' > tmp && mv tmp ${DIR}/rcorr/${DATASET}.${SAMP}.subsamp_2.cor.fq
 
 run_skewer:
 	cd ${DIR}/rcorr && \
-	skewer -l 25 -m pe -o skewer --mean-quality 2 --end-quality 2 -t $(CPU) -x ${DIR}/scripts/barcodes.fa ${DIR}/rcorr/${SAMP}.subsamp_1.cor.fq ${DIR}/rcorr/${SAMP}.subsamp_2.cor.fq && \
-	mv ${DIR}/rcorr/skewer-trimmed-pair1.fastq ${DIR}/rcorr/${SAMP}.skewer-trimmed-pair1.fastq && \
-	mv ${DIR}/rcorr/skewer-trimmed-pair2.fastq ${DIR}/rcorr/${SAMP}.skewer-trimmed-pair2.fastq && \
-	rm ${DIR}/rcorr/${SAMP}.subsamp_1.cor.fq && \
-	rm ${DIR}/rcorr/${SAMP}.subsamp_2.cor.fq
+	skewer -l 25 -m pe -o ${DATASET}.${SAMP}.skewer --mean-quality 2 --end-quality 2 -t $(CPU) -x ${DIR}/scripts/barcodes.fa ${DIR}/rcorr/${DATASET}.${SAMP}.subsamp_1.cor.fq ${DIR}/rcorr/${DATASET}.${SAMP}.subsamp_2.cor.fq
 
 rcorr_trinity:
 	cd ${DIR}/assemblies && \
-	Trinity --no_normalize_reads --seqType fq --output ${SAMP}.trinity --max_memory 50G --left ${DIR}/rcorr/${SAMP}.skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/${SAMP}.skewer-trimmed-pair2.fastq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup
+	Trinity --no_normalize_reads --seqType fq --output ${SAMP}.trinity --max_memory 50G --left ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair2.fastq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup
 
 rcorr_spades:
 	cd ${DIR}/assemblies && \
-	rnaspades.py -o ${SAMP}.spades_k75 --threads $(CPU) --memory 100 -k 75 -1 ${DIR}/rcorr/${SAMP}.skewer-trimmed-pair1.fastq -2 ${DIR}/rcorr/${SAMP}.skewer-trimmed-pair2.fastq && \
-	rnaspades.py -o ${SAMP}.spades_k55 --threads $(CPU) --memory 100 -k 55 -1 ${DIR}/rcorr/${SAMP}.skewer-trimmed-pair1.fastq -2 ${DIR}/rcorr/${SAMP}.skewer-trimmed-pair2.fastq && \
-	mv ${SAMP}.spades_k55/transcripts.fasta ${SAMP}.spades_k55/${SAMP}.transcripts55.fasta && \
-	mv ${SAMP}.spades_k75/transcripts.fasta ${SAMP}.spades_k75/${SAMP}.transcripts75.fasta
+	rnaspades.py -o ${DATASET}.${SAMP}.spades_k75 --threads $(CPU) --memory 100 -k 75 -1 ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair1.fastq -2 ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair2.fastq && \
+	rnaspades.py -o ${DATASET}.${SAMP}.spades_k55 --threads $(CPU) --memory 100 -k 55 -1 ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair1.fastq -2 ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair2.fastq && \
+	mv ${DATASET}.${SAMP}.spades_k55/transcripts.fasta ${DATASET}.${SAMP}.transcripts55.fasta && \
+	mv ${DATASET}.${SAMP}.spades_k75/transcripts.fasta ${DATASET}.${SAMP}.transcripts75.fasta  && \
+	rm -fr ${DATASET}.${SAMP}.spades_k55 ${DATASET}.${SAMP}.spades_k75
 
 rcorr_shannon:
 	cd ${DIR}/assemblies && \
-	python $$(which shannon.py) -o ${SAMP}.shannon --left ${DIR}/rcorr/${SAMP}.skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/${SAMP}.skewer-trimmed-pair2.fastq -p $(CPU) -K 75
+	python $$(which shannon.py) -o ${DATASET}.${SAMP}.shannon --left ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair2.fastq -p $(CPU) -K 75 && \
+	mv ${DATASET}.${SAMP}.shannon/shannon.fasta ${DATASET}.${SAMP}.shannon.fasta && \
+	rm -fr ${DATASET}.${SAMP}.shannon
 
 transfuse:
 	cd ${DIR}/assemblies && \
-	transfuse -t $(CPU) -i 0.98 -o ${SAMP}.transfuse -l ${DIR}/rcorr/${SAMP}.skewer-trimmed-pair1.fastq -r ${DIR}/rcorr/${SAMP}.skewer-trimmed-pair2.fastq -a ${SAMP}.spades_k55/${SAMP}.transcripts55.fasta,${SAMP}.spades_k75/${SAMP}.transcripts75.fasta,${SAMP}.trinity.Trinity.fasta,${SAMP}.shannon/shannon.fasta
+	transfuse -t $(CPU) -i 0.98 -o ${SAMP}.transfuse -l ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair1.fastq -r ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair2.fastq -a ${DATASET}.${SAMP}.transcripts55.fasta,${DATASET}.${SAMP}.transcripts75.fasta,${SAMP}.trinity.Trinity.fasta,${DATASET}.${SAMP}.fasta
 
 busco.done:
 	cd ${DIR}/reports && \
@@ -89,7 +89,7 @@ busco.done:
 
 transrate.done:
 	cd ${DIR}/reports && \
-	transrate -o transrate_${basename ${ASSEMBLY} .fasta}  -a ${DIR}/assemblies/${ASSEMBLY} --left ${DIR}/rcorr/${SAMP}.skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/${SAMP}.skewer-trimmed-pair2.fastq -t $(CPU) && \
+	transrate -o transrate_${basename ${ASSEMBLY} .fasta}  -a ${DIR}/assemblies/${ASSEMBLY} --left ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair2.fastq -t $(CPU) && \
 	touch transrate.done
 
 report:
