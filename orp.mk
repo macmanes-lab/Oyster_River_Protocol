@@ -25,7 +25,7 @@ BUSCODB :=
 
 prep: setup run_scripts
 main: subsamp_reads run_rcorrector run_skewer rcorr_trinity rcorr_spades rcorr_shannon transfuse
-report:busco.done transrate.done report
+report:busco.done transrate.done reportgen
 busco:busco.done
 transrate:transrate.done
 
@@ -92,12 +92,12 @@ transrate.done:
 	transrate -o transrate_${basename ${ASSEMBLY} .fasta}  -a ${DIR}/assemblies/${ASSEMBLY} --left ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair2.fastq -t $(CPU) && \
 	touch transrate.done
 
-report:
+reportgen:
 	printf "\n\n*****  QUALITY REPORT FOR: ${ASSEMBLY} **** \n\n"
-	printf "*****  BUSCO SCORE ~~~~~>           " | tee -a qualreport.${basename ${ASSEMBLY} .fasta}
-	cat $$(find reports/run_${BUSCOUT} -name short*) | sed -n 8p  | tee -a qualreport.${basename ${ASSEMBLY} .fasta}
-	printf "*****  TRANSRATE SCORE ~~~~~>           " | tee -a qualreport.${basename ${ASSEMBLY} .fasta}
-	cat $$(find reports/transrate_${basename ${ASSEMBLY} .fasta} -name assemblies.csv) | awk -F , '{print $$37}' | sed -n 2p | tee -a qualreport.${basename ${ASSEMBLY} .fasta}
-	printf "*****  TRANSRATE OPTIMAL SCORE ~~~~~>   " | tee -a qualreport.${basename ${ASSEMBLY} .fasta}
-	cat $$(find reports/transrate_${basename ${ASSEMBLY} .fasta} -name assemblies.csv) | awk -F , '{print $$38}' | sed -n 2p | tee -a qualreport.${basename ${ASSEMBLY} .fasta}
+	printf "*****  BUSCO SCORE ~~~~~>           " | tee -a ${DIR}/reports/qualreport.${basename ${ASSEMBLY} .fasta}
+	cat $$(find reports/run_${BUSCOUT} -name short*) | sed -n 8p  | tee -a ${DIR}/reports/qualreport.${basename ${ASSEMBLY} .fasta}
+	printf "*****  TRANSRATE SCORE ~~~~~>           " | tee -a ${DIR}/reports/qualreport.${basename ${ASSEMBLY} .fasta}
+	cat $$(find reports/transrate_${basename ${ASSEMBLY} .fasta} -name assemblies.csv) | awk -F , '{print $$37}' | sed -n 2p | tee -a ${DIR}/reports/qualreport.${basename ${ASSEMBLY} .fasta}
+	printf "*****  TRANSRATE OPTIMAL SCORE ~~~~~>   " | tee -a ${DIR}/reports/qualreport.${basename ${ASSEMBLY} .fasta}
+	cat $$(find reports/transrate_${basename ${ASSEMBLY} .fasta} -name assemblies.csv) | awk -F , '{print $$38}' | sed -n 2p | tee -a ${DIR}/reports/qualreport.${basename ${ASSEMBLY} .fasta}
 	printf " \n\n"
