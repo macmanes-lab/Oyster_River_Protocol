@@ -84,7 +84,7 @@ transfuse:
 
 busco.done:
 	cd ${DIR}/reports && \
-	python3 $(which run_BUSCO.py) -in ${DIR}/assemblies/${ASSEMBLY} -m trans --cpu $(CPU) -l ${LINEAGE} -o ${BUSCOUT} && \
+	python3 $$(which run_BUSCO.py) -in ${DIR}/assemblies/${ASSEMBLY} -m trans --cpu $(CPU) -l ${LINEAGE} -o ${BUSCOUT} && \
 	touch busco.done
 
 transrate.done:
