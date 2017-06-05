@@ -4,7 +4,7 @@ START=1
 
 /share/orthonucl/OrthoFinder/orthofinder/orthofinder.py -f fasta/ -og -t 40 -a 40
 
-
+transrate 
 
 for i in $(eval echo "{$START..$END}") ; do
   sed -n ''$i'p' $input | tr ' ' '\n' | grep -f - trans/merged/contigs.csv \
