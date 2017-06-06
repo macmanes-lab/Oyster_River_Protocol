@@ -27,7 +27,7 @@ START := 1
 
 
 prep: setup run_scripts
-main: subsamp_reads run_rcorrector run_skewer rcorr_trinity rcorr_spades rcorr_shannon transfuse
+main: subsamp_reads run_rcorrector run_skewer rcorr_trinity rcorr_spades rcorr_shannon orthofusing
 report:busco.done transrate.done reportgen
 busco:busco.done
 transrate:transrate.done
@@ -90,15 +90,14 @@ orthofusing:
 	ln -s ${DATASET}.${SAMP}.trinity.Trinity.fasta ${DATASET}.${SAMP}/${DATASET}.${SAMP}.trinity.Trinity.fasta && \
 	ln -s ${DATASET}.${SAMP}.shannon.fasta ${DATASET}.${SAMP}/${DATASET}.${SAMP}.shannon.fasta && \
 	python $$(which orthofinder.py) -f ${DATASET}.${SAMP}/ -og -t $(CPU) -a $(CPU) && \
-	cat ${DATASET}.${SAMP}/*fasta > ${DATASET}.${SAMP}/merged.fasta && \
-	transrate -o merged -t $(CPU) -a ${DATASET}.${SAMP}/merged.fasta --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} && \
+	cat ${DIR}/orthofuse/${DATASET}.${SAMP}/*fasta > ${DIR}/orthofuse/${DATASET}.${SAMP}/merged.fasta && \
+	transrate -o merged -t $(CPU) -a ${DIR}/orthofuse/${DATASET}.${SAMP}/merged.fasta --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} && \
 	for i in $(eval echo "{$START..$END}") ; do
 	  sed -n ''$i'p' $ORTHOINPUT | tr ' ' '\n' | grep -f - ${DIR}/orthofuse/${DATASET}.${SAMP}/merged/contigs.csv \
-	  | awk -F, 'BEGIN {max = 0} {if ($9>max) max=$9} END {print $1 "\t" max}' | tee -a ${DATASET}.${SAMP}/good.list
+	  | awk -F, 'BEGIN {max = 0} {if ($9>max) max=$9} END {print $1 "\t" max}' | tee -a ${DIR}/orthofuse/${DATASET}.${SAMP}/good.list
 	done && \
-	python $$(which filter.py) ${DATASET}.${SAMP}/merged.fasta/merged.fasta <(awk '{print $1}' ${DATASET}.${SAMP}/good.list) > ${DATASET}.${SAMP}/orthomerged.fasta && \
+	python $$(which filter.py) ${DIR}/orthofuse/${DATASET}.${SAMP}/merged.fasta/merged.fasta <(awk '{print $1}' ${DATASET}.${SAMP}/good.list) > ${DIR}/orthofuse/${DATASET}.${SAMP}/orthomerged.fasta && \
 	touch orthofuse.done
-
 
 transfuse:
 	cd ${DIR}/assemblies && \
@@ -111,6 +110,7 @@ busco.done:
 
 transrate.done:
 	cd ${DIR}/reports && \
+	#transrate -o transrate_${basename ${DATASET}.${SAMP}/orthomerged.fasta .fasta}  -a ${DIR}/orthofuse/${DATASET}.${SAMP}/orthomerged.fasta --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} -t $(CPU) && \
 	transrate -o transrate_${basename ${ASSEMBLY} .fasta}  -a ${DIR}/assemblies/${ASSEMBLY} --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} -t $(CPU) && \
 	#transrate -o transrate_${basename ${ASSEMBLY} .fasta}  -a ${DIR}/assemblies/${ASSEMBLY} --left ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair2.fastq -t $(CPU) && \
 	touch transrate.done
