@@ -21,6 +21,9 @@ ASSEMBLY=
 LINEAGE=
 BUSCOUT := BUSCO_$(shell basename ${ASSEMBLY} .fasta)
 BUSCODB :=
+ORTHOINPUT := ${DIR}/orthofuse/${DATASET}.${SAMP}/Results_"date +"%b%m""/Orthogroups.txt
+END := $(wc -l $ORTHOINPUT | awk '{print $1}')
+START := 1
 
 
 prep: setup run_scripts
@@ -38,6 +41,7 @@ setup:
 	mkdir -p ${DIR}/assemblies
 	mkdir -p ${DIR}/rcorr
 	mkdir -p ${DIR}/reports
+	mkdir -p ${DIR}/orthofuse
 
 run_scripts:
 	@echo Downloading Scripts
@@ -77,6 +81,24 @@ rcorr_shannon:
 	python $$(which shannon.py) -o ${DATASET}.${SAMP}.shannon --left ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair2.fastq -p $(CPU) -K 75 && \
 	mv ${DATASET}.${SAMP}.shannon/shannon.fasta ${DATASET}.${SAMP}.shannon.fasta && \
 	rm -fr ${DATASET}.${SAMP}.shannon
+
+orthofusing:
+	cd ${DIR}/orthofuse && \
+	mkdir ${DATASET}.${SAMP}
+	ln -s ${DATASET}.${SAMP}.transcripts55.fasta ${DATASET}.${SAMP}/${DATASET}.${SAMP}.transcripts55.fasta && \
+	ln -s ${DATASET}.${SAMP}.transcripts75.fasta ${DATASET}.${SAMP}/${DATASET}.${SAMP}.transcripts75.fasta && \
+	ln -s ${DATASET}.${SAMP}.trinity.Trinity.fasta ${DATASET}.${SAMP}/${DATASET}.${SAMP}.trinity.Trinity.fasta && \
+	ln -s ${DATASET}.${SAMP}.shannon.fasta ${DATASET}.${SAMP}/${DATASET}.${SAMP}.shannon.fasta && \
+	python $$(which orthofinder.py) -f ${DATASET}.${SAMP}/ -og -t $(CPU) -a $(CPU) && \
+	cat ${DATASET}.${SAMP}/*fasta > ${DATASET}.${SAMP}/merged.fasta && \
+	transrate -o merged -t $(CPU) -a ${DATASET}.${SAMP}/merged.fasta --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2}  && \
+	for i in $(eval echo "{$START..$END}") ; do
+	  sed -n ''$i'p' $ORTHOINPUT | tr ' ' '\n' | grep -f - ${DIR}/orthofuse/${DATASET}.${SAMP}/merged/contigs.csv \
+	  | awk -F, 'BEGIN {max = 0} {if ($9>max) max=$9} END {print $1 "\t" max}' | tee -a good.list
+	done
+
+${DIR}/orthofuse/${DATASET}.${SAMP}/
+
 
 transfuse:
 	cd ${DIR}/assemblies && \
