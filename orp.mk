@@ -22,6 +22,8 @@ LINEAGE=
 BUSCOUT := BUSCO_$(shell basename ${ASSEMBLY} .fasta)
 BUSCODB :=
 START=1
+END=$$(wc -l $$(find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}')
+ORTHOINPUT=$$(find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name Orthogroups.txt)
 
 prep: setup run_scripts
 main: subsamp_reads run_rcorrector run_skewer rcorr_trinity rcorr_spades rcorr_shannon orthofusing
@@ -90,7 +92,8 @@ orthofusing:
 	#python $$(which orthofinder.py) -f ${DIR}/orthofuse/${DATASET}.${SAMP}/ -og -t $(CPU) -a $(CPU) && \
 	#cat ${DIR}/orthofuse/${DATASET}.${SAMP}/*fasta > ${DIR}/orthofuse/${DATASET}.${SAMP}/merged.fasta && \
 	#transrate -o ${DIR}/orthofuse/${DATASET}.${SAMP}/merged -t $(CPU) -a ${DIR}/orthofuse/${DATASET}.${SAMP}/merged.fasta --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} && \
-	export END=$$(wc -l $$(find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}')
+	export END=$$(wc -l $$(find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}') && \
+	export ORTHOINPUT=$$(find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name Orthogroups.txt 2> /dev/null)) && \
 	for i in $$(eval echo "{1..$$END}") ; do sed -n ''$$i'p' $$ORTHOINPUT | tr ' ' '\n' | grep -f - ${DIR}/orthofuse/${DATASET}.${SAMP}/merged/merged/contigs.csv | awk -F, 'BEGIN {max = 0} {if ($$9>max) max=$$9} END {print $$1 "\t" max}' | tee -a ${DIR}/orthofuse/${DATASET}.${SAMP}/good.list; done && \
 	python $$(which filter.py) ${DIR}/orthofuse/${DATASET}.${SAMP}/merged.fasta <(awk '{print $$1}' ${DATASET}.${SAMP}/good.list) > ${DIR}/orthofuse/${DATASET}.${SAMP}/${DATASET}.${SAMP}.orthomerged.fasta && \
 	touch orthofuse.done
