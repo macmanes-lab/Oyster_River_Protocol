@@ -82,13 +82,14 @@ rcorr_shannon:
 	mv ${DATASET}.${SAMP}.shannon/shannon.fasta ${DATASET}.${SAMP}.shannon.fasta && \
 	rm -fr ${DATASET}.${SAMP}.shannon
 
+
 orthofusing:
 	cd ${DIR}/orthofuse && \
 	mkdir ${DATASET}.${SAMP} && \
-	ln -s ${DATASET}.${SAMP}.transcripts55.fasta ${DATASET}.${SAMP}/${DATASET}.${SAMP}.transcripts55.fasta && \
-	ln -s ${DATASET}.${SAMP}.transcripts75.fasta ${DATASET}.${SAMP}/${DATASET}.${SAMP}.transcripts75.fasta && \
-	ln -s ${DATASET}.${SAMP}.trinity.Trinity.fasta ${DATASET}.${SAMP}/${DATASET}.${SAMP}.trinity.Trinity.fasta && \
-	ln -s ${DATASET}.${SAMP}.shannon.fasta ${DATASET}.${SAMP}/${DATASET}.${SAMP}.shannon.fasta && \
+	ln -s ${DIR}/assemblies/${DATASET}.${SAMP}.transcripts55.fasta ${DIR}/orthofuse/${DATASET}.${SAMP}/${DATASET}.${SAMP}.transcripts55.fasta && \
+	ln -s ${DIR}/assemblies/${DATASET}.${SAMP}.transcripts75.fasta ${DIR}/orthofuse/${DATASET}.${SAMP}/${DATASET}.${SAMP}.transcripts75.fasta && \
+	ln -s ${DIR}/assemblies/${DATASET}.${SAMP}.trinity.Trinity.fasta ${DIR}/orthofuse/${DATASET}.${SAMP}/${DATASET}.${SAMP}.trinity.Trinity.fasta && \
+	ln -s ${DIR}/assemblies/${DATASET}.${SAMP}.shannon.fasta ${DIR}/orthofuse/${DATASET}.${SAMP}/${DATASET}.${SAMP}.shannon.fasta && \
 	python $$(which orthofinder.py) -f ${DATASET}.${SAMP}/ -og -t $(CPU) -a $(CPU) && \
 	cat ${DIR}/orthofuse/${DATASET}.${SAMP}/*fasta > ${DIR}/orthofuse/${DATASET}.${SAMP}/merged.fasta && \
 	transrate -o merged -t $(CPU) -a ${DIR}/orthofuse/${DATASET}.${SAMP}/merged.fasta --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} && \
