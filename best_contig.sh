@@ -14,7 +14,7 @@ cat fasta/*fasta > merged.fasta
 
 for i in $(eval echo "{$START..$END}") ; do
   sed -n ''$i'p' $input | tr ' ' '\n' | /home/macmanes/.linuxbrew/bin/grep -f - /mouse/orthofinder/test/Results_Jun05/ortho/merged/contigs.csv \
-  | awk -F, 'BEGIN {max = 0} {if ($9>max) max=$9} END {print $1 "\t" max}' | tee -a good2.list
+  | awk -F, 'BEGIN {max = 0} {if ($9>max) max=$9} END {print $1 "\t" max}' | tee -a good.list
 done
 
 python /mnt/data3/macmanes/Mc_Transcriptome/final/Sept16/filter.py merged.fasta <(awk '{print $1}' good.list)  >  orthomerged.fasta
