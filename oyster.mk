@@ -22,8 +22,8 @@ LINEAGE=
 BUSCOUT := BUSCO_$(shell basename ${ASSEMBLY} .fasta)
 BUSCODB :=
 START=1
-#END := $$(wc -l $$(find ${DIR}/orthofuse/${DATASET} -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}')
-#ORTHOINPUT := $$(find ${DIR}/orthofuse/${DATASET} -name Orthogroups.txt)
+#END := $$(wc -l $$(find ${DIR}/orthofuse/${DATASET}/ -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}')
+#ORTHOINPUT := $$(find ${DIR}/orthofuse/${DATASET}/ -name Orthogroups.txt)
 
 prep: setup run_scripts
 main: subsamp_reads run_rcorrector run_skewer rcorr_trinity rcorr_spades rcorr_shannon orthofusing
@@ -78,18 +78,18 @@ rcorr_shannon:
 
 orthofusing:
 	cd ${DIR}/orthofuse && \
-	mkdir ${DATASET}.${SAMP} && \
+	mkdir ${DATASET} && \
 	ln -s ${DIR}/assemblies/${DATASET}.transcripts55.fasta ${DIR}/orthofuse/${DATASET}/${DATASET}.transcripts55.fasta && \
 	ln -s ${DIR}/assemblies/${DATASET}.transcripts75.fasta ${DIR}/orthofuse/${DATASET}/${DATASET}.transcripts75.fasta && \
-	ln -s ${DIR}/assemblies/${DATASET}.trinity.Trinity.fasta ${DIR}/orthofuse/${DATASET}${DATASET}.trinity.Trinity.fasta && \
-	ln -s ${DIR}/assemblies/${DATASET}.shannon.fasta ${DIR}/orthofuse/${DATASET}${DATASET}.shannon.fasta && \
-	python $$(which orthofinder.py) -f ${DIR}/orthofuse/${DATASET} -og -t $(CPU) -a $(CPU) && \
-	cat ${DIR}/orthofuse/${DATASET}*fasta > ${DIR}/orthofuse/${DATASET}merged.fasta && \
-	transrate -o ${DIR}/orthofuse/${DATASET}merged -t $(CPU) -a ${DIR}/orthofuse/${DATASET}merged.fasta --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} && \
-	export END=$$(wc -l $$(find ${DIR}/orthofuse/${DATASET} -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}') && \
-	export ORTHOINPUT=$$(find ${DIR}/orthofuse/${DATASET} -name Orthogroups.txt 2> /dev/null) && \
-	for i in $$(eval echo "{1..$$END}") ; do sed -n ''$$i'p' $$ORTHOINPUT | tr ' ' '\n' | grep -f - $$(find ${DIR}/orthofuse/${DATASET} -name contigs.csv 2> /dev/null) | awk -F, 'BEGIN {max = 0} {if ($$9>max) max=$$9} END {print $$1 "\t" max}' | tee -a ${DIR}/orthofuse/${DATASET}good.list; done && \
-	python $$(which filter.py) ${DIR}/orthofuse/${DATASET}merged.fasta <(awk '{print $$1}' ${DATASET}good.list) > ${DIR}/orthofuse/${DATASET}${DATASET}.orthomerged.fasta && \
+	ln -s ${DIR}/assemblies/${DATASET}.trinity.Trinity.fasta ${DIR}/orthofuse/${DATASET}/${DATASET}.trinity.Trinity.fasta && \
+	ln -s ${DIR}/assemblies/${DATASET}.shannon.fasta ${DIR}/orthofuse/${DATASET}/${DATASET}.shannon.fasta && \
+	python $$(which orthofinder.py) -f ${DIR}/orthofuse/${DATASET}/ -og -t $(CPU) -a $(CPU) && \
+	cat ${DIR}/orthofuse/${DATASET}/*fasta > ${DIR}/orthofuse/${DATASET}/merged.fasta && \
+	transrate -o ${DIR}/orthofuse/${DATASET}/merged -t $(CPU) -a ${DIR}/orthofuse/${DATASET}/merged.fasta --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} && \
+	export END=$$(wc -l $$(find ${DIR}/orthofuse/${DATASET}/ -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}') && \
+	export ORTHOINPUT=$$(find ${DIR}/orthofuse/${DATASET}/ -name Orthogroups.txt 2> /dev/null) && \
+	for i in $$(eval echo "{1..$$END}") ; do sed -n ''$$i'p' $$ORTHOINPUT | tr ' ' '\n' | grep -f - $$(find ${DIR}/orthofuse/${DATASET}/ -name contigs.csv 2> /dev/null) | awk -F, 'BEGIN {max = 0} {if ($$9>max) max=$$9} END {print $$1 "\t" max}' | tee -a ${DIR}/orthofuse/${DATASET}/good.list; done && \
+	python $$(which filter.py) ${DIR}/orthofuse/${DATASET}/merged.fasta <(awk '{print $$1}' ${DATASET}/good.list) > ${DIR}/orthofuse/${DATASET}/${DATASET}.orthomerged.fasta && \
 	touch orthofuse.done
 
 transfuse:
@@ -103,7 +103,7 @@ busco.done:
 
 transrate.done:
 	cd ${DIR}/reports && \
-	#transrate -o transrate_${basename ${DATASET}orthomerged.fasta .fasta}  -a ${DIR}/orthofuse/${DATASET}orthomerged.fasta --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} -t $(CPU) && \
+	#transrate -o transrate_${basename ${DATASET}/orthomerged.fasta .fasta}  -a ${DIR}/orthofuse/${DATASET}/orthomerged.fasta --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} -t $(CPU) && \
 	transrate -o transrate_${basename ${ASSEMBLY} .fasta}  -a ${DIR}/assemblies/${ASSEMBLY} --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} -t $(CPU) && \
 	#transrate -o transrate_${basename ${ASSEMBLY} .fasta}  -a ${DIR}/assemblies/${ASSEMBLY} --left ${DIR}/rcorr/${DATASET}.skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/${DATASET}.skewer-trimmed-pair2.fastq -t $(CPU) && \
 	touch transrate.done
