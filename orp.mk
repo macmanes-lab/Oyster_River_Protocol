@@ -93,7 +93,7 @@ orthofusing:
 	python $$(which orthofinder.py) -f ${DIR}/orthofuse/${DATASET}.${SAMP}/ -og -t $(CPU) -a $(CPU) && \
 	cat ${DIR}/orthofuse/${DATASET}.${SAMP}/*fasta > ${DIR}/orthofuse/${DATASET}.${SAMP}/merged.fasta && \
 	transrate -o ${DIR}/orthofuse/${DATASET}.${SAMP}/merged -t $(CPU) -a ${DIR}/orthofuse/${DATASET}.${SAMP}/merged.fasta --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} && \
-	for i in $$(eval echo "{$$START..$$END}") ; do sed -n ''$$i'p' $$ORTHOINPUT | tr ' ' '\n' | grep -f - ${DIR}/orthofuse/${DATASET}.${SAMP}/merged/contigs.csv | awk -F, 'BEGIN {max = 0} {if ($$9>max) max=$$9} END {print $$1 "\t" max}' | tee -a ${DIR}/orthofuse/${DATASET}.${SAMP}/good.list; done && \
+	for i in $$(eval echo "{$$START..$$END}") ; do sed -n ''$$i'p' $$ORTHOINPUT | tr ' ' '\n' | grep -f - ${DIR}/orthofuse/${DATASET}.${SAMP}/merged/merged/contigs.csv | awk -F, 'BEGIN {max = 0} {if ($$9>max) max=$$9} END {print $$1 "\t" max}' | tee -a ${DIR}/orthofuse/${DATASET}.${SAMP}/good.list; done && \
 	python $$(which filter.py) ${DIR}/orthofuse/${DATASET}.${SAMP}/merged.fasta <(awk '{print $$1}' ${DATASET}.${SAMP}/good.list) > ${DIR}/orthofuse/${DATASET}.${SAMP}/${DATASET}.${SAMP}.orthomerged.fasta && \
 	touch orthofuse.done
 
