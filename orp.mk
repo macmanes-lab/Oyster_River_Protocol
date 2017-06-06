@@ -10,20 +10,20 @@ SHELL=/bin/bash -o pipefail
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
 CPU=16
-RCORR ?= ${shell which rcorrector}
+RCORR := ${shell which rcorrector}
 RCORRDIR := $(dir $(firstword $(RCORR)))
 READ1=
 READ2=
-BUSCO ?= ${shell which run_BUSCO.py}
+BUSCO := ${shell which run_BUSCO.py}
 BUSCODIR := $(dir $(firstword $(BUSCO)))
 DATASET := $(shell basename ${READ1} _1.fastq.gz)
 ASSEMBLY=
 LINEAGE=
 BUSCOUT := BUSCO_$(shell basename ${ASSEMBLY} .fasta)
 BUSCODB :=
-ORTHOINPUT := ${shell $${DIR}/orthofuse/$${DATASET}.$${SAMP}/Results_"date +"%b%m""/Orthogroups.txt}
-END := ${shell wc -l $$ORTHOINPUT | awk '{print $$1}'}
-START = 1
+ORTHOINPUT ?= ${shell $${DIR}/orthofuse/$${DATASET}.$${SAMP}/Results_"date +"%b%m""/Orthogroups.txt}
+END ?= ${shell wc -l $$ORTHOINPUT | awk '{print $$1}'}
+START=1
 
 prep: setup run_scripts
 main: subsamp_reads run_rcorrector run_skewer rcorr_trinity rcorr_spades rcorr_shannon orthofusing
