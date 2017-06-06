@@ -19,7 +19,7 @@ done
 
 python /mnt/data3/macmanes/Mc_Transcriptome/final/Sept16/filter.py merged.fasta <(awk '{print $1}' good.list)  >  orthomerged.fasta
 
-python3 /share/busco/busco/scripts/run_BUSCO.py -i orthomerged.fasta -o mer -m tran -l $RAID/busco_dbs/eukaryota_odb9 -c 48
+python /share/busco/busco/scripts/run_BUSCO.py -i orthomerged.fasta -o mer -m tran -l $RAID/busco_dbs/eukaryota_odb9 -c 48
 
 /share/test/share/transrate-1.0.4beta/transrate -o orthomerged -t 48 \
 -a orthomerged.fasta \
