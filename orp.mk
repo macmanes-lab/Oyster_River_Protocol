@@ -22,7 +22,7 @@ LINEAGE=
 BUSCOUT := BUSCO_$(shell basename ${ASSEMBLY} .fasta)
 BUSCODB :=
 ORTHOINPUT := ${DIR}/orthofuse/${DATASET}.${SAMP}/Results_"date +"%b%m""/Orthogroups.txt
-END = $(shell wc -l $ORTHOINPUT | awk '{print $1}')
+END = $(shell wc -l $$ORTHOINPUT | awk '{print $$1}')
 START = 1
 
 
@@ -94,7 +94,7 @@ orthofusing:
 	#cat ${DIR}/orthofuse/${DATASET}.${SAMP}/*fasta > ${DIR}/orthofuse/${DATASET}.${SAMP}/merged.fasta && \
 	#transrate -o ${DIR}/orthofuse/${DATASET}.${SAMP}/merged -t $(CPU) -a ${DIR}/orthofuse/${DATASET}.${SAMP}/merged.fasta --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} && \
 	START = 1 && \
-	END = $(shell wc -l $ORTHOINPUT | awk '{print $$1}') && \
+	END = $(shell wc -l $$ORTHOINPUT | awk '{print $$1}') && \
 	echo $$START && \
 	echo $$END && \
 	for i in $$(eval echo "{$$START..$$END}") ; do sed -n ''$$i'p' $$ORTHOINPUT | tr ' ' '\n' | grep -f - ${DIR}/orthofuse/${DATASET}.${SAMP}/merged/merged/contigs.csv | awk -F, 'BEGIN {max = 0} {if ($$9>max) max=$$9} END {print $$1 "\t" max}' | tee -a ${DIR}/orthofuse/${DATASET}.${SAMP}/good.list; done && \
