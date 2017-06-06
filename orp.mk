@@ -22,7 +22,7 @@ LINEAGE=
 BUSCOUT := BUSCO_$(shell basename ${ASSEMBLY} .fasta)
 BUSCODB :=
 ORTHOINPUT := $$(shell $${DIR}/orthofuse/$${DATASET}.$${SAMP}/Results_"date +"%b%m""/Orthogroups.txt)
-END = $$(shell wc -l $$ORTHOINPUT | awk '{print $$1}')
+END := $$(shell wc -l $$ORTHOINPUT | awk '{print $$1}')
 START = 1
 
 prep: setup run_scripts
