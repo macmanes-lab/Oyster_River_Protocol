@@ -89,10 +89,6 @@ orthofusing:
 	python $$(which filter.py) ${DIR}/orthofuse/${DATASET}/merged.fasta <(awk '{print $$1}' ${DATASET}/good.list) > ${DIR}/orthofuse/${DATASET}/${DATASET}.orthomerged.fasta && \
 	touch orthofuse.done
 
-transfuse:
-	cd ${DIR}/assemblies && \
-	transfuse -t $(CPU) -i 0.98 -o ${DATASET}.transfuse.fasta -l ${DIR}/rcorr/${DATASET}.skewer-trimmed-pair1.fastq -r ${DIR}/rcorr/${DATASET}.skewer-trimmed-pair2.fastq -a ${DATASET}.transcripts55.fasta,${DATASET}.transcripts75.fasta,${DATASET}.trinity.Trinity.fasta,${DATASET}.shannon.fasta
-
 busco.done:
 	cd ${DIR}/reports && \
 	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${ASSEMBLY} -m transcriptome --cpu $(CPU) -l /mnt/lustre/macmaneslab/macmanes/BUSCODB/${LINEAGE} -o ${BUSCOUT} && \
