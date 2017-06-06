@@ -4,7 +4,7 @@ SHELL=/bin/bash -o pipefail
 
 #USAGE:
 #
-#	for i in 1 2 5 10 20 40 60 80 100; do ./orp.mk prep main SAMP=$i CPU=24; done
+#	oyster.mk prep main READ1= READ2= CPU=24
 #
 
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
@@ -22,11 +22,9 @@ LINEAGE=
 BUSCOUT := BUSCO_$(shell basename ${ASSEMBLY} .fasta)
 BUSCODB :=
 START=1
-#END := $$(wc -l $$(find ${DIR}/orthofuse/${DATASET}/ -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}')
-#ORTHOINPUT := $$(find ${DIR}/orthofuse/${DATASET}/ -name Orthogroups.txt)
 
 prep: setup run_scripts
-main: subsamp_reads run_rcorrector run_skewer rcorr_trinity rcorr_spades rcorr_shannon orthofusing
+main: run_rcorrector run_skewer rcorr_trinity rcorr_spades rcorr_shannon orthofusing report
 report:busco.done transrate.done reportgen
 busco:busco.done
 transrate:transrate.done
@@ -43,7 +41,6 @@ setup:
 	mkdir -p ${DIR}/orthofuse
 
 run_scripts:
-	@echo Downloading Scripts
 	cd ${DIR}/scripts && \
 	curl -LO https://raw.githubusercontent.com/macmanes-lab/general/master/filter.py && \
 	wget https://raw.githubusercontent.com/macmanes/read_error_corr/master/barcodes.fa
