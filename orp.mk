@@ -83,14 +83,14 @@ rcorr_shannon:
 
 orthofusing:
 	cd ${DIR}/orthofuse && \
-	#mkdir ${DATASET}.${SAMP} && \
-	#ln -s ${DIR}/assemblies/${DATASET}.${SAMP}.transcripts55.fasta ${DIR}/orthofuse/${DATASET}.${SAMP}/${DATASET}.${SAMP}.transcripts55.fasta && \
-	#ln -s ${DIR}/assemblies/${DATASET}.${SAMP}.transcripts75.fasta ${DIR}/orthofuse/${DATASET}.${SAMP}/${DATASET}.${SAMP}.transcripts75.fasta && \
-	#ln -s ${DIR}/assemblies/${DATASET}.${SAMP}.trinity.Trinity.fasta ${DIR}/orthofuse/${DATASET}.${SAMP}/${DATASET}.${SAMP}.trinity.Trinity.fasta && \
-	#ln -s ${DIR}/assemblies/${DATASET}.${SAMP}.shannon.fasta ${DIR}/orthofuse/${DATASET}.${SAMP}/${DATASET}.${SAMP}.shannon.fasta && \
-	#python $$(which orthofinder.py) -f ${DIR}/orthofuse/${DATASET}.${SAMP}/ -og -t $(CPU) -a $(CPU) && \
-	#cat ${DIR}/orthofuse/${DATASET}.${SAMP}/*fasta > ${DIR}/orthofuse/${DATASET}.${SAMP}/merged.fasta && \
-	#transrate -o ${DIR}/orthofuse/${DATASET}.${SAMP}/merged -t $(CPU) -a ${DIR}/orthofuse/${DATASET}.${SAMP}/merged.fasta --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} && \
+	mkdir ${DATASET}.${SAMP} && \
+	ln -s ${DIR}/assemblies/${DATASET}.${SAMP}.transcripts55.fasta ${DIR}/orthofuse/${DATASET}.${SAMP}/${DATASET}.${SAMP}.transcripts55.fasta && \
+	ln -s ${DIR}/assemblies/${DATASET}.${SAMP}.transcripts75.fasta ${DIR}/orthofuse/${DATASET}.${SAMP}/${DATASET}.${SAMP}.transcripts75.fasta && \
+	ln -s ${DIR}/assemblies/${DATASET}.${SAMP}.trinity.Trinity.fasta ${DIR}/orthofuse/${DATASET}.${SAMP}/${DATASET}.${SAMP}.trinity.Trinity.fasta && \
+	ln -s ${DIR}/assemblies/${DATASET}.${SAMP}.shannon.fasta ${DIR}/orthofuse/${DATASET}.${SAMP}/${DATASET}.${SAMP}.shannon.fasta && \
+	python $$(which orthofinder.py) -f ${DIR}/orthofuse/${DATASET}.${SAMP}/ -og -t $(CPU) -a $(CPU) && \
+	cat ${DIR}/orthofuse/${DATASET}.${SAMP}/*fasta > ${DIR}/orthofuse/${DATASET}.${SAMP}/merged.fasta && \
+	transrate -o ${DIR}/orthofuse/${DATASET}.${SAMP}/merged -t $(CPU) -a ${DIR}/orthofuse/${DATASET}.${SAMP}/merged.fasta --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} && \
 	export END=$$(wc -l $$(find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}') && \
 	export ORTHOINPUT=$$(find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name Orthogroups.txt 2> /dev/null) && \
 	for i in $$(eval echo "{1..$$END}") ; do sed -n ''$$i'p' $$ORTHOINPUT | tr ' ' '\n' | grep -f - $$(find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name contigs.csv 2> /dev/null) | awk -F, 'BEGIN {max = 0} {if ($$9>max) max=$$9} END {print $$1 "\t" max}' | tee -a ${DIR}/orthofuse/${DATASET}.${SAMP}/good.list; done && \
