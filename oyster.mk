@@ -51,8 +51,8 @@ run_rcorrector:
 	long=${INPUT}
 	short=$${long:0:6}
 	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 31 -1 ${READ1} -2 ${READ2} -od ${DIR}/rcorr
-	awk -F 'l:' '{print $$1}' $$(find ${DIR}/rcorr/ -name $${short}*R1.cor.fq.gz 2> /dev/null) | sed 's_ __g' > tmp && mv tmp ${DIR}/rcorr/${RUNOUT}.1.cor.fq
-	awk -F 'l:' '{print $$1}' $$(find ${DIR}/rcorr/ -name $${short}*R2.cor.fq.gz 2> /dev/null) | sed 's_ __g' > tmp && mv tmp ${DIR}/rcorr/${RUNOUT}.2.cor.fq
+	awk -F 'l:' '{print $$1}' $$(find ${DIR}/rcorr/ -name $${short}*R1.cor.fq.gz 2> /dev/null) | sed 's_ __g' > tmp1 && mv tmp1 ${DIR}/rcorr/${RUNOUT}.1.cor.fq
+	awk -F 'l:' '{print $$1}' $$(find ${DIR}/rcorr/ -name $${short}*R2.cor.fq.gz 2> /dev/null) | sed 's_ __g' > tmp2 && mv tmp2 ${DIR}/rcorr/${RUNOUT}.2.cor.fq
 
 run_skewer:
 	skewer -l 25 -m pe -o ${DIR}/rcorr/${RUNOUT}.skewer --mean-quality 2 --end-quality 2 -t $(CPU) -x ${DIR}/scripts/barcodes.fa ${DIR}/rcorr/${RUNOUT}.1.cor.fq ${DIR}/rcorr/${RUNOUT}.2.cor.fq
@@ -87,7 +87,6 @@ orthofusing:
 	transrate -o ${DIR}/orthofuse/${RUNOUT}/merged -t $(CPU) -a ${DIR}/orthofuse/${RUNOUT}/merged.fasta --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} && \
 	export END=$$(wc -l $$(find ${DIR}/orthofuse/${RUNOUT}/ -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}') && \
 	export ORTHOINPUT=$$(find ${DIR}/orthofuse/${RUNOUT}/ -name Orthogroups.txt 2> /dev/null) && \
-	#for i in $$(eval echo "{1..$$END}") ; do sed -n ''$$i'p' $$ORTHOINPUT | tr ' ' '\n' | grep -f - $$(find ${DIR}/orthofuse/${RUNOUT}/ -name contigs.csv 2> /dev/null) | awk -F, 'BEGIN {max = 0} {if ($$9>max) max=$$9} END {print $$1 "\t" max}' | tee -a ${DIR}/orthofuse/${RUNOUT}/good.list; done && \
 	for i in $$(eval echo "{1..$$END}") ; do sed -n ''$$i'p' $$ORTHOINPUT | tr ' ' '\n' > ${DIR}/orthofuse/${RUNOUT}/$$i.txt; done && \
 	ls ${DIR}/orthofuse/${RUNOUT}/*txt | parallel -j $(CPU) "grep -wf {} $$(find ${DIR}/orthofuse/${RUNOUT}/ -name contigs.csv 2> /dev/null) > {1}.out" && \
 	find ${DIR}/orthofuse/${RUNOUT}/ -name *txt -delete && \
