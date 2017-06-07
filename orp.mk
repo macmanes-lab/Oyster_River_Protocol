@@ -22,8 +22,6 @@ LINEAGE=
 BUSCOUT := BUSCO_$(shell basename ${ASSEMBLY} .fasta)
 BUSCODB :=
 START=1
-#END := $$(wc -l $$(find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}')
-#ORTHOINPUT := $$(find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name Orthogroups.txt)
 
 prep: setup run_scripts
 main: subsamp_reads run_rcorrector run_skewer rcorr_trinity rcorr_spades rcorr_shannon orthofusing
