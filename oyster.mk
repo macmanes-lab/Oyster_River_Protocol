@@ -26,7 +26,7 @@ INPUT := $(shell basename ${READ1})
 
 
 prep: setup run_scripts
-main: run_rcorrector run_skewer rcorr_trinity rcorr_spades rcorr_shannon orthofusing report
+main: run_rcorrector run_trimmomatic run_trinity run_spades run_shannon orthofusing report
 report:busco.done transrate.done reportgen
 busco:busco.done
 transrate:transrate.done
@@ -54,14 +54,14 @@ run_rcorrector:
 	mv $$(find ${DIR}/rcorr/ -name $${short}*R1.cor* 2> /dev/null) ${DIR}/rcorr/${RUNOUT}.1.cor.fq
 	mv $$(find ${DIR}/rcorr/ -name $${short}*R2.cor* 2> /dev/null) ${DIR}/rcorr/${RUNOUT}.2.cor.fq
 
-run_skewer:
-	skewer -l 25 -m pe -o ${DIR}/rcorr/${RUNOUT}.skewer --mean-quality 2 --end-quality 2 -t $(CPU) -x ${DIR}/scripts/barcodes.fa ${DIR}/rcorr/${RUNOUT}.1.cor.fq ${DIR}/rcorr/${RUNOUT}.2.cor.fq
+run_trimmomatic:
+	trimmomatic PE -threads $(CPU) -baseout ${DIR}/rcorr/${RUNOUT}.TRIM ${DIR}/rcorr/${RUNOUT}.1.cor.fq ${DIR}/rcorr/${RUNOUT}.2.cor.fq  LEADING:3 TRAILING:3 ILLUMINACLIP:${DIR}/scripts/barcodes.fa:2:30:10 MINLEN:25
 
-rcorr_trinity:
+run_trinity:
 	cd ${DIR}/assemblies && \
 	Trinity --no_normalize_reads --seqType fq --output ${RUNOUT}.trinity --max_memory 50G --left ${DIR}/rcorr/${RUNOUT}.skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/${RUNOUT}.skewer-trimmed-pair2.fastq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup
 
-rcorr_spades:
+run_spades:
 	cd ${DIR}/assemblies && \
 	rnaspades.py -o ${RUNOUT}.spades_k75 --threads $(CPU) --memory 100 -k 75 -1 ${DIR}/rcorr/${RUNOUT}.skewer-trimmed-pair1.fastq -2 ${DIR}/rcorr/${RUNOUT}.skewer-trimmed-pair2.fastq && \
 	rnaspades.py -o ${RUNOUT}.spades_k55 --threads $(CPU) --memory 100 -k 55 -1 ${DIR}/rcorr/${RUNOUT}.skewer-trimmed-pair1.fastq -2 ${DIR}/rcorr/${RUNOUT}.skewer-trimmed-pair2.fastq && \
@@ -69,7 +69,7 @@ rcorr_spades:
 	mv ${RUNOUT}.spades_k75/transcripts.fasta ${RUNOUT}.transcripts75.fasta  && \
 	rm -fr ${RUNOUT}.spades_k55 ${RUNOUT}.spades_k75
 
-rcorr_shannon:
+run_shannon:
 	cd ${DIR}/assemblies && \
 	python $$(which shannon.py) -o ${RUNOUT}.shannon --left ${DIR}/rcorr/${RUNOUT}.skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/${RUNOUT}.skewer-trimmed-pair2.fastq -p $(CPU) -K 75 && \
 	mv ${RUNOUT}.shannon/shannon.fasta ${RUNOUT}.shannon.fasta && \
