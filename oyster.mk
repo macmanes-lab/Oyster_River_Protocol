@@ -22,6 +22,7 @@ LINEAGE=
 BUSCOUT := BUSCO_$(shell basename ${ASSEMBLY} .fasta)
 BUSCODB :=
 START=1
+INPUT := $(shell basename ${READ1})
 
 prep: setup run_scripts
 main: run_rcorrector run_skewer rcorr_trinity rcorr_spades rcorr_shannon orthofusing report
@@ -47,8 +48,8 @@ run_scripts:
 
 run_rcorrector:
 	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 31 -1 ${READ1} -2 ${READ1} -od ${DIR}/rcorr
-	awk -F 'l:' '{print $$1}' ${DIR}/rcorr/${RUNOUT}.1.cor.fq | sed 's_ __g' > tmp && mv tmp ${DIR}/rcorr/${RUNOUT}.1.cor.fq
-	awk -F 'l:' '{print $$1}' ${DIR}/rcorr/${RUNOUT}.2.cor.fq | sed 's_ __g' > tmp && mv tmp ${DIR}/rcorr/${RUNOUT}.2.cor.fq
+	awk -F 'l:' '{print $$1}' ${DIR}/rcorr/${INPUT}.1.cor.fq | sed 's_ __g' > tmp && mv tmp ${DIR}/rcorr/${RUNOUT}.1.cor.fq
+	awk -F 'l:' '{print $$1}' ${DIR}/rcorr/${INPUT}.2.cor.fq | sed 's_ __g' > tmp && mv tmp ${DIR}/rcorr/${RUNOUT}.2.cor.fq
 
 run_skewer:
 	skewer -l 25 -m pe -o ${DIR}/rcorr/${RUNOUT}.skewer --mean-quality 2 --end-quality 2 -t $(CPU) -x ${DIR}/scripts/barcodes.fa ${DIR}/rcorr/${RUNOUT}.1.cor.fq ${DIR}/rcorr/${RUNOUT}.2.cor.fq
@@ -89,13 +90,13 @@ orthofusing:
 
 busco.done:
 	cd ${DIR}/reports && \
-	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${ASSEMBLY} -m transcriptome --cpu $(CPU) -l /mnt/lustre/macmaneslab/macmanes/BUSCODB/${LINEAGE} -o ${BUSCOUT} && \
+	python $$(which run_BUSCO.py) -i ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta -m transcriptome --cpu $(CPU) -l /mnt/lustre/macmaneslab/macmanes/BUSCODB/${LINEAGE} -o ${BUSCOUT} && \
 	touch busco.done
 
 transrate.done:
 	cd ${DIR}/reports && \
 	#transrate -o transrate_${basename ${RUNOUT}/orthomerged.fasta .fasta}  -a ${DIR}/orthofuse/${RUNOUT}/orthomerged.fasta --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} -t $(CPU) && \
-	transrate -o transrate_${basename ${ASSEMBLY} .fasta}  -a ${DIR}/assemblies/${ASSEMBLY} --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} -t $(CPU) && \
+	transrate -o transrate_${basename ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta .fasta}  -a ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} -t $(CPU) && \
 	#transrate -o transrate_${basename ${ASSEMBLY} .fasta}  -a ${DIR}/assemblies/${ASSEMBLY} --left ${DIR}/rcorr/${RUNOUT}.skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/${RUNOUT}.skewer-trimmed-pair2.fastq -t $(CPU) && \
 	touch transrate.done
 
