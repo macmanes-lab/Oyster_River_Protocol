@@ -55,11 +55,11 @@ run_rcorrector:
 	mv $$(find ${DIR}/rcorr/ -name $${short}*R2.cor* 2> /dev/null) ${DIR}/rcorr/${RUNOUT}.2.cor.fq
 
 run_trimmomatic:
-	trimmomatic PE -threads $(CPU) -baseout ${DIR}/rcorr/${RUNOUT}.TRIM ${DIR}/rcorr/${RUNOUT}.1.cor.fq ${DIR}/rcorr/${RUNOUT}.2.cor.fq  LEADING:3 TRAILING:3 ILLUMINACLIP:${DIR}/scripts/barcodes.fa:2:30:10 MINLEN:25
+	trimmomatic PE -threads $(CPU) -baseout ${DIR}/rcorr/${RUNOUT}.TRIM.fastq ${DIR}/rcorr/${RUNOUT}.1.cor.fq ${DIR}/rcorr/${RUNOUT}.2.cor.fq  LEADING:3 TRAILING:3 ILLUMINACLIP:${DIR}/scripts/barcodes.fa:2:30:10 MINLEN:25
 
 run_trinity:
 	cd ${DIR}/assemblies && \
-	Trinity --no_normalize_reads --seqType fq --output ${RUNOUT}.trinity --max_memory 50G --left ${DIR}/rcorr/${RUNOUT}.skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/${RUNOUT}.skewer-trimmed-pair2.fastq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup
+	Trinity --no_normalize_reads --seqType fq --output ${RUNOUT}.trinity --max_memory 50G --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup
 
 run_spades:
 	cd ${DIR}/assemblies && \
