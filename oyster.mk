@@ -49,10 +49,10 @@ run_scripts:
 
 run_rcorrector:
 	long=${INPUT}
-	short=${long:0:2}
+	short=$${long:0:6}
 	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 31 -1 ${READ1} -2 ${READ1} -od ${DIR}/rcorr
-	awk -F 'l:' '{print $$1}' $$(find ${DIR}/rcorr/ -name ${short}*R1.cor.fq.gz 2> /dev/null) | sed 's_ __g' > tmp && mv tmp ${DIR}/rcorr/${RUNOUT}.1.cor.fq
-	awk -F 'l:' '{print $$1}' $$(find ${DIR}/rcorr/ -name ${short}*R2.cor.fq.gz 2> /dev/null) | sed 's_ __g' > tmp && mv tmp ${DIR}/rcorr/${RUNOUT}.2.cor.fq
+	awk -F 'l:' '{print $$1}' $$(find ${DIR}/rcorr/ -name $${short}*R1.cor.fq.gz 2> /dev/null) | sed 's_ __g' > tmp && mv tmp ${DIR}/rcorr/${RUNOUT}.1.cor.fq
+	awk -F 'l:' '{print $$1}' $$(find ${DIR}/rcorr/ -name $${short}*R2.cor.fq.gz 2> /dev/null) | sed 's_ __g' > tmp && mv tmp ${DIR}/rcorr/${RUNOUT}.2.cor.fq
 
 run_skewer:
 	skewer -l 25 -m pe -o ${DIR}/rcorr/${RUNOUT}.skewer --mean-quality 2 --end-quality 2 -t $(CPU) -x ${DIR}/scripts/barcodes.fa ${DIR}/rcorr/${RUNOUT}.1.cor.fq ${DIR}/rcorr/${RUNOUT}.2.cor.fq
