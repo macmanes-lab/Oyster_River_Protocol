@@ -14,9 +14,10 @@ RCORR := ${shell which rcorrector}
 RCORRDIR := $(dir $(firstword $(RCORR)))
 READ1=
 READ2=
+INPUT1 := $(shell basename ${READ1})
 BUSCO := ${shell which run_BUSCO.py}
 BUSCODIR := $(dir $(firstword $(BUSCO)))
-DATASET := $(shell basename ${READ1} _1.fastq.gz)
+RUNOUT =
 ASSEMBLY=
 LINEAGE=
 BUSCOUT := BUSCO_$(shell basename ${ASSEMBLY} .fasta)
@@ -47,46 +48,46 @@ run_scripts:
 
 run_rcorrector:
 	cd ${DIR}/rcorr && \
-	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 31 -1 ../${READ1} -2 ../${READ1} && \
-	awk -F 'l:' '{print $$1}' ${DIR}/rcorr/${DATASET}.1.cor.fq | sed 's_ __g' > tmp && mv tmp ${DIR}/rcorr/${DATASET}.1.cor.fq && \
-	awk -F 'l:' '{print $$1}' ${DIR}/rcorr/${DATASET}.2.cor.fq | sed 's_ __g' > tmp && mv tmp ${DIR}/rcorr/${DATASET}.2.cor.fq
+	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 31 -1 ${READ1} -2 ${READ1} && \
+	awk -F 'l:' '{print $$1}' ${DIR}/rcorr/${RUNOUT}.1.cor.fq | sed 's_ __g' > tmp && mv tmp ${DIR}/rcorr/${RUNOUT}.1.cor.fq && \
+	awk -F 'l:' '{print $$1}' ${DIR}/rcorr/${RUNOUT}.2.cor.fq | sed 's_ __g' > tmp && mv tmp ${DIR}/rcorr/${RUNOUT}.2.cor.fq
 
 run_skewer:
 	cd ${DIR}/rcorr && \
-	skewer -l 25 -m pe -o ${DATASET}.skewer --mean-quality 2 --end-quality 2 -t $(CPU) -x ${DIR}/scripts/barcodes.fa ${DIR}/rcorr/${DATASET}.1.cor.fq ${DIR}/rcorr/${DATASET}.2.cor.fq
+	skewer -l 25 -m pe -o ${RUNOUT}.skewer --mean-quality 2 --end-quality 2 -t $(CPU) -x ${DIR}/scripts/barcodes.fa ${DIR}/rcorr/${RUNOUT}.1.cor.fq ${DIR}/rcorr/${RUNOUT}.2.cor.fq
 
 rcorr_trinity:
 	cd ${DIR}/assemblies && \
-	Trinity --no_normalize_reads --seqType fq --output ${DATASET}.trinity --max_memory 50G --left ${DIR}/rcorr/${DATASET}.skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/${DATASET}.skewer-trimmed-pair2.fastq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup
+	Trinity --no_normalize_reads --seqType fq --output ${RUNOUT}.trinity --max_memory 50G --left ${DIR}/rcorr/${RUNOUT}.skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/${RUNOUT}.skewer-trimmed-pair2.fastq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup
 
 rcorr_spades:
 	cd ${DIR}/assemblies && \
-	rnaspades.py -o ${DATASET}.spades_k75 --threads $(CPU) --memory 100 -k 75 -1 ${DIR}/rcorr/${DATASET}.skewer-trimmed-pair1.fastq -2 ${DIR}/rcorr/${DATASET}.skewer-trimmed-pair2.fastq && \
-	rnaspades.py -o ${DATASET}.spades_k55 --threads $(CPU) --memory 100 -k 55 -1 ${DIR}/rcorr/${DATASET}.skewer-trimmed-pair1.fastq -2 ${DIR}/rcorr/${DATASET}.skewer-trimmed-pair2.fastq && \
-	mv ${DATASET}.spades_k55/transcripts.fasta ${DATASET}.transcripts55.fasta && \
-	mv ${DATASET}.spades_k75/transcripts.fasta ${DATASET}.transcripts75.fasta  && \
-	rm -fr ${DATASET}.spades_k55 ${DATASET}.spades_k75
+	rnaspades.py -o ${RUNOUT}.spades_k75 --threads $(CPU) --memory 100 -k 75 -1 ${DIR}/rcorr/${RUNOUT}.skewer-trimmed-pair1.fastq -2 ${DIR}/rcorr/${RUNOUT}.skewer-trimmed-pair2.fastq && \
+	rnaspades.py -o ${RUNOUT}.spades_k55 --threads $(CPU) --memory 100 -k 55 -1 ${DIR}/rcorr/${RUNOUT}.skewer-trimmed-pair1.fastq -2 ${DIR}/rcorr/${RUNOUT}.skewer-trimmed-pair2.fastq && \
+	mv ${RUNOUT}.spades_k55/transcripts.fasta ${RUNOUT}.transcripts55.fasta && \
+	mv ${RUNOUT}.spades_k75/transcripts.fasta ${RUNOUT}.transcripts75.fasta  && \
+	rm -fr ${RUNOUT}.spades_k55 ${RUNOUT}.spades_k75
 
 rcorr_shannon:
 	cd ${DIR}/assemblies && \
-	python $$(which shannon.py) -o ${DATASET}.shannon --left ${DIR}/rcorr/${DATASET}.skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/${DATASET}.skewer-trimmed-pair2.fastq -p $(CPU) -K 75 && \
-	mv ${DATASET}.shannon/shannon.fasta ${DATASET}.shannon.fasta && \
-	rm -fr ${DATASET}.shannon
+	python $$(which shannon.py) -o ${RUNOUT}.shannon --left ${DIR}/rcorr/${RUNOUT}.skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/${RUNOUT}.skewer-trimmed-pair2.fastq -p $(CPU) -K 75 && \
+	mv ${RUNOUT}.shannon/shannon.fasta ${RUNOUT}.shannon.fasta && \
+	rm -fr ${RUNOUT}.shannon
 
 orthofusing:
 	cd ${DIR}/orthofuse && \
-	mkdir ${DATASET} && \
-	ln -s ${DIR}/assemblies/${DATASET}.transcripts55.fasta ${DIR}/orthofuse/${DATASET}/${DATASET}.transcripts55.fasta && \
-	ln -s ${DIR}/assemblies/${DATASET}.transcripts75.fasta ${DIR}/orthofuse/${DATASET}/${DATASET}.transcripts75.fasta && \
-	ln -s ${DIR}/assemblies/${DATASET}.trinity.Trinity.fasta ${DIR}/orthofuse/${DATASET}/${DATASET}.trinity.Trinity.fasta && \
-	ln -s ${DIR}/assemblies/${DATASET}.shannon.fasta ${DIR}/orthofuse/${DATASET}/${DATASET}.shannon.fasta && \
-	python $$(which orthofinder.py) -f ${DIR}/orthofuse/${DATASET}/ -og -t $(CPU) -a $(CPU) && \
-	cat ${DIR}/orthofuse/${DATASET}/*fasta > ${DIR}/orthofuse/${DATASET}/merged.fasta && \
-	transrate -o ${DIR}/orthofuse/${DATASET}/merged -t $(CPU) -a ${DIR}/orthofuse/${DATASET}/merged.fasta --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} && \
-	export END=$$(wc -l $$(find ${DIR}/orthofuse/${DATASET}/ -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}') && \
-	export ORTHOINPUT=$$(find ${DIR}/orthofuse/${DATASET}/ -name Orthogroups.txt 2> /dev/null) && \
-	for i in $$(eval echo "{1..$$END}") ; do sed -n ''$$i'p' $$ORTHOINPUT | tr ' ' '\n' | grep -f - $$(find ${DIR}/orthofuse/${DATASET}/ -name contigs.csv 2> /dev/null) | awk -F, 'BEGIN {max = 0} {if ($$9>max) max=$$9} END {print $$1 "\t" max}' | tee -a ${DIR}/orthofuse/${DATASET}/good.list; done && \
-	python $$(which filter.py) ${DIR}/orthofuse/${DATASET}/merged.fasta <(awk '{print $$1}' ${DATASET}/good.list) > ${DIR}/orthofuse/${DATASET}/${DATASET}.orthomerged.fasta && \
+	mkdir ${RUNOUT} && \
+	ln -s ${DIR}/assemblies/${RUNOUT}.transcripts55.fasta ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.transcripts55.fasta && \
+	ln -s ${DIR}/assemblies/${RUNOUT}.transcripts75.fasta ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.transcripts75.fasta && \
+	ln -s ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.trinity.Trinity.fasta && \
+	ln -s ${DIR}/assemblies/${RUNOUT}.shannon.fasta ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.shannon.fasta && \
+	python $$(which orthofinder.py) -f ${DIR}/orthofuse/${RUNOUT}/ -og -t $(CPU) -a $(CPU) && \
+	cat ${DIR}/orthofuse/${RUNOUT}/*fasta > ${DIR}/orthofuse/${RUNOUT}/merged.fasta && \
+	transrate -o ${DIR}/orthofuse/${RUNOUT}/merged -t $(CPU) -a ${DIR}/orthofuse/${RUNOUT}/merged.fasta --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} && \
+	export END=$$(wc -l $$(find ${DIR}/orthofuse/${RUNOUT}/ -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}') && \
+	export ORTHOINPUT=$$(find ${DIR}/orthofuse/${RUNOUT}/ -name Orthogroups.txt 2> /dev/null) && \
+	for i in $$(eval echo "{1..$$END}") ; do sed -n ''$$i'p' $$ORTHOINPUT | tr ' ' '\n' | grep -f - $$(find ${DIR}/orthofuse/${RUNOUT}/ -name contigs.csv 2> /dev/null) | awk -F, 'BEGIN {max = 0} {if ($$9>max) max=$$9} END {print $$1 "\t" max}' | tee -a ${DIR}/orthofuse/${RUNOUT}/good.list; done && \
+	python $$(which filter.py) ${DIR}/orthofuse/${RUNOUT}/merged.fasta <(awk '{print $$1}' ${RUNOUT}/good.list) > ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta && \
 	touch orthofuse.done
 
 busco.done:
@@ -96,9 +97,9 @@ busco.done:
 
 transrate.done:
 	cd ${DIR}/reports && \
-	#transrate -o transrate_${basename ${DATASET}/orthomerged.fasta .fasta}  -a ${DIR}/orthofuse/${DATASET}/orthomerged.fasta --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} -t $(CPU) && \
+	#transrate -o transrate_${basename ${RUNOUT}/orthomerged.fasta .fasta}  -a ${DIR}/orthofuse/${RUNOUT}/orthomerged.fasta --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} -t $(CPU) && \
 	transrate -o transrate_${basename ${ASSEMBLY} .fasta}  -a ${DIR}/assemblies/${ASSEMBLY} --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} -t $(CPU) && \
-	#transrate -o transrate_${basename ${ASSEMBLY} .fasta}  -a ${DIR}/assemblies/${ASSEMBLY} --left ${DIR}/rcorr/${DATASET}.skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/${DATASET}.skewer-trimmed-pair2.fastq -t $(CPU) && \
+	#transrate -o transrate_${basename ${ASSEMBLY} .fasta}  -a ${DIR}/assemblies/${ASSEMBLY} --left ${DIR}/rcorr/${RUNOUT}.skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/${RUNOUT}.skewer-trimmed-pair2.fastq -t $(CPU) && \
 	touch transrate.done
 
 reportgen:
