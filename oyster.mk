@@ -4,7 +4,7 @@ SHELL=/bin/bash -o pipefail
 
 #USAGE:
 #
-#	oyster.mk prep main READ1= READ2= CPU=24
+#	oyster.mk prep main READ1= READ2= CPU=24 RUNOUT=runname
 #
 
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
@@ -14,7 +14,6 @@ RCORR := ${shell which rcorrector}
 RCORRDIR := $(dir $(firstword $(RCORR)))
 READ1=
 READ2=
-INPUT1 := $(shell basename ${READ1})
 BUSCO := ${shell which run_BUSCO.py}
 BUSCODIR := $(dir $(firstword $(BUSCO)))
 RUNOUT =
@@ -47,14 +46,12 @@ run_scripts:
 	wget https://raw.githubusercontent.com/macmanes/read_error_corr/master/barcodes.fa
 
 run_rcorrector:
-	cd ${DIR}/rcorr && \
-	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 31 -1 ${READ1} -2 ${READ1} && \
-	awk -F 'l:' '{print $$1}' ${DIR}/rcorr/${RUNOUT}.1.cor.fq | sed 's_ __g' > tmp && mv tmp ${DIR}/rcorr/${RUNOUT}.1.cor.fq && \
+	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 31 -1 ${READ1} -2 ${READ1} -od ${DIR}/rcorr
+	awk -F 'l:' '{print $$1}' ${DIR}/rcorr/${RUNOUT}.1.cor.fq | sed 's_ __g' > tmp && mv tmp ${DIR}/rcorr/${RUNOUT}.1.cor.fq
 	awk -F 'l:' '{print $$1}' ${DIR}/rcorr/${RUNOUT}.2.cor.fq | sed 's_ __g' > tmp && mv tmp ${DIR}/rcorr/${RUNOUT}.2.cor.fq
 
 run_skewer:
-	cd ${DIR}/rcorr && \
-	skewer -l 25 -m pe -o ${RUNOUT}.skewer --mean-quality 2 --end-quality 2 -t $(CPU) -x ${DIR}/scripts/barcodes.fa ${DIR}/rcorr/${RUNOUT}.1.cor.fq ${DIR}/rcorr/${RUNOUT}.2.cor.fq
+	skewer -l 25 -m pe -o ${DIR}/rcorr/${RUNOUT}.skewer --mean-quality 2 --end-quality 2 -t $(CPU) -x ${DIR}/scripts/barcodes.fa ${DIR}/rcorr/${RUNOUT}.1.cor.fq ${DIR}/rcorr/${RUNOUT}.2.cor.fq
 
 rcorr_trinity:
 	cd ${DIR}/assemblies && \
