@@ -81,7 +81,7 @@ rcorr_shannon:
 
 orthofusing:
 	cd ${DIR}/orthofuse && \
-	mkdir ${DATASET}.${SAMP} && \
+	mkdir -p ${DATASET}.${SAMP} && \
 	ln -s ${DIR}/assemblies/${DATASET}.${SAMP}.transcripts55.fasta ${DIR}/orthofuse/${DATASET}.${SAMP}/${DATASET}.${SAMP}.transcripts55.fasta && \
 	ln -s ${DIR}/assemblies/${DATASET}.${SAMP}.transcripts75.fasta ${DIR}/orthofuse/${DATASET}.${SAMP}/${DATASET}.${SAMP}.transcripts75.fasta && \
 	ln -s ${DIR}/assemblies/${DATASET}.${SAMP}.trinity.Trinity.fasta ${DIR}/orthofuse/${DATASET}.${SAMP}/${DATASET}.${SAMP}.trinity.Trinity.fasta && \
