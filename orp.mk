@@ -92,7 +92,7 @@ orthofusing:
 	export END=$$(wc -l $$(find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}') && \
 	export ORTHOINPUT=$$(find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name Orthogroups.txt 2> /dev/null) && \
 	for i in $$(eval echo "{1..$$END}") ; do sed -n ''$$i'p' $$ORTHOINPUT | tr ' ' '\n' > ${DIR}/orthofuse/${DATASET}.${SAMP}/$$i.txt; done && \
-	find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name *txt 2> /dev/null | parallel -j $(CPU) "grep -wf {} $$(find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name contigs.csv 2> /dev/null) > ${DIR}/orthofuse/${DATASET}.${SAMP}/{1}.out" && \
+	find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name *txt 2> /dev/null | parallel -j $(CPU) "grep -wf {} $$(find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name contigs.csv 2> /dev/null) > {1}.out" && \
 	find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name *txt -delete && \
 	find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name *out 2> /dev/null | parallel -j $(CPU) "awk -F, 'BEGIN {max = 0} {if (\$$9>max) max=\$$9} END {print \$$1 \"\\t\" max}'" | tee -a ${DIR}/orthofuse/${DATASET}.${SAMP}/good.list && \
 	find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name *out -delete && \
