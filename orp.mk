@@ -91,12 +91,13 @@ orthofusing:
 	transrate -o ${DIR}/orthofuse/${DATASET}.${SAMP}/merged -t $(CPU) -a ${DIR}/orthofuse/${DATASET}.${SAMP}/merged.fasta --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} && \
 	export END=$$(wc -l $$(find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}') && \
 	export ORTHOINPUT=$$(find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name Orthogroups.txt 2> /dev/null) && \
-	#for i in $$(eval echo "{1..$$END}") ; do sed -n ''$$i'p' $$ORTHOINPUT | tr ' ' '\n' | grep -f - $$(find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name contigs.csv 2> /dev/null) | awk -F, 'BEGIN {max = 0} {if ($$9>max) max=$$9} END {print $$1 "\t" max}' | tee -a ${DIR}/orthofuse/${DATASET}.${SAMP}/good.list; done && \
-	for i in $$(eval echo "{1..$$END}") ; do sed -n ''$$i'p' $$ORTHOINPUT | tr ' ' '\n' > ${DIR}/orthofuse/${DATASET}.${SAMP}/$$i.txt; done && \
-	ls ${DIR}/orthofuse/${DATASET}.${SAMP}/*txt | parallel -j $(CPU) "grep -wf {} $$(find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name contigs.csv 2> /dev/null) > ${DIR}/orthofuse/${DATASET}.${SAMP}/{1}.out" && \
-	find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name *txt -delete && \
-	ls ${DIR}/orthofuse/${DATASET}.${SAMP}/*out | parallel -j $(CPU) "awk -F, 'BEGIN {max = 0} {if (\$$9>max) max=\$$9} END {print \$$1 \"\\t\" max}'" | tee -a ${DIR}/orthofuse/${DATASET}.${SAMP}/good.list && \
-	find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name *out -delete && \
+	for i in $$(eval echo "{1..$$END}") ; do
+	  sed -n ''$$i'p' $$ORTHOINPUT \
+	  | tr ' ' '\n' \
+	  | parallel -j $(CPU) "grep -wf {} $$(find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name contigs.csv 2> /dev/null)" \
+	  | parallel -j $(CPU) "awk -F, 'BEGIN {max = 0} {if (\$$9>max) max=\$$9} END {print \$$1 \"\\t\" max}'" \
+	  | tee -a ${DIR}/orthofuse/${DATASET}.${SAMP}/good.list;
+	done && \
 	python $$(which filter.py) ${DIR}/orthofuse/${DATASET}.${SAMP}/merged.fasta <(awk '{print $$1}' ${DIR}/orthofuse/${DATASET}.${SAMP}/good.list) > ${DIR}/orthofuse/${DATASET}.${SAMP}/${DATASET}.${SAMP}.orthomerged.fasta && \
 	touch orthofuse.done
 
