@@ -91,14 +91,14 @@ orthofusing:
 	transrate -o ${DIR}/orthofuse/${DATASET}.${SAMP}/merged -t $(CPU) -a ${DIR}/orthofuse/${DATASET}.${SAMP}/merged.fasta --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} && \
 	export END=$$(wc -l $$(find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}') && \
 	export ORTHOINPUT=$$(find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name Orthogroups.txt 2> /dev/null) && \
-	for i in $$(eval echo "{1..$$END}") ; do sed -n ''$$i'p' $$ORTHOINPUT | tr ' ' '\n' > ${DIR}/orthofuse/${DATASET}.${SAMP}/$$i.txt; done && \
+	for i in $$(eval echo "{1..$$END}") ; do sed -n ''$$i'p' $$ORTHOINPUT | tr ' ' '\n' > ${DIR}/orthofuse/${DATASET}.${SAMP}/$$i.groups; done && \
 	echo All the text files are made, start GREP  && \
-	find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name *txt 2> /dev/null | parallel -j $(CPU) "grep -wf {} $$(find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name contigs.csv 2> /dev/null) > {1}.out 2> /dev/null" && \
+	find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name *groups 2> /dev/null | parallel -j $(CPU) "grep -wf {} $$(find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name contigs.csv 2> /dev/null) > {1}.orthout 2> /dev/null" && \
 	echo About to delete all the text files  && \
-	find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name *txt -delete && \
+	find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name *groups -delete && \
 	echo Search output files  && \
-	find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name *out 2> /dev/null | parallel -j $(CPU) "awk -F, 'BEGIN {max = 0} {if (\$$9>max) max=\$$9} END {print \$$1 \"\\t\" max}'" | tee -a ${DIR}/orthofuse/${DATASET}.${SAMP}/good.list && \
-	find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name *out -delete && \
+	find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name *orthout 2> /dev/null | parallel -j $(CPU) "awk -F, 'BEGIN {max = 0} {if (\$$9>max) max=\$$9} END {print \$$1 \"\\t\" max}'" | tee -a ${DIR}/orthofuse/${DATASET}.${SAMP}/good.list && \
+	find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name *orthout -delete && \
 	python $$(which filter.py) ${DIR}/orthofuse/${DATASET}.${SAMP}/merged.fasta <(awk '{print $$1}' ${DIR}/orthofuse/${DATASET}.${SAMP}/good.list) > ${DIR}/orthofuse/${DATASET}.${SAMP}/${DATASET}.${SAMP}.orthomerged.fasta && \
 	touch orthofuse.done
 
