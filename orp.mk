@@ -93,7 +93,7 @@ orthofusing:
 	export ORTHOINPUT=$$(find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name Orthogroups.txt 2> /dev/null) && \
 	for i in $$(eval echo "{1..$$END}") ; do sed -n ''$$i'p' $$ORTHOINPUT | tr ' ' '\n' > ${DIR}/orthofuse/${DATASET}.${SAMP}/$$i.txt; done && \
 	echo All the text files are made, start GREP  && \
-	find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name *txt 2> /dev/null | parallel -j $(CPU) "grep -wf {} $$(find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name contigs.csv 2> /dev/null) > {1}.out" && \
+	find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name *txt 2> /dev/null | parallel -j $(CPU) "grep -wf {} $$(find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name contigs.csv 2> /dev/null) > {1}.out 2> /dev/null" && \
 	echo About to delete all the text files  && \
 	find ${DIR}/orthofuse/${DATASET}.${SAMP}/ -name *txt -delete && \
 	echo Search output files  && \
