@@ -84,7 +84,7 @@ orthofusing:
 	ln -s ${DIR}/assemblies/${RUNOUT}.shannon.fasta ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.shannon.fasta && \
 	python $$(which orthofuser.py) -f ${DIR}/orthofuse/${RUNOUT}/ -og -t $(CPU) -a $(CPU) && \
 	cat ${DIR}/orthofuse/${RUNOUT}/*fasta > ${DIR}/orthofuse/${RUNOUT}/merged.fasta && \
-	transrate -o ${DIR}/orthofuse/${RUNOUT}/merged -t $(CPU) -a ${DIR}/orthofuse/${RUNOUT}/merged.fasta --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} && \
+	transrate -o ${DIR}/orthofuse/${RUNOUT}/merged -t $(CPU) -a ${DIR}/orthofuse/${RUNOUT}/merged.fasta --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq && \
 	export END=$$(wc -l $$(find ${DIR}/orthofuse/${RUNOUT}/ -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}') && \
 	export ORTHOINPUT=$$(find ${DIR}/orthofuse/${RUNOUT}/ -name Orthogroups.txt 2> /dev/null) && \
 	for i in $$(eval echo "{1..$$END}") ; do sed -n ''$$i'p' $$ORTHOINPUT | tr ' ' '\n' > ${DIR}/orthofuse/${RUNOUT}/$$i.groups; done && \
@@ -106,7 +106,7 @@ busco.done:
 transrate.done:
 	cd ${DIR}/reports && \
 	#transrate -o transrate_${basename ${RUNOUT}/orthomerged.fasta .fasta}  -a ${DIR}/orthofuse/${RUNOUT}/orthomerged.fasta --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} -t $(CPU) && \
-	transrate -o transrate_${basename ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta .fasta}  -a ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq --right ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq -t $(CPU) && \
+	transrate -o transrate_${basename ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta .fasta}  -a ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq -t $(CPU) && \
 	#transrate -o transrate_${basename ${ASSEMBLY} .fasta}  -a ${DIR}/assemblies/${ASSEMBLY} --left ${DIR}/rcorr/${RUNOUT}.skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/${RUNOUT}.skewer-trimmed-pair2.fastq -t $(CPU) && \
 	touch transrate.done
 
