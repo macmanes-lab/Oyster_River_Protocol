@@ -51,8 +51,8 @@ run_rcorrector:
 	long=${INPUT}
 	short=$${long:0:6}
 	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 31 -1 ${READ1} -2 ${READ2} -od ${DIR}/rcorr
-	mv $$(find ${DIR}/rcorr/ -name $${short}*1.cor* 2> /dev/null) ${DIR}/rcorr/${RUNOUT}.1.cor.fq
-	mv $$(find ${DIR}/rcorr/ -name $${short}*2.cor* 2> /dev/null) ${DIR}/rcorr/${RUNOUT}.2.cor.fq
+	mv $$(find ${DIR}/rcorr/ -name $$(basename "$READ1" | cut -d. -f1)* 2> /dev/null) ${DIR}/rcorr/${RUNOUT}.1.cor.fq
+	mv $$(find ${DIR}/rcorr/ -name $$(basename "$READ2" | cut -d. -f1)*  2> /dev/null) ${DIR}/rcorr/${RUNOUT}.2.cor.fq
 
 run_trimmomatic:
 	trimmomatic PE -threads $(CPU) -baseout ${DIR}/rcorr/${RUNOUT}.TRIM.fastq ${DIR}/rcorr/${RUNOUT}.1.cor.fq ${DIR}/rcorr/${RUNOUT}.2.cor.fq  LEADING:3 TRAILING:3 ILLUMINACLIP:${DIR}/scripts/barcodes.fa:2:30:10 MINLEN:25
@@ -77,7 +77,7 @@ run_shannon:
 
 orthofusing:
 	cd ${DIR}/orthofuse && \
-	mkdir ${RUNOUT} && \
+	mkdir -p ${RUNOUT} && \
 	ln -s ${DIR}/assemblies/${RUNOUT}.transcripts55.fasta ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.transcripts55.fasta && \
 	ln -s ${DIR}/assemblies/${RUNOUT}.transcripts75.fasta ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.transcripts75.fasta && \
 	ln -s ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.trinity.Trinity.fasta && \
