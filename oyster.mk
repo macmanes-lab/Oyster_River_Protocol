@@ -26,7 +26,7 @@ INPUT := $(shell basename ${READ1})
 
 
 prep: setup run_scripts
-main: run_rcorrector run_trimmomatic run_trinity run_spades run_shannon orthofusing report
+main: run_trimmomatic run_rcorrector run_trinity run_spades run_shannon orthofusing report
 report:busco.done transrate.done reportgen
 busco:busco.done
 transrate:transrate.done
@@ -47,19 +47,17 @@ run_scripts:
 	curl -LO https://raw.githubusercontent.com/macmanes-lab/general/master/filter.py && \
 	wget https://raw.githubusercontent.com/macmanes/read_error_corr/master/barcodes.fa
 
-run_rcorrector:
-	long=${INPUT}
-	short=$${long:0:6}
-	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 31 -1 ${READ1} -2 ${READ2} -od ${DIR}/rcorr
-	mv $$(find ${DIR}/rcorr/ -name $$(basename "$READ1" | cut -d. -f1)* 2> /dev/null) ${DIR}/rcorr/${RUNOUT}.1.cor.fq
-	mv $$(find ${DIR}/rcorr/ -name $$(basename "$READ2" | cut -d. -f1)*  2> /dev/null) ${DIR}/rcorr/${RUNOUT}.2.cor.fq
-
 run_trimmomatic:
-	trimmomatic PE -threads $(CPU) -baseout ${DIR}/rcorr/${RUNOUT}.TRIM.fastq ${DIR}/rcorr/${RUNOUT}.1.cor.fq ${DIR}/rcorr/${RUNOUT}.2.cor.fq  LEADING:3 TRAILING:3 ILLUMINACLIP:${DIR}/scripts/barcodes.fa:2:30:10 MINLEN:25
+	trimmomatic PE -threads $(CPU) -baseout ${DIR}/rcorr/${RUNOUT}.TRIM.fastq ${READ1} ${READ2}  LEADING:3 TRAILING:3 ILLUMINACLIP:${DIR}/scripts/barcodes.fa:2:30:10 MINLEN:25
+
+
+run_rcorrector:
+	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 31 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq -od ${DIR}/rcorr
+
 
 run_trinity:
 	cd ${DIR}/assemblies && \
-	Trinity --no_normalize_reads --seqType fq --output ${RUNOUT}.trinity --max_memory 50G --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup
+	Trinity --no_normalize_reads --seqType fq --output ${RUNOUT}.trinity --max_memory 50G --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fastq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fastq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup
 
 run_spades:
 	cd ${DIR}/assemblies && \
