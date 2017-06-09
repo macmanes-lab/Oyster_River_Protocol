@@ -10,7 +10,7 @@ Contact Information
 
     - Gitter (preferred) |ImageLink|_
     - Email (good): Matthew.MacManes@unh.edu
-    - Twitter (good):  `@macmanes <http://twitter.com/macmanes>`_
+    - Twitter (good):  `@MacManes <http://twitter.com/macmanes>`_
     - Phone (discouraged): 603-862-4052
     - Office (I'm hiding under my desk): 189 Rudman Hall
 
