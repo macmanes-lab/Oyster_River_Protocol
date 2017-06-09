@@ -61,8 +61,8 @@ run_trinity:
 
 run_spades:
 	cd ${DIR}/assemblies && \
-	rnaspades.py -o ${RUNOUT}.spades_k75 --threads $(CPU) --memory 100 -k 75 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq && \
-	rnaspades.py -o ${RUNOUT}.spades_k55 --threads $(CPU) --memory 100 -k 55 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq && \
+	rnaspades.py --only-assembler -o ${RUNOUT}.spades_k75 --threads $(CPU) --memory 100 -k 75 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq && \
+	rnaspades.py --only-assembler -o ${RUNOUT}.spades_k55 --threads $(CPU) --memory 100 -k 55 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq && \
 	mv ${RUNOUT}.spades_k55/transcripts.fasta ${RUNOUT}.transcripts55.fasta && \
 	mv ${RUNOUT}.spades_k75/transcripts.fasta ${RUNOUT}.transcripts75.fasta  && \
 	rm -fr ${RUNOUT}.spades_k55 ${RUNOUT}.spades_k75
