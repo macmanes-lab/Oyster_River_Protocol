@@ -57,19 +57,19 @@ run_rcorrector:
 
 run_trinity:
 	cd ${DIR}/assemblies && \
-	Trinity --no_normalize_reads --seqType fq --output ${RUNOUT}.trinity --max_memory 50G --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fastq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fastq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup
+	Trinity --no_normalize_reads --seqType fq --output ${RUNOUT}.trinity --max_memory 50G --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup
 
 run_spades:
 	cd ${DIR}/assemblies && \
-	rnaspades.py -o ${RUNOUT}.spades_k75 --threads $(CPU) --memory 100 -k 75 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq && \
-	rnaspades.py -o ${RUNOUT}.spades_k55 --threads $(CPU) --memory 100 -k 55 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq && \
+	rnaspades.py -o ${RUNOUT}.spades_k75 --threads $(CPU) --memory 100 -k 75 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq && \
+	rnaspades.py -o ${RUNOUT}.spades_k55 --threads $(CPU) --memory 100 -k 55 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq && \
 	mv ${RUNOUT}.spades_k55/transcripts.fasta ${RUNOUT}.transcripts55.fasta && \
 	mv ${RUNOUT}.spades_k75/transcripts.fasta ${RUNOUT}.transcripts75.fasta  && \
 	rm -fr ${RUNOUT}.spades_k55 ${RUNOUT}.spades_k75
 
 run_shannon:
 	cd ${DIR}/assemblies && \
-	python $$(which shannon.py) -o ${RUNOUT}.shannon --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq -p $(CPU) -K 75 && \
+	python $$(which shannon.py) -o ${RUNOUT}.shannon --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -p $(CPU) -K 75 && \
 	mv ${RUNOUT}.shannon/shannon.fasta ${RUNOUT}.shannon.fasta && \
 	rm -fr ${RUNOUT}.shannon
 
@@ -82,7 +82,7 @@ orthofusing:
 	ln -s ${DIR}/assemblies/${RUNOUT}.shannon.fasta ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.shannon.fasta && \
 	python $$(which orthofuser.py) -f ${DIR}/orthofuse/${RUNOUT}/ -og -t $(CPU) -a $(CPU) && \
 	cat ${DIR}/orthofuse/${RUNOUT}/*fasta > ${DIR}/orthofuse/${RUNOUT}/merged.fasta && \
-	transrate -o ${DIR}/orthofuse/${RUNOUT}/merged -t $(CPU) -a ${DIR}/orthofuse/${RUNOUT}/merged.fasta --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq && \
+	transrate -o ${DIR}/orthofuse/${RUNOUT}/merged -t $(CPU) -a ${DIR}/orthofuse/${RUNOUT}/merged.fasta --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq && \
 	export END=$$(wc -l $$(find ${DIR}/orthofuse/${RUNOUT}/ -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}') && \
 	export ORTHOINPUT=$$(find ${DIR}/orthofuse/${RUNOUT}/ -name Orthogroups.txt 2> /dev/null) && \
 	for i in $$(eval echo "{1..$$END}") ; do sed -n ''$$i'p' $$ORTHOINPUT | tr ' ' '\n' > ${DIR}/orthofuse/${RUNOUT}/$$i.groups; done && \
@@ -104,7 +104,7 @@ busco.done:
 transrate.done:
 	cd ${DIR}/reports && \
 	#transrate -o transrate_${basename ${RUNOUT}/orthomerged.fasta .fasta}  -a ${DIR}/orthofuse/${RUNOUT}/orthomerged.fasta --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} -t $(CPU) && \
-	transrate -o transrate_${basename ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta .fasta}  -a ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq -t $(CPU) && \
+	transrate -o transrate_${basename ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta .fasta}  -a ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -t $(CPU) && \
 	#transrate -o transrate_${basename ${ASSEMBLY} .fasta}  -a ${DIR}/assemblies/${ASSEMBLY} --left ${DIR}/rcorr/${RUNOUT}.skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/${RUNOUT}.skewer-trimmed-pair2.fastq -t $(CPU) && \
 	touch transrate.done
 
