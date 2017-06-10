@@ -102,10 +102,6 @@ orthofusing:
 	python $$(which filter.py) ${DIR}/orthofuse/${DATASET}.${SAMP}/merged.fasta <(awk '{print $$1}' ${DIR}/orthofuse/${DATASET}.${SAMP}/good.list) > ${DIR}/orthofuse/${DATASET}.${SAMP}/${DATASET}.${SAMP}.orthomerged.fasta && \
 	touch orthofuse.done
 
-transfuse:
-	cd ${DIR}/assemblies && \
-	transfuse -t $(CPU) -i 0.98 -o ${DATASET}.${SAMP}.transfuse.fasta -l ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair1.fastq -r ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair2.fastq -a ${DATASET}.${SAMP}.transcripts55.fasta,${DATASET}.${SAMP}.transcripts75.fasta,${DATASET}.${SAMP}.trinity.Trinity.fasta,${DATASET}.${SAMP}.shannon.fasta
-
 busco.done:
 	cd ${DIR}/reports && \
 	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${ASSEMBLY} -m transcriptome --cpu $(CPU) -l /mnt/lustre/macmaneslab/macmanes/BUSCODB/${LINEAGE} -o ${BUSCOUT} && \
@@ -113,7 +109,7 @@ busco.done:
 
 transrate.done:
 	cd ${DIR}/reports && \
-	transrate -o transrate_${basename ${ASSEMBLY} .fasta}  -a ${DIR}/assemblies/${ASSEMBLY} --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} -t $(CPU) && \
+	transrate -o transrate_$(basename ${ASSEMBLY} .fasta)  -a ${DIR}/assemblies/${ASSEMBLY} --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} -t $(CPU) && \
 	touch transrate.done
 
 reportgen:
