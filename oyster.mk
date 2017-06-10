@@ -25,6 +25,8 @@ START=1
 INPUT := $(shell basename ${READ1})
 
 
+run_trimmomatic:${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq
+
 prep: setup run_scripts
 main: run_trimmomatic run_rcorrector run_trinity run_spades run_shannon orthofusing report
 report:busco.done transrate.done reportgen
@@ -32,7 +34,7 @@ busco:busco.done
 transrate:transrate.done
 
 .DELETE_ON_ERROR:
-.PHONY:report transfuse
+.PHONY:report
 
 setup:
 	mkdir -p ${DIR}/scripts
@@ -47,7 +49,7 @@ run_scripts:
 	curl -LO https://raw.githubusercontent.com/macmanes-lab/general/master/filter.py && \
 	wget https://raw.githubusercontent.com/macmanes/read_error_corr/master/barcodes.fa
 
-run_trimmomatic:
+${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq: ${READ1} ${READ2}
 	trimmomatic PE -threads $(CPU) -baseout ${DIR}/rcorr/${RUNOUT}.TRIM.fastq ${READ1} ${READ2}  LEADING:3 TRAILING:3 ILLUMINACLIP:${DIR}/scripts/barcodes.fa:2:30:10 MINLEN:25
 
 
