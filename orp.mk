@@ -113,9 +113,7 @@ busco.done:
 
 transrate.done:
 	cd ${DIR}/reports && \
-	#transrate -o transrate_${basename ${DATASET}.${SAMP}/orthomerged.fasta .fasta}  -a ${DIR}/orthofuse/${DATASET}.${SAMP}/orthomerged.fasta --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} -t $(CPU) && \
 	transrate -o transrate_${basename ${ASSEMBLY} .fasta}  -a ${DIR}/assemblies/${ASSEMBLY} --left ${DIR}/reads/${READ1} --right ${DIR}/reads/${READ2} -t $(CPU) && \
-	#transrate -o transrate_${basename ${ASSEMBLY} .fasta}  -a ${DIR}/assemblies/${ASSEMBLY} --left ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair1.fastq --right ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair2.fastq -t $(CPU) && \
 	touch transrate.done
 
 reportgen:
