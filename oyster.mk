@@ -27,6 +27,9 @@ INPUT := $(shell basename ${READ1})
 
 run_trimmomatic:${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq
 run_rcorrector:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
+run_trinity:${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
+run_spades:${DIR}/assemblies/${RUNOUT}.transcripts55.fasta
+run_shannon:${DIR}/assemblies/${RUNOUT}.shannon.fasta
 
 prep: setup run_scripts
 main: run_trimmomatic run_rcorrector run_trinity run_spades run_shannon orthofusing report
@@ -58,11 +61,11 @@ ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq:${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq
 	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 31 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq -od ${DIR}/rcorr
 
 
-run_trinity:
+${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	cd ${DIR}/assemblies && \
 	Trinity --no_normalize_reads --seqType fq --output ${RUNOUT}.trinity --max_memory 50G --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup
 
-run_spades:
+${DIR}/assemblies/${RUNOUT}.transcripts55.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	cd ${DIR}/assemblies && \
 	rnaspades.py --only-assembler -o ${RUNOUT}.spades_k75 --threads $(CPU) --memory 100 -k 75 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq && \
 	rnaspades.py --only-assembler -o ${RUNOUT}.spades_k55 --threads $(CPU) --memory 100 -k 55 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq && \
@@ -70,7 +73,7 @@ run_spades:
 	mv ${RUNOUT}.spades_k75/transcripts.fasta ${RUNOUT}.transcripts75.fasta  && \
 	rm -fr ${RUNOUT}.spades_k55 ${RUNOUT}.spades_k75
 
-run_shannon:
+${DIR}/assemblies/${RUNOUT}.shannon.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	cd ${DIR}/assemblies && \
 	python $$(which shannon.py) -o ${RUNOUT}.shannon --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -p $(CPU) -K 75 && \
 	mv ${RUNOUT}.shannon/shannon.fasta ${RUNOUT}.shannon.fasta && \
