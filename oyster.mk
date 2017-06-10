@@ -30,6 +30,7 @@ run_rcorrector:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 run_trinity:${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
 run_spades:${DIR}/assemblies/${RUNOUT}.transcripts55.fasta
 run_shannon:${DIR}/assemblies/${RUNOUT}.shannon.fasta
+orthofusing:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 
 prep: setup run_scripts
 main: run_trimmomatic run_rcorrector run_trinity run_spades run_shannon orthofusing report
@@ -79,7 +80,7 @@ ${DIR}/assemblies/${RUNOUT}.shannon.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	mv ${RUNOUT}.shannon/shannon.fasta ${RUNOUT}.shannon.fasta && \
 	rm -fr ${RUNOUT}.shannon
 
-orthofusing:
+${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/assemblies/${RUNOUT}.transcripts55.fasta ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta ${DIR}/assemblies/${RUNOUT}.shannon.fasta
 	cd ${DIR}/orthofuse && \
 	mkdir -p ${RUNOUT} && \
 	ln -s ${DIR}/assemblies/${RUNOUT}.transcripts55.fasta ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.transcripts55.fasta && \
