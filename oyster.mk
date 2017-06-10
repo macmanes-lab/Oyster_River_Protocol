@@ -49,7 +49,7 @@ run_scripts:
 	curl -LO https://raw.githubusercontent.com/macmanes-lab/general/master/filter.py && \
 	wget https://raw.githubusercontent.com/macmanes/read_error_corr/master/barcodes.fa
 
-${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq: ${READ1} ${READ2}
+${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq: ${READ1} ${READ2}
 	trimmomatic PE -threads $(CPU) -baseout ${DIR}/rcorr/${RUNOUT}.TRIM.fastq ${READ1} ${READ2}  LEADING:3 TRAILING:3 ILLUMINACLIP:${DIR}/scripts/barcodes.fa:2:30:10 MINLEN:25
 
 
