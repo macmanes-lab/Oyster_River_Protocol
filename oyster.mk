@@ -26,6 +26,7 @@ INPUT := $(shell basename ${READ1})
 
 
 run_trimmomatic:${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq
+run_rcorrector:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 
 prep: setup run_scripts
 main: run_trimmomatic run_rcorrector run_trinity run_spades run_shannon orthofusing report
@@ -53,7 +54,7 @@ ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq: ${READ1} ${READ2}
 	trimmomatic PE -threads $(CPU) -baseout ${DIR}/rcorr/${RUNOUT}.TRIM.fastq ${READ1} ${READ2}  LEADING:3 TRAILING:3 ILLUMINACLIP:${DIR}/scripts/barcodes.fa:2:30:10 MINLEN:25
 
 
-run_rcorrector:
+${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq:${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq
 	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 31 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq -od ${DIR}/rcorr
 
 
