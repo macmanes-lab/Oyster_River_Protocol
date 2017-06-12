@@ -37,5 +37,18 @@ blast:
 		export PATH=${DIR}/software/ncbi-blast-2.6.0+/bin:$PATH
 spades:
 	ifndef spades.py && \
+	cd ${DIR}/software && \
 	curl -LO http://cab.spbu.ru/files/release3.10.1/SPAdes-3.10.1-Linux.tar.gz && tar -zxf SPAdes-3.10.1-Linux.tar.gz && \
 	export PATH=${DIR}/software/SPAdes-3.10.1-Linux/bin:$PATH
+
+trinity:
+	ifndef Trinity && \
+	cd ${DIR}/software && \
+	git clone https://github.com/trinityrnaseq/trinityrnaseq.git && cd trinityrnaseq && make
+	export PATH=$PATH:${DIR}/software/trinityrnaseq
+
+shannon:
+	ifndef shannon.py && \
+	cd ${DIR}/software && \
+	git clone https://github.com/sreeramkannan/Shannon.git
+	export PATH=$PATH:${DIR}/software/Shannon
