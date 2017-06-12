@@ -52,3 +52,8 @@ shannon:
 	cd ${DIR}/software && \
 	git clone https://github.com/sreeramkannan/Shannon.git
 	export PATH=$PATH:${DIR}/software/Shannon
+
+seqtk:
+	ifndef seqtk && \
+	cd ${DIR}/software && \
+	git clone https://github.com/lh3/seqtk.git && cd seqtk && make
