@@ -44,7 +44,7 @@ else
 endif
 
 blast:
-ifeq "$(shell basename $(shell which blastp))" "blastww"
+ifeq "$(shell basename $(shell which blastp))" "blastw"
 	@echo "BLASTP is already installed"
 else
 	@echo "blastp is not installed, installing now..."
@@ -115,5 +115,5 @@ else
 endif
 
 postscript:
-	@echo \n\n "*** The following locations need to be added to your $$PATH ***" \n\n
+	@echo \\n\\n "*** The following locations need to be added to your PATH ***" \\n\\n
 	@cat pathfile
