@@ -13,7 +13,6 @@ DIR := ${CURDIR}
 
 all: setup brew download_scripts orthofuser blast spades trinity shannon seqtk busco trimmomatic transrate postscript
 
-define \n
 .DELETE_ON_ERROR:
 .PHONY:report
 
@@ -116,5 +115,6 @@ else
 endif
 
 postscript:
-	@echo ${\n} "*** The following locations need to be added to your PATH ***" ${\n}
+	@printf "\n\n*** The following locations need to be added to your PATH ***\n\n"
 	@cat pathfile
+	@printf "\n\n\n"
