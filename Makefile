@@ -11,7 +11,7 @@ MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
 
 
-prep: setup run_scripts
+all: setup download_scripts orthofuser blast spades trinity shannon seqtk
 
 .DELETE_ON_ERROR:
 .PHONY:report
