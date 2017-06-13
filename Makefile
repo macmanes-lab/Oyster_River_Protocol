@@ -31,10 +31,13 @@ orthofuser:
 	git clone https://github.com/macmanes-lab/OrthoFinder.git && export PATH=${DIR}/software/OrthoFinder/orthofinder:$$PATH
 
 blast:
-	ifndef blastp && \
+	ifeq (, $(shell which blastp)) && \
+		$(error "No blastp in $(PATH), installing now...") && \
 		cd ${DIR}/software && \
 		curl -LO ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.6.0+-x64-linux.tar.gz && tar -zxf ncbi-blast-2.6.0+-x64-linux.tar.gz && \
-		export PATH=${DIR}/software/ncbi-blast-2.6.0+/bin:$$PATH
+		export PATH=${DIR}/software/ncbi-blast-2.6.0+/bin:$$PATH  && \
+		endif
+
 spades:
 	ifndef spades.py && \
 	cd ${DIR}/software && \
