@@ -115,5 +115,5 @@ else
 endif
 
 postscript:
-	@echo "\n\n *** The following locations need to be added to your $PATH *** \n\n "
-	cat pathfile
+	@echo \n\n "*** The following locations need to be added to your $$PATH ***" \n\n
+	@cat pathfile
