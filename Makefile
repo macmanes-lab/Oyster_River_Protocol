@@ -27,8 +27,12 @@ download_scripts:
 	curl -LO https://raw.githubusercontent.com/macmanes-lab/general/master/filter.py
 
 orthofuser:
+ifeq "$(shell basename $(shell which orthofuser.py))" "orthofuser.py"
+	@echo "ORTHOFUSER is already installed"
+else
 	cd ${DIR}/software && \
 	git clone https://github.com/macmanes-lab/OrthoFinder.git && export PATH=${DIR}/software/OrthoFinder/orthofinder:$$PATH
+endif
 
 blast:
 ifeq "$(shell basename $(shell which blastp))" "blastp"
