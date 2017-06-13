@@ -11,7 +11,7 @@ MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
 
 
-all: setup download_scripts orthofuser blast spades trinity shannon seqtk busco
+all: brew setup download_scripts orthofuser blast spades trinity shannon seqtk busco trimmomatic
 
 .DELETE_ON_ERROR:
 .PHONY:report
@@ -22,6 +22,13 @@ setup:
 	mkdir -p ${DIR}/shared
 
 
+brew:
+ifeq "$(shell basename $(shell which brew))" "brew"
+	@echo "BREW is already installed"
+else
+	$error("*** BREW MUST BE INSTALLED BEFORE YOU CAN PROCEED, SEE: http://angus.readthedocs.io/en/2016/linuxbrew_install.html ***")
+endif
+
 download_scripts:
 	cd ${DIR}/scripts && \
 	curl -LO https://raw.githubusercontent.com/macmanes-lab/general/master/filter.py
@@ -31,16 +38,19 @@ ifeq "$(shell basename $(shell which orthofuser.py))" "orthofuser.py"
 	@echo "ORTHOFUSER is already installed"
 else
 	cd ${DIR}/software && \
-	git clone https://github.com/macmanes-lab/OrthoFinder.git && export PATH=${DIR}/software/OrthoFinder/orthofinder:$$PATH
+	git clone https://github.com/macmanes-lab/OrthoFinder.git
+	export PATH=${DIR}/software/OrthoFinder/orthofinder:$$PATH
+	@echo ${DIR}/software/OrthoFinder/orthofinder | tee -a pathfile
 endif
 
 blast:
-ifeq "$(shell basename $(shell which blastp))" "blastp"
+ifeq "$(shell basename $(shell which blastp))" "blastwww"
 	@echo "BLASTP is already installed"
 else
 	@echo "blastp is not installed, installing now..."
 	cd ${DIR}/software &$ curl -LO ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.6.0+-x64-linux.tar.gz && tar -zxf ncbi-blast-2.6.0+-x64-linux.tar.gz
 	export PATH=${DIR}/software/ncbi-blast-2.6.0+/bin:$$PATH
+	@echo ${DIR}/software/ncbi-blast-2.6.0+/bin | tee -a pathfile
 endif
 
 spades:
@@ -86,4 +96,20 @@ else
 	cd ${DIR}/software && \
 	git clone https://gitlab.com/ezlab/busco.git && cd busco && python setup.py install --user --prefix=
 	export PATH=$$PATH:${DIR}/software/busco
+endif
+
+trimmomatic:
+ifeq "$(shell basename $(shell which trimmomatic))" "trimmomatic"
+	@echo "trimmomatic is already installed"
+else
+	brew install trimmomatic
+endif
+
+transrate:
+ifeq "$(shell basename $(shell which transrate))" "transrate"
+	@echo "trimmomatic is already installed"
+else
+	cd ${DIR}/software && \
+	curl -LO https://bintray.com/artifact/download/blahah/generic/transrate-1.0.3-linux-x86_64.tar.gz && tar -zxf transrate-1.0.3-linux-x86_64.tar.gz
+	export PATH=$$PATH:${DIR}/software/transrate-1.0.3-linux-x86_64
 endif
