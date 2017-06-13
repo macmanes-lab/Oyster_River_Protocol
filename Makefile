@@ -22,7 +22,6 @@ setup:
 	@mkdir -p ${DIR}/shared
 	@rm pathfile
 
-
 brew:
 ifeq "$(shell basename $(shell which brew))" "brew"
 	@echo "BREW is already installed"
@@ -115,6 +114,6 @@ else
 endif
 
 postscript:
-	@printf "\n\n*** The following locations need to be added to your PATH ***\n\n"
+	@printf "\n\n*** The following location(s), if any print, need to be added to your PATH ***\n\n"
 	@cat pathfile
 	@printf "\n\n\n"
