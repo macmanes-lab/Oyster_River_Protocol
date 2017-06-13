@@ -11,7 +11,7 @@ MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
 
 
-all: setup download_scripts orthofuser blast spades trinity shannon seqtk
+all: setup download_scripts orthofuser blast spades trinity shannon seqtk busco
 
 .DELETE_ON_ERROR:
 .PHONY:report
@@ -77,4 +77,13 @@ else
 	cd ${DIR}/software && \
 	git clone https://github.com/lh3/seqtk.git && cd seqtk && make
 	export PATH=$$PATH:${DIR}/software/seqtk
+endif
+
+busco:
+ifeq "$(shell basename $(shell which run_BUSCO.py))" "run_BUSCO.py"
+	@echo "BUSCO is already installed"
+else
+	cd ${DIR}/software && \
+	git clone https://gitlab.com/ezlab/busco.git && cd busco && python setup.py install --user --prefix=
+	export PATH=$$PATH:${DIR}/software/busco
 endif
