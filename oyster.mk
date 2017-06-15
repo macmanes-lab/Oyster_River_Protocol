@@ -29,7 +29,7 @@ INPUT := $(shell basename ${READ1})
 run_trimmomatic:
 run_rcorrector:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 run_trinity:${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
-run_spades:${DIR}/assemblies/${RUNOUT}.transcripts55.fasta
+run_spades:${DIR}/assemblies/${RUNOUT}.spades55.fasta
 run_shannon:${DIR}/assemblies/${RUNOUT}.shannon.fasta
 orthofusing:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 
@@ -59,12 +59,12 @@ ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P
 	cd ${DIR}/assemblies && \
 	Trinity --no_normalize_reads --seqType fq --output ${RUNOUT}.trinity --max_memory $(MEM)G --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup
 
-${DIR}/assemblies/${RUNOUT}.transcripts55.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
+${DIR}/assemblies/${RUNOUT}.spades55.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	cd ${DIR}/assemblies && \
 	rnaspades.py --only-assembler -o ${RUNOUT}.spades_k75 --threads $(CPU) --memory $(MEM) -k 75 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq && \
 	rnaspades.py --only-assembler -o ${RUNOUT}.spades_k55 --threads $(CPU) --memory $(MEM) -k 55 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq && \
-	mv ${RUNOUT}.spades_k55/transcripts.fasta ${RUNOUT}.transcripts55.fasta && \
-	mv ${RUNOUT}.spades_k75/transcripts.fasta ${RUNOUT}.transcripts75.fasta  && \
+	mv ${RUNOUT}.spades_k55/transcripts.fasta ${RUNOUT}.spades55.fasta && \
+	mv ${RUNOUT}.spades_k75/transcripts.fasta ${RUNOUT}.spades75.fasta  && \
 	rm -fr ${RUNOUT}.spades_k55 ${RUNOUT}.spades_k75
 
 ${DIR}/assemblies/${RUNOUT}.shannon.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
@@ -75,11 +75,11 @@ ${DIR}/assemblies/${RUNOUT}.shannon.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	mv ${RUNOUT}.shannon/shannon.fasta ${RUNOUT}.shannon.fasta && \
 	rm -fr ${RUNOUT}.shannon
 
-${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/assemblies/${RUNOUT}.transcripts55.fasta ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta ${DIR}/assemblies/${RUNOUT}.shannon.fasta
+${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/assemblies/${RUNOUT}.spades55.fasta ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta ${DIR}/assemblies/${RUNOUT}.shannon.fasta
 	cd ${DIR}/orthofuse && \
 	mkdir -p ${RUNOUT} && \
-	ln -s ${DIR}/assemblies/${RUNOUT}.transcripts55.fasta ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.transcripts55.fasta && \
-	ln -s ${DIR}/assemblies/${RUNOUT}.transcripts75.fasta ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.transcripts75.fasta && \
+	ln -s ${DIR}/assemblies/${RUNOUT}.transcripts55.fasta ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.spades55.fasta && \
+	ln -s ${DIR}/assemblies/${RUNOUT}.transcripts75.fasta ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.spades75.fasta && \
 	ln -s ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.trinity.Trinity.fasta && \
 	ln -s ${DIR}/assemblies/${RUNOUT}.shannon.fasta ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.shannon.fasta && \
 	python $$(which orthofuser.py) -f ${DIR}/orthofuse/${RUNOUT}/ -og -t $(CPU) -a $(CPU) && \
