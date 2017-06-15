@@ -75,8 +75,8 @@ ${DIR}/assemblies/${RUNOUT}.transcripts55.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.c
 
 ${DIR}/assemblies/${RUNOUT}.shannon.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	cd ${DIR}/assemblies && \
-	seqtk seq -A ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq > $$(basename ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq .fq).fa
-	seqtk seq -A ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq > $$(basename ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq .fq).fa
+	seqtk seq -A ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq > /mouse/orthofinder/orp/rcorr/$$(basename ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq .fq).fa
+	seqtk seq -A ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq > /mouse/orthofinder/orp/rcorr/$$(basename ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq .fq).fa
 	python $$(which shannon.py) -o ${RUNOUT}.shannon --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fa --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fa -p $(CPU) -K 75 && \
 	mv ${RUNOUT}.shannon/shannon.fasta ${RUNOUT}.shannon.fasta && \
 	rm -fr ${RUNOUT}.shannon
