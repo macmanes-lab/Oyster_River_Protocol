@@ -33,7 +33,7 @@ run_spades:${DIR}/assemblies/${RUNOUT}.transcripts55.fasta
 run_shannon:${DIR}/assemblies/${RUNOUT}.shannon.fasta
 orthofusing:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 
-all: setup run_trimmomatic run_rcorrector run_trinity run_spades run_shannon orthofusing report
+main: setup run_trimmomatic run_rcorrector run_trinity run_spades run_shannon orthofusing report
 report:busco.done transrate.done reportgen
 busco:busco.done
 transrate:transrate.done
