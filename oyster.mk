@@ -107,7 +107,6 @@ ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/merged.
 	find ${DIR}/orthofuse/${RUNOUT}/ -name *orthout -delete && \
 	python $$(which filter.py) ${DIR}/orthofuse/${RUNOUT}/merged.fasta <(awk '{print $$1}' ${DIR}/orthofuse/${RUNOUT}/good.list) > ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta && \
 	cp ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
-	touch orthofuse.done
 
 busco.done:
 	cd ${DIR}/reports && \
