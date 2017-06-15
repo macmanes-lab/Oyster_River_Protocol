@@ -25,8 +25,8 @@ BUSCODB :=
 START=1
 INPUT := $(shell basename ${READ1})
 
-
-run_trimmomatic:${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq
+#${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq
+run_trimmomatic:
 run_rcorrector:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 run_trinity:${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
 run_spades:${DIR}/assemblies/${RUNOUT}.transcripts55.fasta
@@ -42,12 +42,12 @@ transrate:transrate.done
 .PHONY:report
 
 setup:
-	mkdir -p ${DIR}/scripts
-	mkdir -p ${DIR}/reads
-	mkdir -p ${DIR}/assemblies
-	mkdir -p ${DIR}/rcorr
-	mkdir -p ${DIR}/reports
-	mkdir -p ${DIR}/orthofuse
+	@mkdir -p ${DIR}/scripts
+	@mkdir -p ${DIR}/reads
+	@mkdir -p ${DIR}/assemblies
+	@mkdir -p ${DIR}/rcorr
+	@mkdir -p ${DIR}/reports
+	@mkdir -p ${DIR}/orthofuse
 
 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq:
 	trimmomatic PE -threads $(CPU) -baseout ${DIR}/rcorr/${RUNOUT}.TRIM.fastq ${READ1} ${READ2} LEADING:3 TRAILING:3 ILLUMINACLIP:${DIR}/scripts/barcodes.fa:2:30:10 MINLEN:25
