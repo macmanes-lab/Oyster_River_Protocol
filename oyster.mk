@@ -62,25 +62,24 @@ ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P
 	Trinity --no_normalize_reads --seqType fq --output ${RUNOUT}.trinity --max_memory $(MEM)G --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup
 
 ${DIR}/assemblies/${RUNOUT}.spades55.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
-	cd ${DIR}/assemblies && \
-	rnaspades.py --only-assembler -o ${RUNOUT}.spades_k55 --threads $(CPU) --memory $(MEM) -k 55 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq && \
-	mv ${RUNOUT}.spades_k55/transcripts.fasta ${RUNOUT}.spades55.fasta && \
-	rm -fr ${RUNOUT}.spades_k55
+	rnaspades.py --only-assembler -o ${DIR}/assemblies/${RUNOUT}.spades_k55 --threads $(CPU) --memory $(MEM) -k 55 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
+	mv ${DIR}/assemblies/${RUNOUT}.spades_k55/transcripts.fasta ${DIR}/assemblies/${RUNOUT}.spades55.fasta
+	rm -fr ${DIR}/assemblies/${RUNOUT}.spades_k55
 
 ${DIR}/assemblies/${RUNOUT}.spades75.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
-	cd ${DIR}/assemblies && \
-	rnaspades.py --only-assembler -o ${RUNOUT}.spades_k75 --threads $(CPU) --memory $(MEM) -k 75 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq && \
-	mv ${RUNOUT}.spades_k75/transcripts.fasta ${RUNOUT}.spades75.fasta  && \
-	rm -fr ${RUNOUT}.spades_k75
+	rnaspades.py --only-assembler -o ${DIR}/assemblies/${RUNOUT}.spades_k75 --threads $(CPU) --memory $(MEM) -k 75 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
+	mv ${DIR}/assemblies/${RUNOUT}.spades_k75/transcripts.fasta ${DIR}/assemblies/${RUNOUT}.spades75.fasta
+	rm -fr ${DIR}/assemblies/${RUNOUT}.spades_k75
 
 
-${DIR}/assemblies/${RUNOUT}.shannon.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
-	cd ${DIR}/assemblies && \
-	seqtk seq -A ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq > /mouse/orthofinder/orp/rcorr/$$(basename ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq .fq).fa && \
-	seqtk seq -A ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq > /mouse/orthofinder/orp/rcorr/$$(basename ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq .fq).fa && \
-	python $$(which shannon.py) -o ${RUNOUT}.shannon --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fa --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fa -p $(CPU) -K 75 && \
-	mv ${RUNOUT}.shannon/shannon.fasta ${RUNOUT}.shannon.fasta && \
-	rm -fr ${RUNOUT}.shannon
+/mouse/orthofinder/orp/rcorr/$$(basename ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq .fq).fa:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
+	seqtk seq -A ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq > /mouse/orthofinder/orp/rcorr/$$(basename ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq .fq).fa
+	seqtk seq -A ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq > /mouse/orthofinder/orp/rcorr/$$(basename ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq .fq).fa
+
+${DIR}/assemblies/${RUNOUT}.shannon.fasta:/mouse/orthofinder/orp/rcorr/$$(basename ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq .fq).fa
+	python $$(which shannon.py) -o ${DIR}/assemblies/${RUNOUT}.shannon --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fa --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fa -p $(CPU) -K 75
+	mv ${DIR}/assemblies/${RUNOUT}.shannon/shannon.fasta {DIR}/assemblies/${RUNOUT}.shannon.fasta
+	rm -fr {DIR}/assemblies/${RUNOUT}.shannon
 
 ${DIR}/orthofuse/${RUNOUT}/merged.fasta:${DIR}/assemblies/${RUNOUT}.spades55.fasta ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta ${DIR}/assemblies/${RUNOUT}.shannon.fasta
 	cd ${DIR}/orthofuse && \
@@ -95,8 +94,8 @@ ${DIR}/orthofuse/${RUNOUT}/merged.fasta:${DIR}/assemblies/${RUNOUT}.spades55.fas
 ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/merged.fasta
 	cd ${DIR}/orthofuse && \
 	transrate -o ${DIR}/orthofuse/${RUNOUT}/merged -t $(CPU) -a ${DIR}/orthofuse/${RUNOUT}/merged.fasta --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq && \
-	export END=$$(wc -l $$(find ${DIR}/orthofuse/${RUNOUT}/ -mmin 1 -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}') && \
-	export ORTHOINPUT=$$(find ${DIR}/orthofuse/${RUNOUT}/ -mmin 1 -name Orthogroups.txt 2> /dev/null) && \
+	export END=$$(wc -l $$(find ${DIR}/orthofuse/${RUNOUT}/ -cmin 1 -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}') && \
+	export ORTHOINPUT=$$(find ${DIR}/orthofuse/${RUNOUT}/ -cmin 1 -name Orthogroups.txt 2> /dev/null) && \
 	for i in $$(eval echo "{1..$$END}") ; do sed -n ''$$i'p' $$ORTHOINPUT | tr ' ' '\n' > ${DIR}/orthofuse/${RUNOUT}/$$i.groups; done && \
 	echo All the text files are made, start GREP  && \
 	find ${DIR}/orthofuse/${RUNOUT}/ -name *groups 2> /dev/null | parallel -j $(CPU) "grep -wf {} $$(find ${DIR}/orthofuse/${RUNOUT}/ -name contigs.csv 2> /dev/null) > {1}.orthout 2> /dev/null" && \
