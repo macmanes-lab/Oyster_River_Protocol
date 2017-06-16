@@ -68,8 +68,8 @@ rcorr_trinity:
 
 rcorr_spades:
 	cd ${DIR}/assemblies && \
-	rnaspades.py -o ${DATASET}.${SAMP}.spades_k75 --memory $(MEM) --threads $(CPU) --memory 100 -k 75 -1 ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair1.fastq -2 ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair2.fastq && \
-	rnaspades.py -o ${DATASET}.${SAMP}.spades_k55 --memory $(MEM) --threads $(CPU) --memory 100 -k 55 -1 ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair1.fastq -2 ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair2.fastq && \
+	rnaspades.py -o ${DATASET}.${SAMP}.spades_k75 --memory $(MEM) --threads $(CPU) -k 75 -1 ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair1.fastq -2 ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair2.fastq && \
+	rnaspades.py -o ${DATASET}.${SAMP}.spades_k55 --memory $(MEM) --threads $(CPU) -k 55 -1 ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair1.fastq -2 ${DIR}/rcorr/${DATASET}.${SAMP}.skewer-trimmed-pair2.fastq && \
 	mv ${DATASET}.${SAMP}.spades_k55/transcripts.fasta ${DATASET}.${SAMP}.transcripts55.fasta && \
 	mv ${DATASET}.${SAMP}.spades_k75/transcripts.fasta ${DATASET}.${SAMP}.transcripts75.fasta  && \
 	rm -fr ${DATASET}.${SAMP}.spades_k55 ${DATASET}.${SAMP}.spades_k75

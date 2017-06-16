@@ -78,7 +78,7 @@ ${DIR}/assemblies/${RUNOUT}.shannon.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 
 ${DIR}/orthofuse/${RUNOUT}/merged.fasta:${DIR}/assemblies/${RUNOUT}.spades55.fasta ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta ${DIR}/assemblies/${RUNOUT}.shannon.fasta
 	cd ${DIR}/orthofuse && \
-	mkdir -p ${RUNOUT} && \
+	mkdir -p ${DIR}/orthofuse/${RUNOUT} && \
 	ln -sf ${DIR}/assemblies/${RUNOUT}.spades55.fasta ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.spades55.fasta && \
 	ln -sf ${DIR}/assemblies/${RUNOUT}.spades75.fasta ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.spades75.fasta && \
 	ln -sf ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.trinity.Trinity.fasta && \
