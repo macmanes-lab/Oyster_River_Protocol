@@ -25,7 +25,6 @@ BUSCODB :=
 START=1
 INPUT := $(shell basename ${READ1})
 
-#${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq
 run_trimmomatic:
 run_rcorrector:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 run_trinity:${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
