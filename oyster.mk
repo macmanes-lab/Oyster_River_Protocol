@@ -83,15 +83,15 @@ ${DIR}/orthofuse/${RUNOUT}/merged.fasta:${DIR}/assemblies/${RUNOUT}.spades55.fas
 	ln -sf ${DIR}/assemblies/${RUNOUT}.spades75.fasta ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.spades75.fasta && \
 	ln -sf ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.trinity.Trinity.fasta && \
 	ln -sf ${DIR}/assemblies/${RUNOUT}.shannon.fasta ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.shannon.fasta && \
-	python $$(which orthofuser.py) -f ${DIR}/orthofuse/${RUNOUT}/ -og -t $(CPU) -a $(CPU) && \
+	python $$(which orthofuser.py) -I 4 -f ${DIR}/orthofuse/${RUNOUT}/ -og -t $(CPU) -a $(CPU) && \
 	cat ${DIR}/orthofuse/${RUNOUT}/*fasta > ${DIR}/orthofuse/${RUNOUT}/merged.fasta
 
 ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/merged.fasta
 	cd ${DIR}/orthofuse && \
 	export END=$$(wc -l $$(find ${DIR}/orthofuse/${RUNOUT}/ -cmin 1 -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}') && \
 	export ORTHOINPUT=$$(find ${DIR}/orthofuse/${RUNOUT}/ -cmin 1 -name Orthogroups.txt 2> /dev/null) && \
+	parallel  -j $(CPU) -k "sed -n ''$$i'p' $$ORTHOINPUT | tr ' ' '\n' > ${DIR}/orthofuse/${RUNOUT}/{1}.groups"  ::: $$(eval echo "{1..$$END}") && \
 	transrate -o ${DIR}/orthofuse/${RUNOUT}/merged -t $(CPU) -a ${DIR}/orthofuse/${RUNOUT}/merged.fasta --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq && \
-	for i in $$(eval echo "{1..$$END}") ; do sed -n ''$$i'p' $$ORTHOINPUT | tr ' ' '\n' > ${DIR}/orthofuse/${RUNOUT}/$$i.groups; done && \
 	echo All the text files are made, start GREP  && \
 	find ${DIR}/orthofuse/${RUNOUT}/ -name *groups 2> /dev/null | parallel -j $(CPU) "grep -wf {} $$(find ${DIR}/orthofuse/${RUNOUT}/ -name contigs.csv 2> /dev/null) > {1}.orthout 2> /dev/null" && \
 	echo About to delete all the text files  && \
