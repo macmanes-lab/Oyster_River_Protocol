@@ -20,6 +20,7 @@ BUSCODB :=
 INPUT := $(shell basename ${READ1})
 FASTADIR=
 
+
 merge:${DIR}/orthofuse/${RUNOUT}/merged.fasta
 orthotransrate:${DIR}/orthofuse/${RUNOUT}/orthotransrate.done
 orthofusing:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
