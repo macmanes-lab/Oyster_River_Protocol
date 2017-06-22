@@ -35,7 +35,7 @@ setup:
 	@mkdir -p ${DIR}/reports
 	@mkdir -p ${DIR}/orthofuse
 
-${DIR}/orthofuse/${RUNOUT}/merged.fasta:${DIR}/assemblies/${RUNOUT}.spades55.fasta ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta ${DIR}/assemblies/${RUNOUT}.shannon.fasta
+${DIR}/orthofuse/${RUNOUT}/merged.fasta:
 	cd ${DIR}/orthofuse && \
 	mkdir -p ${DIR}/orthofuse/${RUNOUT} && \
 	for file in $(ls ${FASTADIR}); do ln -sf $$file ${DIR}/orthofuse/${RUNOUT}/$$file.fasta;done && \
