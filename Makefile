@@ -11,7 +11,7 @@ MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
 
 
-all: setup brew download_scripts orthofuser blast spades trinity shannon seqtk busco trimmomatic transrate postscript
+all: setup brew orthofuser blast spades trinity shannon seqtk busco trimmomatic transrate postscript
 
 .DELETE_ON_ERROR:
 .PHONY:report
@@ -28,10 +28,6 @@ ifeq "$(shell basename $(shell which brew))" "brew"
 else
 	$error("*** BREW MUST BE PROPERLY INSTALLED BEFORE YOU CAN PROCEED, SEE: http://angus.readthedocs.io/en/2016/linuxbrew_install.html ***")
 endif
-
-download_scripts:
-	cd ${DIR}/scripts && \
-	curl -LO https://raw.githubusercontent.com/macmanes-lab/general/master/filter.py
 
 orthofuser:
 ifeq "$(shell basename $(shell which orthofuser.py))" "orthofuser.py"
