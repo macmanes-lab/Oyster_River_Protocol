@@ -21,7 +21,7 @@ INPUT := $(shell basename ${READ1})
 FASTADIR=
 
 merge:${DIR}/orthofuse/${RUNOUT}/merged.fasta
-orthotransrate:orthotransrate.done
+orthotransrate:${DIR}/orthofuse/${RUNOUT}/orthotransrate.done
 orthofusing:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 
 all: setup merge orthotransrate orthofusing report
@@ -43,12 +43,12 @@ ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
 	mv ${FASTADIR}/Results* ${DIR}/orthofuse/${RUNOUT}/
 	cat ${FASTADIR}/* > ${DIR}/orthofuse/${RUNOUT}/merged.fasta
 
-orthotransrate.done:${DIR}/orthofuse/${RUNOUT}/merged.fasta
+${DIR}/orthofuse/${RUNOUT}/orthotransrate.done:${DIR}/orthofuse/${RUNOUT}/merged.fasta
 	export END=$$(wc -l $$(find ${DIR}/orthofuse/${RUNOUT}/ -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}')
 	export ORTHOINPUT=$$(find ${DIR}/orthofuse/${RUNOUT}/ -name Orthogroups.txt 2> /dev/null)
 	parallel  -j $(CPU) -k "sed -n ''{}'p' $$ORTHOINPUT | tr ' ' '\n' | sed '1d' > ${DIR}/orthofuse/${RUNOUT}/{1}.groups"  ::: $$(eval echo "{1..$$END}")
 	transrate -o ${DIR}/orthofuse/${RUNOUT}/merged -t $(CPU) -a ${DIR}/orthofuse/${RUNOUT}/merged.fasta --left ${READ1} --right ${READ2}
-	touch orthotransrate.done
+	touch ${DIR}/orthofuse/${RUNOUT}/orthotransrate.done
 
 ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:orthotransrate.done
 	echo All the text files are made, start GREP
