@@ -38,13 +38,14 @@ setup:
 ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
 	mkdir -p ${DIR}/orthofuse/${RUNOUT}
 	python $$(which orthofuser.py) -I 4 -f ${FASTADIR} -og -t $(CPU) -a $(CPU)
-	cat ${FASTADIR}/* > ${DIR}/orthofuse/${RUNOUT}/merged.fasta
 	mv ${FASTADIR}/Results* ${DIR}/orthofuse/${RUNOUT}/
+	cat ${FASTADIR}/* > ${DIR}/orthofuse/${RUNOUT}/merged.fasta
+
 
 ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/merged.fasta
 	cd ${DIR}/orthofuse && \
-	export END=$$(wc -l $$(find ${DIR}/orthofuse/${RUNOUT}/ -cmin 1 -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}') && \
-	export ORTHOINPUT=$$(find ${DIR}/orthofuse/${RUNOUT}/ -cmin 1 -name Orthogroups.txt 2> /dev/null) && \
+	export END=$$(wc -l $$(find ${DIR}/orthofuse/${RUNOUT}/ -cmin 2 -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}') && \
+	export ORTHOINPUT=$$(find ${DIR}/orthofuse/${RUNOUT}/ -cmin 2 -name Orthogroups.txt 2> /dev/null) && \
 	parallel  -j $(CPU) -k "sed -n ''{}'p' $$ORTHOINPUT | tr ' ' '\n' | sed '1d' > ${DIR}/orthofuse/${RUNOUT}/{1}.groups"  ::: $$(eval echo "{1..$$END}") && \
 	transrate -o ${DIR}/orthofuse/${RUNOUT}/merged -t $(CPU) -a ${DIR}/orthofuse/${RUNOUT}/merged.fasta --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq && \
 	echo All the text files are made, start GREP  && \
