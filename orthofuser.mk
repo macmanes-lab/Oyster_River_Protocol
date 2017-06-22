@@ -36,10 +36,9 @@ setup:
 	@mkdir -p ${DIR}/orthofuse
 
 ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
-	cd ${DIR}/orthofuse && \
-	mkdir -p ${DIR}/orthofuse/${RUNOUT} && \
-	for file in $$(ls ${FASTADIR}); do ln -sf $$file ${DIR}/orthofuse/${RUNOUT}/$$file.fasta;done && \
-	python $$(which orthofuser.py) -I 4 -f ${DIR}/orthofuse/${RUNOUT}/ -og -t $(CPU) -a $(CPU) && \
+	mkdir -p ${DIR}/orthofuse/${RUNOUT}
+	for file in $$(ls ${FASTADIR}); do ln -sf $$file ${DIR}/orthofuse/${RUNOUT}/$$file.fasta;done
+	python $$(which orthofuser.py) -I 4 -f ${DIR}/orthofuse/${RUNOUT}/ -og -t $(CPU) -a $(CPU)
 	cat ${DIR}/orthofuse/${RUNOUT}/*fasta > ${DIR}/orthofuse/${RUNOUT}/merged.fasta
 
 ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/merged.fasta
