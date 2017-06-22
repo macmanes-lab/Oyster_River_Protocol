@@ -4,7 +4,7 @@ SHELL=/bin/bash -o pipefail
 
 #USAGE:
 #
-#	orthofuser.mk READ1= READ2= CPU= RUNOUT= FASTADIR= LINEAGE=
+#	orthofuser.mk all READ1= READ2= CPU= RUNOUT= FASTADIR= LINEAGE=
 #
 
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
