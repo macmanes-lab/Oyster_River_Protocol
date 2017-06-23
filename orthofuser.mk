@@ -40,7 +40,8 @@ setup:
 
 ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
 	mkdir -p ${DIR}/orthofuse/${RUNOUT}
-	for fasta in $$(ls ${FASTADIR}); do python ${MAKEDIR}/scripts/long.seq.py $$fasta $$($$fasta).short.fasta;gzip $$fasta; done 
+	cd ${FASTADIR} && \
+	for fasta in $$(ls ${FASTADIR}); do python ${MAKEDIR}/scripts/long.seq.py $$fasta $$($$fasta).short.fasta;gzip $$fasta; done
 	python $$(which orthofuser.py) -I 4 -f ${FASTADIR} -og -t $(CPU) -a $(CPU)
 	mv ${FASTADIR}/Results* ${DIR}/orthofuse/${RUNOUT}/
 	cat ${FASTADIR}/* > ${DIR}/orthofuse/${RUNOUT}/merged.fasta
