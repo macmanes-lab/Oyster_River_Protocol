@@ -64,7 +64,7 @@ ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/orthotr
 	rm ${DIR}/orthofuse/${RUNOUT}/good.list ${DIR}/orthofuse/${RUNOUT}/merged.fasta
 
 busco.done:
-	python $$(which run_BUSCO.py) -i ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta -m transcriptome --cpu $(CPU) -l /mnt/lustre/macmaneslab/macmanes/BUSCODB/${LINEAGE} -o ${DIR}/reports/${RUNOUT} && \
+	python3 $$(which run_BUSCO.py) -i ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta -m transcriptome --cpu $(CPU) -l /mnt/lustre/macmaneslab/macmanes/BUSCODB/${LINEAGE} -o ${DIR}/reports/${RUNOUT} && \
 	touch busco.done
 
 transrate.done:
