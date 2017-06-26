@@ -45,8 +45,8 @@ ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
 	cat ${FASTADIR}/*short.fasta > ${DIR}/orthofuse/${RUNOUT}/merged.fasta
 
 ${DIR}/orthofuse/${RUNOUT}/orthotransrate.done:${DIR}/orthofuse/${RUNOUT}/merged.fasta
-	export END=$$(wc -l $$(find ${FASTADIR} -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}')
-	export ORTHOINPUT=$$(find ${FASTADIR} -name Orthogroups.txt 2> /dev/null)
+	export END=$$(wc -l $$(find ${FASTADIR} -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}') && \
+	export ORTHOINPUT=$$(find ${FASTADIR} -name Orthogroups.txt 2> /dev/null) && \
 	parallel  -j $(CPU) -k "sed -n ''{}'p' $$ORTHOINPUT | tr ' ' '\n' | sed '1d' > ${DIR}/orthofuse/${RUNOUT}/{1}.groups"  ::: $$(eval echo "{1..$$END}")
 	transrate -o ${DIR}/orthofuse/${RUNOUT}/merged -t $(CPU) -a ${DIR}/orthofuse/${RUNOUT}/merged.fasta --left ${READ1} --right ${READ2}
 	touch ${DIR}/orthofuse/${RUNOUT}/orthotransrate.done
@@ -64,7 +64,7 @@ ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/orthotr
 	rm ${DIR}/orthofuse/${RUNOUT}/good.list ${DIR}/orthofuse/${RUNOUT}/merged.fasta
 
 busco.done:
-	python $$(which run_BUSCO.py) -i ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta -m transcriptome --cpu $(CPU) -l /mnt/lustre/macmaneslab/macmanes/BUSCODB/${LINEAGE} -o ${DIR}/reports/${RUNOUT} && \
+	python3 $$(which run_BUSCO.py) -i ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta -m transcriptome --cpu $(CPU) -l /mnt/lustre/macmaneslab/macmanes/BUSCODB/${LINEAGE} -o ${DIR}/reports/${RUNOUT} && \
 	touch busco.done
 
 transrate.done:
