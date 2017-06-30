@@ -26,9 +26,10 @@ orthotransrate:${DIR}/orthofuse/${RUNOUT}/orthotransrate.done
 orthofusing:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 
 all: setup merge orthotransrate orthofusing report
-report:busco.done transrate.done reportgen
-busco:busco.done
-transrate:transrate.done
+busco:${DIR}/reports/busco.done
+transrate:${DIR}/reports/transrate.done
+report:busco transrate reportgen
+
 
 
 .DELETE_ON_ERROR:
