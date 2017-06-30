@@ -64,11 +64,11 @@ ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/orthotr
 	rm ${DIR}/orthofuse/${RUNOUT}/good.list ${DIR}/orthofuse/${RUNOUT}/merged.fasta
 
 busco.done:
-	python3 $$(which run_BUSCO.py) -i ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta -m transcriptome --cpu $(CPU) -l ${LINEAGE} -o ${DIR}/reports/${RUNOUT}
+	python3 $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -m transcriptome --cpu $(CPU) -l ${LINEAGE} -o ${DIR}/reports/${RUNOUT}
 	touch ${DIR}/reports/busco.done
 
 transrate.done:
-	transrate -o ${DIR}/reports/transrate_${basename ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta .fasta}  -a ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta --left ${READ1} --right ${READ2} -t $(CPU)
+	transrate -o ${DIR}/reports/transrate_${basename ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta .fasta}  -a ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta --left ${READ1} --right ${READ2} -t $(CPU)
 	touch ${DIR}/reports/transrate.done
 
 reportgen:
