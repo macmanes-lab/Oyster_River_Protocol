@@ -78,12 +78,11 @@ ${DIR}/assemblies/${RUNOUT}.shannon.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	mv ${DIR}/assemblies/${RUNOUT}.shannon/shannon.fasta ${DIR}/assemblies/${RUNOUT}.shannon.fasta
 	rm -fr {DIR}/assemblies/${RUNOUT}.shannon
 
-### STINN NEED TO CONVERT TO FASTADIR, MAYBE MOVE ASSEMBLIES TO DIR, OR JUST WRITE THE THERE IN THE 1ST PLACE
-
 ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
 	mkdir -p ${DIR}/orthofuse/${RUNOUT}
-	cd ${DIR}/orthofuse/${RUNOUT} && ln -s {DIR}/assemblies/${RUNOUT}*fasta .
-	for fasta in $$(ls ${DIR}/orthofuse/${RUNOUT}); do python ${MAKEDIR}/scripts/long.seq.py ${DIR}/orthofuse/${RUNOUT}/$$fasta ${DIR}/orthofuse/${RUNOUT}/$$fasta.short.fasta 200;gzip  ${DIR}/orthofuse/${RUNOUT}/$$fasta ; done
+	cd ${DIR}/orthofuse/${RUNOUT} && ln -s ${DIR}/assemblies/${RUNOUT}*fasta .
+	for fasta in $$(ls ${DIR}/orthofuse/${RUNOUT}); do python ${MAKEDIR}/scripts/long.seq.py ${DIR}/orthofuse/${RUNOUT}/$$fasta ${DIR}/orthofuse/${RUNOUT}/$$fasta.short.fasta 200; done
+	find ${DIR}/orthofuse/${RUNOUT} -type l -delete
 	python $$(which orthofuser.py) -I 4 -f ${DIR}/orthofuse/${RUNOUT} -og -t $(CPU) -a $(CPU)
 	cat ${DIR}/orthofuse/${RUNOUT}/*short.fasta > ${DIR}/orthofuse/${RUNOUT}/merged.fasta
 
@@ -107,7 +106,8 @@ ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/orthotr
 	rm ${DIR}/orthofuse/${RUNOUT}/good.list
 
 ${DIR}/reports/busco.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
-	python3 $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -m transcriptome --cpu $(CPU) -l ${LINEAGE} -o ${DIR}/reports/${RUNOUT}
+	python3 $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -m transcriptome --cpu $(CPU) -l ${LINEAGE} -o ${RUNOUT}
+	mv run_${RUNOUT} ${DIR}/reports/
 	touch ${DIR}/reports/busco.done
 
 ${DIR}/reports/transrate.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
