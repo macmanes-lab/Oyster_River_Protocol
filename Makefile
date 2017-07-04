@@ -39,7 +39,7 @@ else
 endif
 
 blast:
-ifeq "$(shell basename $(shell which blastp))" "blastw"
+ifeq "$(shell basename $(shell which blastp))" "blastp"
 	@echo "BLASTP is already installed"
 else
 	@echo "blastp is not installed, installing now..."
