@@ -20,7 +20,7 @@ setup:
 	@mkdir -p ${DIR}/scripts
 	@mkdir -p ${DIR}/software
 	@mkdir -p ${DIR}/shared
-	@rm pathfile
+	@rm -f pathfile
 
 brew:
 ifeq "$(shell basename $(shell which brew))" "brew"
