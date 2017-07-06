@@ -20,7 +20,7 @@ setup:
 	@mkdir -p ${DIR}/scripts
 	@mkdir -p ${DIR}/software
 	@mkdir -p ${DIR}/shared
-	@rm pathfile
+	@rm -f pathfile
 
 brew:
 ifeq "$(shell basename $(shell which brew))" "brew"
@@ -39,7 +39,7 @@ else
 endif
 
 blast:
-ifeq "$(shell basename $(shell which blastp))" "blastw"
+ifeq "$(shell basename $(shell which blastp))" "blastp"
 	@echo "BLASTP is already installed"
 else
 	@echo "blastp is not installed, installing now..."

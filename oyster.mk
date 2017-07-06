@@ -4,7 +4,8 @@ SHELL=/bin/bash -o pipefail
 
 #USAGE:
 #
-#	oyster.mk prep main READ1= READ2= MEM=500 CPU=24 RUNOUT=runname
+#	oyster.mk main READ1= READ2= MEM=500 CPU=24 RUNOUT=runname
+# oyster.mk orthofuse FASTADIR= READ1= READ2= MEM=500 CPU=24 RUNOUT=runname
 #
 
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
@@ -24,6 +25,7 @@ BUSCOUT := BUSCO_$(shell basename ${ASSEMBLY} .fasta)
 BUSCODB :=
 START=1
 INPUT := $(shell basename ${READ1})
+FASTADIR=
 
 run_trimmomatic:
 run_rcorrector:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
@@ -98,13 +100,13 @@ ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/orthotr
 	echo All the text files are made, start GREP
 	find ${DIR}/orthofuse/${RUNOUT}/ -name *groups 2> /dev/null | parallel -j $(CPU) "grep -wf {} $$(find ${DIR}/orthofuse/${RUNOUT}/ -name contigs.csv 2> /dev/null) > {1}.orthout 2> /dev/null"
 	echo About to delete all the text files
-	#find ${DIR}/orthofuse/${RUNOUT}/ -name *groups -delete
+	find ${DIR}/orthofuse/${RUNOUT}/ -name *groups -delete
 	echo Search output files
 	find ${DIR}/orthofuse/${RUNOUT}/ -name *orthout 2> /dev/null | parallel -j $(CPU) "awk -F, -v max=0 '{if(\$$14>max){want=\$$1; max=\$$14}}END{print want}'" | tee -a ${DIR}/orthofuse/${RUNOUT}/good.list
-	#find ${DIR}/orthofuse/${RUNOUT}/ -name *orthout -delete
+	find ${DIR}/orthofuse/${RUNOUT}/ -name *orthout -delete
 	python ${MAKEDIR}/scripts/filter.py ${DIR}/orthofuse/${RUNOUT}/merged.fasta ${DIR}/orthofuse/${RUNOUT}/good.list > ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta
 	cp ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
-	#rm ${DIR}/orthofuse/${RUNOUT}/good.list
+	rm ${DIR}/orthofuse/${RUNOUT}/good.list
 
 ${DIR}/reports/busco.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	python3 $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -m transcriptome --cpu $(CPU) -l ${LINEAGE} -o ${RUNOUT}
