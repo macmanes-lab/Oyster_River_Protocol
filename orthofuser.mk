@@ -48,7 +48,8 @@ ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
 ${DIR}/orthofuse/${RUNOUT}/orthotransrate.done:${DIR}/orthofuse/${RUNOUT}/merged.fasta
 	export END=$$(wc -l $$(find ${FASTADIR} -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}') && \
 	export ORTHOINPUT=$$(find ${FASTADIR} -name Orthogroups.txt 2> /dev/null) && \
-	parallel  -j $(CPU) -k "sed -n ''{}'p' $$ORTHOINPUT | tr ' ' '\n' | sed '1d' > ${DIR}/orthofuse/${RUNOUT}/{1}.groups"  ::: $$(eval echo "{1..$$END}")
+	echo $$(eval echo "{1..$$END}") | tr ' ' '\n' > list && \
+	cat list | parallel  -j $(CPU) -k "sed -n ''{}'p' $$ORTHOINPUT | tr ' ' '\n' | sed '1d' > ${DIR}/orthofuse/${RUNOUT}/{1}.groups"
 	transrate -o ${DIR}/orthofuse/${RUNOUT}/merged -t $(CPU) -a ${DIR}/orthofuse/${RUNOUT}/merged.fasta --left ${READ1} --right ${READ2}
 	touch ${DIR}/orthofuse/${RUNOUT}/orthotransrate.done
 
