@@ -70,7 +70,7 @@ ${DIR}/reports/busco.done:${FASTADIR}/${RUNOUT}.orthomerged.fasta
 	mv run_${RUNOUT} ${DIR}/reports/
 	touch ${DIR}/reports/busco.done
 
-${DIR}/reports/transrate.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
+${DIR}/reports/transrate.done:${FASTADIR}/${RUNOUT}.orthomerged.fasta
 	transrate -o ${DIR}/reports/transrate_${RUNOUT}  -a ${FASTADIR}/${RUNOUT}.orthomerged.fasta --left ${READ1} --right ${READ2} -t $(CPU)
 	touch ${DIR}/reports/transrate.done
 
