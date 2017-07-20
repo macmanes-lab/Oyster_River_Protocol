@@ -41,7 +41,8 @@ setup:
 
 ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
 	mkdir -p ${DIR}/orthofuse/${RUNOUT}
-	for fasta in $$(ls ${FASTADIR}); do python ${MAKEDIR}/scripts/long.seq.py ${FASTADIR}/$$fasta ${FASTADIR}/$$fasta.short.fasta 200;gzip  ${FASTADIR}/$$fasta ; done
+	for fasta in $$(ls ${FASTADIR}); do python ${MAKEDIR}/scripts/long.seq.py ${FASTADIR}/$$fasta ${FASTADIR}/$$fasta.short.fasta 200; done
+	find ${DIR}/orthofuse/${RUNOUT} -type l -delete
 	python $$(which orthofuser.py) -I 4 -f ${FASTADIR} -og -t $(CPU) -a $(CPU)
 	cat ${FASTADIR}/*short.fasta > ${DIR}/orthofuse/${RUNOUT}/merged.fasta
 
