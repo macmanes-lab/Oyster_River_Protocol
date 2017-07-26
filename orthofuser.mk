@@ -37,14 +37,12 @@ report:busco transrate reportgen
 
 setup:
 	@mkdir -p ${DIR}/reports
-	@mkdir -p ${DIR}/orthofuse
 
 ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
-	mkdir -p ${DIR}/orthofuse/${RUNOUT}
-	for fasta in $$(ls ${FASTADIR}); do python ${MAKEDIR}/scripts/long.seq.py ${FASTADIR}/$$fasta ${FASTADIR}/$$fasta.short.fasta 200; done
-	find ${DIR}/orthofuse/${RUNOUT} -type l -delete
-	python $$(which orthofuser.py) -I 4 -f ${FASTADIR} -og -t $(CPU) -a $(CPU)
-	cat ${FASTADIR}/*short.fasta > ${DIR}/orthofuse/${RUNOUT}/merged.fasta
+	mkdir -p ${DIR}/orthofuse/${RUNOUT}/working
+	for fasta in $$(ls ${FASTADIR}); do python ${MAKEDIR}/scripts/long.seq.py ${FASTADIR}/$$fasta ${DIR}/orthofuse/${RUNOUT}/working/$$fasta.short.fasta 200; done
+	python $$(which orthofuser.py) -I 4 -f ${DIR}/orthofuse/${RUNOUT}/working/ -og -t $(CPU) -a $(CPU)
+	cat ${DIR}/orthofuse/${RUNOUT}/working/*short.fasta > ${DIR}/orthofuse/${RUNOUT}/merged.fasta
 
 ${DIR}/orthofuse/${RUNOUT}/orthotransrate.done:${DIR}/orthofuse/${RUNOUT}/merged.fasta
 	export END=$$(wc -l $$(find ${FASTADIR} -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}') && \
