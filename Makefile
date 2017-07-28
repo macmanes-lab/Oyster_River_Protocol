@@ -106,7 +106,7 @@ else
 endif
 
 trimmomatic:
-ifeq "$(shell basename $(shell which trimmomatics))" "trimmomatic"
+ifeq "$(basename $(which trimmomatics))" "trimmomatic"
 	@echo "TRIMMOMATIC is already installed"
 else
 	brew install trimmomatic
