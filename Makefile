@@ -23,7 +23,7 @@ setup:
 	@rm -f pathfile
 
 brew:
-ifeq "$(basename $(which brew))" "brew"
+ifeq "$(shell basename $(shell which brew))" "brew"
 	@echo "BREW is already installed"
 else
 	$error("*** BREW MUST BE PROPERLY INSTALLED BEFORE YOU CAN PROCEED, SEE: http://angus.readthedocs.io/en/2016/linuxbrew_install.html ***")
@@ -33,7 +33,7 @@ git:
 	brew install git
 
 rcorrector:
-ifeq "$(basename $(which rcorrector))" "rcorrector"
+ifeq "$(shell basename $(shell which rcorrector))" "rcorrector"
 	@echo "rcorrector is already installed"
 else
 	pip install CVXOPT
@@ -42,7 +42,7 @@ else
 endif
 
 orthofuser:
-ifeq "$(basename $(which orthofuser.py))" "orthofuser.py"
+ifeq "$(shell basename $(shell which orthofuser.py))" "orthofuser.py"
 	touch pathfile
 	@echo "ORTHOFUSER is already installed"
 else
@@ -52,7 +52,7 @@ else
 endif
 
 blast:
-ifeq "$(basename $(which blastp))" "blastp"
+ifeq "$(shell basename $(shell which blastp))" "blastp"
 	@echo "BLASTP is already installed"
 else
 	@echo "blastp is not installed, installing now..."
@@ -61,7 +61,7 @@ else
 endif
 
 spades:
-ifeq "$(basename $(which spades.py))" "spades.py"
+ifeq "$(shell basename $(shell which spades.py))" "spades.py"
 	@echo "SPAdes is already installed"
 else
 	cd ${DIR}/software && \
@@ -70,7 +70,7 @@ else
 endif
 
 trinity:
-ifeq "$(basename $(which Trinity))" "Trinity"
+ifeq "$(shell basename $(shell which Trinity))" "Trinity"
 	@echo "TRINITY is already installed"
 else
 	cd ${DIR}/software && \
@@ -79,7 +79,7 @@ else
 endif
 
 shannon:
-ifeq "$(basename $(which shannon.py))" "shannon.py"
+ifeq "$(shell basename $(shell which shannon.py))" "shannon.py"
 	@echo "SHANNON is already installed"
 else
 	cd ${DIR}/software && \
@@ -88,7 +88,7 @@ else
 endif
 
 seqtk:
-ifeq "$(basename $(which seqtk))" "seqtk"
+ifeq "$(shell basename $(shell which seqtk))" "seqtk"
 	@echo "SEQTK is already installed"
 else
 	cd ${DIR}/software && \
@@ -97,7 +97,7 @@ else
 endif
 
 busco:
-ifeq "$(basename $(which run_BUSCO.py))" "run_BUSCO.py"
+ifeq "$(shell basename $(shell which run_BUSCO.py))" "run_BUSCO.py"
 	@echo "BUSCO is already installed"
 else
 	cd ${DIR}/software && \
@@ -106,14 +106,14 @@ else
 endif
 
 trimmomatic:
-ifeq "$(basename $(which trimmomatic))" "trimmomatic"
+ifeq "$(shell basename $(shell which trimmomatic))" "trimmomatic"
 	@echo "TRIMMOMATIC is already installed"
 else
 	brew install trimmomatic
 endif
 
 transrate:
-ifeq "$(basename $(which transrate))" "transrate"
+ifeq "$(shell basename $(shell which transrate))" "transrate"
 	@echo "TRANSRATE is already installed"
 else
 	cd ${DIR}/software && \
