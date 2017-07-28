@@ -11,7 +11,7 @@ MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
 rcorrPath = `which rcorrector`
 
-all: setup brew rcorrector orthofuser blast spades trinity shannon seqtk busco trimmomatic transrate postscript
+all: setup brew git rcorrector orthofuser blast spades trinity shannon seqtk busco trimmomatic transrate postscript
 
 .DELETE_ON_ERROR:
 .PHONY:report
@@ -29,18 +29,20 @@ else
 	$error("*** BREW MUST BE PROPERLY INSTALLED BEFORE YOU CAN PROCEED, SEE: http://angus.readthedocs.io/en/2016/linuxbrew_install.html ***")
 endif
 
+git:
+	brew install git
 
 rcorrector:
-if [ ! $(rcorrPath) ] ; \
-then \
-	cd ${DIR}/software && \
-	git clone git clone https://github.com/mourisl/rcorrector.git && cd rcorrector && make
-	@echo ${DIR}/software/rcorrector | tee -a pathfile
+ifeq "$(shell basename $(shell which rcorrector))" "rcorrector"
+	@echo "rcorrector is already installed"
 else
-	@echo "Rcorrector is already installed"
-fi;
+	pip install CVXOPT
+	pip install numpy
+	brew install rcorrector
+endif
 
 orthofuser:
+touch pathfile
 ifeq "$(shell basename $(shell which orthofuser.py))" "orthofuser.py"
 	@echo "ORTHOFUSER is already installed"
 else
@@ -104,7 +106,7 @@ else
 endif
 
 trimmomatic:
-ifeq "$(shell basename $(shell which trimmomatic))" "trimmomatic"
+ifeq "$(shell basename $(shell which trimmomatics))" "trimmomatic"
 	@echo "TRIMMOMATIC is already installed"
 else
 	brew install trimmomatic
