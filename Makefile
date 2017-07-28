@@ -42,7 +42,6 @@ else
 endif
 
 orthofuser:
-touch pathfile
 ifeq "$(shell basename $(shell which orthofuser.py))" "orthofuser.py"
 	touch pathfile
 	@echo "ORTHOFUSER is already installed"
