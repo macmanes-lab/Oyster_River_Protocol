@@ -11,7 +11,7 @@ MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
 rcorrPath = `which rcorrector`
 
-all: setup brew rcorrector orthofuser blast spades trinity shannon seqtk busco trimmomatic transrate postscript
+all: setup brew orthofuser rcorrector blast spades trinity shannon seqtk busco trimmomatic transrate postscript
 
 .DELETE_ON_ERROR:
 .PHONY:report
