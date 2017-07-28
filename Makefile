@@ -9,9 +9,9 @@ SHELL=/bin/bash -o pipefail
 
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
+rcorrPath = `which rcorrector`
 
-
-all: setup brew orthofuser blast spades trinity shannon seqtk busco trimmomatic transrate postscript
+all: setup brew rcorrector orthofuser blast spades trinity shannon seqtk busco trimmomatic transrate postscript
 
 .DELETE_ON_ERROR:
 .PHONY:report
@@ -28,6 +28,17 @@ ifeq "$(shell basename $(shell which brew))" "brew"
 else
 	$error("*** BREW MUST BE PROPERLY INSTALLED BEFORE YOU CAN PROCEED, SEE: http://angus.readthedocs.io/en/2016/linuxbrew_install.html ***")
 endif
+
+
+rcorrector:
+if [ ! $(rcorrPath) ] ; \
+then \
+	cd ${DIR}/software && \
+	git clone git clone https://github.com/mourisl/rcorrector.git && cd rcorrector && make
+	@echo ${DIR}/software/rcorrector | tee -a pathfile
+else
+	@echo "Rcorrector is already installed"
+fi;
 
 orthofuser:
 ifeq "$(shell basename $(shell which orthofuser.py))" "orthofuser.py"
@@ -89,8 +100,7 @@ ifeq "$(shell basename $(shell which run_BUSCO.py))" "run_BUSCO.py"
 else
 	cd ${DIR}/software && \
 	git clone https://gitlab.com/ezlab/busco.git && cd busco && python setup.py install --user --prefix=
-	export PATH=$$PATH:${DIR}/software/busco
-	@echo PATH=$$PATH:${DIR}/software/busco | tee -a pathfile
+	@echo PATH=$$PATH:${DIR}/software/busco/scripts | tee -a pathfile
 endif
 
 trimmomatic:
