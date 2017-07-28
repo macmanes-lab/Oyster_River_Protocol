@@ -11,7 +11,7 @@ MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
 rcorrPath = `which rcorrector`
 
-all: setup brew git rcorrector orthofuser blast spades trinity shannon seqtk busco trimmomatic transrate postscript
+all: setup brew rcorrector orthofuser blast spades trinity shannon seqtk busco trimmomatic transrate postscript
 
 .DELETE_ON_ERROR:
 .PHONY:report
@@ -28,9 +28,6 @@ ifeq "$(shell basename $(shell which brew))" "brew"
 else
 	$error("*** BREW MUST BE PROPERLY INSTALLED BEFORE YOU CAN PROCEED, SEE: http://angus.readthedocs.io/en/2016/linuxbrew_install.html ***")
 endif
-
-git:
-	brew install git
 
 rcorrector:
 ifeq "$(shell basename $(shell which rcorrector))" "rcorrector"
