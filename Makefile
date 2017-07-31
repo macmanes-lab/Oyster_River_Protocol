@@ -9,7 +9,10 @@ SHELL=/bin/bash -o pipefail
 
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
-shannonpath := $(shell which shasnnon.py 2>/dev/null)
+shannonpath := $(shell which shannon.py 2>/dev/null)
+brewpath := $(shell which brew 2>/dev/null)
+rcorrpath := $(shell which rcorrector 2>/dev/null)
+orthopath := $(shell which orthofuser.py 2>/dev/null)
 
 
 all: setup brew orthofuser rcorrector blast spades trinity shannon seqtk busco trimmomatic transrate postscript
@@ -23,31 +26,28 @@ setup:
 	@rm -f pathfile
 
 brew:
-ifeq "$(shell basename $(shell which brew))" "brew"
-	@echo "BREW is already installed"
+ifdef brewpath
+	echo "BREW is already installed"
 else
 	$error("*** BREW MUST BE PROPERLY INSTALLED BEFORE YOU CAN PROCEED, SEE: http://angus.readthedocs.io/en/2016/linuxbrew_install.html ***")
 endif
 
 rcorrector:
-	@if [ $$(basename $$(which rcorrector)) == 'rcorrector' ];\
-	then\
-		echo "Rcorrector is already installed";\
-	else\
-		brew install rcorrector;\
-	fi
+ifdef rcorrpath
+	echo "RCORRECTOR is already installed"
+else
+	brew install rcorrector
+endif
 
 orthofuser:
-	@if [ $$(basename $$(which orthofuser.py)) == 'orthofuser.py' ];\
-	then\
-		touch pathfile;\
-		echo "ORTHOFUSER is already installed";\
-	else\
-		touch pathfile;\
-		cd ${DIR}/software && \
-		git clone https://github.com/macmanes-lab/OrthoFinder.git;\
-		echo PATH=$$PATH:${DIR}/software/OrthoFinder/orthofinder | tee -a pathfile;\
-	fi
+ifdef orthopath
+	touch pathfile
+	echo "ORTHOFUSER is already installed"
+else
+	touch pathfile
+	cd ${DIR}/software && git clone https://github.com/macmanes-lab/OrthoFinder.git
+	@echo PATH=\$$PATH:${DIR}/software/OrthoFinder/orthofinder | tee -a pathfile;\
+endif
 
 blast:
 ifeq "$(shell basename $(shell which blastp))" "blastp"
