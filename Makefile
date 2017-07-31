@@ -46,7 +46,7 @@ orthofuser:
 		touch pathfile;\
 		cd ${DIR}/software && \
 		git clone https://github.com/macmanes-lab/OrthoFinder.git;\
-		echo ${DIR}/software/OrthoFinder/orthofinder | tee -a pathfile;\
+		echo PATH=$$PATH:${DIR}/software/OrthoFinder/orthofinder | tee -a pathfile;\
 	fi
 
 blast:
@@ -77,13 +77,14 @@ else
 endif
 
 shannon:
-ifeq "$(shell basename $(shell which shannon.py))" "shannon.py"
-	@echo "SHANNON is already installed"
-else
-	cd ${DIR}/software && \
-	git clone https://github.com/sreeramkannan/Shannon.git
-	@echo PATH=$$PATH:${DIR}/software/Shannon | tee -a pathfile
-endif
+	@if [ $$(basename $$(which shannon.py)) == 'shannon.py' ];\
+	then\
+		echo "SHANNON is already installed";\
+	else\
+		cd ${DIR}/software && \
+		git clone https://github.com/sreeramkannan/Shannon.git;\
+		echo PATH=$$PATH:${DIR}/software/Shannon | tee -a pathfile;\
+	fi
 
 seqtk:
 ifeq "$(shell basename $(shell which seqtk))" "seqtk"
