@@ -78,7 +78,7 @@ endif
 
 shannon:
 ifdef shannonpath
-	echo "SHANNON is already installed"
+	@echo "SHANNON is already installed"
 else
 	cd ${DIR}/software && git clone https://github.com/sreeramkannan/Shannon.git
 	chmod +x software/Shannon/shannon.py
