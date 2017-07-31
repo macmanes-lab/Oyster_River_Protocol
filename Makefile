@@ -13,7 +13,7 @@ shannonpath := $(shell which shannon.py 2>/dev/null)
 brewpath := $(shell which brew 2>/dev/null)
 rcorrpath := $(shell which rcorrector 2>/dev/null)
 orthopath := $(shell which orthofuser.py 2>/dev/null)
-
+trimmomaticpath := $(shell which trimmomatic 2>/dev/null)
 
 all: setup brew orthofuser rcorrector blast spades trinity shannon seqtk busco trimmomatic transrate postscript
 
@@ -104,12 +104,16 @@ else
 endif
 
 trimmomatic:
+ifdef trimmomaticpath
+	@echo "TRIMMOMATIC is already installed"
+else
 	@if [ $$(hostname | cut -d. -f3-5) == 'bridges.psc.edu' ];\
 	then\
 		module load trimmomatic/0.36;\
 	else\
 		brew install trimmomatic;\
 	fi
+endif
 
 transrate:
 ifeq "$(shell basename $(shell which transrate))" "transrate"
