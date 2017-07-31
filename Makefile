@@ -102,11 +102,12 @@ else
 endif
 
 trimmomatic:
-ifeq "$(shell basename $(shell which trimmomatic))" "trimmomatic"
-	@echo "TRIMMOMATIC is already installed"
-else
-	brew install trimmomatic
-endif
+	@if [ $$(hostname | cut -d. -f3-5) == 'bridges.psc.edu' ];\
+	then\
+		module load trimmomatic/0.36
+	else\
+		brew install trimmomatic
+	fi
 
 transrate:
 ifeq "$(shell basename $(shell which transrate))" "transrate"
