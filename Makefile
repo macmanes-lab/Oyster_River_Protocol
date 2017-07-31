@@ -38,14 +38,14 @@ rcorrector:
 	fi
 
 orthofuser:
-ifeq "$(shell basename $(shell which orthofuser.py))" "orthofuser.py"
-	@touch pathfile
-	@echo "ORTHOFUSER is already installed"
-else
-	cd ${DIR}/software && \
-	git clone https://github.com/macmanes-lab/OrthoFinder.git
-	@echo ${DIR}/software/OrthoFinder/orthofinder | tee -a pathfile
-endif
+	@if [ $$(basename $$(which orthofuser.py)) == 'orthofuser.py' ];\
+	then\
+		echo "ORTHOFUSER is already installed";\
+	else\
+		cd ${DIR}/software && \
+		git clone https://github.com/macmanes-lab/OrthoFinder.git;\
+		echo ${DIR}/software/OrthoFinder/orthofinder | tee -a pathfile;\
+	fi
 
 blast:
 ifeq "$(shell basename $(shell which blastp))" "blastp"
