@@ -30,13 +30,12 @@ else
 endif
 
 rcorrector:
-ifeq "$(shell basename $(shell which rcorrector))" "rcorrector"
-	@echo "rcorrector is already installed"
-else
-	pip install CVXOPT
-	pip install numpy
-	brew install rcorrector
-endif
+	@if [ $$(basename $$(which rcorrector)) == 'rcorrector' ];\
+	then\
+		@echo "Rcorrector is already installed"
+	else\
+		brew install rcorrector
+	fi
 
 orthofuser:
 ifeq "$(shell basename $(shell which orthofuser.py))" "orthofuser.py"
