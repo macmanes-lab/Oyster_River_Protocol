@@ -83,7 +83,7 @@ shannon:
 	else\
 		cd ${DIR}/software && \
 		git clone https://github.com/sreeramkannan/Shannon.git;\
-		echo PATH=\$$PATH:${DIR}/software/Shannon | tee -a pathfile;\
+		echo PATH=\$$PATH:${DIR}/software/Shannon >> pathfile;\
 	fi
 
 seqtk:
