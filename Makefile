@@ -46,7 +46,7 @@ ifdef orthopath
 else
 	touch pathfile
 	cd ${DIR}/software && git clone https://github.com/macmanes-lab/OrthoFinder.git
-	@echo PATH=\$$PATH:${DIR}/software/OrthoFinder/orthofinder | tee -a pathfile;\
+	@echo PATH=\$$PATH:${DIR}/software/OrthoFinder/orthofinder | tee -a pathfile
 endif
 
 blast:
