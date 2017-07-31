@@ -9,12 +9,12 @@ SHELL=/bin/bash -o pipefail
 
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
-rcorrPath = `which rcorrector`
+shannonpath := $(shell which shasnnon.py 2>/dev/null)
+
 
 all: setup brew orthofuser rcorrector blast spades trinity shannon seqtk busco trimmomatic transrate postscript
 
 .DELETE_ON_ERROR:
-.PHONY:report
 
 setup:
 	@mkdir -p ${DIR}/scripts
@@ -77,14 +77,13 @@ else
 endif
 
 shannon:
-	@if [ $$(basename $$(which shannon.py)) == 'shannon.py' ];\
-	then\
-		echo "SHANNON is already installed";\
-	else\
-		cd ${DIR}/software && \
-		git clone https://github.com/sreeramkannan/Shannon.git;\
-		echo PATH=\$$PATH:${DIR}/software/Shannon | tee -a pathfile;\
-	fi
+ifdef shannonpath
+	echo "SHANNON is already installed"
+else
+	cd ${DIR}/software && git clone https://github.com/sreeramkannan/Shannon.git
+	chmod +x software/Shannon/shannon.py
+	@echo PATH=\$$PATH:${DIR}/software/Shannon | tee -a pathfile
+endif
 
 seqtk:
 ifeq "$(shell basename $(shell which seqtk))" "seqtk"
@@ -92,7 +91,7 @@ ifeq "$(shell basename $(shell which seqtk))" "seqtk"
 else
 	cd ${DIR}/software && \
 	git clone https://github.com/lh3/seqtk.git && cd seqtk && make
-	@echo PATH=$$PATH:${DIR}/software/seqtk | tee -a pathfile
+	@echo PATH=\$$PATH:${DIR}/software/seqtk | tee -a pathfile
 endif
 
 busco:
