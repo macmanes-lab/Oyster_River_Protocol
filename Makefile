@@ -27,24 +27,24 @@ setup:
 
 brew:
 ifdef brewpath
-	echo "BREW is already installed"
+	@echo "BREW is already installed"
 else
 	$error("*** BREW MUST BE PROPERLY INSTALLED BEFORE YOU CAN PROCEED, SEE: http://angus.readthedocs.io/en/2016/linuxbrew_install.html ***")
 endif
 
 rcorrector:
 ifdef rcorrpath
-	echo "RCORRECTOR is already installed"
+	@echo "RCORRECTOR is already installed"
 else
 	brew install rcorrector
 endif
 
 orthofuser:
 ifdef orthopath
-	touch pathfile
-	echo "ORTHOFUSER is already installed"
+	@touch pathfile
+	@echo "ORTHOFUSER is already installed"
 else
-	touch pathfile
+	@touch pathfile
 	cd ${DIR}/software && git clone https://github.com/macmanes-lab/OrthoFinder.git
 	@echo PATH=\$$PATH:${DIR}/software/OrthoFinder/orthofinder | tee -a pathfile
 endif
