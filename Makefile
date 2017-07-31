@@ -110,8 +110,10 @@ else
 	@if [ $$(hostname | cut -d. -f3-5) == 'bridges.psc.edu' ];\
 	then\
 		module load trimmomatic/0.36;\
+		@echo "I just installed TRIMMOMATIC via the module system ";\
 	else\
 		brew install trimmomatic;\
+		@echo "I just installed TRIMMOMATIC via brew ";\
 	fi
 endif
 
