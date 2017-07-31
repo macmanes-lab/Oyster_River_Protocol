@@ -32,9 +32,9 @@ endif
 rcorrector:
 	@if [ $$(basename $$(which rcorrector)) == 'rcorrector' ];\
 	then\
-		@echo "Rcorrector is already installed"
+		echo "Rcorrector is already installed";\
 	else\
-		brew install rcorrector
+		brew install rcorrector;\
 	fi
 
 orthofuser:
@@ -104,9 +104,9 @@ endif
 trimmomatic:
 	@if [ $$(hostname | cut -d. -f3-5) == 'bridges.psc.edu' ];\
 	then\
-		module load trimmomatic/0.36
+		module load trimmomatic/0.36;\
 	else\
-		brew install trimmomatic
+		brew install trimmomatic;\
 	fi
 
 transrate:
