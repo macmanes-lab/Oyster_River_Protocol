@@ -40,8 +40,10 @@ rcorrector:
 orthofuser:
 	@if [ $$(basename $$(which orthofuser.py)) == 'orthofuser.py' ];\
 	then\
+		touch pathfile;\
 		echo "ORTHOFUSER is already installed";\
 	else\
+		touch pathfile;\
 		cd ${DIR}/software && \
 		git clone https://github.com/macmanes-lab/OrthoFinder.git;\
 		echo ${DIR}/software/OrthoFinder/orthofinder | tee -a pathfile;\
