@@ -88,7 +88,7 @@ ${DIR}/assemblies/${RUNOUT}.shannon.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 
 ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
 	mkdir -p ${DIR}/orthofuse/${RUNOUT}/working
-	for fasta in $$(ls ${DIR}/assemblies/${RUNOUT}*); do python ${MAKEDIR}/scripts/long.seq.py ${FASTADIR}/$$fasta ${DIR}/orthofuse/${RUNOUT}/working/$$fasta.short.fasta 200; done
+	for fasta in $$(ls ${DIR}/assemblies/${RUNOUT}*); do python ${MAKEDIR}/scripts/long.seq.py ${DIR}/assemblies/$$fasta ${DIR}/orthofuse/${RUNOUT}/working/$$fasta.short.fasta 200; done
 	python $$(which orthofuser.py) -I 4 -f ${DIR}/orthofuse/${RUNOUT}/working/ -og -t $(CPU) -a $(CPU)
 	cat ${DIR}/orthofuse/${RUNOUT}/working/*short.fasta > ${DIR}/orthofuse/${RUNOUT}/merged.fasta
 
