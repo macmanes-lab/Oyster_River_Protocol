@@ -87,16 +87,14 @@ ${DIR}/assemblies/${RUNOUT}.shannon.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	rm -fr {DIR}/assemblies/${RUNOUT}.shannon
 
 ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
-	mkdir -p ${DIR}/orthofuse/${RUNOUT}
-	cd ${DIR}/orthofuse/${RUNOUT} && ln -s ${DIR}/assemblies/${RUNOUT}*fasta .
-	for fasta in $$(ls ${DIR}/orthofuse/${RUNOUT}); do python ${MAKEDIR}/scripts/long.seq.py ${DIR}/orthofuse/${RUNOUT}/$$fasta ${DIR}/orthofuse/${RUNOUT}/$$fasta.short.fasta 200; done
-	find ${DIR}/orthofuse/${RUNOUT} -type l -delete
-	python $$(which orthofuser.py) -I 4 -f ${DIR}/orthofuse/${RUNOUT} -og -t $(CPU) -a $(CPU)
-	cat ${DIR}/orthofuse/${RUNOUT}/*short.fasta > ${DIR}/orthofuse/${RUNOUT}/merged.fasta
+	mkdir -p ${DIR}/orthofuse/${RUNOUT}/working
+	for fasta in $$(ls ${DIR}/assemblies/${RUNOUT}*); do python ${MAKEDIR}/scripts/long.seq.py ${FASTADIR}/$$fasta ${DIR}/orthofuse/${RUNOUT}/working/$$fasta.short.fasta 200; done
+	python $$(which orthofuser.py) -I 4 -f ${DIR}/orthofuse/${RUNOUT}/working/ -og -t $(CPU) -a $(CPU)
+	cat ${DIR}/orthofuse/${RUNOUT}/working/*short.fasta > ${DIR}/orthofuse/${RUNOUT}/merged.fasta
 
 ${DIR}/orthofuse/${RUNOUT}/orthotransrate.done:${DIR}/orthofuse/${RUNOUT}/merged.fasta
-	export END=$$(wc -l $$(find ${DIR}/orthofuse/${RUNOUT} -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}') && \
-	export ORTHOINPUT=$$(find ${DIR}/orthofuse/${RUNOUT} -name Orthogroups.txt 2> /dev/null) && \
+	export END=$$(wc -l $$(find ${DIR}/orthofuse/${RUNOUT}/working/ -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}') && \
+	export ORTHOINPUT=$$(find ${DIR}/orthofuse/${RUNOUT}/working/ -name Orthogroups.txt 2> /dev/null) && \
 	echo $$(eval echo "{1..$$END}") | tr ' ' '\n' > list && \
 	cat list | parallel  -j $(CPU) -k "sed -n ''{}'p' $$ORTHOINPUT | tr ' ' '\n' | sed '1d' > ${DIR}/orthofuse/${RUNOUT}/{1}.groups"
 	transrate -o ${DIR}/orthofuse/${RUNOUT}/merged -t $(CPU) -a ${DIR}/orthofuse/${RUNOUT}/merged.fasta --left ${READ1} --right ${READ2}
