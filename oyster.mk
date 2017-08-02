@@ -128,21 +128,6 @@ else
 endif
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq:
 	@if [ $$(hostname | cut -d. -f3-5) == 'bridges.psc.edu' ];\
 	then\
