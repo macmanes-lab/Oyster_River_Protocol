@@ -5,7 +5,7 @@
 
 rm -f list list2 buscos.txt
 
-for table in $(find . -name full_table*); do 
+for table in $(find . -name full_table*); do
     echo $table >> list;
 done
 
@@ -15,6 +15,9 @@ grep Complete $(sed -n 1p list) \
 | grep Complete \
 | cut -f1 \
 | grep -f - $(sed -n 3p list) \
+| grep Complete \
+| cut -f1 \
+| grep -f - $(sed -n 4p list) \
 | grep Complete \
 | cut -f1 \
 | sort -R \
