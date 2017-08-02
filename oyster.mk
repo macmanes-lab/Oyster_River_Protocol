@@ -36,9 +36,9 @@ run_shannon:${DIR}/assemblies/${RUNOUT}.shannon.fasta
 merge:${DIR}/orthofuse/${RUNOUT}/merged.fasta
 orthotransrate:${DIR}/orthofuse/${RUNOUT}/orthotransrate.done
 orthofusing:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
+salmon:${DIR}/quants/shannon/quant.sf
 
-
-main: setup run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_shannon merge orthotransrate orthofusing report
+main: setup run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_shannon merge orthotransrate orthofusing salmon report
 report:busco transrate reportgen
 busco:${DIR}/reports/busco.done
 transrate:${DIR}/reports/transrate.done
@@ -53,6 +53,7 @@ setup:
 	@mkdir -p ${DIR}/rcorr
 	@mkdir -p ${DIR}/reports
 	@mkdir -p ${DIR}/orthofuse
+	@mkdir -p ${DIR}/quants
 
 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq:
 	@if [ $$(hostname | cut -d. -f3-5) == 'bridges.psc.edu' ];\
@@ -68,16 +69,24 @@ ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq:${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq
 ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	Trinity --no_version_check --no_normalize_reads --seqType fq --output ${DIR}/assemblies/${RUNOUT}.trinity --max_memory $(MEM)G --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup
 	awk '{print $$1}' ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta > ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fa && mv -f ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fa ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
+	salmon index -t ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta -i salmon.idx --type quasi -k 31
+	salmon quant -p $(CPU) -i salmon.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/trinity
 
 ${DIR}/assemblies/${RUNOUT}.spades55.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	rnaspades.py --only-assembler -o ${DIR}/assemblies/${RUNOUT}.spades_k55 --threads $(CPU) --memory $(MEM) -k 55 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
 	mv ${DIR}/assemblies/${RUNOUT}.spades_k55/transcripts.fasta ${DIR}/assemblies/${RUNOUT}.spades55.fasta
 	rm -fr ${DIR}/assemblies/${RUNOUT}.spades_k55
+	salmon index -t ${DIR}/assemblies/${RUNOUT}.spades55.fasta -i salmon.idx --type quasi -k 31
+	salmon quant -p $(CPU) -i salmon.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/spades55
+
 
 ${DIR}/assemblies/${RUNOUT}.spades75.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	rnaspades.py --only-assembler -o ${DIR}/assemblies/${RUNOUT}.spades_k75 --threads $(CPU) --memory $(MEM) -k 75 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
 	mv ${DIR}/assemblies/${RUNOUT}.spades_k75/transcripts.fasta ${DIR}/assemblies/${RUNOUT}.spades75.fasta
 	rm -fr ${DIR}/assemblies/${RUNOUT}.spades_k75
+	salmon index -t ${DIR}/assemblies/${RUNOUT}.spades75.fasta -i salmon.idx --type quasi -k 31
+	salmon quant -p $(CPU) -i salmon.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/spades75
+
 
 ${DIR}/assemblies/${RUNOUT}.shannon.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	seqtk seq -A ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq > ${DIR}/rcorr/$$(basename ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq .fq).fa
@@ -85,6 +94,9 @@ ${DIR}/assemblies/${RUNOUT}.shannon.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	python $$(which shannon.py) -o ${DIR}/assemblies/${RUNOUT}.shannon --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fa --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fa -p $(CPU) -K 75
 	mv ${DIR}/assemblies/${RUNOUT}.shannon/shannon.fasta ${DIR}/assemblies/${RUNOUT}.shannon.fasta
 	rm -fr {DIR}/assemblies/${RUNOUT}.shannon
+	salmon index -t ${DIR}/assemblies/${RUNOUT}.shannon.fasta -i salmon.idx --type quasi -k 31
+	salmon quant -p $(CPU) -i salmon.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/shannon
+
 
 ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
 	mkdir -p ${DIR}/orthofuse/${RUNOUT}/working
@@ -120,6 +132,11 @@ ${DIR}/reports/busco.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 ${DIR}/reports/transrate.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	transrate -o ${DIR}/reports/transrate_${RUNOUT}  -a ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta --left ${READ1} --right ${READ2} -t $(CPU)
 	touch ${DIR}/reports/transrate.done
+
+${DIR}/quants/shannon/quant.sf:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
+	salmon index -t ${DIR}/assemblies/${RUNOUT}.shannon.fasta -i salmon.idx --type quasi -k 31
+	salmon quant -p $(CPU) -i salmon.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/shannon
+
 
 reportgen:
 	printf "\n\n*****  QUALITY REPORT FOR: ${RUNOUT} **** \n\n"
