@@ -26,6 +26,21 @@ BUSCODB :=
 START=1
 INPUT := $(shell basename ${READ1})
 FASTADIR=
+shannonpath := $(shell which shannon.py 2>/dev/null)
+brewpath := $(shell which brew 2>/dev/null)
+rcorrpath := $(shell which rcorrector 2>/dev/null)
+orthopath := $(shell which orthofuser.py 2>/dev/null)
+trimmomaticpath := $(shell which trimmomatic 2>/dev/null)
+trinitypath := $(shell which Trinity 2>/dev/null)
+spadespath := $(shell which rnaspades.py 2>/dev/null)
+salmonpath := $(shell which salmon 2>/dev/null)
+mclpath := $(shell which mcl 2>/dev/null)
+buscopath := $(shell which run_BUSCO.py 2>/dev/null)
+seqtkpath := $(shell which seqtk 2>/dev/null)
+transratepath := $(shell which transrate 2>/dev/null)
+
+
+
 
 run_trimmomatic:
 run_rcorrector:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
@@ -44,7 +59,7 @@ busco:${DIR}/reports/busco.done
 transrate:${DIR}/reports/transrate.done
 
 .DELETE_ON_ERROR:
-.PHONY:report
+.PHONY:report check
 
 setup:
 	@mkdir -p ${DIR}/scripts
@@ -54,6 +69,79 @@ setup:
 	@mkdir -p ${DIR}/reports
 	@mkdir -p ${DIR}/orthofuse
 	@mkdir -p ${DIR}/quants
+
+check:
+ifdef salmonpath
+	@echo "SALMON is already installed"
+else
+	$error("*** SALMON is not installed, must fix ***")
+endif
+ifdef transratepath
+	@echo "TRANSRATE is already installed"
+else
+	$error("*** TRANSRATE is not installed, must fix ***")
+endif
+ifdef seqtkpath
+	@echo "SEQTK is already installed"
+else
+	$error("*** SEQTK is not installed, must fix ***")
+endif
+ifdef buscopath
+	@echo "BUSCO is already installed"
+else
+	$error("*** BUSCO is not installed, must fix ***")
+endif
+ifdef mclpath
+	@echo "MCL is already installed"
+else
+	$error("*** MCL is not installed, must fix ***")
+endif
+ifdef spadespath
+	@echo "SPADES is already installed"
+else
+	$error("*** SPADES is not installed, must fix ***")
+endif
+ifdef trinitypath
+	@echo "TRINITY is already installed"
+else
+	$error("*** TRINITY is not installed, must fix ***")
+endif
+ifdef trimmomaticpath
+	@echo "TRIMMOMATIC is already installed"
+else
+	$error("*** TRIMMOMATIC is not installed, must fix ***")
+endif
+ifdef shannonpath
+	@echo "SHANNON is already installed"
+else
+	$error("*** SHANNON is not installed, must fix ***")
+endif
+ifdef rcorrpath
+	@echo "RCORRECTOR is already installed"
+else
+	$error("*** RCORRECTOR is not installed, must fix ***")
+endif
+ifdef orthopath
+	@echo "ORTHOFUSER is already installed"
+else
+	$error("*** ORTHOFUSER is not installed, must fix ***")
+endif
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq:
 	@if [ $$(hostname | cut -d. -f3-5) == 'bridges.psc.edu' ];\
