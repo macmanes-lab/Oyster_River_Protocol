@@ -109,7 +109,7 @@ endif
 ifdef trimmomaticpath
 	@echo "TRIMMOMATIC is already installed"
 else
-	$error("*** TRIMMOMATIC is not installed, must fix ***")
+	@echo "Maybe TRIMMOMATIC is not installed, or maybe you are working on Bridges"
 endif
 ifdef shannonpath
 	@echo "SHANNON is already installed"
