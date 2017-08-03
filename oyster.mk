@@ -144,7 +144,7 @@ ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P
 	awk '{print $$1}' ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta > ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fa && mv -f ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fa ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
 	salmon index -t ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta -i salmon.idx --type quasi -k 31
 	salmon quant -p $(CPU) -i salmon.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/trinity
-	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta -m transcriptome --cpu $(CPU) -l ${LINEAGE} -o ${DIR}/reports/${RUNOUT}.trin
+	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta -m transcriptome --cpu $(CPU) -o ${DIR}/reports/${RUNOUT}.trin
 
 ${DIR}/assemblies/${RUNOUT}.spades55.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	rnaspades.py --only-assembler -o ${DIR}/assemblies/${RUNOUT}.spades_k55 --threads $(CPU) --memory $(MEM) -k 55 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
@@ -152,7 +152,7 @@ ${DIR}/assemblies/${RUNOUT}.spades55.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	rm -fr ${DIR}/assemblies/${RUNOUT}.spades_k55
 	salmon index -t ${DIR}/assemblies/${RUNOUT}.spades55.fasta -i salmon.idx --type quasi -k 31
 	salmon quant -p $(CPU) -i salmon.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/spades55
-	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.spades55.fasta -m transcriptome --cpu $(CPU) -l ${LINEAGE} -o ${DIR}/reports/${RUNOUT}.spades55
+	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.spades55.fasta -m transcriptome --cpu $(CPU) -o ${DIR}/reports/${RUNOUT}.spades55
 
 
 ${DIR}/assemblies/${RUNOUT}.spades75.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
@@ -161,7 +161,7 @@ ${DIR}/assemblies/${RUNOUT}.spades75.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	rm -fr ${DIR}/assemblies/${RUNOUT}.spades_k75
 	salmon index -t ${DIR}/assemblies/${RUNOUT}.spades75.fasta -i salmon.idx --type quasi -k 31
 	salmon quant -p $(CPU) -i salmon.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/spades75
-	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.spades75.fasta -m transcriptome --cpu $(CPU) -l ${LINEAGE} -o ${DIR}/reports/${RUNOUT}.spades75
+	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.spades75.fasta -m transcriptome --cpu $(CPU) -o ${DIR}/reports/${RUNOUT}.spades75
 
 
 ${DIR}/assemblies/${RUNOUT}.shannon.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
@@ -172,7 +172,7 @@ ${DIR}/assemblies/${RUNOUT}.shannon.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	rm -fr {DIR}/assemblies/${RUNOUT}.shannon
 	salmon index -t ${DIR}/assemblies/${RUNOUT}.shannon.fasta -i salmon.idx --type quasi -k 31
 	salmon quant -p $(CPU) -i salmon.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/shannon
-	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.shannon.fasta -m transcriptome --cpu $(CPU) -l ${LINEAGE} -o ${DIR}/reports/${RUNOUT}.shannon
+	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.shannon.fasta -m transcriptome --cpu $(CPU) -o ${DIR}/reports/${RUNOUT}.shannon
 
 
 ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
@@ -202,7 +202,7 @@ ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/orthotr
 	rm ${DIR}/orthofuse/${RUNOUT}/good.list
 
 ${DIR}/reports/busco.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
-	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -m transcriptome --cpu $(CPU) -l ${LINEAGE} -o ${RUNOUT}
+	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}
 	mv run_${RUNOUT} ${DIR}/reports/
 	touch ${DIR}/reports/busco.done
 
