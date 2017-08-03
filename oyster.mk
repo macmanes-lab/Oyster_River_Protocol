@@ -53,7 +53,7 @@ orthotransrate:${DIR}/orthofuse/${RUNOUT}/orthotransrate.done
 orthofusing:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 salmon:${DIR}/quants/shannon/quant.sf
 
-main: setup run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_shannon merge orthotransrate orthofusing salmon report
+main: setup check run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_shannon merge orthotransrate orthofusing salmon report
 report:busco transrate reportgen
 busco:${DIR}/reports/busco.done
 transrate:${DIR}/reports/transrate.done
