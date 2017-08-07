@@ -64,7 +64,7 @@ ${FASTADIR}/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/orthotransrat
 	rm ${DIR}/orthofuse/${RUNOUT}/good.list
 
 ${DIR}/reports/busco.done:${FASTADIR}/${RUNOUT}.orthomerged.fasta
-	python $$(which run_BUSCO.py) -i ${FASTADIR}/${RUNOUT}.orthomerged.fasta -m transcriptome --cpu $(CPU) -l ${LINEAGE} -o ${RUNOUT}
+	python $$(which run_BUSCO.py) -i ${FASTADIR}/${RUNOUT}.orthomerged.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}
 	mv run_${RUNOUT} ${DIR}/reports/
 	touch ${DIR}/reports/busco.done
 
