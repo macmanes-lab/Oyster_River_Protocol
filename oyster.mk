@@ -210,7 +210,7 @@ ${DIR}/reports/transrate.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	transrate -o ${DIR}/reports/transrate_${RUNOUT}  -a ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta --left ${READ1} --right ${READ2} -t $(CPU)
 	touch ${DIR}/reports/transrate.done
 
-${DIR}/quants/shannon/quant.sf:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
+${DIR}/quants/orthomerged/quant.sf:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	salmon index -t ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta  -i ortho.idx --type quasi -k 31
 	salmon quant -p $(CPU) -i ortho.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/orthomerged
 
