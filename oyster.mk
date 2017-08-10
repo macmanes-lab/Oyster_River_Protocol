@@ -51,7 +51,7 @@ run_shannon:${DIR}/assemblies/${RUNOUT}.shannon.fasta
 merge:${DIR}/orthofuse/${RUNOUT}/merged.fasta
 orthotransrate:${DIR}/orthofuse/${RUNOUT}/orthotransrate.done
 orthofusing:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
-salmon:${DIR}/quants/shannon/quant.sf
+salmon:${DIR}/quants/orthomerged/quant.sf
 
 main: setup check run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_shannon merge orthotransrate orthofusing salmon report
 report:busco transrate reportgen
@@ -211,8 +211,8 @@ ${DIR}/reports/transrate.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	touch ${DIR}/reports/transrate.done
 
 ${DIR}/quants/shannon/quant.sf:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
-	salmon index -t ${DIR}/assemblies/${RUNOUT}.shannon.fasta -i salmon.idx --type quasi -k 31
-	salmon quant -p $(CPU) -i salmon.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/shannon
+	salmon index -t ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta  -i ortho.idx --type quasi -k 31
+	salmon quant -p $(CPU) -i ortho.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/orthomerged
 
 
 reportgen:
