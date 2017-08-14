@@ -102,9 +102,9 @@ salmon:
 ifdef salmonpath
 	@echo "SALMON is already installed"
 else
-	cd ${DIR}/software && curl -LO https://github.com/COMBINE-lab/salmon/releases/download/v0.8.2/Salmon-0.8.2_linux_x86_64.tar.gz
+	cd ${DIR}/software && curl -LO https://github.com/COMBINE-lab/salmon/releases/download/v0.8.2/Salmon-0.8.2_linux_x86_64.tar.gz &&\
 	tar -zxf ${DIR}/software/Salmon-0.8.2_linux_x86_64.tar.gz
-	@echo PATH=\$$PATH:${DIR}/software/Salmon-0.8.2_linux_x86_64 | tee -a pathfile
+	@echo PATH=\$$PATH:${DIR}/software/Salmon-0.8.2_linux_x86_64/bin | tee -a pathfile
 endif
 
 seqtk:
