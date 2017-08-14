@@ -26,7 +26,6 @@ all: setup brew orthofuser rcorrector blast spades trinity shannon seqtk busco t
 
 setup:
 	@mkdir -p ${DIR}/scripts
-	@mkdir -p ${DIR}/software
 	@mkdir -p ${DIR}/shared
 	@rm -f pathfile
 
@@ -35,6 +34,11 @@ ifdef brewpath
 	@echo "BREW is already installed"
 else
 	$error("*** BREW MUST BE PROPERLY INSTALLED BEFORE YOU CAN PROCEED, SEE: http://angus.readthedocs.io/en/2016/linuxbrew_install.html ***")
+endif
+
+transrate:
+	cd ${DIR}/software && tar -zxf orp-transrate.tar.gz
+	@echo PATH=\$$PATH:${DIR}/software/orp-transrate | tee -a pathfile
 endif
 
 rcorrector:
@@ -139,14 +143,6 @@ else
 	fi
 endif
 
-transrate:
-ifeq "$(shell basename $(shell which transrate))" "transrate"
-	@echo "TRANSRATE is already installed"
-else
-	cd ${DIR}/software && \
-	curl -LO https://bintray.com/artifact/download/blahah/generic/transrate-1.0.3-linux-x86_64.tar.gz && tar -zxf transrate-1.0.3-linux-x86_64.tar.gz
-	@echo PATH=\$$PATH:${DIR}/software/transrate-1.0.3-linux-x86_64 | tee -a pathfile
-endif
 
 postscript:
 	@printf "\n\n*** The following location(s), if any print, need to be added to your PATH ***\n\n"
