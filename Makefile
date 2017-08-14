@@ -121,7 +121,7 @@ ifeq "$(shell basename $(shell which run_BUSCO.py))" "run_BUSCO.py"
 	@echo "BUSCO is already installed"
 else
 	cd ${DIR}/software && \
-	git clone https://gitlab.com/ezlab/busco.git && cd busco && python2 setup.py install --user --prefix=
+	git clone https://gitlab.com/ezlab/busco.git && cd busco && python setup.py install --user --prefix=
 	@echo PATH=\$$PATH:${DIR}/software/busco/scripts | tee -a pathfile
 endif
 

@@ -144,7 +144,7 @@ ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P
 	awk '{print $$1}' ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta > ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fa && mv -f ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fa ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
 	salmon index -t ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta -i salmon.idx --type quasi -k 31
 	salmon quant -p $(CPU) -i salmon.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/trinity
-	python2 $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}.trin
+	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}.trin
 
 ${DIR}/assemblies/${RUNOUT}.spades55.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	rnaspades.py --only-assembler -o ${DIR}/assemblies/${RUNOUT}.spades_k55 --threads $(CPU) --memory $(MEM) -k 55 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
@@ -152,7 +152,7 @@ ${DIR}/assemblies/${RUNOUT}.spades55.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	rm -fr ${DIR}/assemblies/${RUNOUT}.spades_k55
 	salmon index -t ${DIR}/assemblies/${RUNOUT}.spades55.fasta -i salmon.idx --type quasi -k 31
 	salmon quant -p $(CPU) -i salmon.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/spades55
-	python2 $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.spades55.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}.spades55
+	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.spades55.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}.spades55
 
 
 ${DIR}/assemblies/${RUNOUT}.spades75.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
@@ -161,24 +161,24 @@ ${DIR}/assemblies/${RUNOUT}.spades75.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	rm -fr ${DIR}/assemblies/${RUNOUT}.spades_k75
 	salmon index -t ${DIR}/assemblies/${RUNOUT}.spades75.fasta -i salmon.idx --type quasi -k 31
 	salmon quant -p $(CPU) -i salmon.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/spades75
-	python2 $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.spades75.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}.spades75
+	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.spades75.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}.spades75
 
 
 ${DIR}/assemblies/${RUNOUT}.shannon.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	seqtk seq -A ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq > ${DIR}/rcorr/$$(basename ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq .fq).fa
 	seqtk seq -A ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq > ${DIR}/rcorr/$$(basename ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq .fq).fa
-	python2 $$(which shannon.py) -o ${DIR}/assemblies/${RUNOUT}.shannon --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fa --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fa -p $(CPU) -K 75
+	python $$(which shannon.py) -o ${DIR}/assemblies/${RUNOUT}.shannon --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fa --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fa -p $(CPU) -K 75
 	mv ${DIR}/assemblies/${RUNOUT}.shannon/shannon.fasta ${DIR}/assemblies/${RUNOUT}.shannon.fasta
 	rm -fr {DIR}/assemblies/${RUNOUT}.shannon
 	salmon index -t ${DIR}/assemblies/${RUNOUT}.shannon.fasta -i salmon.idx --type quasi -k 31
 	salmon quant -p $(CPU) -i salmon.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/shannon
-	python2 $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.shannon.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}.shannon
+	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.shannon.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}.shannon
 
 
 ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
 	mkdir -p ${DIR}/orthofuse/${RUNOUT}/working
-	for fasta in $$(ls ${DIR}/assemblies/${RUNOUT}*fasta); do python2 ${MAKEDIR}/scripts/long.seq.py ${DIR}/assemblies/$$(basename $$fasta) ${DIR}/orthofuse/${RUNOUT}/working/$$(basename $$fasta).short.fasta 200; done
-	python2 $$(which orthofuser.py) -I 4 -f ${DIR}/orthofuse/${RUNOUT}/working/ -og -t $(CPU) -a $(CPU)
+	for fasta in $$(ls ${DIR}/assemblies/${RUNOUT}*fasta); do python ${MAKEDIR}/scripts/long.seq.py ${DIR}/assemblies/$$(basename $$fasta) ${DIR}/orthofuse/${RUNOUT}/working/$$(basename $$fasta).short.fasta 200; done
+	python $$(which orthofuser.py) -I 4 -f ${DIR}/orthofuse/${RUNOUT}/working/ -og -t $(CPU) -a $(CPU)
 	cat ${DIR}/orthofuse/${RUNOUT}/working/*short.fasta > ${DIR}/orthofuse/${RUNOUT}/merged.fasta
 
 ${DIR}/orthofuse/${RUNOUT}/orthotransrate.done:${DIR}/orthofuse/${RUNOUT}/merged.fasta
@@ -197,12 +197,12 @@ ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/orthotr
 	echo Search output files
 	find ${DIR}/orthofuse/${RUNOUT}/ -name '*orthout' 2> /dev/null | parallel -j $(CPU) "awk -F, -v max=0 '{if(\$$14>max){want=\$$1; max=\$$14}}END{print want}'" | tee -a ${DIR}/orthofuse/${RUNOUT}/good.list
 	find ${DIR}/orthofuse/${RUNOUT}/ -name '*orthout' -delete
-	python2 ${MAKEDIR}/scripts/filter.py ${DIR}/orthofuse/${RUNOUT}/merged.fasta ${DIR}/orthofuse/${RUNOUT}/good.list > ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta
+	python ${MAKEDIR}/scripts/filter.py ${DIR}/orthofuse/${RUNOUT}/merged.fasta ${DIR}/orthofuse/${RUNOUT}/good.list > ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta
 	cp ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	rm ${DIR}/orthofuse/${RUNOUT}/good.list
 
 ${DIR}/reports/busco.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
-	python2 $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}
+	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}
 	mv run_${RUNOUT} ${DIR}/reports/
 	touch ${DIR}/reports/busco.done
 
