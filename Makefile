@@ -16,9 +16,10 @@ orthopath := $(shell which orthofuser.py 2>/dev/null)
 trimmomaticpath := $(shell which trimmomatic 2>/dev/null)
 salmonpath := $(shell which salmon 2>/dev/null)
 bowtie2path := $(shell which bowtie2 2>/dev/null)
+hmmerpath := $(shell which hmmsan 2>/dev/null)
 
 
-all: setup brew orthofuser rcorrector blast spades trinity shannon seqtk busco trimmomatic transrate bowtie2 salmon postscript
+all: setup brew hmmer orthofuser rcorrector blast spades trinity shannon seqtk busco trimmomatic transrate bowtie2 salmon postscript
 
 .DELETE_ON_ERROR:
 
@@ -45,6 +46,13 @@ ifdef rcorrpath
 	@echo "RCORRECTOR is already installed"
 else
 	brew install rcorrector
+endif
+
+hmmer:
+ifdef hmmerpath
+	@echo "HMMER is already installed"
+else
+	brew install hmmer
 endif
 
 bowtie2:
