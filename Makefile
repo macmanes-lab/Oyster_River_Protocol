@@ -39,7 +39,6 @@ endif
 transrate:
 	cd ${DIR}/software && tar -zxf orp-transrate.tar.gz
 	@echo PATH=\$$PATH:${DIR}/software/orp-transrate | tee -a pathfile
-endif
 
 rcorrector:
 ifdef rcorrpath
