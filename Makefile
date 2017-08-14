@@ -122,7 +122,7 @@ ifeq "$(shell basename $(shell which run_BUSCO.py))" "run_BUSCO.py"
 else
 	cd ${DIR}/software && \
 	git clone https://gitlab.com/ezlab/busco.git && cd busco && python2 setup.py install --user --prefix=
-	@echo PATH=$$PATH:${DIR}/software/busco/scripts | tee -a pathfile
+	@echo PATH=\$$PATH:${DIR}/software/busco/scripts | tee -a pathfile
 endif
 
 trimmomatic:
@@ -145,7 +145,7 @@ ifeq "$(shell basename $(shell which transrate))" "transrate"
 else
 	cd ${DIR}/software && \
 	curl -LO https://bintray.com/artifact/download/blahah/generic/transrate-1.0.3-linux-x86_64.tar.gz && tar -zxf transrate-1.0.3-linux-x86_64.tar.gz
-	@echo PATH=$$PATH:${DIR}/software/transrate-1.0.3-linux-x86_64 | tee -a pathfile
+	@echo PATH=\$$PATH:${DIR}/software/transrate-1.0.3-linux-x86_64 | tee -a pathfile
 endif
 
 postscript:
