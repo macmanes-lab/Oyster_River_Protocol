@@ -32,7 +32,7 @@ do
     do
         echo $(basename $file) $(grep $busco $file) | awk '{print $1 "\t" $2 "\t" $4}'
     done
-done | sort -k1 | tee -a buscos.txt
+done | sort -k1 >> buscos.txt
 
 
 x=$(wc -l list2 | cut -d " " -f1)
