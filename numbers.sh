@@ -5,8 +5,8 @@
 rm -f list list2 buscos.txt
 
 for table in $(find . -name full_table_*$1*); do
-    echo $table | sort -k1 >> list;
-done
+    echo $table;
+done | sort -k1 >> list
 
 grep Complete $(sed -n 1p list) \
 | cut -f1 \
