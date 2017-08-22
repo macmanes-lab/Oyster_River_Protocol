@@ -17,9 +17,10 @@ trimmomaticpath := $(shell which trimmomatic 2>/dev/null)
 salmonpath := $(shell which salmon 2>/dev/null)
 bowtie2path := $(shell which bowtie2 2>/dev/null)
 hmmerpath := $(shell which hmmsan 2>/dev/null)
+mclpath := $(shell which mcl 2>/dev/null)
 
 
-all: setup brew hmmer orthofuser rcorrector blast spades trinity shannon seqtk busco trimmomatic transrate bowtie2 salmon postscript
+all: setup brew mcl hmmer orthofuser rcorrector blast spades trinity shannon seqtk busco trimmomatic transrate bowtie2 salmon postscript
 
 .DELETE_ON_ERROR:
 
@@ -46,6 +47,13 @@ ifdef rcorrpath
 	@echo "RCORRECTOR is already installed"
 else
 	brew install rcorrector
+endif
+
+mcl:
+ifdef mclpath
+	@echo "MCL is already installed"
+else
+	brew install mcl
 endif
 
 hmmer:
