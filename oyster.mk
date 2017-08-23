@@ -150,8 +150,8 @@ ${DIR}/assemblies/${RUNOUT}.spades55.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	rnaspades.py --only-assembler -o ${DIR}/assemblies/${RUNOUT}.spades_k55 --threads $(CPU) --memory $(MEM) -k 55 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
 	mv ${DIR}/assemblies/${RUNOUT}.spades_k55/transcripts.fasta ${DIR}/assemblies/${RUNOUT}.spades55.fasta
 	rm -fr ${DIR}/assemblies/${RUNOUT}.spades_k55
-	salmon index -t ${DIR}/assemblies/${RUNOUT}.spades55.fasta -i salmon.idx --type quasi -k 31
-	salmon quant -p $(CPU) -i salmon.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/spades55
+	salmon index --no_version_check -t ${DIR}/assemblies/${RUNOUT}.spades55.fasta -i salmon.idx --type quasi -k 31
+	salmon quant --no_version_check -p $(CPU) -i salmon.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/spades55
 	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.spades55.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}.spades55
 
 
@@ -159,8 +159,8 @@ ${DIR}/assemblies/${RUNOUT}.spades75.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	rnaspades.py --only-assembler -o ${DIR}/assemblies/${RUNOUT}.spades_k75 --threads $(CPU) --memory $(MEM) -k 75 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
 	mv ${DIR}/assemblies/${RUNOUT}.spades_k75/transcripts.fasta ${DIR}/assemblies/${RUNOUT}.spades75.fasta
 	rm -fr ${DIR}/assemblies/${RUNOUT}.spades_k75
-	salmon index -t ${DIR}/assemblies/${RUNOUT}.spades75.fasta -i salmon.idx --type quasi -k 31
-	salmon quant -p $(CPU) -i salmon.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/spades75
+	salmon index --no_version_check -t ${DIR}/assemblies/${RUNOUT}.spades75.fasta -i salmon.idx --type quasi -k 31
+	salmon quant --no_version_check -p $(CPU) -i salmon.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/spades75
 	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.spades75.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}.spades75
 
 
@@ -170,8 +170,8 @@ ${DIR}/assemblies/${RUNOUT}.shannon.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	python $$(which shannon.py) -o ${DIR}/assemblies/${RUNOUT}.shannon --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fa --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fa -p $(CPU) -K 75
 	mv ${DIR}/assemblies/${RUNOUT}.shannon/shannon.fasta ${DIR}/assemblies/${RUNOUT}.shannon.fasta
 	rm -fr {DIR}/assemblies/${RUNOUT}.shannon
-	salmon index -t ${DIR}/assemblies/${RUNOUT}.shannon.fasta -i salmon.idx --type quasi -k 31
-	salmon quant -p $(CPU) -i salmon.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/shannon
+	salmon index --no_version_check -t ${DIR}/assemblies/${RUNOUT}.shannon.fasta -i salmon.idx --type quasi -k 31
+	salmon quant --no_version_check -p $(CPU) -i salmon.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/shannon
 	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.shannon.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}.shannon
 
 
@@ -211,8 +211,8 @@ ${DIR}/reports/transrate.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	touch ${DIR}/reports/transrate.done
 
 ${DIR}/quants/orthomerged/quant.sf:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
-	salmon index -t ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta  -i ortho.idx --type quasi -k 31
-	salmon quant -p $(CPU) -i ortho.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/orthomerged
+	salmon index --no_version_check -t ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta  -i ortho.idx --type quasi -k 31
+	salmon quant --no_version_check -p $(CPU) -i ortho.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/orthomerged
 
 
 reportgen:
