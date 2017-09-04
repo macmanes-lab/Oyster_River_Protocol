@@ -94,8 +94,8 @@ ifeq "$(shell basename $(shell which spades.py))" "spades.py"
 	@echo "SPAdes is already installed"
 else
 	cd ${DIR}/software && \
-	curl -LO http://cab.spbu.ru/files/release3.10.1/SPAdes-3.10.1-Linux.tar.gz && tar -zxf SPAdes-3.10.1-Linux.tar.gz
-	@echo PATH=\$$PATH:${DIR}/software/SPAdes-3.10.1-Linux/bin | tee -a pathfile
+	curl -LO http://cab.spbu.ru/files/release3.11.0/SPAdes-3.11.0-Linux.tar.gz && tar -zxf SPAdes-3.11.0-Linux.tar.gz
+	@echo PATH=\$$PATH:${DIR}/software/SPAdes-3.11.0-Linux/bin | tee -a pathfile
 endif
 
 trinity:
