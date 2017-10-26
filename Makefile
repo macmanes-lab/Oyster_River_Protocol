@@ -29,6 +29,7 @@ all: setup brew mcl shmlast hmmer orthofuser rcorrector blast spades trinity sha
 setup:
 	@mkdir -p ${DIR}/scripts
 	@mkdir -p ${DIR}/shared
+	@mkdir -p ${DIR}/databases
 	@rm -f pathfile
 
 brew:
@@ -37,6 +38,9 @@ ifdef brewpath
 else
 	$error("*** BREW MUST BE PROPERLY INSTALLED BEFORE YOU CAN PROCEED, SEE: http://angus.readthedocs.io/en/2016/linuxbrew_install.html ***")
 endif
+
+uniprot:
+	curl -L -o ${DIR}/databases/uniprot.fasta.gz ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz 
 
 transrate:
 	cd ${DIR}/software && tar -zxf orp-transrate.tar.gz
@@ -49,11 +53,16 @@ else
 	brew install rcorrector
 endif
 
+##have to install Shmlast in a virtual environment
+
 shmlast:
 ifdef crbhpath
 	@echo "SHMLAST is already installed"
 else
-	pip install shmlast
+	python3 -m venv shmlast_env
+	. shmlast_env/bin/activate
+	pip install shmlast==1.2
+	deactivate
 endif
 
 mcl:

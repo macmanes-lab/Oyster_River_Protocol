@@ -70,6 +70,8 @@ setup:
 	@mkdir -p ${DIR}/reports
 	@mkdir -p ${DIR}/orthofuse
 	@mkdir -p ${DIR}/quants
+	@mkdir -p ${DIR}/crbh
+
 
 check:
 ifdef salmonpath
@@ -175,6 +177,14 @@ ${DIR}/assemblies/${RUNOUT}.shannon.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	salmon quant --no-version-check -p $(CPU) -i ${RUNOUT}.salmon.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/salmon_shannon_${RUNOUT}
 	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.shannon.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}.shannon
 
+${DIR}/assemblies/${RUNOUT}.shannon.fasta ${DIR}/assemblies/${RUNOUT}.spades75.fasta ${DIR}/assemblies/${RUNOUT}.spades55.fasta ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta:
+	cd ${DIR}/assemblies/
+	. $HOME/shmlast_env/bin/activate
+	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.shannon.fasta -d ${DIR}/databases/uniprot.fasta.gz --n_threads $(CPU) --e 0.0000000001
+	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.spades75.fasta -d ${DIR}/databases/uniprot.fasta.gz --n_threads $(CPU) --e 0.0000000001
+	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.spades55.fasta -d ${DIR}/databases/uniprot.fasta.gz --n_threads $(CPU) --e 0.0000000001
+	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta -d ${DIR}/databases/uniprot.fasta.gz --n_threads $(CPU) --e 0.0000000001
+	deavtivate
 
 ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
 	mkdir -p ${DIR}/orthofuse/${RUNOUT}/working
