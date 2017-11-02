@@ -67,7 +67,7 @@ bowtie2:
 ifdef bowtie2path
 	@echo "BOWTIE2 is already installed"
 else
-	brew install bowtie2
+	brew install python bowtie2
 endif
 
 orthofuser:
