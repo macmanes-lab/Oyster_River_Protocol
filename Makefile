@@ -85,8 +85,8 @@ ifeq "$(shell basename $(shell which blastp))" "blastp"
 	@echo "BLASTP is already installed"
 else
 	@echo "blastp is not installed, installing now..."
-	cd ${DIR}/software && curl -LO ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.6.0+-x64-linux.tar.gz && tar -zxf ncbi-blast-2.6.0+-x64-linux.tar.gz
-	@echo PATH=\$$PATH:${DIR}/software/ncbi-blast-2.6.0+/bin | tee -a pathfile
+	cd ${DIR}/software && curl -LO ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.7.1+-x64-linux.tar.gz && tar -zxf ncbi-blast-2.7.1+-x64-linux.tar.gz
+	@echo PATH=\$$PATH:${DIR}/software/ncbi-blast-2.7.1+/bin | tee -a pathfile
 endif
 
 spades:
