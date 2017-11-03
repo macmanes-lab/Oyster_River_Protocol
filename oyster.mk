@@ -178,7 +178,7 @@ ${DIR}/assemblies/${RUNOUT}.shannon.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.shannon.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}.shannon
 
 ${DIR}/assemblies/${RUNOUT}.shannon.fasta ${DIR}/assemblies/${RUNOUT}.spades75.fasta ${DIR}/assemblies/${RUNOUT}.spades55.fasta ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta:
-	cd ${DIR}/assemblies/
+	cd ${DIR}/assemblies/crbh
 	. $HOME/shmlast_env/bin/activate
 	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.shannon.fasta -d ${DIR}/databases/uniprot.fasta.gz --n_threads $(CPU) --e 0.0000000001
 	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.spades75.fasta -d ${DIR}/databases/uniprot.fasta.gz --n_threads $(CPU) --e 0.0000000001
