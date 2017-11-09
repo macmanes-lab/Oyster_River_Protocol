@@ -1,4 +1,3 @@
-
 #Response To review
 ## Reviewer 1
 
@@ -6,26 +5,37 @@ This is really interesting paper that I feel could yield good results however th
 
 Some of this is pedantic detail regarding the manuscript; the English needs to be be improved (e.g. “Troublesome, this biology is lost from all downstream analysis and inference”) as could the flow of the manuscript. There is considerable repetition (for example, at the start of the Discussion and the Conclusions) and p-values are routinely quoted to more significant figures than I believe (e.g. Section 3.2.1 p=0.0001322 for a comparison of the distributions with only 15 data-points per distribution). There are more serious shortcomings to the manuscript however that I think require considerably more attention.
 
-> Thanks for pointing out the pedantic details related to the manuscript. I have addressed them. 
+> Thanks for pointing out the pedantic details related to the manuscript. I have addressed them.
 
-I understand that the manuscript is a short presentation of a potentially useful tool but I do not feel that the authors give sufficient context in the introduction. In particular, there is no attention given to previous work on attempting to benchmark and reconcile the differences between potential de novo transcriptome assemblers, no attempt made to provide a list or or reference to the current suite of tools or any discussion of previous work highlighting how sensitive these tools are to a sensible and carefully chosen set of parameters (although the authors do correctly note that the apparent ease of use of these tools belies the complexity of the process). 
+I understand that the manuscript is a short presentation of a potentially useful tool but I do not feel that the authors give sufficient context in the introduction. In particular, there is no attention given to previous work on attempting to benchmark and reconcile the differences between potential de novo transcriptome assemblers, no attempt made to provide a list or or reference to the current suite of tools or any discussion of previous work highlighting how sensitive these tools are to a sensible and carefully chosen set of parameters (although the authors do correctly note that the apparent ease of use of these tools belies the complexity of the process).
 
-> I have beefed up the introductory materials significantly. 
+> I have beefed up the introductory materials significantly.
 
 On the plus side, the manuscript is well set out and the author has shared their code, the data they use is public and the assemblies will be made available, which is all good news.
 
 > :)
 
 #### Experimental design
-The research question is well laid out, however the lack of summarisation of previous efforts to benchmark de novo transcriptome assembly makes it a little unclear how significant the problem they are trying to address is. 
+The research question is well laid out, however the lack of summarisation of previous efforts to benchmark de novo transcriptome assembly makes it a little unclear how significant the problem they are trying to address is.
 
 A good effort has been made to assess the performance of their new protocol in the context of other stand-alone assemblers, but I am concerned about several aspects of the process:
 
 1) The main standalone tool they compare the Oyster River Protocol (ORP) to is Trinity, which itself forms one of the three assemblers that comprise the ORP. As such, it is perhaps not surprising that the ORP might outperform it.
 
+
+> Thanks for the comment. I chose to compare to Trinity, mostly because this was the assembler that (arguably) most people are using. It would be the product that most people would be interested in comparing to. That the ORP outperforms Trinity is not at all a given however. It could have been possible that the merging steps introduced significant noise into the assembly, or that Trinity just outperformed the other assemblers in most ways, so contribution from other assemblers was un-helpful.
+
 2) The author doesn’t really give any justification for why he chose these three tools for the ORP as opposed to any other of the myriad of different tools. Did he choose them because they were popular, or known to give good results, or because they have very different underlying algorithms and so might be sampling different regions of search-space?
 
+> Excellent comment! I have included this info in the methods section. "These assemblers were chosen based on the fact that (1) use an open-science development model, whereby end-users may contribute code, (2) they are all actively maintained and are undergoing continuous development, and (3) occupy different parts of the algorithmic landscape."
+
+> Without a doubt, other assembler could add value, but they lack these important characteristics, they were left out of the comparison. BinPacker, for instance, has produced some very nice assemblies, but it is nearly impossible to install, and the developers have been minimally responsive to my inquiries.
+
+> Adding new assemblers, as they are developed, is definitely in the development plan. As of now, I encourage people to suggest to me different things to benchmark and add.  
+
 3) The data preparation for the stand alone Trinity runs is not the same as for the ORP assemblies. Specifically, the data for the stand-alone Trinity runs doesn’t include the error correction step that is included in the ORP from a previously published tool (RCorrector). As a result, it is unclear whether the improvement observed for the ORP over Trinity is a result of combining the assemblies or the error correction. In particular the % read -mapping Transrate score - which is where the ORP sees the most dramatic improvement over Trinity - may well be be strongly affected by the error correction step.
+
+> Sorry for the confusion. The reads that I used for the Trinity assembly are treated in identical fashion to the rest of the pipeline. I have clarified this in the manuscript. 
 
 4) The manuscript doesn’t give very much detail on how the BUSCO transcripts were assessed. For example, the manuscript often includes statements such as “Trinity assemblies contained on average 86% (sd = 21%) of the full-length orthologs, 154 while the ORP assembled datasets contained on average 85% (sd = 16%) of the full length transcripts.” without carefully describing what this actually means. Are these isoform matching with 100% identity over 100% of both the ISOFORM and BUSCO transcript length? I highly doubt that the matches are this perfect (from my own experience with de novo transcript assembly). We really need considerable more detail here on how these things are compared and considered matching or not.
 
@@ -49,7 +59,7 @@ Although multiple transcriptome assemblers were leveraged, the figures focused a
 Experimental design
 The ultimate goal of ORP is to generate a final assembly that contains the best assembled transcripts among all leveraged assemblers and to generate a final mixed assembly that is of higher quality than any of the individual input assemblers. Specifically, the ORP method involves running multiple assemblers, scoring each transcript, and clustering together transcripts that likely correspond to the same isoform of each gene. Based on TransRate contig scores, the single highest scoring transcript within each group is selected to represent that group in the final ORP reported assembly.
 
-Comparisons among the final assemblies involve the TransRate final assembly scores, percent of reads represented by each assembly, and core ortholog representation as per Busco. These are all useful metrics, but it would be of interest to include additional metrics that reflect rates of chimerism and correct representation of alternatively spliced transcripts. In general, accuracy evaluations should rely on two metrics: sensitivity and specificity. Most metrics leveraged by the author nicely reflect sensitivity, but there is little devoted to specificity. Targeting specificity is difficult to do with data sets lacking reference data sets, but there are many well-studied model organisms that can be leveraged for this analysis, and among the data sets leveraged by the author, mouse is included - which has a high quality reference genome and reference annotation set where evaluation of correct alternatively spliced isoforms could be explored. Simulated data sets are also very useful for evaluating performance metrics, given that the reference transcripts (and splicing isoforms) are known entities - and in resulting assemblies, incorrectly assembled transcripts, chimeras, or missing splicing isoforms can be readily identified. 
+Comparisons among the final assemblies involve the TransRate final assembly scores, percent of reads represented by each assembly, and core ortholog representation as per Busco. These are all useful metrics, but it would be of interest to include additional metrics that reflect rates of chimerism and correct representation of alternatively spliced transcripts. In general, accuracy evaluations should rely on two metrics: sensitivity and specificity. Most metrics leveraged by the author nicely reflect sensitivity, but there is little devoted to specificity. Targeting specificity is difficult to do with data sets lacking reference data sets, but there are many well-studied model organisms that can be leveraged for this analysis, and among the data sets leveraged by the author, mouse is included - which has a high quality reference genome and reference annotation set where evaluation of correct alternatively spliced isoforms could be explored. Simulated data sets are also very useful for evaluating performance metrics, given that the reference transcripts (and splicing isoforms) are known entities - and in resulting assemblies, incorrectly assembled transcripts, chimeras, or missing splicing isoforms can be readily identified.
 
 It would benefit the manuscript to include an orthogonal measure of assembly quality such as provided by the DETONATE software. Ideally, this would show that ORP compiled assemblies have improved DETONATE scores as compared to the assemblies provided as input to ORP.
 
@@ -65,11 +75,11 @@ I commend the author on the development of ORP. Generating high quality transcri
 
 1. ORP should ideally outperform each of the individual methods used as input. Performance should include reduced chimerism and retention of alternatively spliced isoforms that are well supported by the rna-seq data.
 
-2. ORP should be resilient to including 'bad' assemblies along with 'good' assemblies as input. 
+2. ORP should be resilient to including 'bad' assemblies along with 'good' assemblies as input.
 
 3. ORP should demonstrate improved assembly quality across metrics that address both sensitivity and specificity (eg. leveraging DETONATE along with TransRate, and leveraging high-quality model organism reference data sets).
 
-#### Additional comments: 
+#### Additional comments:
 
 As a protocol, ORP should apply equally well to de novo transcriptome assemblies as to genome-guided assemblies. Using reference model organism data sets, one could explore applying ORP to transcript sets resulting from cufflinks, stringtie, or other genome-guided methods such that ORP will yield the best quality transcript set.
 
