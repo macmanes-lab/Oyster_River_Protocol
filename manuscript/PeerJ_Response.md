@@ -35,25 +35,40 @@ A good effort has been made to assess the performance of their new protocol in t
 
 3) The data preparation for the stand alone Trinity runs is not the same as for the ORP assemblies. Specifically, the data for the stand-alone Trinity runs doesn’t include the error correction step that is included in the ORP from a previously published tool (RCorrector). As a result, it is unclear whether the improvement observed for the ORP over Trinity is a result of combining the assemblies or the error correction. In particular the % read -mapping Transrate score - which is where the ORP sees the most dramatic improvement over Trinity - may well be be strongly affected by the error correction step.
 
-> Sorry for the confusion. The reads that I used for the Trinity assembly are treated in identical fashion to the rest of the pipeline. I have clarified this in the manuscript. 
+> Sorry for the confusion. The reads that I used for the Trinity assembly are treated in identical fashion to the rest of the pipeline. I have clarified this in the manuscript.
 
 4) The manuscript doesn’t give very much detail on how the BUSCO transcripts were assessed. For example, the manuscript often includes statements such as “Trinity assemblies contained on average 86% (sd = 21%) of the full-length orthologs, 154 while the ORP assembled datasets contained on average 85% (sd = 16%) of the full length transcripts.” without carefully describing what this actually means. Are these isoform matching with 100% identity over 100% of both the ISOFORM and BUSCO transcript length? I highly doubt that the matches are this perfect (from my own experience with de novo transcript assembly). We really need considerable more detail here on how these things are compared and considered matching or not.
 
+> Here, we follow the default definitions developed as part of the BUSCO manuscript. Specifically, I have nw included in the manuscript the following language to help clarify.
+"We report default BUSCO metrics as described in (Simao:2015kk). Specifically, "complete orthologs", are defined as query transcripts that are within 2 standard deviations of the length of the BUSCO group mean, while contigs falling short of this metric are listed as "fragmented"."
+
+> BUSCO definitions are not that tight with regards to ISOFORMS, and, on an aside, proper isoform reconstruction using Illumina data is not something to be trusted, as you are aware. I agree there is significant complexity here, but in the absence of real confidence in isoform reconstruction, and a well benchmarked tool (BUSCO), I think that reporting default values is helpful to readers.
+
+
 5) The inclusion of multiple kmer lengths is interesting, but no real effort is made to determine whether the differences between the individual assemblies is due to the different kmer lengths or the different algorithms of the tools. For example, how does an ORP assembly compare with three Trinity assemblies, with kmers of 25,55 & 75, combined in the same fashion?
 
+> This is impossible, as the longest kmer that Trinity can use is k=32. I have more fully fleshed out the contributions of k=55 and k=75 within SPAdes. See figures 3, 4, and 5, as well as Table 2. This (especially the MDS plot and table 2) demonstrate value in running SPAdes at the 2 different kmer lengths.    
+
 Overall, however, the manuscript is lacking the depth and detail I think it needs to really fill the knowledge gap and without this details reproducing these results would be difficult despite the easy and availability of the software install and the dataset.
-Validity of the findings
+
+> I have added significant detail in all phases of the manuscript which should help in the interpretation of the results. Regarding reproducibility, all the data are publicly available, and the code I used is freely available on Github.
+
+#### Validity of the findings
 In its current form, the manuscript has not convinced me that the ORP represents any significant improvement over Trinity, the existing stand-alone de novo assembly tool tested. As such, I think that the conclusion the the ORP represents an improvement over existing tools is not yet sound.
 
 #### Comments for the Author
-This work details a new multi-assembler approach to improving de novo transcriptome assembly. This is a really good idea that is worth exploring and I really want to see a strong detailed exploration of the concept and how much we might gain from combining de novo transcriptome tools, but I’m afraid that these have not been adequately illuminated here. A little more time, exploration of the tools and more careful analysis and I think it would make a good paper. I'd be happy to review future revisions of the paper and would like to see ORP bradened to include more assembly tools.
+This work details a new multi-assembler approach to improving de novo transcriptome assembly. This is a really good idea that is worth exploring and I really want to see a strong detailed exploration of the concept and how much we might gain from combining de novo transcriptome tools, but I’m afraid that these have not been adequately illuminated here. A little more time, exploration of the tools and more careful analysis and I think it would make a good paper. I'd be happy to review future revisions of the paper and would like to see ORP broadened to include more assembly tools.
 
 The instruction for installing and running the software (http://oyster-river-protocol.readthedocs.io/en/latest/aws_setup.html) work and I could set up the tool on my local box and verify that it runs. Unfortunately I don't have access to sudo on my clusters large memory machines, and we have no way of charging AWS tie to grants, so I couldn't test it on live data. Perhaps, given the complex web of dependencies involved, it might be an idea to distribute this as a conda package or a docker instance?
+
+
 ##Reviewer 2
 #### Basic reporting
 The manuscript is well written and well organized.
 
 The transcriptome assemblies resulting from each of the assemblies are made available as supplementary data, but there are many other supplementary data files and figures that would be useful to include that were not available, such as the TransRate reports for each of the assemblies, and ideally a summary data table that includes all TransRate scores and score components (ie. the individual metrics computed by TransRate that are leveraged in computing the final overall assembly score). Busco scores for all assemblies should be included as well.
+
+> I have compiled these results into a csv file, available at https://github.com/macmanes-lab/Oyster_River_Protocol/blob/master/manuscript/orp.csv
 
 Although multiple transcriptome assemblers were leveraged, the figures focused almost entirely on comparisons between the single assembler Trinity and the author's results from ORP. It would be useful to include comparisons to the other assemblers as well in a similar format, and provided as supplementary materials if not deemed worthy as main figures.
 Experimental design
