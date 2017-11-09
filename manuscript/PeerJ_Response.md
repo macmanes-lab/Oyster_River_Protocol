@@ -62,7 +62,7 @@ This work details a new multi-assembler approach to improving de novo transcript
 The instruction for installing and running the software (http://oyster-river-protocol.readthedocs.io/en/latest/aws_setup.html) work and I could set up the tool on my local box and verify that it runs. Unfortunately I don't have access to sudo on my clusters large memory machines, and we have no way of charging AWS tie to grants, so I couldn't test it on live data. Perhaps, given the complex web of dependencies involved, it might be an idea to distribute this as a conda package or a docker instance?
 
 
-##Reviewer 2
+## Reviewer 2
 #### Basic reporting
 The manuscript is well written and well organized.
 
@@ -79,10 +79,12 @@ Comparisons among the final assemblies involve the TransRate final assembly scor
 
 It would benefit the manuscript to include an orthogonal measure of assembly quality such as provided by the DETONATE software. Ideally, this would show that ORP compiled assemblies have improved DETONATE scores as compared to the assemblies provided as input to ORP.
 
+> Thanks Brian for pushing me to do this. I have added the detonate scores to the analyses (See figure 1c). Without exception, the scores are improved in the ORP assembly over the Trinity assemblies.
+
 While ORP attempts to stringently cluster transcripts into isoform-level groupings as a way of minimizing the loss of relevant splicing isoforms, there's no evidence shown of the impact of this method on splice isoform representation in the final ORP assembly. This deserves much more attention in the manuscript. Also, in the case of isoforms that are fused as chimeras, selecting a single best representation from a cluster containing chimeras and non-chimeras would expect to contribute to loss of important transcripts. For example, given a cluster {AB, A, B} where AB is a chimera, selecting a single representative transcript with the best score would presumably yield A or B and hence exclude an important transcript in the final output. More attention to resolving clusters of transcripts containing chimeras is warranted.
 
 Since ORP is centered around combining results from multiple assemblers, it begs the question of what assemblers would be generally best suited to use with ORP. The author leverages Trinity, Shannon, and Spades. Trinity and Shannon have been previously demonstrated to be highly effective transcriptome assemblers, but to my knowledge, Spades has seen comparably little use for transcriptome assembly; instead Spades has been more targeted towards genome assembly. There does appear to be an rnaSPAdes method included with Spades that's more specifically targeted to transcriptome assembly, but I could find little information about it being used in practice nor how effective it is for resolving spliced isoforms, which is one of the primary goals of transcriptome assembly and one that most differentiates it from other assembly challenges. One of the goals of ORP is to leverage multiple kmer lengths as part of the assembly, and Spades is run twice using different kmer values as one way to accomplish this. Using multiple kmer values to generate an assembly, leveraging the benefits of small and large kmers, is a feature of existing transcriptome assemblers Oases and IDBA-tran, neither of which were used by ORP nor cited. It isn't clear as to why the author would rely so heavily on Spades when other highly effective transcriptome assemblers are readily available and already implement ideas that are central to ORP's goals. ORP would ideally be shown to benefit from using the very best assemblers as well as to be resilient towards including results from assemblers that are sub par.
-Validity of the findings
+#### Validity of the findings
 The primary finding is that the author's ORP yields assemblies that are generally higher in quality than the Trinity assembler alone, primarily leveraging TransRate and BUSCO for assembly quality assessment. In terms of the bulk statistics, this is a valid conclusion, but it does not specifically address reducing chimeric contigs and ensuring representation of alternatively spliced isoforms, both very important aspects of transcriptome assembly and also often negligible with respect to the bulk statistics focused upon here.
 
 Overall, the results section is overly directed towards comparisons to Trinity when there were several other assembly methods being used by ORP. For each assembly quality metric, it would be useful to see how ORP compares to each of the individual assemblies, including Trinity. If there exist cases where any individual assembly used as input to ORP ends up outperforming ORP, it would call into question the value of applying ORP as a general protocol.
@@ -104,7 +106,7 @@ Most data sets in the manuscript appear to lightly benefit from ORP, whereas the
 The composition of the final ORP assemblies appears to mostly derive from Spades assembled transcripts. I imagine this could happen for several reasons. For example, (a) there could be clusters of transcripts where Spades yields the best representative transcript with the highest score, (b) there are clusters where there are tied scores and Spades is chosen preferentially, (c) Spades generates many transcripts that are unique to Spades and these are automatically propagated to ORP. It would be useful to know how the composition of the final ORP assembly reflects which transcripts were selected as best within clusters vs. alternative justifications for their inclusion in the final assembly.
 
 It would be useful to include in main figures or supplementary materials examples of genes that are better represented by the output of ORP as compared to any one individual assembler, having captured proper splice variants and/or resolved chimeras.
-##Reviewer 3
+## Reviewer 3
 #### Basic reporting
 
 
@@ -129,13 +131,24 @@ However, there are a number of puzzling choices and omissions in the paper as it
 
 * it seems that no evaluation is done against a quality reference transcriptome, e.g. mouse RNAseq -> mouse. This is a major omission; the major reference-based approach used, BUSCO, only looks at a small subset of the transcripts, and does not evaluate transcript content systematically. It would be valuable to use a reference-based measure of transcriptome quality here, such as the Trinity paper used.
 
+> Thanks for the important suggestion. I have attempted to address this by using the `Shmlast
+` package to find CRBH's in the Swissprot database, which I believe is better that looking in individual (e.g. Mus) reference transcriptomes, in that the same reference database can be used for all assemblies, thereby allowing for inter-dataset comparison. What this analysis shows, is that in all cases, I recover more CRHBs using the ORP that when using any other assembly, which speaks to the general merits of the approach.
+
 * The choice of taxonomic descriptions in table 1 is bewildering - I don't see any reason (biological or other) for the descriptions chosen. Maybe stick with 'animal' and 'plant'?
+
+> I reworked the figure to include animal, plant, and protozoa. I agree this makes the presentation much cleaner.
 
 * More, section 4.2 incompletely addresses an interesting question - there are many features of genomes/transcriptomes that are more likely to challenge transcriptome assembly than taxonomic membership, e.g. tissue sampled, tissue complexity in terms of number of cell types, presence of RNA editing, recent genome duplications, polymorphism rate, etc. It's probably beyond the scope of this paper to explore these issues, but I'm not sure how it merits the incomplete discussion it's given in the current paper. Perhaps a single sentence "ORP performed equally well across all of the organisms chosen at random" would be better, or something like that.
 
 * The paper states that no value is seen in including reads beyond 30m, which is intuitive and matches our experience. However, most transcriptome assembly projects sequence multiple tissues and then combine them in a de novo assembly. Is the recommendation for the ORP to subsample each tissue data set to 30m and then combine them? Or what? Some comment (along with a specific reference to a paper with an overall suggested workflow for making use of the assembly) would be welcome.
 
+ > My general recommendation for people strolling on to my office is to subsample each tissue set to ~30M pairs, assemble, and merge. If isoforms are of zero interest (or you have zero confidence in isoform assembly from short read data, as I do), then the recommendation is to combine reads from all tissues together then generate one 30M read dataset. The assembly of this dataset is likely to contain some isoforms not seen in "real life" (e.g., imagine chimerism of liver-specific isoform with brain-specific isoform), but given isoform reconstruction is so bad anyway, the risk of these chimeric events might not be so impactful.
+
+ > I'd be *really* happy to provide some comment in the manuscript, but I'm afraid that the recommendation is based on a lot of anecdote, and very little data. Further, I don't really know of a paper where this question has been fully resolved. Do you know of one?
+
 * Along those lines, the extra computational requirements of the ORP seem likely to be significant when combining multiple tissue RNAseq data sets. This is one of the reasons that Trinity recommends using in silico normalization, which was explicitly *not* used in this paper. The discussion should be expanded to include this.
+
+> I generally do not recommend diginorm, as it (in my hands) has resulted in slightly less contiguous assemblies. I can certainly add this  
 
 * I'm puzzled by the division between Results and Discussion in this paper. I'd suggest either combining them or having the primary results be separate from the discussion of what the results mean; typically the division I use is "here are the facts I see" (for results), and "here is what I think they mean".
 
@@ -145,3 +158,5 @@ However, there are a number of puzzling choices and omissions in the paper as it
 
 * surely there is a review citation of some sort for the statement that "transcriptome sequencing has been influential"? p2 line 24
 * Throughout the paper, clickable links in the PDF are used (The code ... is available _here_.) these should be replaced with URLs, perhaps in footnotes or references.
+
+> These have all be replaced.
