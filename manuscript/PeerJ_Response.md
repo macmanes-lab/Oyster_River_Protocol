@@ -5,11 +5,11 @@ This is really interesting paper that I feel could yield good results however th
 
 Some of this is pedantic detail regarding the manuscript; the English needs to be be improved (e.g. “Troublesome, this biology is lost from all downstream analysis and inference”) as could the flow of the manuscript. There is considerable repetition (for example, at the start of the Discussion and the Conclusions) and p-values are routinely quoted to more significant figures than I believe (e.g. Section 3.2.1 p=0.0001322 for a comparison of the distributions with only 15 data-points per distribution). There are more serious shortcomings to the manuscript however that I think require considerably more attention.
 
-> Thanks for pointing out the pedantic details related to the manuscript. I have addressed them.
+> Thanks for pointing out these details related to the manuscript. They are important and I have addressed them.
 
 I understand that the manuscript is a short presentation of a potentially useful tool but I do not feel that the authors give sufficient context in the introduction. In particular, there is no attention given to previous work on attempting to benchmark and reconcile the differences between potential de novo transcriptome assemblers, no attempt made to provide a list or or reference to the current suite of tools or any discussion of previous work highlighting how sensitive these tools are to a sensible and carefully chosen set of parameters (although the authors do correctly note that the apparent ease of use of these tools belies the complexity of the process).
 
-> I have beefed up the introductory materials significantly.
+> I have beefed up the introductory materials significantly, to include a fuller treatment of the history of transcriptome tools.
 
 On the plus side, the manuscript is well set out and the author has shared their code, the data they use is public and the assemblies will be made available, which is all good news.
 
@@ -18,14 +18,14 @@ On the plus side, the manuscript is well set out and the author has shared their
 #### Experimental design
 The research question is well laid out, however the lack of summarisation of previous efforts to benchmark de novo transcriptome assembly makes it a little unclear how significant the problem they are trying to address is.
 
-> The systematic benchmarking of assemblies, to the degree done here, is novel. Even in developing Trinity, we used Detonate (not transrate), and BUSCO did not exist at the time, nor did tools for very rapidly (and at scale) performing reciprocal blast. Therefore, I believe that these assemblies are way more benchmarked, using orthogonal metrics, that is commonplace in the assembly literature.
+> The systematic benchmarking of assemblies, to the degree done here, is novel. Even in developing Trinity, we used Detonate (not transrate), and BUSCO did not exist at the time, nor did tools for very rapidly (and at scale) performing reciprocal blast. Therefore, I believe that these assemblies are way more benchmarked, using orthogonal metrics, than is commonplace in the assembly literature. I've added some language to address these points in the manuscript.
 
 A good effort has been made to assess the performance of their new protocol in the context of other stand-alone assemblers, but I am concerned about several aspects of the process:
 
 1) The main standalone tool they compare the Oyster River Protocol (ORP) to is Trinity, which itself forms one of the three assemblers that comprise the ORP. As such, it is perhaps not surprising that the ORP might outperform it.
 
 
-> Thanks for the comment. I chose to compare to Trinity, mostly because this was the assembler that (arguably) most people are using. It would be the product that most people would be interested in comparing to. That the ORP outperforms Trinity is not at all a given however. It could have been possible that the merging steps introduced significant noise into the assembly, or that Trinity just outperformed the other assemblers in most ways, so contribution from other assemblers was un-helpful.
+> Thanks for the comment. I chose to compare to Trinity, mostly because this was the assembler that (arguably) most people are using. It would be the product that most people would be interested in comparing to. That the ORP outperforms Trinity is not at all a given, however. It could have been possible that the merging steps introduced significant noise into the assembly, or that Trinity just outperformed the other assemblers in most ways, so contribution from other assemblers was un-helpful.
 
 2) The author doesn’t really give any justification for why he chose these three tools for the ORP as opposed to any other of the myriad of different tools. Did he choose them because they were popular, or known to give good results, or because they have very different underlying algorithms and so might be sampling different regions of search-space?
 
@@ -33,7 +33,7 @@ A good effort has been made to assess the performance of their new protocol in t
 
 > Without a doubt, other assembler could add value, but they lack these important characteristics, they were left out of the comparison. BinPacker, for instance, has produced some very nice assemblies, but it is nearly impossible to install, and the developers have been minimally responsive to my inquiries.
 
-> Adding new assemblers, as they are developed, is definitely in the development plan. As of now, I encourage people to suggest to me different things to benchmark and add.  
+> Adding new assemblers, as they are developed, is definitely in the development plan. As of now, I encourage people to suggest to me different things to benchmark and potentially add.  
 
 3) The data preparation for the stand alone Trinity runs is not the same as for the ORP assemblies. Specifically, the data for the stand-alone Trinity runs doesn’t include the error correction step that is included in the ORP from a previously published tool (RCorrector). As a result, it is unclear whether the improvement observed for the ORP over Trinity is a result of combining the assemblies or the error correction. In particular the % read -mapping Transrate score - which is where the ORP sees the most dramatic improvement over Trinity - may well be be strongly affected by the error correction step.
 
@@ -49,7 +49,7 @@ A good effort has been made to assess the performance of their new protocol in t
 
 5) The inclusion of multiple kmer lengths is interesting, but no real effort is made to determine whether the differences between the individual assemblies is due to the different kmer lengths or the different algorithms of the tools. For example, how does an ORP assembly compare with three Trinity assemblies, with kmers of 25,55 & 75, combined in the same fashion?
 
-> This is impossible, as the longest kmer that Trinity can use is k=32. I have more fully fleshed out the contributions of k=55 and k=75 within SPAdes. See figures 3, 4, and 5, as well as Table 2. This (especially the MDS plot and table 2) demonstrate value in running SPAdes at the 2 different kmer lengths.    
+> This is impossible, as the longest kmer that Trinity can use is k=32, and using Trinity to assembly with anything other than the default (k=25) is highly experimental. I have more fully fleshed out the contributions of k=55 and k=75 within SPAdes. See figures 3, 4, and 5, as well as Table 2. This (especially the MDS plot and table 2) demonstrates the value in running SPAdes at the 2 different kmer lengths.    
 
 Overall, however, the manuscript is lacking the depth and detail I think it needs to really fill the knowledge gap and without this details reproducing these results would be difficult despite the easy and availability of the software install and the dataset.
 
@@ -58,16 +58,16 @@ Overall, however, the manuscript is lacking the depth and detail I think it need
 #### Validity of the findings
 In its current form, the manuscript has not convinced me that the ORP represents any significant improvement over Trinity, the existing stand-alone de novo assembly tool tested. As such, I think that the conclusion the the ORP represents an improvement over existing tools is not yet sound.
 
-> I hope that the revised manuscript, with the additional benchmarking, has convinced you.
+> I hope that the revised manuscript, with the additional benchmarking and details, has convinced you.
 
 #### Comments for the Author
 This work details a new multi-assembler approach to improving de novo transcriptome assembly. This is a really good idea that is worth exploring and I really want to see a strong detailed exploration of the concept and how much we might gain from combining de novo transcriptome tools, but I’m afraid that these have not been adequately illuminated here. A little more time, exploration of the tools and more careful analysis and I think it would make a good paper. I'd be happy to review future revisions of the paper and would like to see ORP broadened to include more assembly tools.
 
-> There is a balance between adding more tools and the time it takes to run the ORP. I have tried to justify the choice of assemblers better (Lines 105-107). If there are specific assemblers that meet those criteria that you'd like me to try, please suggest them specifically!
+> There is a balance between adding more tools and the time it takes to run the ORP. I have tried to justify the choice of assemblers better (Lines 114-117). If there are specific assemblers that meet those criteria that you'd like me to try, please suggest them specifically!
 
-The instruction for installing and running the software (http://oyster-river-protocol.readthedocs.io/en/latest/aws_setup.html) work and I could set up the tool on my local box and verify that it runs. Unfortunately I don't have access to sudo on my clusters large memory machines, and we have no way of charging AWS tie to grants, so I couldn't test it on live data. Perhaps, given the complex web of dependencies involved, it might be an idea to distribute this as a conda package or a docker instance?
+The instruction for installing and running the software (http://oyster-river-protocol.readthedocs.io/en/latest/aws_setup.html) work and I could set up the tool on my local box and verify that it runs. Unfortunately I don't have access to sudo on my clusters large memory machines, and we have no way of charging AWS time to grants, so I couldn't test it on live data. Perhaps, given the complex web of dependencies involved, it might be an idea to distribute this as a conda package or a docker instance?
 
-> I will consider making a bioconda/docker image, but I do not have the bandwidth at the moment (I've never developed a bioconda package). Open to collaborations on this! I will say, however, that the install (once you have Linuxbrew) is easy (`make` in install dir), and does not require `sudo` privileges. I have stated this in the manuscript (line 85), and have reiterated in the online instructions.
+> I will consider making a bioconda/docker image, but I do not have the bandwidth at the moment (I've never developed a bioconda package). Open to collaborations on this! I will say, however, that the install (once you have Linuxbrew) is easy (`make` in install dir), and does not require `sudo` privileges. I have stated this in the manuscript (line 93), and have reiterated in the online instructions.
 
 ## Reviewer 2
 #### Basic reporting
@@ -75,7 +75,7 @@ The manuscript is well written and well organized.
 
 The transcriptome assemblies resulting from each of the assemblies are made available as supplementary data, but there are many other supplementary data files and figures that would be useful to include that were not available, such as the TransRate reports for each of the assemblies, and ideally a summary data table that includes all TransRate scores and score components (ie. the individual metrics computed by TransRate that are leveraged in computing the final overall assembly score). Busco scores for all assemblies should be included as well.
 
-> I have compiled these results into a csv file, available at https://github.com/macmanes-lab/Oyster_River_Protocol/blob/master/manuscript/orp.csv
+> I have compiled these results into a csv file, available at https://github.com/macmanes-lab/Oyster_River_Protocol/blob/master/manuscript/orp.csv. I link to these data from the MS.
 
 Although multiple transcriptome assemblers were leveraged, the figures focused almost entirely on comparisons between the single assembler Trinity and the author's results from ORP. It would be useful to include comparisons to the other assemblers as well in a similar format, and provided as supplementary materials if not deemed worthy as main figures.
 
@@ -84,7 +84,7 @@ Although multiple transcriptome assemblers were leveraged, the figures focused a
 #### Experimental design
 Comparisons among the final assemblies involve the TransRate final assembly scores, percent of reads represented by each assembly, and core ortholog representation as per Busco. These are all useful metrics, but it would be of interest to include additional metrics that reflect rates of chimerism.
 
-> Thanks Brian, chimerism is indeed a big problem, and a hard one to directly detect, particularly when lacking a reference. TransRate does provide a metric related to chimerism, and I now report that metric (Line 202-206). Rates of chimerism range between 10% and 12%, with Shannon being the lowest (ORP is the 2nd lowest at 10.4%). So, what I can say is that the ORP does not improve or worsen chimerism.  
+> Thanks Brian, chimerism is indeed a big problem, and a hard one to directly detect, particularly when lacking a reference. TransRate does provide a metric related to chimerism, and I now report that metric (Line 213-219). Rates of chimerism range between 10% and 12%, with Shannon being the lowest (ORP is the 2nd lowest at 10.4%). So, what I can say is that the ORP does not improve or worsen chimerism.  
 
 It would benefit the manuscript to include an orthogonal measure of assembly quality such as provided by the DETONATE software. Ideally, this would show that ORP compiled assemblies have improved DETONATE scores as compared to the assemblies provided as input to ORP.
 
@@ -96,7 +96,7 @@ While ORP attempts to stringently cluster transcripts into isoform-level groupin
 
 Since ORP is centered around combining results from multiple assemblers, it begs the question of what assemblers would be generally best suited to use with ORP. The author leverages Trinity, Shannon, and Spades. Trinity and Shannon have been previously demonstrated to be highly effective transcriptome assemblers, but to my knowledge, Spades has seen comparably little use for transcriptome assembly; instead Spades has been more targeted towards genome assembly. There does appear to be an rnaSPAdes method included with Spades that's more specifically targeted to transcriptome assembly, but I could find little information about it being used in practice nor how effective it is for resolving spliced isoforms, which is one of the primary goals of transcriptome assembly and one that most differentiates it from other assembly challenges. One of the goals of ORP is to leverage multiple kmer lengths as part of the assembly, and Spades is run twice using different kmer values as one way to accomplish this. Using multiple kmer values to generate an assembly, leveraging the benefits of small and large kmers, is a feature of existing transcriptome assemblers Oases and IDBA-tran, neither of which were used by ORP nor cited. It isn't clear as to why the author would rely so heavily on Spades when other highly effective transcriptome assemblers are readily available and already implement ideas that are central to ORP's goals. ORP would ideally be shown to benefit from using the very best assemblers as well as to be resilient towards including results from assemblers that are sub par.
 
-> I have added some descriptions of the rationale I used for selecting assemblers. In short, they had to be active developed and open sourced. I benchmarked a larger number of assemblers, and picked the ones that seemed to come from different parts of the "algorithmic landscape". I also picked ones that I could reliably install and run (BinPacker was excluded for this reason, even though when it worked, it performed very well). I describe this decision making process in lines 112-115.
+> I have added some descriptions of the rationale I used for selecting assemblers. In short, they had to be active developed and open sourced. I benchmarked a larger number of assemblers, and picked the ones that seemed to come from different parts of the "algorithmic landscape". I also picked ones that I could reliably install and run (BinPacker was excluded for this reason, even though when it worked, it performed very well). I describe this decision making process in lines 114-117.
 
 > I have beefed up the into, to include references to some more of the classical assemblers, including Oases and IDBA-trans, which indeed both made important earlier contributions to the field.
 
@@ -109,7 +109,7 @@ The primary finding is that the author's ORP yields assemblies that are generall
 
 Overall, the results section is overly directed towards comparisons to Trinity when there were several other assembly methods being used by ORP. For each assembly quality metric, it would be useful to see how ORP compares to each of the individual assemblies, including Trinity. If there exist cases where any individual assembly used as input to ORP ends up outperforming ORP, it would call into question the value of applying ORP as a general protocol.
 
-> I've added language throughout where I note the performance relative to the other assemblies. Other assemblers underperform the ORP, though in a very small number of cases, they outperform Trinity. I still think that the major comparison needs to be to Trinity as this is the most commonly used assembler, and the thing most people will be familiar with. Does this make sense?
+> I've added language throughout where I note the performance relative to the other assemblies. Other assemblers underperform the ORP, though in some cases, they do outperform Trinity. I still think that the major comparison needs to be to Trinity as this is the most commonly used assembler, and the thing most people will be familiar with. Does this make sense?
 
 
 #### Additional comments:
@@ -120,13 +120,13 @@ As a protocol, ORP should apply equally well to de novo transcriptome assemblies
 
 Most data sets in the manuscript appear to lightly benefit from ORP, whereas there are a few assemblies that greatly benefit from ORP, especially in the context of percent reads mapping. It would be useful to comment on this and whether the suboptimal Trinity assemblies in these cases were reflective of some aspect of the data, and whether the alternative assemblers provided much better assemblies than Trinity in these cases. This would be much easier to assess if the results from all methods were easily accessible in tables and figures in supplementary materials.
 
-> True, most assemblies are improved by ~2-10% over single assembler solutions, across several metrics, so the improvement is marginal. I think given the modest increase in computational requirements (and 0 increase in hands on time), this improvement will be valuable to researchers wi=anting to squeeze any last drop of utility out of their assemblies. About the specific contrast to Trinity, sometimes yes the Trinity mapping is the worst, and sometimes not. I've added language in multiple places in the revised manuscript to illustrate the relationships between the ORP and other assemblers.  
+> True, most assemblies are improved by ~2-10% over single assembler solutions, across several metrics, so the improvement is marginal. I think given the modest increase in computational requirements (and 0 increase in hands on time), this improvement will be valuable to researchers wanting to squeeze every last drop of utility out of their assemblies. About the specific contrast to Trinity, sometimes yes the Trinity mapping is the worst, and sometimes not. I've added language in multiple places in the revised manuscript to illustrate the relationships between the ORP and other assemblers.  
 
 The composition of the final ORP assemblies appears to mostly derive from Spades assembled transcripts. I imagine this could happen for several reasons. For example, (a) there could be clusters of transcripts where Spades yields the best representative transcript with the highest score, (b) there are clusters where there are tied scores and Spades is chosen preferentially, (c) Spades generates many transcripts that are unique to Spades and these are automatically propagated to ORP. It would be useful to know how the composition of the final ORP assembly reflects which transcripts were selected as best within clusters vs. alternative justifications for their inclusion in the final assembly.
 
-> I think this was largely an artifact of how I described the composition in the last version of the manuscript. Basically, each assembly contributes about 25% of the final assembly. So technically SPAdes does contribute more to the final assembly that do the other 2, but I think this is largely a function of the fact that we use 2 different kmer lengths.
+> I think this was largely an artifact of how I described the composition in the last version of the manuscript. Basically, each assembly contributes about 25% of the final assembly. So technically SPAdes does contribute more to the final assembly than do the other 2, but I think this is largely a function of the fact that we use 2 different kmer lengths.
 
-> About the alternative explanation B. I looked a few hundred scored clusters, and no ties were observed (at the high-scoring end). The scores are reported to 5 significant digits, so a lot of room to be different. In the case of ties, the 1st contig is selected in the list or transcripts. This list comes from OrthoFinder, and is populated in random order (per David Emms, the Orthofinder developer). So, I don't think B is likely. Alternative C: I've made a new Table 2 which reports the number of unique transcripts, which is a very small number relative to the total number of transcripts. I also wondered if it might be due to the fact that there are just more SPAdes transcripts to chose from (higher contig number). In some cases that number of SPAdes transcripts exceeds other assembles (this is try especially for SPAdes kmer=55), this is not the case (https://github.com/macmanes-lab/Oyster_River_Protocol/blob/master/manuscript/contrib_by_numcontigs.eps). There is no relationship between the number of contigs in the primary assembly and the percent contribution.
+> About the alternative explanation B. I looked a few hundred scored clusters, and no ties were observed (at the high-scoring end). The scores are reported to 5 significant digits, so a lot of room to be different. In the case of ties, the 1st contig is selected in the list of transcripts. This list comes from OrthoFinder, and is populated in random order (per David Emms, the Orthofinder developer). So, I don't think B is likely. Alternative C: I've made a new Table 2 which reports the number of unique transcripts, which is a very small number relative to the total number of transcripts. I also wondered if it might be due to the fact that there are just more SPAdes transcripts to chose from (higher contig number). In some cases that number of SPAdes transcripts exceeds other assembles (this is try especially for SPAdes kmer=55). This is not the case (https://github.com/macmanes-lab/Oyster_River_Protocol/blob/master/manuscript/contrib_by_numcontigs.eps). There is no relationship between the number of contigs in the primary assembly and the percent contribution, so I think we can rule out this hypothesis. I think this leaves is A. I agree that RNAspades is less well known, but at least in my hands, it produces excellent assemblies. As a bonus, it is also very fast.
 
 ## Reviewer 3
 #### Basic reporting
@@ -149,7 +149,7 @@ However, there are a number of puzzling choices and omissions in the paper as it
 
 * line 52 - I would imagine that other kinds of biases might result from the approach chosen in the paper; any thoughts as to downsides of the ORP approach here? (See comment on evaluating against a quality ref transcriptome, below.) e.g. in genome assemblies, maximizing N50 leads to misassemblies; might that happen here?
 
-> reviewer 2 brings up the same points, specifically as it relates to isoforms and chimerism. While I don't have a great answer to either issue, mainly because of the lack of high-quality reference genomes, I can use the TransRate segmentation metric to estimate chimerism. I trust short-read isoform assembly so little that I don't have much insight here. I added in some discussion and indirect reasoning about why I don't think the ORP is doing worse than other things, but it's probably not doing much better also.
+> reviewer 2 brings up the same points, specifically as it relates to isoforms and chimerism. While I don't have a great answer to either issue, mainly because of the lack of high-quality reference genomes, I can use the TransRate segmentation metric to estimate chimerism. I trust short-read isoform assembly so little that I don't have much insight here. I added in some discussion and indirect reasoning about why I don't think the ORP is doing worse than other things, but it's probably not doing much better also. In short, I think downsides are [1] takes more time [2] isoforms *might* be more confused than with a stand-alone assembler, but I doubt it.
 
 * unweighted assembly content is not systematically evaluated in this paper - most of the evaluations such as mapping rate and transrate score are biased by underlying abundance distribution of the transcripts, i.e. more abundant transcripts will produce more reads. I would suggest doing some kind of unweighted assembly comparison (one with higher resolution than BUSCO; next point) to see if more overall content is produced. This could be what Figure 4 intends to show, at least partly, but see below.
 
