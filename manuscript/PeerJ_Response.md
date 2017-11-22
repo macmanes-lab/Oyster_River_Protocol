@@ -126,7 +126,11 @@ The composition of the final ORP assemblies appears to mostly derive from Spades
 
 > I think this was largely an artifact of how I described the composition in the last version of the manuscript. Basically, each assembly contributes about 25% of the final assembly. So technically SPAdes does contribute more to the final assembly that do the other 2, but I think this is largely a function of the fact that we use 2 different kmer lengths.
 
-> About the alternative explanation B. I looked a few hundred scored clusters, and no ties were observed (at the top end). The scores are reported to 5 significant digits, so a lot of room to be different. 
+> About the alternative explanation B. I looked a few hundred scored clusters, and no ties were observed (at the high-scoring end). The scores are reported to 5 significant digits, so a lot of room to be different. In the case of ties, the 1st contig is selected in the list or transcripts. This list comes from OrthoFinder, and is populated in random order (per David Emms, the Orthofinder developer). So, I don't think B is likely. Alternative C: I've made a new Table 2 which reports the number of unique transcripts, which is a very small number relative to the total number of transcripts. I also wondered if it might be due to the fact that there are just more SPAdes transcripts to chose from (higher contig number). In some cases that number of SPAdes transcripts exceeds other assembles (this is try especially for SPAdes kmer=55), this is n
+
+
+
+
 ## Reviewer 3
 #### Basic reporting
 
