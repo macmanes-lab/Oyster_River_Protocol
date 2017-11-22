@@ -153,7 +153,7 @@ However, there are a number of puzzling choices and omissions in the paper as it
 
 * unweighted assembly content is not systematically evaluated in this paper - most of the evaluations such as mapping rate and transrate score are biased by underlying abundance distribution of the transcripts, i.e. more abundant transcripts will produce more reads. I would suggest doing some kind of unweighted assembly comparison (one with higher resolution than BUSCO; next point) to see if more overall content is produced. This could be what Figure 4 intends to show, at least partly, but see below.
 
-> I now use Shmlast analysis against Swissprot for a more higher resolution comparison. See Figure 3 and Table 2 for a summary. In all cases, the scores are better for the ORP reconstruction. Importantly, this analysis helped me identify a place where further optimization can be had. Specifically, the ORP seems to leave out some real transcripts that 1 of the individual assemblers reconstructed. I have a student working on tracking these transcripts down, and this will be included in a future ORP release. 
+> I now use Shmlast analysis against Swissprot for a more higher resolution comparison. See Figure 3 and Table 2 for a summary. In all cases, the scores are better for the ORP reconstruction. Importantly, this analysis helped me identify a place where further optimization can be had. Specifically, the ORP seems to leave out some real transcripts that 1 of the individual assemblers reconstructed. I have a student working on tracking these transcripts down, and this will be included in a future ORP release.
 
 * it seems that no evaluation is done against a quality reference transcriptome, e.g. mouse RNAseq -> mouse. This is a major omission; the major reference-based approach used, BUSCO, only looks at a small subset of the transcripts, and does not evaluate transcript content systematically. It would be valuable to use a reference-based measure of transcriptome quality here, such as the Trinity paper used.
 
@@ -166,23 +166,32 @@ However, there are a number of puzzling choices and omissions in the paper as it
 
 * More, section 4.2 incompletely addresses an interesting question - there are many features of genomes/transcriptomes that are more likely to challenge transcriptome assembly than taxonomic membership, e.g. tissue sampled, tissue complexity in terms of number of cell types, presence of RNA editing, recent genome duplications, polymorphism rate, etc. It's probably beyond the scope of this paper to explore these issues, but I'm not sure how it merits the incomplete discussion it's given in the current paper. Perhaps a single sentence "ORP performed equally well across all of the organisms chosen at random" would be better, or something like that.
 
+> I actually just deleted this section - In the end, it felt weak. I added some language about taxa in other sections of the paper (e.g., line 197)
+
 * The paper states that no value is seen in including reads beyond 30m, which is intuitive and matches our experience. However, most transcriptome assembly projects sequence multiple tissues and then combine them in a de novo assembly. Is the recommendation for the ORP to subsample each tissue data set to 30m and then combine them? Or what? Some comment (along with a specific reference to a paper with an overall suggested workflow for making use of the assembly) would be welcome.
 
- > My general recommendation for people strolling on to my office is to subsample each tissue set to ~30M pairs, assemble, and merge. If isoforms are of zero interest (or you have zero confidence in isoform assembly from short read data, as I do), then the recommendation is to combine reads from all tissues together then generate one 30M read dataset. The assembly of this dataset is likely to contain some isoforms not seen in "real life" (e.g., imagine chimerism of liver-specific isoform with brain-specific isoform), but given isoform reconstruction is so bad anyway, the risk of these chimeric events might not be so impactful.
+ > My general recommendation for people strolling in to my office is to subsample each tissue set to ~30M pairs, assemble, and merge. If isoforms are of zero interest (or you have zero confidence in isoform assembly from short read data, as I do), then the recommendation is to combine reads from all tissues together then generate one 30M read dataset. The assembly of this dataset is likely to contain some isoforms not seen in "real life" (e.g., imagine chimerism of liver-specific isoform with brain-specific isoform), but given isoform reconstruction is so bad anyway, the risk of these chimeric events might not be so impactful.
 
  > I'd be *really* happy to provide some comment in the manuscript, but I'm afraid that the recommendation is based on a lot of anecdote, and very little data. Further, I don't really know of a paper where this question has been fully resolved. Do you know of one?
 
 * Along those lines, the extra computational requirements of the ORP seem likely to be significant when combining multiple tissue RNAseq data sets. This is one of the reasons that Trinity recommends using in silico normalization, which was explicitly *not* used in this paper. The discussion should be expanded to include this.
 
-> I generally do not recommend diginorm, as it (in my hands) has resulted in slightly less contiguous assemblies. I can certainly add this  
+> I generally do not recommend diginorm, as it (in my hands) has resulted in slightly less contiguous assemblies. I added a single line to this effect at line 110.   
 
 * I'm puzzled by the division between Results and Discussion in this paper. I'd suggest either combining them or having the primary results be separate from the discussion of what the results mean; typically the division I use is "here are the facts I see" (for results), and "here is what I think they mean".
 
+> I've combined them into 1 section.
+
 * I had trouble understanding the section starting at line 188, and figure 4, at least at first. If I understand correctly, this paragraph is discussing both swissprot match percentages AND transcript "origin" percentages. The latter can be studied because orthofuse doesn't actually merge transcripts, it picks a "best" transcript from each orthologous grouping - is that right? The former (swissprot analysis) is of objective interest because it speaks to what genes are being recovered by which assembler. Or... maybe that's not what the paragraph is saying. It would be nice if this could be clearly split into discussions of homology/orthology/recover of known genes, and recovery of transcripts (known or unknown). As it is I think it's muddled in its message. Figure 4 seems clear enough but I'm not sure if it's talking about transcripts (my guess) or swissprot matches. (In retrospect, it seems like the beginning of section 3.2.3 is talking about transcript origin wrt the final assembly, while the bottom of that section is talking about swissprot).
+
+> I've deleted this whole section in favor of the Shmlast experiment, which was much more useful to readers (I think).
 
 #### Minor comments:
 
 * surely there is a review citation of some sort for the statement that "transcriptome sequencing has been influential"? p2 line 24
+
+> added
+
 * Throughout the paper, clickable links in the PDF are used (The code ... is available _here_.) these should be replaced with URLs, perhaps in footnotes or references.
 
 > These have all be replaced.
