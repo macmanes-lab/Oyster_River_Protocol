@@ -168,11 +168,11 @@ else
 endif
 
 postscript:brew setup transrate rcorrector mcl hmmer bowtie2 orthofuser blast spades trinity shannon salmon seqtk busco trimmomatic
-		@printf "\n\n*** The following location(s), if any print, need to be added to your PATH ***"
-		@printf "\n*** They will be automatically to your ~/.profile or ~/.bash_profile ***\n\n"
-		@cat pathfile
-		@cat pathfile >> ~/.profile
-		@cat pathfile >> ~/.bash_profile
-		@export PATH=$$PATH:$$(cat pathfile)
-		@printf "\n\n\n"
-		@printf "\n*** type <<source ~/.profile>> to complete the install ***\n\n"
+	@printf "\n\n*** The following location(s), if any print, need to be added to your PATH ***"
+	@printf "\n*** They will be automatically to your ~/.profile or ~/.bash_profile ***\n\n"
+	@cat pathfile
+	@cat pathfile >> ~/.profile
+	@cat pathfile >> ~/.bash_profile
+	@export PATH=$$PATH:$$(cat pathfile)
+	@printf "\n\n\n"
+	@printf "\n*** type <<source ~/.profile>> to complete the install ***\n\n"
