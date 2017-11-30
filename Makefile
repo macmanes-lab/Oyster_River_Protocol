@@ -31,46 +31,46 @@ setup:
 	@mkdir -p ${DIR}/shared
 	@rm -f pathfile
 
-brew:
+brew:setup
 ifdef brewpath
 	@echo "BREW is already installed"
 else
 	$error("*** BREW MUST BE PROPERLY INSTALLED BEFORE YOU CAN PROCEED, SEE: http://angus.readthedocs.io/en/2016/linuxbrew_install.html ***")
 endif
 
-transrate:
+transrate:brew
 	cd ${DIR}/software && tar -zxf orp-transrate.tar.gz
 	@echo PATH=\$$PATH:${DIR}/software/orp-transrate | tee -a pathfile
 
-rcorrector:
+rcorrector:brew
 ifdef rcorrpath
 	@echo "RCORRECTOR is already installed"
 else
 	brew install rcorrector
 endif
 
-mcl:
+mcl:brew
 ifdef mclpath
 	@echo "MCL is already installed"
 else
 	brew install mcl
 endif
 
-hmmer:
+hmmer:brew
 ifdef hmmerpath
 	@echo "HMMER is already installed"
 else
 	brew install hmmer
 endif
 
-bowtie2:
+bowtie2:brew
 ifdef bowtie2path
 	@echo "BOWTIE2 is already installed"
 else
 	brew install python bowtie2
 endif
 
-orthofuser:
+orthofuser:brew
 ifdef orthopath
 	@touch pathfile
 	@echo "ORTHOFUSER is already installed"
@@ -80,7 +80,7 @@ else
 	@echo PATH=\$$PATH:${DIR}/software/OrthoFinder/orthofinder | tee -a pathfile
 endif
 
-blast:
+blast:brew
 ifeq "$(shell basename $(shell which blastp))" "blastp"
 	@echo "BLASTP is already installed"
 else
@@ -89,7 +89,7 @@ else
 	@echo PATH=\$$PATH:${DIR}/software/ncbi-blast-2.7.1+/bin | tee -a pathfile
 endif
 
-spades:
+spades:brew
 ifeq "$(shell basename $(shell which spades.py))" "spades.py"
 	@echo "SPAdes is already installed"
 else
@@ -98,7 +98,7 @@ else
 	@echo PATH=\$$PATH:${DIR}/software/SPAdes-3.11.0-Linux/bin | tee -a pathfile
 endif
 
-trinity:
+trinity:brew
 ifeq "$(shell basename $(shell which Trinity))" "Trinity"
 	@echo "TRINITY is already installed"
 else
@@ -107,7 +107,7 @@ else
 	@echo PATH=\$$PATH:${DIR}/software/trinityrnaseq | tee -a pathfile
 endif
 
-shannon:
+shannon:brew
 ifdef shannonpath
 	@echo "SHANNON is already installed"
 else
@@ -117,7 +117,7 @@ else
 endif
 
 
-salmon:
+salmon:brew
 ifdef salmonpath
 	@echo "SALMON is already installed"
 else
@@ -126,7 +126,7 @@ else
 	@echo PATH=\$$PATH:${DIR}/software/Salmon-0.8.2_linux_x86_64/bin | tee -a pathfile
 endif
 
-seqtk:
+seqtk:brew
 ifeq "$(shell basename $(shell which seqtk))" "seqtk"
 	@echo "SEQTK is already installed"
 else
@@ -135,7 +135,7 @@ else
 	@echo PATH=\$$PATH:${DIR}/software/seqtk | tee -a pathfile
 endif
 
-busco:
+busco:brew
 ifeq "$(shell basename $(shell which run_BUSCO.py))" "run_BUSCO.py"
 	@echo "BUSCO is already installed"
 else
@@ -144,7 +144,7 @@ else
 	@echo PATH=\$$PATH:${DIR}/software/busco/scripts | tee -a pathfile
 endif
 
-trimmomatic:
+trimmomatic:brew
 ifdef trimmomaticpath
 	@echo "TRIMMOMATIC is already installed"
 else
@@ -159,7 +159,7 @@ else
 endif
 
 
-postscript:
+postscript:setup brew rcorrector transrate busco seqtk salmon shannon trinity trimmomatic spades blast orthofuser bowtie2 hmmer mcl
 	@printf "\n\n*** The following location(s), if any print, need to be added to your PATH ***\n\n"
 	@printf "\n\n*** They will be automatically to your ~/.profile or ~/.bash_profile ***\n\n"
 	@cat pathfile
