@@ -59,25 +59,25 @@ else
 	brew install rcorrector
 endif
 
-mcl:brew
+mcl:brew rcorrector
 ifdef mclpath
 	@echo "MCL is already installed"
 else
 	brew install mcl
 endif
 
-hmmer:brew
+hmmer:brew mcl
 ifdef hmmerpath
 	@echo "HMMER is already installed"
 else
 	brew install hmmer
 endif
 
-bowtie2:brew
+bowtie2:brew hmmer
 ifdef bowtie2path
 	@echo "BOWTIE2 is already installed"
 else
-	brew install python bowtie2
+	brew install bowtie2
 endif
 
 orthofuser:brew
@@ -153,7 +153,7 @@ else
 	@echo PATH=\$$PATH:${DIR}/software/busco/scripts >> pathfile
 endif
 
-trimmomatic:brew
+trimmomatic:brew bowtie2
 ifdef trimmomaticpath
 	@echo "TRIMMOMATIC is already installed"
 else
