@@ -44,7 +44,7 @@ ifdef transrate
 	@echo "transrate is already installed"
 else
 	cd ${DIR}/software && tar -zxf orp-transrate.tar.gz
-	@echo PATH=\$$PATH:${DIR}/software/orp-transrate | tee -a pathfile
+	@echo PATH=\$$PATH:${DIR}/software/orp-transrate >> pathfile
 endif
 
 rcorrector:brew
@@ -82,7 +82,7 @@ ifdef orthopath
 else
 	@touch pathfile
 	cd ${DIR}/software && git clone https://github.com/macmanes-lab/OrthoFinder.git
-	@echo PATH=\$$PATH:${DIR}/software/OrthoFinder/orthofinder | tee -a pathfile
+	@echo PATH=\$$PATH:${DIR}/software/OrthoFinder/orthofinder >> pathfile
 endif
 
 blast:brew
@@ -91,7 +91,7 @@ ifeq "$(shell basename $(shell which blastp))" "blastp"
 else
 	@echo "blastp is not installed, installing now..."
 	cd ${DIR}/software && curl -LO ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.7.1+-x64-linux.tar.gz && tar -zxf ncbi-blast-2.7.1+-x64-linux.tar.gz
-	@echo PATH=\$$PATH:${DIR}/software/ncbi-blast-2.7.1+/bin | tee -a pathfile
+	@echo PATH=\$$PATH:${DIR}/software/ncbi-blast-2.7.1+/bin >> pathfile
 endif
 
 spades:brew
@@ -100,7 +100,7 @@ ifeq "$(shell basename $(shell which spades.py))" "spades.py"
 else
 	cd ${DIR}/software && \
 	curl -LO http://cab.spbu.ru/files/release3.11.0/SPAdes-3.11.0-Linux.tar.gz && tar -zxf SPAdes-3.11.0-Linux.tar.gz
-	@echo PATH=\$$PATH:${DIR}/software/SPAdes-3.11.0-Linux/bin | tee -a pathfile
+	@echo PATH=\$$PATH:${DIR}/software/SPAdes-3.11.0-Linux/bin >> pathfile
 endif
 
 trinity:brew
@@ -109,7 +109,7 @@ ifeq "$(shell basename $(shell which Trinity))" "Trinity"
 else
 	cd ${DIR}/software && \
 	git clone https://github.com/trinityrnaseq/trinityrnaseq.git && cd trinityrnaseq && make -j4
-	@echo PATH=\$$PATH:${DIR}/software/trinityrnaseq | tee -a pathfile
+	@echo PATH=\$$PATH:${DIR}/software/trinityrnaseq >> pathfile
 endif
 
 shannon:brew
@@ -118,7 +118,7 @@ ifdef shannonpath
 else
 	cd ${DIR}/software && git clone https://github.com/sreeramkannan/Shannon.git
 	chmod +x software/Shannon/shannon.py
-	@echo PATH=\$$PATH:${DIR}/software/Shannon | tee -a pathfile
+	@echo PATH=\$$PATH:${DIR}/software/Shannon >> pathfile
 endif
 
 
@@ -128,7 +128,7 @@ ifdef salmonpath
 else
 	cd ${DIR}/software && curl -LO https://github.com/COMBINE-lab/salmon/releases/download/v0.8.2/Salmon-0.8.2_linux_x86_64.tar.gz &&\
 	tar -zxf ${DIR}/software/Salmon-0.8.2_linux_x86_64.tar.gz
-	@echo PATH=\$$PATH:${DIR}/software/Salmon-0.8.2_linux_x86_64/bin | tee -a pathfile
+	@echo PATH=\$$PATH:${DIR}/software/Salmon-0.8.2_linux_x86_64/bin >> pathfile
 endif
 
 seqtk:brew
@@ -137,7 +137,7 @@ ifeq "$(shell basename $(shell which seqtk))" "seqtk"
 else
 	cd ${DIR}/software && \
 	git clone https://github.com/lh3/seqtk.git && cd seqtk && make
-	@echo PATH=\$$PATH:${DIR}/software/seqtk | tee -a pathfile
+	@echo PATH=\$$PATH:${DIR}/software/seqtk >> pathfile
 endif
 
 busco:brew
@@ -146,7 +146,7 @@ ifeq "$(shell basename $(shell which run_BUSCO.py))" "run_BUSCO.py"
 else
 	cd ${DIR}/software && \
 	git clone https://gitlab.com/ezlab/busco.git && cd busco && python setup.py install --user --prefix=
-	@echo PATH=\$$PATH:${DIR}/software/busco/scripts | tee -a pathfile
+	@echo PATH=\$$PATH:${DIR}/software/busco/scripts >> pathfile
 endif
 
 trimmomatic:brew
@@ -171,4 +171,4 @@ postscript:brew setup rcorrector transrate bowtie2 hmmer trimmomatic busco seqtk
 		@cat pathfile >> ~/.bash_profile
 		@export PATH=$$PATH:$$(cat pathfile)
 		@printf "\n\n\n"
-		@printf "\n*** type `source ~/.profile` to complete the install ***\n\n"
+		@printf "\n*** type <<source ~/.profile>> to complete the install ***\n\n"
