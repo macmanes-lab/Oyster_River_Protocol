@@ -18,6 +18,7 @@ salmonpath := $(shell which salmon 2>/dev/null)
 bowtie2path := $(shell which bowtie2 2>/dev/null)
 hmmerpath := $(shell which hmmsan 2>/dev/null)
 mclpath := $(shell which mcl 2>/dev/null)
+transrate := $(shell which transrate 2>/dev/null)
 
 
 all: setup brew mcl hmmer orthofuser rcorrector blast spades trinity shannon seqtk busco trimmomatic transrate bowtie2 salmon postscript
@@ -39,8 +40,12 @@ else
 endif
 
 transrate:brew
+ifdef transrate
+	@echo "transrate is already installed"
+else
 	cd ${DIR}/software && tar -zxf orp-transrate.tar.gz
 	@echo PATH=\$$PATH:${DIR}/software/orp-transrate | tee -a pathfile
+endif
 
 rcorrector:brew
 ifdef rcorrpath
@@ -158,11 +163,12 @@ else
 	fi
 endif
 
-
-postscript:setup brew rcorrector transrate busco seqtk salmon shannon trinity trimmomatic spades blast orthofuser bowtie2 hmmer mcl
-	@printf "\n\n*** The following location(s), if any print, need to be added to your PATH ***\n\n"
-	@printf "\n\n*** They will be automatically to your ~/.profile or ~/.bash_profile ***\n\n"
-	@cat pathfile
-	@cat pathfile >> ~/.profile
-	@cat pathfile >> ~/.bash_profile
-	@printf "\n\n\n"
+postscript:
+        @printf "\n\n*** The following location(s), if any print, need to be added to your PATH ***"
+        @printf "*** They will be automatically to your ~/.profile or ~/.bash_profile ***\n\n"
+        @cat pathfile
+        @cat pathfile >> ~/.profile
+        @cat pathfile >> ~/.bash_profile
+        @export PATH=$$PATH:$$(cat ~/.profile)
+        @export PATH=$$PATH:$$(cat ~/.bash_profile)
+        @printf "\n\n\n"
