@@ -161,5 +161,8 @@ endif
 
 postscript:
 	@printf "\n\n*** The following location(s), if any print, need to be added to your PATH ***\n\n"
+	@printf "\n\n*** They will be automatically to your ~/.profile or ~/.bash_profile ***\n\n"
 	@cat pathfile
+	@cat pathfile >> ~/.profile
+	@cat pathfile >> ~/.bash_profile
 	@printf "\n\n\n"
