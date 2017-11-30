@@ -163,12 +163,11 @@ else
 	fi
 endif
 
-postscript:
+postscript:brew setup rcorrector transrate bowtie2 hmmer trimmomatic busco seqtk salmon shannon trinity spades orthofuser blast mcl 
 		@printf "\n\n*** The following location(s), if any print, need to be added to your PATH ***"
 		@printf "*** They will be automatically to your ~/.profile or ~/.bash_profile ***\n\n"
 		@cat pathfile
 		@cat pathfile >> ~/.profile
 		@cat pathfile >> ~/.bash_profile
-		@export PATH=$$PATH:$$(cat ~/.profile)
-		@export PATH=$$PATH:$$(cat ~/.bash_profile)
+		@export PATH=$$PATH:$$(cat pathfile)
 		@printf "\n\n\n"
