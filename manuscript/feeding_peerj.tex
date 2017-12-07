@@ -172,7 +172,7 @@ In addition to the generation of metrics to evaluation the quality of transcript
 
 All statistics analyses were conducted in R version 3.4.0 \citep{RALanguageandEn:wf}. Violin plots were constructed using the beanplot \citep{Kampstra:2008vc} and the beeswarm R packages (\url{https://CRAN.R-project.org/package=beeswarm}). Expression distributions were plotted using the ggjoy package (\url{https://CRAN.R-project.org/package=ggjoy}).   
 
-\section{Results}
+\section{Results and Discussion}
 
 Fifteen RNAseq datasets, ranging in size from (30-206M paired end reads) were assembled using the Oyster River Protocol and with \texttt{Trinity}. Each assembly was evaluated using the software \texttt{BUSCO}, \texttt{shmlast}, \texttt{Detonate}, and \texttt{TransRate}. From these, several metrics were chosen to represent the quality of the produced assemblies. Of note, all the assemblies produced as part of this work are available at \url{https://www.dropbox.com/sh/ehxvd0ont9ge8id/AABZxRCwcpaxb7rXWclTBbJga}, and will be moved to dataDryad after acceptance. A file containing the evaluative metrics is available at \url{https://github.com/macmanes-lab/Oyster_River_Protocol/blob/master/manuscript/orp.csv}, while the distance matrices are available within the folder \url{https://github.com/macmanes-lab/Oyster_River_Protocol/blob/master/manuscript/}. 
 
@@ -195,7 +195,9 @@ The distance between assemblies of a given dataset were calculated using \texttt
 
 \subsubsection{Assembly Structure}
 
-The structural integrity of each assembly was evaluated using the \texttt{TransRate} and \texttt{Detonate} software packages. As many downstream application depend critically on accurate read mapping, assembly quality is correlated with increased mapping rates. The split violin plot presented in figure 2A visually represent the mapping rates of each assembly, with lines connecting the mapping rates of datasets assembled with \texttt{Trinity} and with the ORP, respectively. The average mapping rate of the \texttt{Trinity} assembled datasets was 87\% (sd = 8\%), while the average mapping rates of the ORP assembled datasets was 93\% (sd=4\%). This test is statistically significant (one-sided Wilcoxon rank sum test, p = 2E-2). Mapping rates of the other assemblies are less than that of the ORP assembly, but in all cases, greater than that of the Trinity assembly.  Figure 2B describes the distribution of \texttt{TransRate} assembly scores, which is a synthetic metric taking into account multiple mapping and coverage-based statistics. The \texttt{Trinity} assemblies had an average optimal score of 0.35 (sd = .14), while the ORP assembled datasets had an average score of 0.46 (sd = .07). This test is statistically significant (one-sided Wilcoxon rank sum test, p-value = 1.8E-2). Optimal scores of the other assemblies are less than that of the ORP assembly, but in all cases, greater than that of the \texttt{Trinity} assembly. Lastly, figure 2C describes the distribution of \texttt{Detonate} scores. The \texttt{Trinity} assemblies had an average score of -6.9E9 (sd = 5.2E9), while the ORP assembled datasets had an average score of -5.3E9 (sd = 3.5E9). This test not is statistically significant, though in all cases, relative to all other assemblies, scores of the ORP assemblies are improved (become less negative), indicating that the ORP produced assemblies of higher quality. 
+The structural integrity of each assembly was evaluated using the \texttt{TransRate} and \texttt{Detonate} software packages. As many downstream application depend critically on accurate read mapping, assembly quality is correlated with increased mapping rates. The split violin plot presented in figure 2A visually represent the mapping rates of each assembly, with lines connecting the mapping rates of datasets assembled with \texttt{Trinity} and with the ORP, respectively. The average mapping rate of the \texttt{Trinity} assembled datasets was 87\% (sd = 8\%), while the average mapping rates of the ORP assembled datasets was 93\% (sd=4\%). This test is statistically significant (one-sided Wilcoxon rank sum test, p = 2E-2). Mapping rates of the other assemblies are less than that of the ORP assembly, but in all cases, greater than that of the Trinity assembly. This aspect of quality is critical. Specifically mapping rates measure how representative the assembly is of the reads. If we assume that the vast majority of generated reads come from the biological sample under study, when reads fail to map, that fraction of the biology is lost from all downstream analysis and inference. This study conclusively demonstrates that across a wide variety of taxa, assembling RNAseq reads with any single assembler alone may result in a substantial decrease in mapping rate and in turn, the lost ability to draw conclusions from that fraction of the sample. 
+
+Figure 2B describes the distribution of \texttt{TransRate} assembly scores, which is a synthetic metric taking into account the quality of read mapping and coverage-based statistics. The \texttt{Trinity} assemblies had an average optimal score of 0.35 (sd = .14), while the ORP assembled datasets had an average score of 0.46 (sd = .07). This test is statistically significant (one-sided Wilcoxon rank sum test, p-value = 1.8E-2). Optimal scores of the other assemblies are less than that of the ORP assembly, but in all cases, greater than that of the \texttt{Trinity} assembly. Lastly, figure 2C describes the distribution of \texttt{Detonate} scores. The \texttt{Trinity} assemblies had an average score of -6.9E9 (sd = 5.2E9), while the ORP assembled datasets had an average score of -5.3E9 (sd = 3.5E9). This test not is statistically significant, though in all cases, relative to all other assemblies, scores of the ORP assemblies are improved (become less negative), indicating that the ORP produced assemblies of higher quality. 
 
 In addition to reporting synthetic metrics related to assembly structure, \texttt{TransRate} reports individual metrics related to specific elements of assembly quality. One such metric estimates the rate of chimerism, a phenomenon which is known to be problematic in \tit{de novo} assembly. Rates of chimerism are relatively constant between all assemblers, ranging from 10\% for the \texttt{Shannon} assembly, to 12\% for the \texttt{SPAdes75} assembly. 
 
@@ -209,8 +211,7 @@ In addition to reporting synthetic metrics related to assembly structure, \textt
 
 \subsubsection{Assembly Content}
 
-The genic content of assemblies was measured using the software package \texttt{Shmlast}, which implements the conditional reciprocal blast test against the Swiss-prot database. Presented in Table 2 and in Figure 3A, ORP assemblies recovered on average 13364 (sd=3391) blast hits, while all other assemblies recovered fewer (minimum \texttt{Shannon}, mean=10299). In every case across all assemblers, the ORP assembler retained more reciprocal blast hits, though only the comparison between the ORP assembly and \texttt{Shannon} was significant (one-sided Wilcoxon rank sum test, p = 4E-3). Notably, in all cases, each assembler contributed unique transcripts to the final merged assembly, highlighting the utility of using multiple assemblers. 
-  \\
+The genic content of assemblies was measured using the software package \texttt{Shmlast}, which implements the conditional reciprocal blast test against the Swiss-prot database. Presented in Table 2 and in Figure 3A, ORP assemblies recovered on average 13364 (sd=3391) blast hits, while all other assemblies recovered fewer (minimum \texttt{Shannon}, mean=10299). In every case across all assemblers, the ORP assembler retained more reciprocal blast hits, though only the comparison between the ORP assembly and \texttt{Shannon} was significant (one-sided Wilcoxon rank sum test, p = 4E-3). Notably, in all cases, each assembler was both missing transcripts contained in other assemblies, and contributed unique transcripts to the final merged assembly (Table 2), highlighting the utility of using multiple assemblers. \\
 
 \newpage
 \begin{center}
@@ -229,41 +230,56 @@ Trinity &  & $-$1952 $\pm$ 803  & 520 $\pm$ 301  \\ \hline
 %\end{adjustwidth}
 \end{center}
 \begin{quote}
-\noindent{\small{Table 2.
+\noindent{\small{Table 2 describes the number of genes contained in the assemblies, with the row labelled concatenated represents the combines the average ($\pm$ standard deviation) number of genes contained in all assemblies, while the other rows contain information about each assembly. The column labelled delta contains the average number ($\pm$ standard deviation) of genes missing, relative to the concatenated number. The unique column contains the average number of genes ($\pm$ standard deviation) unique to that assembly.     
 
   }}
 \end{quote}
 
-Regarding \texttt{BUSCO} scores, \texttt{Trinity} assemblies contained on average 86\% (sd = 21\%) of the full-length orthologs, while the ORP assembled datasets contained on average 86\% (sd = 13\%) of the full length transcripts. Other assemblers contained fewer full-length orthologs. The \texttt{Trinity} and ORP assemblies were missing, on average 4.5\% (sd = 8.7\%) of orthologs. The \texttt{Trinity} assembled datasets contained 9.5\% (sd = 17\%) of fragmented transcripts while the ORP assemblies each contained on average 9.4\% (sd = 9\%) of fragmented orthologs. The other assemblers in all cases contained more fragmentation. The rate of transcript duplication, depicted in figure 2B is 47\% (sd = 20\%) for \texttt{Trinity} assemblies, and 34\% (sd = 15\%) for ORP assemblies.  This result is statistically significant (One sided Wilcoxon rank sum test, p-value = 0.02). Of note, all other assemblers produce less transcript duplication that does the ORP assembly, but none of these differences arise to the level of statistical significance. 
+Regarding \texttt{BUSCO} scores, \texttt{Trinity} assemblies contained on average 86\% (sd = 21\%) of the full-length orthologs as defined by the \texttt{BUSCO} developers, while the ORP assembled datasets contained on average 86\% (sd = 13\%) of the full length transcripts. Other assemblers contained fewer full-length orthologs. The \texttt{Trinity} and ORP assemblies were missing, on average 4.5\% (sd = 8.7\%) of orthologs. The \texttt{Trinity} assembled datasets contained 9.5\% (sd = 17\%) of fragmented transcripts while the ORP assemblies each contained on average 9.4\% (sd = 9\%) of fragmented orthologs. The other assemblers in all cases contained more fragmentation. The rate of transcript duplication, depicted in figure 3B is 47\% (sd = 20\%) for \texttt{Trinity} assemblies, and 34\% (sd = 15\%) for ORP assemblies.  This result is statistically significant (One sided Wilcoxon rank sum test, p-value = 0.02). Of note, all other assemblers produce less transcript duplication than does the ORP assembly, but none of these differences arise to the level of statistical significance. 
 
+While the majority of the \texttt{BUSCO} metrics were unchanged, the number of orthologs recovered in duplicate (\textgreater 1 copy), was decreased when using the ORP. This difference is important, given that the relative frequency of transcript duplication may have important implications for downstream abundance estimation, with less  duplication potentially resulting in more accurate estimation. Although gene expression quantitation software \citep{Patro:2017iv,Bray:2016ee} probabilistically assigns reads to transcripts in an attempt at mitigating this issue, a primary solution related to decreasing artificial transcript duplication could offer significant advantages.
 
 \newpage
-\textbf{\hypertarget{Figure 2}{Figure 2}} \\
+\textbf{\hypertarget{Figure 3}{Figure 3}} \\
 \centerline{\includegraphics[width=4.0in,angle=-90]{busco_stats.eps}}
 \begin{quote}
-\small{Figure 2. \texttt{BUSCO} generated statistics. Split violin plots depict the relationship between \texttt{Trinity} assemblies (brown color) and ORP produced assemblies (blue color). Red and black dots indicate the value of a given metric for each assembly. Lines connecting the red and black dots connect datasets assembled via the two methods.}
+\small{Figure 3. \texttt{BUSCO} generated statistics. Split violin plots depict the relationship between \texttt{Trinity} assemblies (brown color) and ORP produced assemblies (blue color). Red and black dots indicate the value of a given metric for each assembly. Lines connecting the red and black dots connect datasets assembled via the two methods.}
 \end{quote} 
 
 \subsubsection{Assembler Contributions}
 
-To understand the relative contribution of each assembler to the final merged assembly produced by the Oyster River Protocol, I counted the number of transcripts in the final merged assembly that originated from a given assembler. On average, 36\% of transcripts in the merged assembly were produced by the \texttt{Trinity} assembler. 16\% were produced by \texttt{Shannon}. \texttt{SPAdes} run with a kmer value of length=55 produced 28\% of transcripts, while \texttt{SPAdes} run with a kmer value of length=75 produced 20\% of transcripts 
-
-\newpage
-\textbf{\hypertarget{Figure 3}{Figure 3}} \\
-\centerline{\includegraphics[width=25.0\baselineskip]{contrib.eps}}
-\begin{quote}
-\small{Figure 3 }
-\end{quote} 
-
-
-To further understand the potential biases intrinsic to each assembler, I plotted the distribution of gene expression estimates for each merged assembly, broken down by the assembler of origin (Figure 4, depicting four randomly selected representative assemblies). As is evident, most transcripts are lowly expressed, with \texttt{SPAdes} and \texttt{Trinity} both doing a sufficient job in reconstructing these transcripts. Of note, the \texttt{SPAdes} assemblies using kmer-length=75 is biased, as expected, towards more highly expressed transcripts relative to kmer-length 55 assemblies. \texttt{Shannon} demonstrates a unique profile, consisting of, almost exclusively high-expression transcripts, given a previously undescribed bias against low-abundance transcripts.      
+To understand the relative contribution of each assembler to the final merged assembly produced by the Oyster River Protocol, I counted the number of transcripts in the final merged assembly that originated from a given assembler (Figure 4). On average, 36\% of transcripts in the merged assembly were produced by the \texttt{Trinity} assembler. 16\% were produced by \texttt{Shannon}. \texttt{SPAdes} run with a kmer value of length=55 produced 28\% of transcripts, while \texttt{SPAdes} run with a kmer value of length=75 produced 20\% of transcripts 
 
 \newpage
 \textbf{\hypertarget{Figure 4}{Figure 4}} \\
+\centerline{\includegraphics[width=25.0\baselineskip]{contrib.eps}}
+\begin{quote}
+\small{Figure 4 describes the percent contribution of each assembler to the final ORP assembly.}
+\end{quote} 
+
+
+To further understand the potential biases intrinsic to each assembler, I plotted the distribution of gene expression estimates for each merged assembly, broken down by the assembler of origin (Figure 5, depicting four randomly selected representative assemblies). As is evident, most transcripts are lowly expressed, with \texttt{SPAdes} and \texttt{Trinity} both doing a sufficient job in reconstructing these transcripts. Of note, the \texttt{SPAdes} assemblies using kmer-length=75 is biased, as expected, towards more highly expressed transcripts relative to kmer-length 55 assemblies. \texttt{Shannon} demonstrates a unique profile, consisting of, almost exclusively high-expression transcripts, suggesting a previously undescribed bias against low-abundance transcripts. These differences may reflect a set of assembler-specific heuristics which translate into differential recovery of distinct fractions of the transcript community. Figure 5 and Table 2 describe the outcomes of these processes. Taken together, these expression profiles suggest a mechanism by which the ORP outperforms single-assembler assemblies. While there is substantial overlap in transcript recovery, each assembler recovers unique transcripts (Figure 5) based on expression (and potentially other properties), which when merged together into a final assembly, increases the completeness 
+
+ 
+
+\newpage
+\textbf{\hypertarget{Figure 5}{Figure 5}} \\
 \centerline{\includegraphics[width=25.0\baselineskip]{joyplot.eps}}
 \begin{quote}
-\small{Figure 4 depicts the distribution of gene expression (log(TPM+1)), broke down by individual assembly, for four representative ORP merged final assemblies. As predicted, the use of a higher kmer value with the \texttt{SPAdes} assembler resulted in biasing reconstruction towards more highly expressed transcripts. Interestingly, \texttt{Shannon} uniquely exhibits a strong bias towards the reconstruction of high-expression transcripts (or away from low-abundance transcripts).}
+\small{Figure 5 depicts the distribution of gene expression (log(TPM+1)), broke down by individual assembly, for four representative ORP merged final assemblies. As predicted, the use of a higher kmer value with the \texttt{SPAdes} assembler resulted in biasing reconstruction towards more highly expressed transcripts. Interestingly, \texttt{Shannon} uniquely exhibits a strong bias towards the reconstruction of high-expression transcripts (or away from low-abundance transcripts).}
 \end{quote} 
+
+
+\subsection{Quality is independent of read depth}
+
+This study included read datasets of a variety of sizes. Because of this, I was interested in understanding if the number of reads used in assembly was strongly related to the quality of the resultant assembly. Conclusively, this study demonstrates that between 30 million paired-end reads and 200 million paired-end reads, no strong patterns in quality are evident (Figure 6). This finding is in line with previous work, \citep{MacManes:2015iz} suggesting that assembly metrics plateau at between 20M and 40M read pairs, with sequencing beyond this level resulting in minimal gain in performance.  
+\newpage
+\textbf{\hypertarget{Figure 6}{Figure 6}} \\
+\centerline{\includegraphics[width=25.0\baselineskip]{regression.eps}}
+\begin{quote}
+\small{Figure 6 depicts the relationship between the a subset of assembly metrics and the number of read pairs. There is no significant relationship. In all cases the x-axis is millions of paired-end reads. }
+\end{quote}
+
 
 %Lastly, though the same read data were assembled, each assembler reconstructed unique transcripts. Using the dataset DRR069093 as an example, across the four different assemblies, a sum of 276852 SwissProt entries were matched. Of these 86\% were recovered in all four assemblies. The \texttt{SPAdes} assembly using a kmer value of 55 recovered 96\% of all transcripts, while the \texttt{SPAdes} assembly using a kmer value of 75 recovered 93\%. The \texttt{Trinity} assembly recovered 96\% of the transcripts, while \texttt{Shannon} recovered 90\%. Depicted in Figure 4, the \texttt{SPAdes} assembly using a kmer value of 55 recovered 3749 unique transcripts, \texttt{Trinity} recovered 3055, \texttt{Shannon} recovered 2526, and \texttt{SPAdes} assembly using a kmer value of 75 recovered 775. 
 
@@ -275,43 +291,36 @@ To further understand the potential biases intrinsic to each assembler, I plotte
 
 
 
-\section{Discussion}
+%\section{Discussion}
 
-For non-model organisms lacking reference genomic resources, the error correction, adapter and quality trimmed reads should be assembled \textit{de novo} into transcripts. While the assembly package \texttt{Trinity} \citep{Haas:2013jq} is thought to currently be the most accurate stand-alone assembler \citep{Li:2014cm}, this study demonstrates that a merged assembly with multiple assemblers (and kmer lengths) results in the highest quality assembly. Specifically, the Oyster River Protocol, which contains a recipe for read error correction, quality trimming, assembly with multiple software packages and merging, resulted in a final assembly, the structure of which was greatly improved. 
+%For non-model organisms lacking reference genomic resources, the error correction, adapter and quality trimmed reads may be assembled \textit{de novo} into transcripts. While the assembly package \texttt{Trinity} \citep{Haas:2013jq} is thought to be the most accurate stand-alone assembler \citep{Li:2014cm}, this study demonstrates that a merged assembly with multiple assemblers (and kmer lengths) results in a higher quality assembly. Specifically, the Oyster River Protocol, which contains a recipe for read error correction, quality trimming, assembly with multiple software packages and merging, resulted in a final assembly, the structure of which was greatly improved. 
 
-\texttt{TransRate} scores were significantly improved by using the Oyster River Protocol for transcriptome assembly. One metric in particular, the read mapping metric, was vastly improved (Figure 1A). The aspect of quality that this metric assays is critical - specifically measuring how representative of the reads the assembly is. If we assume that the vast majority of generated reads come from the biological sample under study, when reads fail to map, that fraction of the biology is lost. Troublesome, this biology is lost from all downstream analysis and inference. This study conclusively demonstrates that across a wide variety of taxa, assembling with \texttt{Trinity} alone may result in a substantial decrease in mapping rate and in turn, the lost ability to draw conclusions from that fraction of the sample. 
+%Two packages used to evaluate the structure of assemblies, \texttt{TransRate} and \texttt{Detaonate}, demonstrated significant improvement of assembly quality by using the Oyster River Protocol for transcriptome assembly. One metric in particular, the read mapping metric, was vastly improved (Figure 1A). The aspect of quality that this metric assays is critical - specifically measuring how representative of the reads the assembly is. If we assume that the vast majority of generated reads come from the biological sample under study, when reads fail to map, that fraction of the biology is lost from all downstream analysis and inference. This study conclusively demonstrates that across a wide variety of taxa, assembling RNAseq reads with \texttt{Trinity} alone may result in a substantial decrease in mapping rate and in turn, the lost ability to draw conclusions from that fraction of the sample. 
 
-In contrast to \texttt{TransRate} scores, the \texttt{BUSCO} metrics were essentially unchanged by assembly with the Oyster River Protocol. The recovery of complete orthologs, the proportion of orthologs reconstructed in fragmented form, and missing orthologs were stable across both assembly methods. The number of orthologs recovered in duplicate (\textgreater 1 copy), was decreased when using the ORP. I hypothesize that the relative frequency of transcript duplication may have important implications for downstream abundance estimation, with less  duplication potentially resulting in more accurate estimation. While gene expression quantitation software \citep{Patro:2017iv,Bray:2016ee} probabilistically assigns reads to transcripts in an attempt at mitigating this issue, while not evaluated as part of this work, a primary solution related to decreasing artificial transcript duplication could offer significant advantages.
+%Similar to the \texttt{TransRate} and \texttt{Detaonate} scores, the number of conditional reciprocal blast hits was increased by using the 
 
-\subsection{Each Assembler Recovers Different Transcripts}
+%In contrast to \texttt{TransRate} scores, the \texttt{BUSCO} metrics were essentially unchanged by assembly with the Oyster River Protocol. The recovery of complete orthologs, the proportion of orthologs reconstructed in fragmented form, and missing orthologs were stable across both assembly methods. The number of orthologs recovered in duplicate (\textgreater 1 copy), was decreased when using the ORP. I hypothesize that the relative frequency of transcript duplication may have important implications for downstream abundance estimation, with less  duplication potentially resulting in more accurate estimation. While gene expression quantitation software \citep{Patro:2017iv,Bray:2016ee} probabilistically assigns reads to transcripts in an attempt at mitigating this issue, while not evaluated as part of this work, a primary solution related to decreasing artificial transcript duplication could offer significant advantages.
 
-The main benefit of the Oyster River Protocol is related to the fact that assemblies are constructed four different ways, using three different assemblers (\texttt{Trinity}, \texttt{Shannon}, \texttt{SPAdes}) and three different values for kmer length (k=25,55,75). As described above, each assembler carries with it a set of heuristics, and these heuristics translate into differential recovery of distinct fractions of the transcript community. Figure 3 depicts this process. Looking at the distribution of gene expression, within the \texttt{SPAdes} assemblies, kmer length influences the recovery of transcripts, with longer kmers shifting the distribution to more highly expressed transcripts. Interestingly, \texttt{Shannon} seems to have a very different set of expression-based biases, demonstrating an apparent bias against low-abundance transcripts. Trinity exhibits a typical distribution, similar to the \texttt{SPAdes} assembler using a shorter value for kmer length. 
+%\subsection{Each Assembler Recovers Different Transcripts}
 
-
-
-
-Taken together, these expression profiles suggest a mechanism by which the ORP outperforms, \texttt{Trinity}, and presumably other single-assembler assemblies. While there is substantial overlap in transcript recovery, each assembler recovers unique transcripts (Figure 5), based on expression (and potentially other properties), which when merged together into a final assembly, increases the completeness 
-
-\subsection{Does Taxonomy Influence Assembly Quality?}
-
-Because I was interested in designing a study with broad applicability, I chose read datasets that represented a variety of Eukaryotic groups. Although not originally designed for this purpose, this decision may allow me to understand the influence that intrinsic properties of transcription and transcriptome complexity in different taxonomic groupings may have on assembly. Figure 5 depicts several previously described assembly metrics, broken down by assembly method and by taxonomic group. Given the small sample (n=4 vertebrate, n=5 plant, n=6 invertebrate), it is impossible to draw strong conclusions, but generally, both \texttt{Trinity} and the Oyster River Protocol perform equally well across groups. Invertebrate assembly seems to be the most variable in resultant quality, though this may be driven by low sample size coupled with the specific (potentially low quality) datasets chosen at random. 
-\newpage
-\textbf{\hypertarget{Figure 6}{Figure 6}} \\
-\centerline{\includegraphics[width=25.0\baselineskip]{bytaxa.eps}}
-\begin{quote}
-\small{Figure 6 depicts a subset of assembly metrics broken down by taxonomic group. In general, no consistent patterns are observed, suggesting that the described assembly protocol performs well across eukaryotic groups.}
-\end{quote} 
+%The main benefit of the Oyster River Protocol is related to the fact that assemblies are constructed four different ways, using three different assemblers (\texttt{Trinity}, \texttt{Shannon}, \texttt{SPAdes}) and three different values for kmer length (k=25,55,75). As described above, each assembler carries with it a set of heuristics, and these heuristics translate into differential recovery of distinct fractions of the transcript community. Figure 3 depicts this process. Looking at the distribution of gene expression, within the \texttt{SPAdes} assemblies, kmer length influences the recovery of transcripts, with longer kmers shifting the distribution to more highly expressed transcripts. Interestingly, \texttt{Shannon} seems to have a very different set of expression-based biases, demonstrating an apparent bias against low-abundance transcripts. Trinity exhibits a typical distribution, similar to the \texttt{SPAdes} assembler using a shorter value for kmer length. 
 
 
-\subsection{Does Read Depth Influence Quality?}
 
-This study included read datasets of a variety of sizes. Because of this, I was interested in understanding if the number of reads used in assembly was strongly related to the quality of the resultant assembly. Conclusively, this study demonstrates that between 30 million paired-end reads and 200 million paired-end reads, no strong patterns in quality are evident (Figure 6). This finding is in line with previous work, \citep{MacManes:2015iz} suggesting that assembly metrics plateau at between 20M and 40M read pairs, with sequencing beyond this level resulting in minimal gain in performance.  
-\newpage
-\textbf{\hypertarget{Figure 7}{Figure 7}} \\
-\centerline{\includegraphics[width=25.0\baselineskip]{regression.eps}}
-\begin{quote}
-\small{Figure 6 depicts the relationship between the a subset of assembly metrics and the number of read pairs. There is no significant relationship. In all cases the x-axis is millions of paired-end reads. }
-\end{quote}
+
+%Taken together, these expression profiles suggest a mechanism by which the ORP outperforms, \texttt{Trinity}, and presumably other single-assembler assemblies. While there is substantial overlap in transcript recovery, each assembler recovers unique transcripts (Figure 5), based on expression (and potentially other properties), which when merged together into a final assembly, increases the completeness 
+
+%\subsection{Does Taxonomy Influence Assembly Quality?}
+
+%Because I was interested in designing a study with broad applicability, I chose read datasets that represented a variety of Eukaryotic groups. Although not originally designed for this purpose, this decision may allow me to understand the influence that intrinsic properties of transcription and transcriptome complexity in different taxonomic groupings may have on assembly. Figure 5 depicts several previously described assembly metrics, broken down by assembly method and by taxonomic group. Given the small sample (n=4 vertebrate, n=5 plant, n=6 invertebrate), it is impossible to draw strong conclusions, but generally, both \texttt{Trinity} and the Oyster River Protocol perform equally well across groups. Invertebrate assembly seems to be the most variable in resultant quality, though this may be driven by low sample size coupled with the specific (potentially low quality) datasets chosen at random. 
+%\newpage
+%\textbf{\hypertarget{Figure 6}{Figure 6}} \\
+%\centerline{\includegraphics[width=25.0\baselineskip]{bytaxa.eps}}
+%\begin{quote}
+%\small{Figure 6 depicts a subset of assembly metrics broken down by taxonomic group. In general, no consistent patterns are observed, suggesting that the described assembly protocol performs well across eukaryotic groups.}
+%\end{quote} 
+
+
 
 \section{Conclusions}
 
