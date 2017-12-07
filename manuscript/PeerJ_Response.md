@@ -1,4 +1,7 @@
 #Response To review
+
+Of note, the MS and response are version controlled on Github. Sadly the PeerJ submission website does not allow this type of workflow. See https://github.com/macmanes-lab/Oyster_River_Protocol/tree/master/manuscript. I ave also cut a new release that marks the resubmission. 
+
 ## Reviewer 1
 
 This is really interesting paper that I feel could yield good results however this manuscript feels rushed to me and I don’t think it is ready for publication yet.
