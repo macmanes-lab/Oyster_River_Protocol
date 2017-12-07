@@ -13,7 +13,7 @@
 \usepackage{rotating}
 \usepackage{url}
 \usepackage{setspace} 
-\usepackage{natbib}
+\usepackage{natbib}[sort]
 \doublespacing
 
 \usepackage[sfdefault,light]{roboto}
@@ -94,10 +94,11 @@ As a direct result of their widespread popularity, a diverse toolset for the ass
 
 In addition to the variety of tools available for the \tit{de novo} assembly of transcripts, several tools are available for pre-processing of reads via read trimming ((\eg\ \texttt{Skewer} \citep{Jiang:2014cx}, \texttt{Trimmomatic} \citep{Bolger:2014ek}, \texttt{Cutadapt} \cite{Martin:2011va}), read normalization (\texttt{khmer} \citep{Pell:2012id}), and read error correction (\texttt{SEECER} \citep{Le:2013dy} and \texttt{RCorrector} \citep{Song:2015in}, \texttt{Reptile} \cite{Yang:2010kv}). Similarly, benchmarking tools that evaluate the quality of assembled transcriptomes including \texttt{TransRate} \citep{SmithUnna:2016go}, \texttt{BUSCO} (\underline{B}enchmarking \underline{U}niversal \underline{S}ingle-\underline{C}opy \underline{O}rthologs - \citep{Simao:2015kk}), and \texttt{Detonate} \citep{Li:2014cm} have been developed. Despite the development of these evaluative tools, this manuscript describes the first systematic effort coupling them with the development of a \textit{de novo} transcriptome assembly pipeline.
 
-The ease with which these tools may be used to produce and characterize transcriptome assemblies belies the true complexity underlying the overall process. Indeed, the subtle (and not so subtle) methodological challenges associated with transcriptome reconstruction may result in highly variable assembly quality. In particular, while most tools run using default settings, these defaults may be sensible only for one specific (often unspecified) use case or data type. Because parameter optimization is both dataset-dependent and factorial in nature, an exhaustive optimization particularly of entire pipelines, is never possible. Given this, the production of a \tit{de novo} transcriptome assembly requires a large investment in time and resources, with each step requiring careful consideration. Here, I propose an evidence-based protocol for assembly that results in the production of high quality transcriptome assemblies, across a variety of commonplace experimental conditions. \\
+The ease with which these tools may be used to produce and characterize transcriptome assemblies belies the true complexity underlying the overall process \citep{Ungaro:2017kf, Wang:2017gc, Moreton:2015fw, Yang:2013iz}. Indeed, the subtle (and not so subtle) methodological challenges associated with transcriptome reconstruction may result in highly variable assembly quality. In particular, while most tools run using default settings, these defaults may be sensible only for one specific (often unspecified) use case or data type. Because parameter optimization is both dataset-dependent and factorial in nature, an exhaustive optimization particularly of entire pipelines, is never possible. Given this, the production of a \tit{de novo} transcriptome assembly requires a large investment in time and resources, with each step requiring careful consideration. Here, I propose an evidence-based protocol for assembly that results in the production of high quality transcriptome assemblies, across a variety of commonplace experimental conditions or taxonomic groups. \\
 
-\newpage
-This manuscript describes the development of The Oyster River Protocol\footnotemark\ a multi-assembler and multi-kmer protocol for transcriptome assembly. This innovation is critical, as all assembly solutions treat the sequence read data in ways that bias transcript recovery. Specifically, with the development of assembly software comes the use of a set of heuristics that are necessary given the scope of the assembly problem itself. Given each software development team carries with it a unique set of ideas related to these heuristics while implementing various assembly algorithms, individual assemblers exhibit unique assembly behavior. By leveraging a multi-assembler approach, the strengths of one assembler may complement the weaknesses of another. In addition to biases related to assembly heuristics, it is well known that assembly kmer-length has important effects on transcript reconstruction, with shorter kmers more efficiently reconstructing lower-abundance transcripts relative to more highly abundant transcripts. Given this, assembling with multiple different kmer lengths, then merging the resultant assemblies may effectively reduce this type of bias. Recognizing these issue, I hypothesize that an assembly that results from the combination of multiple different assemblers and lengths of assembly-kmers will be better than each individual assembly, across a variety of metrics. 
+This manuscript describes the development of The Oyster River Protocol\footnotemark\ for transcriptome assembly. It explicitly considers and attempts to address many of the shortcomings described in \citep{Vijay:2012gy}, by leveraging a multi-kmer and multi-assembler strategy. This innovation is critical, as all assembly solutions treat the sequence read data in ways that bias transcript recovery. Specifically, with the development of assembly software comes the use of a set of heuristics that are necessary given the scope of the assembly problem itself. Given each software development team carries with it a unique set of ideas related to these heuristics while implementing various assembly algorithms, individual assemblers exhibit unique assembly behavior. By leveraging a multi-assembler approach, the strengths of one assembler may complement the weaknesses of another. In addition to biases related to assembly heuristics, it is well known that assembly kmer-length has important effects on transcript reconstruction, with shorter kmers more efficiently reconstructing lower-abundance transcripts relative to more highly abundant transcripts. Given this, assembling with multiple different kmer lengths, then merging the resultant assemblies may effectively reduce this type of bias. Recognizing these issue, I hypothesize that an assembly that results from the combination of multiple different assemblers and lengths of assembly-kmers will be better than each individual assembly, across a variety of metrics. 
+
+In addition to developing an enhanced pipeline, the work suggests an exhaustive way of characterizing assemblies while making available a set of fully-benchmarked reference assemblies that may be used by other researchers in developing new assembly algorithms and pipelines. Although many other researchers have published comparisons of assembly methods, up until now these have been limited to single datasets assembled a few different ways \citep{Marchant:2016hl, Finseth:2014bl}, thereby failing to provide more general insights.     
 
 \footnotetext{Named the Oyster River Protocol because the ideas, and some of the code, was developed while overlooking the Oyster River, located in Durham, New Hampshire. NB, the naming assembly of protocols after bodies of water was, to the best of my knowledge, first done by C. Titus Brown (The Eel Pond Protocol: \url{http://khmer-protocols.readthedocs.io/en/latest/mrnaseq/index.html}), and may have subconsciously influenced me in naming this protocol.}
 
@@ -110,7 +111,6 @@ This manuscript describes the development of The Oyster River Protocol\footnotem
 
 In an effort at benchmarking the assembly and merging protocols, I downloaded a set of publicly available RNAseq datasets (Table 1) that had been produced on the Illumina sequencing platform. These datasets were chosen to represent a variety of taxonomic groups, so as to demonstrate the broad utility of the developed methods. Because datasets were selected randomly with respect to sequencing center and read number, they are likely to represent the typical quality of Illumina data circa 2014-2017. 
 
-\newpage
 \begin{center}
 %\begin{adjustwidth}{-2.25in}{0in}% adjust the L and R margins by 1 inch
 \textbf{\hypertarget{Table 1}{Table 1}} \\
@@ -136,7 +136,7 @@ Protozoa & ERR058009& \textit{Entamoeba histolytica} & 68M & 100bp \\ \hline
 %\end{adjustwidth}
 \end{center}
 \begin{quote}
-\noindent{\small{Table 1 lists the datasets used in this study. All datasets are publicly available for download by accession number at the European Nucleotide Archive.
+\noindent{\small{Table 1 lists the datasets used in this study. All datasets are publicly available for download by accession number at the European Nucleotide Archive or NCBI Short Read Archive.
 
   }}
 \end{quote}
@@ -153,7 +153,7 @@ For all assemblies performed, Illumina sequencing adapters were removed from bot
 
 \subsection{Assembly}
 
-I assembled each trimmed and error corrected dataset using three different \textit{de novo} transcriptome assemblers and three different kmer lengths, producing 4 unique assemblies. First, I assembled the reads using \texttt{Trinity} release 2.4.0 \citep{Haas:2013jq}, and default settings (k=25), without read normalization. Next, the \texttt{SPAdes} RNAseq assembler (version 3.10) \cite{Chikhi:2013ep} was used, in two distinct runs, using kmer sizes 55 and 75. Lastly, reads were assembled using the assembler \texttt{Shannon} version 0.0.2 \cite{Kannan:2016be}, using a kmer length of 75. These assemblers were chosen based on the fact that they [1] use an open-science development model, whereby end-users may contribute code, [2] are all actively maintained and are undergoing continuous development, and [3] occupy different parts of the algorithmic landscape. 
+I assembled each trimmed and error corrected dataset using three different \textit{de novo} transcriptome assemblers and three different kmer lengths, producing 4 unique assemblies. First, I assembled the reads using \texttt{Trinity} release 2.4.0 \citep{Haas:2013jq}, and default settings (k=25), without read normalization. The decision to forgo normalization is based on previous work \citep{MacManes:2015iz} showing slightly worse performance of normalized datasets. Next, the \texttt{SPAdes} RNAseq assembler (version 3.10) \cite{Chikhi:2013ep} was used, in two distinct runs, using kmer sizes 55 and 75. Lastly, reads were assembled using the assembler \texttt{Shannon} version 0.0.2 \cite{Kannan:2016be}, using a kmer length of 75. These assemblers were chosen based on the fact that they [1] use an open-science development model, whereby end-users may contribute code, [2] are all actively maintained and are undergoing continuous development, and [3] occupy different parts of the algorithmic landscape. 
 
 This assembly process resulted in the production of four distinct assemblies. The code for running this step of the Oyster River protocols is available at \url{https://github.com/macmanes-lab/Oyster_River_Protocol/blob/master/oyster.mk#L142}.  
  
@@ -174,7 +174,7 @@ All statistical analyses were conducted in R version 3.4.0 \citep{RALanguageandE
 
 \section{Results and Discussion}
 
-Fifteen RNAseq datasets, ranging in size from (30-206M paired end reads) were assembled using the Oyster River Protocol and with \texttt{Trinity}. Each assembly was evaluated using the software \texttt{BUSCO}, \texttt{shmlast}, \texttt{Detonate}, and \texttt{TransRate}. From these, several metrics were chosen to represent the quality of the produced assemblies. Of note, all the assemblies produced as part of this work are available at \url{https://www.dropbox.com/sh/ehxvd0ont9ge8id/AABZxRCwcpaxb7rXWclTBbJga}, and will be moved to dataDryad after acceptance. A file containing the evaluative metrics is available at \url{https://github.com/macmanes-lab/Oyster_River_Protocol/blob/master/manuscript/orp.csv}, while the distance matrices are available within the folder \url{https://github.com/macmanes-lab/Oyster_River_Protocol/blob/master/manuscript/}. 
+Fifteen RNAseq datasets, ranging in size from (30-206M paired end reads) were assembled using the Oyster River Protocol and with \texttt{Trinity}. Each assembly was evaluated using the software \texttt{BUSCO}, \texttt{shmlast}, \texttt{Detonate}, and \texttt{TransRate}. From these, several metrics were chosen to represent the quality of the produced assemblies. Of note, all the assemblies produced as part of this work are available at \url{https://www.dropbox.com/sh/ehxvd0ont9ge8id/AABZxRCwcpaxb7rXWclTBbJga}, and will be moved to dataDryad after acceptance. A file containing the evaluative metrics is available at \url{https://github.com/macmanes-lab/Oyster_River_Protocol/blob/master/manuscript/orp.csv}, while the distance matrices are available within the folder \url{https://github.com/macmanes-lab/Oyster_River_Protocol/blob/master/manuscript/}. R code used to conduct analyses and make figures is found at \url{https://github.com/macmanes-lab/Oyster_River_Protocol/blob/master/manuscript/R-analysis.Rmd}. 
 
 \subsection{Assembled transcriptomes} 
 
@@ -195,11 +195,13 @@ The distance between assemblies of a given dataset were calculated using \texttt
 
 \subsubsection{Assembly Structure}
 
-The structural integrity of each assembly was evaluated using the \texttt{TransRate} and \texttt{Detonate} software packages. As many downstream applications depend critically on accurate read mapping, assembly quality is correlated with increased mapping rates. The split violin plot presented in figure 2A visually represents the mapping rates of each assembly, with lines connecting the mapping rates of datasets assembled with \texttt{Trinity} and with the ORP, respectively. The average mapping rate of the \texttt{Trinity} assembled datasets was 87\% (sd = 8\%), while the average mapping rates of the ORP assembled datasets was 93\% (sd=4\%). This test is statistically significant (one-sided Wilcoxon rank sum test, p = 2E-2). Mapping rates of the other assemblies are less than that of the ORP assembly, but in all cases, greater than that of the Trinity assembly. This aspect of assembly quality is critical. Specifically mapping rates measure how representative the assembly is of the reads. If we assume that the vast majority of generated reads come from the biological sample under study, when reads fail to map, that fraction of the biology is lost from all downstream analysis and inference. This study demonstrates that across a wide variety of taxa, assembling RNAseq reads with any single assembler alone may result in a decrease in mapping rate and in turn, the lost ability to draw conclusions from that fraction of the sample. 
+The structural integrity of each assembly was evaluated using the \texttt{TransRate} and \texttt{Detonate} software packages. As many downstream applications depend critically on accurate read mapping, assembly quality is correlated with increased mapping rates. The split violin plot presented in figure 2A visually represents the mapping rates of each assembly, with lines connecting the mapping rates of datasets assembled with \texttt{Trinity} and with the ORP, respectively. The average mapping rate of the \texttt{Trinity} assembled datasets was 87\% (sd = 8\%), while the average mapping rates of the ORP assembled datasets was 93\% (sd=4\%). This test is statistically significant (one-sided Wilcoxon rank sum test, p = 2E-2). Mapping rates of the other assemblies are less than that of the ORP assembly, but in most cases, greater than that of the Trinity assembly. This aspect of assembly quality is critical. Specifically mapping rates measure how representative the assembly is of the reads. If we assume that the vast majority of generated reads come from the biological sample under study, when reads fail to map, that fraction of the biology is lost from all downstream analysis and inference. This study demonstrates that across a wide variety of taxa, assembling RNAseq reads with any single assembler alone may result in a decrease in mapping rate and in turn, the lost ability to draw conclusions from that fraction of the sample. 
 
-Figure 2B describes the distribution of \texttt{TransRate} assembly scores, which is a synthetic metric taking into account the quality of read mapping and coverage-based statistics. The \texttt{Trinity} assemblies had an average optimal score of 0.35 (sd = .14), while the ORP assembled datasets had an average score of 0.46 (sd = .07). This test is statistically significant (one-sided Wilcoxon rank sum test, p-value = 1.8E-2). Optimal scores of the other assemblies are less than that of the ORP assembly, but in all cases, greater than that of the \texttt{Trinity} assembly. Lastly, figure 2C describes the distribution of \texttt{Detonate} scores. The \texttt{Trinity} assemblies had an average score of -6.9E9 (sd = 5.2E9), while the ORP assembled datasets had an average score of -5.3E9 (sd = 3.5E9). This test not is statistically significant, though in all cases, relative to all other assemblies, scores of the ORP assemblies are improved (become less negative), indicating that the ORP produced assemblies of higher quality. 
+Figure 2B describes the distribution of \texttt{TransRate} assembly scores, which is a synthetic metric taking into account the quality of read mapping and coverage-based statistics. The \texttt{Trinity} assemblies had an average optimal score of 0.35 (sd = .14), while the ORP assembled datasets had an average score of 0.46 (sd = .07). This test is statistically significant (one-sided Wilcoxon rank sum test, p-value = 1.8E-2). Optimal scores of the other assemblies are less than that of the ORP assembly, but in most cases, greater than that of the \texttt{Trinity} assembly. Figure 2C describes the distribution of \texttt{Detonate} scores. The \texttt{Trinity} assemblies had an average score of -6.9E9 (sd = 5.2E9), while the ORP assembled datasets had an average score of -5.3E9 (sd = 3.5E9). This test not is statistically significant, though in all cases, relative to all other assemblies, scores of the ORP assemblies are improved (become less negative), indicating that the ORP produced assemblies of higher quality. 
 
-In addition to reporting synthetic metrics related to assembly structure, \texttt{TransRate} reports individual metrics related to specific elements of assembly quality. One such metric estimates the rate of chimerism, a phenomenon which is known to be problematic in \tit{de novo} assembly. Rates of chimerism are relatively constant between all assemblers, ranging from 10\% for the \texttt{Shannon} assembly, to 12\% for the \texttt{SPAdes75} assembly. The chimerism rate for the ORP assemblies averaged 10.5\% ($\pm$ 4.7\%).
+In addition to reporting synthetic metrics related to assembly structure, \texttt{TransRate} reports individual metrics related to specific elements of assembly quality. One such metric estimates the rate of chimerism, a phenomenon which is known to be problematic in \tit{de novo} assembly \citep{Ungaro:2017kf, Singhal:2013dq}. Rates of chimerism are relatively constant between all assemblers, ranging from 10\% for the \texttt{Shannon} assembly, to 12\% for the \texttt{SPAdes75} assembly. The chimerism rate for the ORP assemblies averaged 10.5\% ($\pm$ 4.7\%). While the new method would ideally improve this metric by exclusively selecting non-chimeric transcripts, this does not seem to be the case, and may be related to the inherent shortcomings of short-read transcriptome assembly.
+
+Of note, consistent with all short-read assemblers \citep{Ungaro:2017kf}, the ORP assemblies may not accurately reflect the true isoform complexity. Specifically, because of the way that single representative transcripts are chosen from a cluster of related sequences, some transcriptional complexity may be lost. Consider the cluster containing contigs \{AB, A, B\} where AB is a false-chimera, selecting a single representative transcript with the best score could yield either A or B, thereby excluding an important transcript in the final output. We believe this type of transcript loss is not common, based on how contigs are scored (Table 1, Figure 3, \cite{SmithUnna:2016go}), though strict demonstration of this is not possible, given the lack of high-quality reference genomes for the majority of the datasets. More generally, mapping rates, \texttt{Detonate} and \texttt{TransRate} score improvements suggest that this type of loss is not widespread.
 
 \newpage
 
@@ -326,13 +328,11 @@ This study included read datasets of a variety of sizes. Because of this, I was 
 
 For non-model organisms lacking reference genomic resources, the error corrected, adapter- and quality-trimmed reads must be assembled \textit{de novo} into transcripts. While the assembly package \texttt{Trinity} \citep{Haas:2013jq} is thought to currently be the most accurate stand-alone assembler \citep{Li:2014cm}, a merged assembly with multiple assemblers results in higher quality assemblies. Specifically, use of the Oyster River Protocol, which contains a recipe for read error correction, quality trimming, assembly with multiple software packages, and merging resulted in a final assembly, the structure of which was greatly improved. 
 
-Specifically, the improvements in assembly metrics described here are attributed to the multi-way approach, where three different assemblers and three different kmer lengths were used. This approach allows the strengths of one approach to effectively complement the weaknesses of another, thereby resulting in a more complete assembly than otherwise possible. These enhancements are important, as unassembled transcripts are invisible to all downstream analysis.      
- 
-
+Specifically, the improvements in assembly metrics described here are attributed to the multi-way approach, where three different assemblers and three different kmer lengths were used. This approach allows the strengths of one assembler to effectively complement the weaknesses of another, thereby resulting in a more complete assembly than otherwise possible. These enhancements are important, as unassembled transcripts are invisible to all downstream analysis.      
 
 \section*{Acknowledgments}
 
-This work was significantly improved by discussions with Richard Smith-Unna, Brian Haas and many others. More generally, the work and its presentation has been influenced by supporters of the Open Access and Open Science movements. 
+This work was significantly improved by discussions with Richard Smith-Unna, Rob Patro, C. Titus Brown, Brian Haas and many others. More generally, the work and its presentation has been influenced by supporters of the Open Access and Open Science movements. 
 
 %\section*{References}
 \bibliography{formatted.bib}
@@ -341,31 +341,3 @@ This work was significantly improved by discussions with Richard Smith-Unna, Bri
 
 
 \end{document}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	
-
