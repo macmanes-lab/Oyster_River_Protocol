@@ -1,5 +1,3 @@
-
-
 \documentclass[10pt,letterpaper]{article}
 \usepackage[top=0.85in,left=1in, right=1in, footskip=0.75in]{geometry}
 \usepackage{changepage}
@@ -164,6 +162,8 @@ To merge the four assemblies produced as part of the Oyster River Protocol, I de
 
 All assemblies were evaluated using \texttt{ORP-TransRate}, \trexttt{Detonate} version 1.11 \cite{Li:2014cma}, \texttt{shmlast} version 1.2 \cite{Scott:2017eg}, and \texttt{BUSCO} version 3.0.2 \cite{Simao:2015kk}. \texttt{TransRate} evaluates transcriptome assembly contiguity by producing a score based on contig and mapping metrics, while \testtt{Detonate} conducts an orthogonal analysis, producing a score that is maximized by an assembly that is representative of input read data. \texttt{BUSCO} evaluates assembly content by searching the assembly for conserved single copy orthologs found in all Eukaryotes. We report default \texttt{BUSCO} metrics as described in \cite{Simao:2015kk}. Specifically, "complete orthologs", are defined as query transcripts that are within 2 standard deviations of the length of the \texttt{BUSCO} group mean, while contigs falling short of this metric are listed as "fragmented". \testtt{Shmlast} implements the conditional reciprocal best hits (CRBH) test \cite{Aubry:2014en}, conducted in this case against the Swiss-Prot protein database (downloaded October 2017) using an e-value of 1E-10.   \\
 
+In addition to the generation of metrics to evaluation the quality of transcriptome assemblies, I generated a distance matrix of assemblies for each dataset using the \texttt{sourmash} package \citep{TitusBrown:2016jg}. Specifically, each assembly was characterized using the \texttt{compute} function using 5000 independent sketches. The distance between assemblies was calculated using the \texttt{compare} function and a kmer length of 51. These distance matrices were visualized using the \texttt{isoMDS} function of the MASS package \url{https://CRAN.R-project.org/package=MASS}. 
+
 \subsection{Statistics}
 
 All statistics analyses were conducted in R version 3.4.0 \citep{RALanguageandEn:wf}. Violin plots were constructed using the beanplot \citep{Kampstra:2008vc} and the beeswarm R packages (\url{https://CRAN.R-project.org/package=beeswarm}). Expression distributions were plotted using the ggjoy package (\url{https://CRAN.R-project.org/package=ggjoy}). Plots for visualizing the unique content of each assembly were constructed using the UpsetR package \citep{Conway:2017in}.  
@@ -230,6 +230,8 @@ Lastly, though the same read data were assembled, each assembler reconstructed u
 \small{Figure 4 depicts the overlap in identified transcripts between the various assemblies for one representative (DRR069093) dataset.}
 \end{quote}
 
+
+
 \section{Discussion}
 
 For non-model organisms lacking reference genomic resources, the error correction, adapter and quality trimmed reads should be assembled \textit{de novo} into transcripts. While the assembly package \texttt{Trinity} \citep{Haas:2013jq} is thought to currently be the most accurate stand-alone assembler \citep{Li:2014cm}, this study demonstrates that a merged assembly with multiple assemblers (and kmer lengths) results in the highest quality assembly. Specifically, the Oyster River Protocol, which contains a recipe for read error correction, quality trimming, assembly with multiple software packages and merging, resulted in a final assembly, the structure of which was greatly improved. 
@@ -241,6 +243,35 @@ In contrast to \texttt{TransRate} scores, the \texttt{BUSCO} metrics were essent
 \subsection{Each Assembler Recovers Different Transcripts}
 
 The main benefit of the Oyster River Protocol is related to the fact that assemblies are constructed four different ways, using three different assemblers (\texttt{Trinity}, \texttt{Shannon}, \texttt{SPAdes}) and three different values for kmer length (k=25,55,75). As described above, each assembler carries with it a set of heuristics, and these heuristics translate into differential recovery of distinct fractions of the transcript community. Figure 3 depicts this process. Looking at the distribution of gene expression, within the \texttt{SPAdes} assemblies, kmer length influences the recovery of transcripts, with longer kmers shifting the distribution to more highly expressed transcripts. Interestingly, \texttt{Shannon} seems to have a very different set of expression-based biases, demonstrating an apparent bias against low-abundance transcripts. Trinity exhibits a typical distribution, similar to the \texttt{SPAdes} assembler using a shorter value for kmer length. 
+
+
+\textbf{\hypertarget{Figure 6}{Figure 6}} \\
+\centerline{\includegraphics[width=25.0\baselineskip]{mds.eps}}
+\begin{quote}
+\small{Figure 6.}
+\end{quote} 
+
+\begin{center}
+%\begin{adjustwidth}{-2.25in}{0in}% adjust the L and R margins by 1 inch
+\textbf{\hypertarget{Table 2}{Table 2}} \\
+\begin{tabular}{l l l c c }
+\textbf{Assembly} & \textbf{Genes} & \textbf{Delta} & \textbf{Unique}   \\ \hline
+Concatenated & 14674 $\pm$ 3590 &  &  \\ \hline
+SPAdes55 &  & $-$1739 $\pm$ 758  & 570 $\pm$ 266  \\ \hline
+SPAdes75 &  & $-$2711 $\pm$ 2047  & 301 $\pm$ 195  \\ \hline
+Shannon &  & $-$4375 $\pm$ 3508  & 302 $\pm$ 241  \\ \hline
+Trinity &  & $-$1952 $\pm$ 803  & 520 $\pm$ 301  \\ \hline
+
+
+\end{tabular}
+%\end{adjustwidth}
+\end{center}
+\begin{quote}
+\noindent{\small{Table 2.
+
+  }}
+\end{quote}
+
 
 Taken together, these expression profiles suggest a mechanism by which the ORP outperforms, \texttt{Trinity}, and presumably other single-assembler assemblies. While there is substantial overlap in transcript recovery, each assembler recovers unique transcripts (Figure 5), based on expression (and potentially other properties), which when merged together into a final assembly, increases the completeness 
 
