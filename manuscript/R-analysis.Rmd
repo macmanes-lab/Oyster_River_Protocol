@@ -1,0 +1,481 @@
+---
+title: "orp_comparisons.Rmd"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r functions, echo=FALSE}
+library(beanplot)
+library(reshape2)
+library(beeswarm)
+library(psych)
+
+Corner_text <- function(text, location="topleft"){
+     legend(location,legend=text, bty ="n", pch=NA, cex=1.5) 
+}
+
+
+Main_text <- function(text, location="center"){
+     legend(location,legend=text, bty ="n", pch=NA, cex=1.5) 
+ }
+
+mapbean <- function(titles)
+{
+  matrix <- melt(matrix(c(orp$mapT, orp$mapO),ncol=2, nrow=15, byrow=F))
+  beanplot(matrix$value ~ matrix$Var2, 
+           side="both",col = list("sienna4", "dodgerblue"), ll = 0, beanlinewd=0,
+           main=do.call(sprintf, as.list(c(title, titles))),
+           boxwex=1, xlim=c(1.1,1.9), at=c(1.5), frame.plot = F, ylab='% Read Mapping', axes=F)
+  Corner_text(text="A")
+  axis(2)
+  axis(1, at=c(1.3, 1.7),  labels=c("Trinity-Only","ORP"))
+  n <- beeswarm(matrix$value ~ matrix$Var2,
+           log = F, 
+           pch = 16, col = c('red', 'black'), add=T, at=c(1.3,1.7))
+  segments(1.3, n$y[1:15], 1.7, n$y[16:31], lwd= 1)
+}
+
+optbean <- function(titles)
+{
+  matrix <- melt(matrix(c(orp$optT, orp$optO),ncol=2, nrow=15, byrow=F))
+  beanplot(matrix$value ~ matrix$Var2, 
+           side="both",col = list("sienna4", "dodgerblue"), ll = 0, beanlinewd=0,
+           main=do.call(sprintf, as.list(c(title, titles))),
+           boxwex=1, xlim=c(1.1,1.9), at=c(1.5), frame.plot = F, ylab='Optimal Assembly Score', axes=F)
+  Corner_text(text="B")
+  axis(2)
+  axis(1, at=c(1.3, 1.7),  labels=c("Trinity-Only","ORP"))
+  n <- beeswarm(matrix$value ~ matrix$Var2,
+                log = F, 
+                pch = 16, col = c('red', 'black'), add=T, at=c(1.3,1.7))
+  segments(1.3, n$y[1:15], 1.7, n$y[16:31], lwd= 1)
+}
+
+
+scorebean <- function(titles)
+{
+  matrix <- melt(matrix(c(orp$scoreT, orp$scoreO),ncol=2, nrow=15, byrow=F))
+  beanplot(matrix$value ~ matrix$Var2, 
+           side="both",col = list("sienna4", "dodgerblue"), ll = 0, beanlinewd=0,
+           main=do.call(sprintf, as.list(c(title, titles))),
+           boxwex=1, xlim=c(1.1,1.9), at=c(1.5), frame.plot = F, ylab='Assembly Score', axes=F)
+  Corner_text(text="B")
+  axis(2)
+  axis(1, at=c(1.4, 1.6),  labels=c("Trinity-Only","ORP"))
+  n <- beeswarm(matrix$value ~ matrix$Var2,
+                log = F, 
+                pch = 16, col = c('red', 'black'), add=T, at=c(1.3,1.7))
+  segments(1.3, n$y[1:15], 1.7, n$y[16:31], lwd= 1)
+}
+
+completebean <- function(titles)
+{
+  matrix <- melt(matrix(c(orp$buscoCompleteSingT, orp$buscoCompleteSingO),ncol=2, nrow=15, byrow=F))
+  beanplot(matrix$value ~ matrix$Var2, 
+           side="both",col = list("sienna4", "dodgerblue"), ll = 0, beanlinewd=0,
+           main=do.call(sprintf, as.list(c(title, titles))),
+           boxwex=1, xlim=c(1.1,1.9), at=c(1.5), frame.plot = F, ylab='Percent Complete Orthologs', axes=F)
+  Corner_text(text="A")
+  axis(2)
+  axis(1, at=c(1.4, 1.6),  labels=c("Trinity-Only","ORP"))
+  n <- beeswarm(matrix$value ~ matrix$Var2,
+                log = F, 
+                pch = 16, col = c('red', 'black'), add=T, at=c(1.3,1.7))
+  segments(1.3, n$y[1:15], 1.7, n$y[16:31], lwd= 1)
+}
+
+missingbean <- function(titles)
+{
+  matrix <- melt(matrix(c(orp$buscoMisT, orp$buscoMisO),ncol=2, nrow=15, byrow=F))
+  beanplot(matrix$value ~ matrix$Var2, 
+           side="both",col = list("sienna4", "dodgerblue"), ll = 0, beanlinewd=0,
+           main=do.call(sprintf, as.list(c(title, titles))),
+           boxwex=1, xlim=c(1.1,1.9), at=c(1.5), frame.plot = F, ylab='Percent Missing Orthologs', axes=F)
+  Corner_text(text="B")
+  axis(2)
+  axis(1, at=c(1.4, 1.6),  labels=c("Trinity-Only","ORP"))
+  n <- beeswarm(matrix$value ~ matrix$Var2,
+                log = F, 
+                pch = 16, col = c('red', 'black'), add=T, at=c(1.3,1.7))
+  segments(1.3, n$y[1:15], 1.7, n$y[16:31], lwd= 1)
+}
+
+fragmentbean <- function(titles)
+{
+  matrix <- melt(matrix(c(orp$buscoFragT, orp$buscoFragO),ncol=2, nrow=15, byrow=F))
+  beanplot(matrix$value ~ matrix$Var2, 
+           side="both",col = list("sienna4", "dodgerblue"), ll = 0, beanlinewd=0,
+           main=do.call(sprintf, as.list(c(title, titles))),
+           boxwex=1, xlim=c(1.1,1.9), at=c(1.5), frame.plot = F, log="",
+           ylab='Percent Fragmented Orthologs', axes=F)
+  Corner_text(text="C")
+  axis(2)
+  axis(1, at=c(1.4, 1.6),  labels=c("Trinity-Only","ORP"))
+  n <- beeswarm(matrix$value ~ matrix$Var2,
+                log = F, 
+                pch = 16, col = c('red', 'black'), add=T, at=c(1.3,1.7))
+  segments(1.3, n$y[1:15], 1.7, n$y[16:31], lwd= 1)
+}
+
+duplicatebean <- function(titles)
+{
+  matrix <- melt(matrix(c(orp$buscoDupT, orp$buscoDupO),ncol=2, nrow=15, byrow=F))
+  beanplot(matrix$value ~ matrix$Var2, 
+           side="both",col = list("sienna4", "dodgerblue"), ll = 0, beanlinewd=0,
+           main=do.call(sprintf, as.list(c(title, titles))),
+           boxwex=1, xlim=c(1.1,1.9), at=c(1.5), frame.plot = F, ylim=c(0,100), ylab='Percent Duplicate Orthologs', axes=F)
+  Corner_text(text="B")
+  axis(2)
+  axis(1, at=c(1.3, 1.7),  labels=c("Trinity-Only","ORP"))
+  n <- beeswarm(matrix$value ~ matrix$Var2,
+                log = F, 
+                pch = 16, col = c('red', 'black'), add=T, at=c(1.3,1.7))
+  segments(1.3, n$y[1:15], 1.7, n$y[16:31], lwd= 1)
+}
+
+
+crbbean <- function(titles)
+{
+  matrix <- melt(matrix(c(orp$crbT, orp$crbO),ncol=2, nrow=15, byrow=F))
+  beanplot(matrix$value ~ matrix$Var2, 
+           side="both",col = list("sienna4", "dodgerblue"), ll = 0, beanlinewd=0,
+           main=do.call(sprintf, as.list(c(title, titles))),
+           boxwex=1, xlim=c(1.1,1.9), at=c(1.5), frame.plot = F, ylim=c(3000,20000), ylab='Number', axes=F)
+  Corner_text(text="A")
+  axis(2)
+  axis(1, at=c(1.3, 1.7),  labels=c("Trinity-Only","ORP"))
+  n <- beeswarm(matrix$value ~ matrix$Var2,
+                log = F, 
+                pch = 16, col = c('red', 'black'), add=T, at=c(1.3,1.7))
+  segments(1.3, n$y[1:15], 1.7, n$y[16:31], lwd= 1)
+}
+
+
+detonbean <- function(titles)
+{
+  matrix <- melt(matrix(c(orp$detonT, orp$detonO),ncol=2, nrow=15, byrow=F))
+  beanplot(matrix$value ~ matrix$Var2, 
+           side="both",col = list("sienna4", "dodgerblue"), ll = 0, beanlinewd=0,
+           main=do.call(sprintf, as.list(c(title, titles))),
+           boxwex=1, xlim=c(1.1,1.9), at=c(1.5), frame.plot = F, ylim=c(-17063080322,-1358667321), ylab='Score', axes=F)
+  Corner_text(text="C")
+  axis(2)
+  axis(1, at=c(1.3, 1.7),  labels=c("Trinity-Only","ORP"))
+  n <- beeswarm(matrix$value ~ matrix$Var2,
+                log = F, 
+                pch = 16, col = c('red', 'black'), add=T, at=c(1.3,1.7))
+  segments(1.3, n$y[1:15], 1.7, n$y[16:31], lwd= 1)
+}
+
+percentbean <- function(titles)
+{
+  par(mfrow = c(1,4))
+  Main_text(text=titles)
+  beanplot(orp$percentS/orp$contigNumO,  ll = 0, beanlinewd=0, boxwex=1, xlim=c(1.1,1.9), at=c(1.5), frame.plot = F, ylim=c(0,.6), ylab='Percent Contribution', axes=T, col="blue")
+  axis(1, at=c(1.5),  cex=1.3,labels=c("Shannon"))
+  beanplot(orp$percent55/orp$contigNumO,  ll = 0, beanlinewd=0, boxwex=1, xlim=c(1.1,1.9), at=c(1.5), frame.plot = F, ylim=c(0,.6), axes=F, col="black")
+  axis(1, at=c(1.5),  labels=c("SPAdes55"))
+    beanplot(orp$percent75/orp$contigNumO,  ll = 0, beanlinewd=0, boxwex=1, xlim=c(1.1,1.9), at=c(1.5), frame.plot = F, ylim=c(0,.6), axes=F, col="red")
+    axis(1, at=c(1.5),  labels=c("SPAdes75"))
+      beanplot(orp$percentT/orp$contigNumO,  ll = 0, beanlinewd=0, boxwex=1, xlim=c(1.1,1.9), at=c(1.5), frame.plot = F, ylim=c(0,.6), axes=F, col="green")
+      axis(1, at=c(1.5),  labels=c("Trinity"))
+}
+
+```
+
+
+```{r data, echo=FALSE}
+taxa <- c("Plant", "Plant", "Insect", "Tapeworm", "Plant", "Fish", "Plant", "Amoebozoa", "Nematode", "Mammal", "Plant", "Mammal", "Polychaeta")
+
+taxacoarse <- c("Plant", "Plant", "Invertebrate", "Invertebrate", "Plant", "Vertebrate", "Plant", "Invertebrate", "Invertebrate", "Vertebrate", "Plant", "Vertebrate", "Invertebrate")
+
+depth <- c(126,69,206,73,60,82,103,68,51,54,30,31,86, 39, 113)
+#for i in $(cat list); do cut -d, -f38 $pylon5/$i/reports/transrate_$i/assemblies.csv | sed -n 2p | tr "\n" ,; done
+orp_opt <- c(0.52689,0.43782,0.47505,0.34,0.42138,0.45681,0.34229,0.48211,0.53116,0.55461,0.54645,0.48676,0.27713,0.45677,0.3726)
+
+#for i in $(cat list); do cut -d, -f37 $pylon5/$i/reports/transrate_$i/assemblies.csv | sed -n 2p | tr "\n" ,; done
+orp_score <- c(0.43098,0.32847,0.35808,0.21885,0.35696,0.33218,0.22982,0.39277,0.47051,0.32011,0.13498,0.32771,0.11906,0.24834,0.2959)
+
+#for i in $(cat list); do cut -d, -f22 $pylon5/$i/reports/transrate_$i/assemblies.csv | sed -n 2p | tr "\n" ,; done
+orp_map <- c(0.97714,0.94626,0.97315,0.89164,0.96743,0.93126,0.96224,0.96251,0.9642,0.97452,0.97234,0.96609,0.84456,0.96004,0.85)
+
+#for i in $(cat list); do cat $pylon5/$i/reports/run_$i/short_summary_$i.txt | sed -n 8p | cut -d : -f 2 | cut -d% -f1 | tr "\n" ,; done
+orp_complete <- c(97.0,81.1,99.4,85.8,85.8,67.0,95.1,55.4,93.4,90.8,97.4,91.4,44.9,94.7,94.0)
+
+#for i in $(cat list); do cat $pylon5/$i/reports/run_$i/short_summary_$i.txt | sed -n 8p | cut -d : -f 4 | cut -d% -f1 | tr "\n" ,; done
+orp_duplicate <- c(46.5,32.3,41.3,29.0,36.6,21.5,52.5,16.8,40.6,30.7,61.1,13.5,5.0,39.6,43.2)
+
+#for i in $(cat list); do cat $pylon5/$i/reports/run_$i/short_summary_$i.txt | sed -n 8p | cut -d : -f 6 | cut -d% -f1 | tr "\n" ,; done
+orp_missing <- c(1.0,3.1,0,3.3,4.3,4.3,1.6,35.4,1.6,0.6,0.9,1.0,4.9,3.6,0.4)
+
+#for i in $(cat list); do cat $pylon5/$i/reports/run_$i/short_summary_$i.txt | sed -n 8p | cut -d : -f 5 | cut -d% -f1 | tr "\n" ,; done
+orp_fragment <- c(2.0,15.8,0.7,10.9,9.9,28.7,3.3,9.2,5.0,8.6,1.7,7.6,50.2,1.7,5.6)
+
+#for i in $(cat list); do cut -d, -f38 $pylon5/justtrin/transrate_$i/assemblies.csv | sed -n 2p | tr "\n" , ; done
+trin_opt <- c(0.43677,0.38865,0.36383,0.16548,0.29251,0.31579,0.3145,0.22169,0.44018,0.38538,0.4373,0.42761,0.09803,0.40317,0.34566)
+
+#for i in $(cat list); do cut -d, -f37 $pylon5/justtrin/transrate_$i/assemblies.csv | sed -n 2p | tr "\n" , ; done
+trin_score <- c(0.29816,0.1842,0.23182,0.07762,0.1961,0.1829,0.18785,0.13095,0.33686,0.32963,0.25317,0.35921,0.0245,0.22762,0.23266)
+
+#for i in $(cat list); do cut -d, -f22 $pylon5/justtrin/transrate_$i/assemblies.csv | sed -n 2p | tr "\n" , ; done
+trin_map <- c(0.91882,0.91672,0.89504,0.62841,0.82701,0.82789,0.93182,0.78577,0.8995,0.84951,0.932,0.93557,0.71522,0.9212,0.84944)
+
+#for i in $(cat list); do  cat $pylon5/justtrin/run_$i.trin/short_summary_$i.trin.txt | sed -n 8p | cut -d : -f 2 | cut -d% -f1 | tr "\n" ,; done
+trin_complete <- c(94.7,94.1,98.3,93.1,89.8,78.2,96.4,58.4,93.0,93.7,91.8,94.4,18.4,96.0,93.7)
+
+#for i in $(cat list); do  cat $pylon5/justtrin/run_$i.trin/short_summary_$i.trin.txt | sed -n 8p | cut -d : -f 4 | cut -d% -f1 | tr "\n" ,; done
+trin_duplicate <- c(49.2,73.3,38.9,49.2,44.6,38.6,68.0,15.8,63.0,38.3,78.9,30.7,5.9,57.4,59.4)
+
+#for i in $(cat list); do  cat $pylon5/justtrin/run_$i.trin/short_summary_$i.trin.txt | sed -n 8p | cut -d : -f 6 | cut -d% -f1 | tr "\n" ,; done
+trin_missing <- c(1.0,0.9,1.0,2.3,3.6,2.3,1.6,34.7,2.4,1.0,0.9,1.0,10.6,3.3,0.4)
+
+#for i in $(cat list); do  cat $pylon5/justtrin/run_$i.trin/short_summary_$i.trin.txt | sed -n 8p | cut -d : -f 5 | cut -d% -f1 | tr "\n" ,; done
+trin_fragment <- c(4.3,5.0,0.7,4.6,6.6,19.5,2.0,6.9,4.6,5.3,7.3,4.6,71.0,0.7,5.9)
+```
+
+##  Plots
+
+
+```{r as, echo=FALSE}
+scorebean("Assembly Score")
+```
+
+```{r oas, echo=FALSE}
+optbean("Optimal Assembly Score")
+```
+
+```{r map, echo=FALSE}
+mapbean("Percent Reads Mapping")
+```
+
+
+```{r busco, echo=FALSE}
+postscript("~/Dropbox/feeding/busco_stats.eps", width = 6, height = 4)
+par(mfrow = c(1,2),
+oma = c(0,0,0,0) + 0.1,
+mar = c(1,0,1,1) + 0.1,
+bty = 'n',
+mai = c(.5, .5, .3, 0))
+
+crbbean("CRBHs")
+duplicatebean("Duplicated BUSCOs")
+dev.off()
+```
+
+```{r transrate, echo=FALSE}
+postscript("~/Dropbox/feeding/transratestats.eps", width=6, height=4)
+par(mfrow = c(2,2),
+oma = c(0,0,0,0) + 0.1,
+mar = c(0,0,1,1) + 0.1,
+bty = 'n',
+mai = c(.3, .5, .3, 0))
+
+mapbean("Mapping Rate")
+#scorebean("Assembly Score")
+optbean("Optimal Assembly Score")
+detonbean("Detonate Score")
+dev.off()
+```
+
+
+
+
+
+```{r joyplot}
+#grep ^S quant.sf > shan.sf
+#grep ^NO quant.sf > sp.sf
+#grep ^TR quant.sf > trin.sf
+
+#wc -l *sf
+
+#paste <(printf 'Trinity\n%.0s' {1..26618}) trin.sf > ggjoy.trin.sf
+#paste <(printf 'SPAdes\n%.0s' {1..35186}) sp.sf > ggjoy.sp.sf
+#paste <(printf 'Shannon\n%.0s' {1..7565}) shan.sf > ggjoy.shan.sf
+#for i in $(cut -f1  ../spades55/quant.sf); do grep -m1 $i ggjoy.sp.sf | sed 's_SPAdes_SPAdes55_' | tee -a ggjoy.sp55.sf; done
+#for i in $(cut -f1  ../spades75/quant.sf); do grep -m1 $i ggjoy.sp.sf | sed 's_SPAdes_SPAdes75_' | tee -a ggjoy.sp75.sf; done
+#cat ggjoy.sp75.sf ggjoy.sp55.sf ggjoy.trin.sf ggjoy.shan.sf | tr "\t" , > DRR030368.ggjoy.sf
+
+
+require(gridExtra)
+library(readr)
+library(ggplot2)
+library(ggjoy)
+
+DRR030368_ggjoy <- read_csv("~/Dropbox/orpstats/DRR030368.ggjoy.sf")
+ERR058009_ggjoy <- read_csv("~/Dropbox/orpstats/ERR058009.ggjoy.sf")
+DRR053698_ggjoy <- read_csv("~/Dropbox/orpstats/DRR053698.ggjoy.sf")
+DRR082659_ggjoy <- read_csv("~/Dropbox/orpstats/DRR082659.ggjoy.sf")
+
+
+plot1 <- ggplot(DRR053698_ggjoy, aes(x = log(tpm+1), y = assembler, fill = assembler)) + geom_joy(scale=1.5) + xlim(0,5) + scale_fill_cyclical(values = c("blue", "black", 'red', 'green')) + ggtitle("DRR053698")
+
+plot2 <- ggplot(ERR058009_ggjoy, aes(x = log(tpm+1), y = assembler, fill = assembler)) + geom_joy(scale=1.5) + xlim(0,5) + scale_fill_cyclical(values = c("blue", "black", 'red', 'green'))+ ggtitle("ERR058009")
+
+plot3 <- ggplot(DRR030368_ggjoy, aes(x = log(tpm+1), y = assembler, fill = assembler)) + geom_joy(scale=1.5) + xlim(0,5) + scale_fill_cyclical(values = c("blue", "black", 'red', 'green'))+ ggtitle("DRR030368")
+
+plot4 <- ggplot(DRR082659_ggjoy, aes(x = log(tpm+1), y = assembler, fill = assembler)) + geom_joy(scale=1.5) + xlim(0,5) + scale_fill_cyclical(values = c("blue", "black", 'red', 'green'))+ ggtitle("DRR082659")
+
+
+grid.arrange(plot4, plot2, plot3, plot1, ncol=2)
+
+```
+
+```{r expression mapping}
+par(mfrow = c(4,2),
+oma = c(0,0,0,0) + 0.1,
+mar = c(0,0,1,1) + 0.1,
+bty = 'n',
+mai = c(.3, .5, .3, 0))
+
+beanplot(orp_map ~ taxa,  ll = 0, beanlinewd=0, col = list("yellow", "green", "orange"), main = 'ORP Mapping', ylab='%Reads Mapping', ylim=c(.5, 1))
+beanplot(trin_map ~ taxa,  ll = 0, beanlinewd=0, col = list("yellow", "green", "orange"), main = 'Trinity Mapping', ylab='', ylim=c(.5, 1))
+
+beanplot(orp_score ~ taxa,  ll = 0, beanlinewd=0, col = list("yellow", "green", "orange"), main = 'ORP Score', ylab='Score', ylim=c(0, .5))
+beanplot(trin_score ~ taxa,  ll = 0, beanlinewd=0, col = list("yellow", "green", "orange"), main = 'Trinity Score', ylab='', ylim=c(0, .5))
+
+
+beanplot(orp_complete ~ taxa,  ll = 0, beanlinewd=0, col = list("yellow", "green", "orange"), main = 'ORP Complete', ylab='% Complete', ylim=c(0, 100))
+beanplot(trin_complete ~ taxa,  ll = 0, beanlinewd=0, col = list("yellow", "green", "orange"), main = 'Trinity Complete', ylab='', ylim=c(0, 100))
+
+beanplot(orp_duplicate ~ taxa,  ll = 0, beanlinewd=0, col = list("yellow", "green", "orange"), main = 'ORP Duplicated', ylab='% Duplication', ylim=c(0, 100))
+beanplot(trin_duplicate ~ taxa,  ll = 0, beanlinewd=0, col = list("yellow", "green", "orange"), main = 'Trinity Duplicated', ylab='', ylim=c(0, 100))
+
+
+
+```
+
+```{r regression depth}
+par(mfrow = c(4,2),
+oma = c(0,0,0,0) + 0.1,
+mar = c(0,0,1,1) + 0.1,
+bty = 'n',
+mai = c(.3, .5, .3, 0))
+
+plot(orp_map ~ depth, main = 'ORP Mapping', ylab='%Reads Mapping', ylim=c(.65,.99))
+text(35,.75,"A", cex=1.5)
+abline(summary(lm(orp_map ~ depth)))
+plot(trin_map ~ depth,main = 'Trinity Mapping', ylab='', ylim=c(.65,.99))
+text(35,.75,"B", cex=1.5)
+abline(summary(lm(trin_map ~ depth)))
+
+
+
+plot(orp_score ~ depth, main = 'ORP Score', ylab='Score', ylim=c(0,.5))
+text(35,.4,"C", cex=1.5)
+abline(summary(lm(orp_score ~ depth)))
+plot(trin_score ~ depth, main = 'Trinity Score', ylab='', ylim=c(0,.5))
+text(35,.4,"D", cex=1.5)
+abline(summary(lm(trin_score ~ depth)))
+
+plot(orp_complete ~ depth, main = 'ORP Complete', ylab='% Complete', ylim=c(0,100))
+text(35,40,"E", cex=1.5)
+abline(summary(lm(orp_complete ~ depth)))
+plot(trin_complete ~ depth, main = 'Trinity Complete', ylab='', ylim=c(0,100))
+text(35,40,"F", cex=1.5)
+abline(summary(lm(trin_complete ~ depth)))
+
+plot(orp_duplicate ~ depth, main = 'ORP Duplicated', ylab='% Duplication', sub='Million PE reads', ylim=c(0,100))
+text(35,80,"G", cex=1.5)
+abline(summary(lm(orp_duplicate ~ depth)))
+plot(trin_duplicate ~ depth, main = 'Trinity Duplicated', ylab='',sub='Million PE reads', ylim=c(0,100))
+text(35,80,"H", cex=1.5)
+abline(summary(lm(trin_duplicate ~ depth)))
+
+```
+
+```{r mash nmds}
+DRR030368_mash <- read_csv("~/Documents/DRR030368.mash.csv")
+DRR031870_mash <- read_csv("~/Documents/DRR031870.mash.csv")
+DRR036858_mash <- read_csv("~/Documents/DRR036858.mash.csv")
+DRR046632_mash <- read_csv("~/Documents/DRR046632.mash.csv")
+DRR053698_mash <- read_csv("~/Documents/DRR053698.mash.csv")
+DRR069093_mash <- read_csv("~/Documents/DRR069093.mash.csv")
+DRR082659_mash <- read_csv("~/Documents/DRR082659.mash.csv")
+ERR058009_mash <- read_csv("~/Documents/ERR058009.mash.csv")
+ERR1016675_mash <- read_csv("~/Documents/ERR1016675.mash.csv")
+ERR1674585_mash <- read_csv("~/Documents/ERR1674585.mash.csv")
+ERR489297_mash <- read_csv("~/Documents/ERR489297.mash.csv")
+SRR1789336_mash <- read_csv("~/Documents/SRR1789336.mash.csv")
+SRR2016923_mash <- read_csv("~/Documents/SRR2016923.mash.csv")
+SRR2086412_mash <- read_csv("~/Documents/SRR2086412.mash.csv")
+SRR3499127_mash <- read_csv("~/Documents/SRR3499127.mash.csv")
+  
+plot(isoMDS(dist(DRR031870_mash))$points, frame.plot = F, col=c("red", "green", "blue", "orange", "black"), pch=4, lwd=4, ylim=c(-1, .8), xlim=c(-1.5, .7), ylab="", xlab="")
+points(isoMDS(dist(DRR030368_mash))$points, col=c("red", "green", "blue", "orange", "black"), pch=4, lwd=4, ylim=c(-1, .8), xlim=c(-1.5, .7))
+points(isoMDS(dist(DRR036858_mash))$points, col=c("red", "green", "blue", "orange", "black"), pch=4, lwd=4, ylim=c(-1, .8), xlim=c(-1.5, .7))
+points(isoMDS(dist(DRR046632_mash))$points, col=c("red", "green", "blue", "orange", "black"), pch=4, lwd=4, ylim=c(-1, .8), xlim=c(-1.5, .7))
+points(isoMDS(dist(DRR053698_mash))$points, col=c("red", "green", "blue", "orange", "black"), pch=4, lwd=4, ylim=c(-1, .8), xlim=c(-1.5, .7))
+points(isoMDS(dist(DRR069093_mash))$points, col=c("red", "green", "blue", "orange", "black"), pch=4, lwd=4, ylim=c(-1, .8), xlim=c(-1.5, .7))
+points(isoMDS(dist(DRR082659_mash))$points, col=c("red", "green", "blue", "orange", "black"), pch=4, lwd=4, ylim=c(-1, .8), xlim=c(-1.5, .7))
+points(isoMDS(dist(ERR058009_mash))$points, col=c("red", "green", "blue", "orange", "black"), pch=4, lwd=4, ylim=c(-1, .8), xlim=c(-1.5, .7))
+points(isoMDS(dist(ERR1016675_mash))$points, col=c("red", "green", "blue", "orange", "black"), pch=4, lwd=4, ylim=c(-1, .8), xlim=c(-1.5, .7))
+points(isoMDS(dist(ERR1674585_mash))$points, col=c("red", "green", "blue", "orange", "black"), pch=4, lwd=4, ylim=c(-1, .8), xlim=c(-1.5, .7))
+points(isoMDS(dist(ERR489297_mash))$points, col=c("red", "green", "blue", "orange", "black"), pch=4, lwd=4, ylim=c(-1, .8), xlim=c(-1.5, .7))
+points(isoMDS(dist(SRR1789336_mash))$points, col=c("red", "green", "blue", "orange", "black"), pch=4, lwd=4, ylim=c(-1, .8), xlim=c(-1.5, .7))
+points(isoMDS(dist(SRR2016923_mash))$points, col=c("red", "green", "blue", "orange", "black"), pch=4, lwd=4, ylim=c(-1, .8), xlim=c(-1.5, .7))
+points(isoMDS(dist(SRR2086412_mash))$points, col=c("red", "green", "blue", "orange", "black"), pch=4, lwd=4, ylim=c(-1, .8), xlim=c(-1.5, .7))
+points(isoMDS(dist(SRR3499127_mash))$points, col=c("red", "green", "blue", "orange", "black"), pch=4, lwd=4, ylim=c(-1, .8), xlim=c(-1.5, .7))
+```
+
+
+```{r stats}
+mean(orp$mapT)
+mean(orp$mapO)
+mean(orp$mapS)
+mean(orp$map55)
+mean(orp$map75)
+
+mean(orp$optO)
+mean(orp$optT)
+mean(orp$optS)
+mean(orp$opt55)
+mean(orp$opt75)
+
+mean(orp$detonO)
+mean(orp$detonT)
+mean(orp$detonS)
+mean(orp$deton55)
+mean(orp$deton75)
+
+mean(orp$crbO)
+mean(orp$crbT)
+mean(orp$crbS)
+mean(orp$crb55)
+mean(orp$crb75)
+
+mean(orp$buscoCompleteO)
+mean(orp$buscoCompleteT)
+mean(orp$buscoCompleteS)
+mean(orp$buscoComplete55)
+mean(orp$buscoComplete75)
+
+mean(orp$buscoMisO)
+mean(orp$buscoMisT)
+mean(orp$buscoMisS)
+mean(orp$buscoMis55)
+mean(orp$buscoMis75)
+
+mean(orp$buscoFragO)
+mean(orp$buscoFragT)
+mean(orp$buscoFragS)
+mean(orp$buscoFrag55)
+mean(orp$buscoFrag75)
+
+mean(orp$buscoDupO)
+mean(orp$buscoDupT)
+mean(orp$buscoDupS)
+mean(orp$buscoDup55)
+mean(orp$buscoDup75)
+
+mean(orp$segO)
+mean(orp$segT)
+mean(orp$segS)
+mean(orp$seg55)
+mean(orp$seg75)
+
+```
