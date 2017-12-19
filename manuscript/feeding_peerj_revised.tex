@@ -6,34 +6,29 @@
 \usepackage{amsmath,amssymb}
 \usepackage{graphicx}
 \usepackage{color} 
-\usepackage{cite}
 \usepackage{nameref,hyperref}
 \usepackage[left]{lineno}
 \usepackage{microtype}
 \usepackage{rotating}
 \usepackage{url}
-\usepackage{setspace} 
-\usepackage{natbib}[sort]
-\doublespacing
-
+\usepackage{setspace}
 \usepackage[sfdefault,light]{roboto}
 \usepackage[T1]{fontenc}
+\usepackage[aboveskip=1pt,labelfont=bf,labelsep=period,justification=raggedright,singlelinecheck=off]{caption}
+
+
+%bib stuff
+
+\usepackage[style=authoryear, minbibnames=99, maxbibnames=9, maxcitenames=9, natbib=true, backend=biber]{biblatex}
+\addbibresource{formatted.bib}
+
 
 % Text layout
 \raggedright
 \setlength{\parindent}{0.5cm}
 \textwidth 6.55in 
 \textheight 8.75in
-
-
-\usepackage[aboveskip=1pt,labelfont=bf,labelsep=period,justification=raggedright,singlelinecheck=off]{caption}
-
-\bibliographystyle{plos2009.bst}
-
-
-\makeatletter
-\renewcommand{\@biblabel}[1]{\quad#1.}
-\makeatother
+\doublespacing
 
 \date{}
 
@@ -50,7 +45,7 @@
 
 
 
-%% END MACROS SECTION
+%begin document
 
 
 \begin{document}
@@ -81,10 +76,7 @@ $\star$ Mailing Address: 46 College Road, 189 Rudman Hall. Durham NH 03824
 % Please keep the abstract between 250 and 300 words
 \section*{Abstract}
 
-Characterizing transcriptomes in non-model organisms has resulted in a massive increase in our understanding of biological phenomena. This boon, largely made possible via high-throughput sequencing, means that studies of functional, evolutionary and population genomics are now being done by hundreds or even thousands of labs around the world. For many, these studies begin with a \textit{de novo} transcriptome assembly, which is a technically complicated process involving several discrete steps. The Oyster River Protocol (ORP), described here, implements a standardized and benchmarked set of bioinformatic processes, resulting in an assembly with enhanced qualities over other standard assembly methods. Specifically, ORP produced assemblies have higher \texttt{Detonate} and \texttt{TransRate} scores and mapping rates, which is largely a product of the fact that it leverages a multi-assembler and kmer assembly process, thereby bypassing the shortcomings of any one approach. These improvements are important, as previously unassembled transcripts are included in ORP assemblies, resulting in a significant enhancement of the power of downstream analysis. Further, as part of this study, I show that assembly quality is unrelated with the number of reads generated, above 30 million reads.  \textbf{Code Availability:} The version controlled open-source code is available at \url{https://github.com/macmanes-lab/Oyster_River_Protocol}.  Instructions for software installation and use, and other details are available at \url{http://oyster-river-protocol.rtfd.org/}.
-
-
-\section*{Competing Interests} The author declares no competing interests.
+Characterizing transcriptomes in non-model organisms has resulted in a massive increase in the understanding of biological phenomena. This boon, largely made possible via high-throughput sequencing, means that studies of functional, evolutionary and population genomics are now being done by hundreds or even thousands of labs around the world. For many, these studies begin with a \textit{de novo} transcriptome assembly, which is a technically complicated process involving several discrete steps. The Oyster River Protocol (ORP), described here, implements a standardized and benchmarked set of bioinformatic processes, resulting in an assembly with enhanced qualities over other standard assembly methods. Specifically, ORP produced assemblies have higher \texttt{Detonate} and \texttt{TransRate} scores and mapping rates, which is largely a product of the fact that it leverages a multi-assembler and kmer assembly process, thereby bypassing the shortcomings of any one approach. These improvements are important, as previously unassembled transcripts are included in ORP assemblies, resulting in a significant enhancement of the power of downstream analysis. Further, as part of this study, I show that assembly quality is unrelated with the number of reads generated, above 30 million reads.  \textbf{Code Availability:} The version controlled open-source code is available at \url{https://github.com/macmanes-lab/Oyster_River_Protocol}.  Instructions for software installation and use, and other details are available at \url{http://oyster-river-protocol.rtfd.org/}.
 
 \section{Introduction}
 
@@ -164,7 +156,7 @@ To merge the four assemblies produced as part of the Oyster River Protocol, I de
 
 \subsection{Assembly Evaluation}
 
-All assemblies were evaluated using \texttt{ORP-TransRate}, \texttt{Detonate} version 1.11 \cite{Li:2014cma}, \texttt{shmlast} version 1.2 \citep{Scott:2017eg}, and \texttt{BUSCO} version 3.0.2 \citep{Simao:2015kk}. \texttt{TransRate} evaluates transcriptome assembly contiguity by producing a score based on length-based and mapping metrics, while \texttt{Detonate} conducts an orthogonal analysis, producing a score that is maximized by an assembly that is representative of input sequence read data. \texttt{BUSCO} evaluates assembly content by searching the assemblies for conserved single copy orthologs found in all Eukaryotes. We report default \texttt{BUSCO} metrics as described in \cite{Simao:2015kk}. Specifically, "complete orthologs", are defined as query transcripts that are within 2 standard deviations of the length of the \texttt{BUSCO} group mean, while contigs falling short of this metric are listed as "fragmented". \texttt{Shmlast} implements the conditional reciprocal best hits (CRBH) test \citep{Aubry:2014en}, conducted in this case against the Swiss-Prot protein database (downloaded October, 2017) using an e-value of 1E-10.   \\
+All assemblies were evaluated using \texttt{ORP-TransRate}, \texttt{Detonate} version 1.11 \cite{Li:2014cm}, \texttt{shmlast} version 1.2 \citep{Scott:2017eg}, and \texttt{BUSCO} version 3.0.2 \citep{Simao:2015kk}. \texttt{TransRate} evaluates transcriptome assembly contiguity by producing a score based on length-based and mapping metrics, while \texttt{Detonate} conducts an orthogonal analysis, producing a score that is maximized by an assembly that is representative of input sequence read data. \texttt{BUSCO} evaluates assembly content by searching the assemblies for conserved single copy orthologs found in all Eukaryotes. I report default \texttt{BUSCO} metrics as described in \cite{Simao:2015kk}. Specifically, "complete orthologs", are defined as query transcripts that are within 2 standard deviations of the length of the \texttt{BUSCO} group mean, while contigs falling short of this metric are listed as "fragmented". \texttt{Shmlast} implements the conditional reciprocal best hits (CRBH) test \citep{Aubry:2014en}, conducted in this case against the Swiss-Prot protein database (downloaded October, 2017) using an e-value of 1E-10.   \\
 
 In addition to the generation of metrics to evaluation the quality of transcriptome assemblies, I generated a distance matrix of assemblies for each dataset using the \texttt{sourmash} package \citep{TitusBrown:2016jg}, in an attempt at characterizing the algorithmic landscape of assemblers. Specifically, each assembly was characterized using the \texttt{compute} function using 5000 independent sketches. The distance between assemblies was calculated using the \texttt{compare} function and a kmer length of 51. These distance matrices were visualized using the \texttt{isoMDS} function of the MASS package (\url{https://CRAN.R-project.org/package=MASS}). 
 
@@ -186,7 +178,7 @@ The distance between assemblies of a given dataset were calculated using \texttt
 
 \newpage
 \textbf{\hypertarget{Figure 1}{Figure 1}} \\
-\centerline{\includegraphics[width=25.0\baselineskip]{mds.eps}}
+\centerline{\includegraphics[width=25.0\baselineskip]{Fig1.png}}
 \begin{quote}
 \small{Figure 1. MDS plot describing the similarity within and between assemblers. Colored x's mark individual assemblies, with red marks corresponding to the ORP assemblies, green marks corresponding to the \texttt{Shannon} assemblies, blue marks corresponding to the \texttt{SPAdes55} assemblies, orange marks corresponding to the \texttt{SPAdes75} assemblies, and the black marks corresponding to the \texttt{Trinity} assemblies. In general assemblies produced by a given assembler tend to cluster together.}
 \end{quote} 
@@ -195,18 +187,16 @@ The distance between assemblies of a given dataset were calculated using \texttt
 
 \subsubsection{Assembly Structure}
 
-The structural integrity of each assembly was evaluated using the \texttt{TransRate} and \texttt{Detonate} software packages. As many downstream applications depend critically on accurate read mapping, assembly quality is correlated with increased mapping rates. The split violin plot presented in figure 2A visually represents the mapping rates of each assembly, with lines connecting the mapping rates of datasets assembled with \texttt{Trinity} and with the ORP, respectively. The average mapping rate of the \texttt{Trinity} assembled datasets was 87\% (sd = 8\%), while the average mapping rates of the ORP assembled datasets was 93\% (sd=4\%). This test is statistically significant (one-sided Wilcoxon rank sum test, p = 2E-2). Mapping rates of the other assemblies are less than that of the ORP assembly, but in most cases, greater than that of the Trinity assembly. This aspect of assembly quality is critical. Specifically mapping rates measure how representative the assembly is of the reads. If we assume that the vast majority of generated reads come from the biological sample under study, when reads fail to map, that fraction of the biology is lost from all downstream analysis and inference. This study demonstrates that across a wide variety of taxa, assembling RNAseq reads with any single assembler alone may result in a decrease in mapping rate and in turn, the lost ability to draw conclusions from that fraction of the sample. 
+The structural integrity of each assembly was evaluated using the \texttt{TransRate} and \texttt{Detonate} software packages. As many downstream applications depend critically on accurate read mapping, assembly quality is correlated with increased mapping rates. The split violin plot presented in figure 2A visually represents the mapping rates of each assembly, with lines connecting the mapping rates of datasets assembled with \texttt{Trinity} and with the ORP, respectively. The average mapping rate of the \texttt{Trinity} assembled datasets was 87\% (sd = 8\%), while the average mapping rates of the ORP assembled datasets was 93\% (sd=4\%). This test is statistically significant (one-sided Wilcoxon rank sum test, p = 2E-2). Mapping rates of the other assemblies are less than that of the ORP assembly, but in most cases, greater than that of the Trinity assembly. This aspect of assembly quality is critical. Specifically mapping rates measure how representative the assembly is of the reads. If I assume that the vast majority of generated reads come from the biological sample under study, when reads fail to map, that fraction of the biology is lost from all downstream analysis and inference. This study demonstrates that across a wide variety of taxa, assembling RNAseq reads with any single assembler alone may result in a decrease in mapping rate and in turn, the lost ability to draw conclusions from that fraction of the sample. 
 
 Figure 2B describes the distribution of \texttt{TransRate} assembly scores, which is a synthetic metric taking into account the quality of read mapping and coverage-based statistics. The \texttt{Trinity} assemblies had an average optimal score of 0.35 (sd = .14), while the ORP assembled datasets had an average score of 0.46 (sd = .07). This test is statistically significant (one-sided Wilcoxon rank sum test, p-value = 1.8E-2). Optimal scores of the other assemblies are less than that of the ORP assembly, but in most cases, greater than that of the \texttt{Trinity} assembly. Figure 2C describes the distribution of \texttt{Detonate} scores. The \texttt{Trinity} assemblies had an average score of -6.9E9 (sd = 5.2E9), while the ORP assembled datasets had an average score of -5.3E9 (sd = 3.5E9). This test not is statistically significant, though in all cases, relative to all other assemblies, scores of the ORP assemblies are improved (become less negative), indicating that the ORP produced assemblies of higher quality. 
 
 In addition to reporting synthetic metrics related to assembly structure, \texttt{TransRate} reports individual metrics related to specific elements of assembly quality. One such metric estimates the rate of chimerism, a phenomenon which is known to be problematic in \tit{de novo} assembly \citep{Ungaro:2017kf, Singhal:2013dq}. Rates of chimerism are relatively constant between all assemblers, ranging from 10\% for the \texttt{Shannon} assembly, to 12\% for the \texttt{SPAdes75} assembly. The chimerism rate for the ORP assemblies averaged 10.5\% ($\pm$ 4.7\%). While the new method would ideally improve this metric by exclusively selecting non-chimeric transcripts, this does not seem to be the case, and may be related to the inherent shortcomings of short-read transcriptome assembly.
 
-Of note, consistent with all short-read assemblers \citep{Ungaro:2017kf}, the ORP assemblies may not accurately reflect the true isoform complexity. Specifically, because of the way that single representative transcripts are chosen from a cluster of related sequences, some transcriptional complexity may be lost. Consider the cluster containing contigs \{AB, A, B\} where AB is a false-chimera, selecting a single representative transcript with the best score could yield either A or B, thereby excluding an important transcript in the final output. We believe this type of transcript loss is not common, based on how contigs are scored (Table 1, Figure 3, \cite{SmithUnna:2016go}), though strict demonstration of this is not possible, given the lack of high-quality reference genomes for the majority of the datasets. More generally, mapping rates, \texttt{Detonate} and \texttt{TransRate} score improvements suggest that this type of loss is not widespread.
-
-\newpage
+Of note, consistent with all short-read assemblers \citep{Ungaro:2017kf}, the ORP assemblies may not accurately reflect the true isoform complexity. Specifically, because of the way that single representative transcripts are chosen from a cluster of related sequences, some transcriptional complexity may be lost. Consider the cluster containing contigs \{AB, A, B\} where AB is a false-chimera, selecting a single representative transcript with the best score could yield either A or B, thereby excluding an important transcript in the final output. I believe this type of transcript loss is not common, based on how contigs are scored (Table 1, Figure 3, \cite{SmithUnna:2016go}), though strict demonstration of this is not possible, given the lack of high-quality reference genomes for the majority of the datasets. More generally, mapping rates, \texttt{Detonate} and \texttt{TransRate} score improvements suggest that this type of loss is not widespread.
 
 \textbf{\hypertarget{Figure 2}{Figure 2}} \\
-\centerline{\includegraphics[width=4.0in,angle=-90]{transratestats.eps}}
+\centerline{\includegraphics[width=25.0\baselineskip]{Fig2.png}}
 \begin{quote}
 \small{Figure 2. \texttt{TransRate} and \texttt{Detonate} generated statistics. Split violin plots depict the relationship between \texttt{Trinity} assemblies (brown color) and ORP produced assemblies (blue color). Red and black dots indicate the value of a given metric for each assembly. Lines connecting the red and black dots connect datasets assembled via the two methods.}
 \end{quote} 
@@ -215,7 +205,6 @@ Of note, consistent with all short-read assemblers \citep{Ungaro:2017kf}, the OR
 
 The genic content of assemblies was measured using the software package \texttt{Shmlast}, which implements the conditional reciprocal blast test against the Swiss-prot database. Presented in Table 2 and in Figure 3A, ORP assemblies recovered on average 13364 (sd=3391) blast hits, while all other assemblies recovered fewer (minimum \texttt{Shannon}, mean=10299). In every case across all assemblers, the ORP assembler retained more reciprocal blast hits, though only the comparison between the ORP assembly and \texttt{Shannon} was significant (one-sided Wilcoxon rank sum test, p = 4E-3). Notably, in all cases, each assembler was both missing transcripts contained in other assemblies, and contributed unique transcripts to the final merged assembly (Table 2), highlighting the utility of using multiple assemblers. \\
 
-\newpage
 \begin{center}
 %\begin{adjustwidth}{-2.25in}{0in}% adjust the L and R margins by 1 inch
 \textbf{\hypertarget{Table 2}{Table 2}} \\
@@ -241,9 +230,9 @@ Regarding \texttt{BUSCO} scores, \texttt{Trinity} assemblies contained on averag
 
 While the majority of the \texttt{BUSCO} metrics were unchanged, the number of orthologs recovered in duplicate (\textgreater 1 copy), was decreased when using the ORP. This difference is important, given that the relative frequency of transcript duplication may have important implications for downstream abundance estimation, with less  duplication potentially resulting in more accurate estimation. Although gene expression quantitation software \citep{Patro:2017iv,Bray:2016ee} probabilistically assigns reads to transcripts in an attempt at mitigating this issue, a primary solution related to decreasing artificial transcript duplication could offer significant advantages.
 
-\newpage
+
 \textbf{\hypertarget{Figure 3}{Figure 3}} \\
-\centerline{\includegraphics[width=4.0in,angle=-90]{busco_stats.eps}}
+\centerline{\includegraphics[width=25.0\baselineskip]{Fig3.png}}
 \begin{quote}
 \small{Figure 3. \texttt{Shmlast} and \texttt{BUSCO} generated statistics. Split violin plots depict the relationship between \texttt{Trinity} assemblies (brown color) and ORP produced assemblies (blue color). Red and black dots indicate the value of a given metric for each assembly. Lines connecting the red and black dots connect datasets assembled via the two methods.}
 \end{quote} 
@@ -252,9 +241,8 @@ While the majority of the \texttt{BUSCO} metrics were unchanged, the number of o
 
 To understand the relative contribution of each assembler to the final merged assembly produced by the Oyster River Protocol, I counted the number of transcripts in the final merged assembly that originated from a given assembler (Figure 4). On average, 36\% of transcripts in the merged assembly were produced by the \texttt{Trinity} assembler. 16\% were produced by \texttt{Shannon}. \texttt{SPAdes} run with a kmer value of length=55 produced 28\% of transcripts, while \texttt{SPAdes} run with a kmer value of length=75 produced 20\% of transcripts 
 
-\newpage
 \textbf{\hypertarget{Figure 4}{Figure 4}} \\
-\centerline{\includegraphics[width=25.0\baselineskip]{contrib.eps}}
+\centerline{\includegraphics[width=25.0\baselineskip]{Fig4.png}}
 \begin{quote}
 \small{Figure 4 describes the percent contribution of each assembler to the final ORP assembly.}
 \end{quote} 
@@ -265,7 +253,7 @@ To further understand the potential biases intrinsic to each assembler, I plotte
  
 
 \textbf{\hypertarget{Figure 5}{Figure 5}} \\
-\centerline{\includegraphics[width=25.0\baselineskip]{joyplot.eps}}
+\centerline{\includegraphics[width=25.0\baselineskip]{Fig5.png}}
 \begin{quote}
 \small{Figure 5 depicts the distribution of gene expression (log(TPM+1)), broken down by individual assembly, for four representative datasets. As predicted, the use of a higher kmer value with the \texttt{SPAdes} assembler resulted in biasing reconstruction towards more highly expressed transcripts. Interestingly, \texttt{Shannon} uniquely exhibits a bias towards the reconstruction of high-expression transcripts (or away from low-abundance transcripts).}
 \end{quote} 
@@ -277,7 +265,7 @@ This study included read datasets of a variety of sizes. Because of this, I was 
 
 
 \textbf{\hypertarget{Figure 6}{Figure 6}} \\
-\centerline{\includegraphics[width=25.0\baselineskip]{regression.eps}}
+\centerline{\includegraphics[width=25.0\baselineskip]{Fig6.png}}
 \begin{quote}
 \small{Figure 6 depicts the relationship between a subset of assembly metrics and the number of read pairs. There is no significant relationship. In all cases the x-axis is millions of paired-end reads. }
 \end{quote}
@@ -335,9 +323,9 @@ Specifically, the improvements in assembly metrics described here are attributed
 This work was significantly improved by discussions with Richard Smith-Unna, Rob Patro, C. Titus Brown, Brian Haas and many others. More generally, the work and its presentation has been influenced by supporters of the Open Access and Open Science movements. 
 
 %\section*{References}
-\bibliography{formatted.bib}
 
-
+\printbibliography
 
 
 \end{document}
+	
