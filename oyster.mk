@@ -1,4 +1,4 @@
-	#!/usr/bin/make -rRsf
+#!/usr/bin/make -rRsf
 
 SHELL=/bin/bash -o pipefail
 
