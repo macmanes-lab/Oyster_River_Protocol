@@ -24,7 +24,7 @@ spades := $(shell which spades.py 2>/dev/null)
 trinity := $(shell which Trinity 2>/dev/null)
 seqtk := $(shell which seqtk 2>/dev/null)
 busco := $(shell which run_BUSCO.py 2>/dev/null)
-quorum := $(shell which quorum 2>/dev/null)
+quorumpath := $(shell which quorum 2>/dev/null)
 
 
 all: setup brew mcl hmmer orthofuser rcorrector blast spades trinity shannon seqtk busco trimmomatic transrate bowtie2 salmon postscript
@@ -57,7 +57,7 @@ else
 endif
 
 quorum:brew
-ifdef quorum
+ifdef quorumpath
 	@echo "quorum is already installed"
 else
 	mkdir ${DIR}/software/quorum
