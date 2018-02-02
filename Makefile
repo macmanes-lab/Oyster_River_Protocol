@@ -62,7 +62,7 @@ ifdef quorumpath
 else
 	mkdir ${DIR}/software/quorum
 	cd ${DIR}/software/quorum && curl -LO ftp://ftp.genome.umd.edu/pub/QuorUM/quorum_easy_install
-	${DIR}/software/quorum && sh ./quorum_easy_install
+	cd ${DIR}/software/quorum && sh ./quorum_easy_install
 	@echo PATH=\$$PATH:${DIR}/software/quorum/bin >> pathfile
 endif
 
