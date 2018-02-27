@@ -30,7 +30,6 @@ FASTADIR=
 shannonpath := $(shell which shannon.py 2>/dev/null)
 brewpath := $(shell which brew 2>/dev/null)
 rcorrpath := $(shell which rcorrector 2>/dev/null)
-orthopath := $(shell which orthofuser.py 2>/dev/null)
 trimmomaticpath := $(shell which trimmomatic 2>/dev/null)
 trinitypath := $(shell which Trinity 2>/dev/null)
 spadespath := $(shell which rnaspades.py 2>/dev/null)
@@ -113,16 +112,12 @@ ifdef rcorrpath
 else
 	$error("*** RCORRECTOR is not installed, must fix ***")
 endif
-ifdef orthopath
-else
-	$error("*** ORTHOFUSER is not installed, must fix ***")
-endif
 
 
-#welcome:
-#	printf "\n\n*****  Welcome to the Oyster River ***** \n\n"
-#	printf "*****  This is version ${VERSION} ***** \n\n "
-#	printf " \n\n"
+welcome:
+	printf "\n\n*****  Welcome to the Oyster River ***** \n\n"
+	printf "*****  This is version ${VERSION} ***** \n\n "
+	printf " \n\n"
 
 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq:
 	@if [ $$(hostname | cut -d. -f3-5) == 'bridges.psc.edu' ];\
