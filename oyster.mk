@@ -8,6 +8,7 @@ SHELL=/bin/bash -o pipefail
 # oyster.mk orthofuse FASTADIR= READ1= READ2= MEM=500 CPU=24 RUNOUT=runname
 #
 
+VERSION = 1.1.0
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
 CPU=16
@@ -53,7 +54,7 @@ orthotransrate:${DIR}/orthofuse/${RUNOUT}/orthotransrate.done
 orthofusing:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 salmon:${DIR}/quants/orthomerged/quant.sf
 
-main: setup check run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_shannon merge orthotransrate orthofusing salmon report
+main: setup check welcome run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_shannon merge orthotransrate orthofusing salmon report
 orthofuse:merge orthotransrate orthofusing
 report:busco transrate reportgen
 busco:${DIR}/reports/busco.done
@@ -73,7 +74,6 @@ setup:
 
 check:
 ifdef salmonpath
-	@echo "SALMON is already installed"
 else
 	$error("*** SALMON is not installed, must fix ***")
 endif
@@ -128,6 +128,11 @@ else
 	$error("*** ORTHOFUSER is not installed, must fix ***")
 endif
 
+
+welcome:
+	printf "\n\n*****  Welcome to the Oyster River **** \n\n"
+	printf "*****  This is version $VERSION ***** \n\n "
+	printf " \n\n"
 
 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq:
 	@if [ $$(hostname | cut -d. -f3-5) == 'bridges.psc.edu' ];\
