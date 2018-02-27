@@ -8,7 +8,7 @@ SHELL=/bin/bash -o pipefail
 # oyster.mk orthofuse FASTADIR= READ1= READ2= MEM=500 CPU=24 RUNOUT=runname
 #
 
-VERSION = 1.1.0
+VERSION = 1.1.1
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
 CPU=16
@@ -115,7 +115,7 @@ endif
 
 
 welcome:
-	printf "\n\n*****  Welcome to the Oyster River ***** \n\n"
+	printf "\n\n*****  Welcome to the Oyster River *****"
 	printf "*****  This is version ${VERSION} ***** \n\n "
 	printf " \n\n"
 
@@ -136,6 +136,7 @@ ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P
 	salmon index --no-version-check -t ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta -i ${RUNOUT}.salmon.idx --type quasi -k 31
 	salmon quant --no-version-check -p $(CPU) -i ${RUNOUT}.salmon.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/salmon_trin_${RUNOUT}
 	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}.trin
+	rm -fr ${RUNOUT}.salmon.idx
 
 ${DIR}/assemblies/${RUNOUT}.spades55.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	rnaspades.py --only-assembler -o ${DIR}/assemblies/${RUNOUT}.spades_k55 --threads $(CPU) --memory $(MEM) -k 55 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
@@ -144,6 +145,7 @@ ${DIR}/assemblies/${RUNOUT}.spades55.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	salmon index --no-version-check -t ${DIR}/assemblies/${RUNOUT}.spades55.fasta -i ${RUNOUT}.salmon.idx --type quasi -k 31
 	salmon quant --no-version-check -p $(CPU) -i ${RUNOUT}.salmon.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/salmon_sp55_${RUNOUT}
 	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.spades55.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}.spades55
+	rm -fr ${RUNOUT}.salmon.idx
 
 
 ${DIR}/assemblies/${RUNOUT}.spades75.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
@@ -153,6 +155,7 @@ ${DIR}/assemblies/${RUNOUT}.spades75.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	salmon index --no-version-check -t ${DIR}/assemblies/${RUNOUT}.spades75.fasta -i ${RUNOUT}.salmon.idx --type quasi -k 31
 	salmon quant --no-version-check -p $(CPU) -i ${RUNOUT}.salmon.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/salmon_sp75_${RUNOUT}
 	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.spades75.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}.spades75
+	rm -fr ${RUNOUT}.salmon.idx
 
 
 ${DIR}/assemblies/${RUNOUT}.shannon.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
@@ -163,6 +166,7 @@ ${DIR}/assemblies/${RUNOUT}.shannon.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	salmon index --no-version-check -t ${DIR}/assemblies/${RUNOUT}.shannon.fasta -i ${RUNOUT}.salmon.idx --type quasi -k 31
 	salmon quant --no-version-check -p $(CPU) -i ${RUNOUT}.salmon.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/salmon_shannon_${RUNOUT}
 	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.shannon.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}.shannon
+	rm -fr ${RUNOUT}.salmon.idx
 
 
 ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
@@ -203,10 +207,10 @@ ${DIR}/reports/transrate.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 ${DIR}/quants/orthomerged/quant.sf:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	salmon index --no-version-check -t ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta  -i ${RUNOUT}.ortho.idx --type quasi -k 31
 	salmon quant --no-version-check -p $(CPU) -i ${RUNOUT}.ortho.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/salmon_orthomerged_${RUNOUT}
-
+	rm -fr ${RUNOUT}.ortho.idx
 
 reportgen:
-	printf "\n\n*****  QUALITY REPORT FOR: ${RUNOUT} **** \n\n"
+	printf "\n\n*****  QUALITY REPORT FOR: ${RUNOUT} using the ORP version ${VERSION} **** \n\n"
 	printf "*****  BUSCO SCORE ~~~~~>           " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	cat $$(find reports/run_${RUNOUT}.orthomerged -name 'short*') | sed -n 8p  | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	printf "*****  TRANSRATE SCORE ~~~~~>           " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
