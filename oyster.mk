@@ -119,10 +119,10 @@ else
 endif
 
 
-welcome:
-	printf "\n\n*****  Welcome to the Oyster River **** \n\n"
-	printf "*****  This is version ${VERSION} ***** \n\n "
-	printf " \n\n"
+#welcome:
+#	printf "\n\n*****  Welcome to the Oyster River ***** \n\n"
+#	printf "*****  This is version ${VERSION} ***** \n\n "
+#	printf " \n\n"
 
 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq:
 	@if [ $$(hostname | cut -d. -f3-5) == 'bridges.psc.edu' ];\
