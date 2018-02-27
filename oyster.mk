@@ -115,7 +115,7 @@ endif
 
 
 welcome:
-	printf "\n\n*****  Welcome to the Oyster River *****"
+	printf "\n\n*****  Welcome to the Oyster River ***** \n"
 	printf "*****  This is version ${VERSION} ***** \n\n "
 	printf " \n\n"
 
