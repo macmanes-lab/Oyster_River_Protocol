@@ -78,52 +78,42 @@ else
 	$error("*** SALMON is not installed, must fix ***")
 endif
 ifdef transratepath
-	@echo "TRANSRATE is already installed"
 else
 	$error("*** TRANSRATE is not installed, must fix ***")
 endif
 ifdef seqtkpath
-	@echo "SEQTK is already installed"
 else
 	$error("*** SEQTK is not installed, must fix ***")
 endif
 ifdef buscopath
-	@echo "BUSCO is already installed"
 else
 	$error("*** BUSCO is not installed, must fix ***")
 endif
 ifdef mclpath
-	@echo "MCL is already installed"
 else
 	$error("*** MCL is not installed, must fix ***")
 endif
 ifdef spadespath
-	@echo "SPADES is already installed"
 else
 	$error("*** SPADES is not installed, must fix ***")
 endif
 ifdef trinitypath
-	@echo "TRINITY is already installed"
 else
 	$error("*** TRINITY is not installed, must fix ***")
 endif
 ifdef trimmomaticpath
-	@echo "TRIMMOMATIC is already installed"
 else
 	@echo "Maybe TRIMMOMATIC is not installed, or maybe you are working on Bridges"
 endif
 ifdef shannonpath
-	@echo "SHANNON is already installed"
 else
 	$error("*** SHANNON is not installed, must fix ***")
 endif
 ifdef rcorrpath
-	@echo "RCORRECTOR is already installed"
 else
 	$error("*** RCORRECTOR is not installed, must fix ***")
 endif
 ifdef orthopath
-	@echo "ORTHOFUSER is already installed"
 else
 	$error("*** ORTHOFUSER is not installed, must fix ***")
 endif
@@ -131,7 +121,7 @@ endif
 
 welcome:
 	printf "\n\n*****  Welcome to the Oyster River **** \n\n"
-	printf "*****  This is version $VERSION ***** \n\n "
+	printf "*****  This is version ${VERSION} ***** \n\n "
 	printf " \n\n"
 
 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq:
