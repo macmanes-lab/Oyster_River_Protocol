@@ -25,9 +25,10 @@ trinity := $(shell which Trinity 2>/dev/null)
 seqtk := $(shell which seqtk 2>/dev/null)
 busco := $(shell which run_BUSCO.py 2>/dev/null)
 quorumpath := $(shell which quorum 2>/dev/null)
+sampath := $(shell which samtools 2>/dev/null)
 
 
-all: setup brew mcl hmmer quorum orthofuser rcorrector blast spades trinity shannon seqtk busco trimmomatic transrate bowtie2 salmon postscript
+all: setup brew mcl samtools hmmer quorum orthofuser rcorrector blast spades trinity shannon seqtk busco trimmomatic transrate bowtie2 salmon postscript
 
 .DELETE_ON_ERROR:
 
@@ -66,25 +67,32 @@ else
 	@echo PATH=\$$PATH:${DIR}/software/quorum/bin >> pathfile
 endif
 
-mcl:brew rcorrector
+mcl:brew
 ifdef mclpath
 	@echo "MCL is already installed"
 else
 	brew install mcl
 endif
 
-hmmer:brew mcl
+hmmer:brew
 ifdef hmmerpath
 	@echo "HMMER is already installed"
 else
 	brew install hmmer
 endif
 
-bowtie2:brew hmmer
+bowtie2:brew
 ifdef bowtie2path
 	@echo "BOWTIE2 is already installed"
 else
 	brew install bowtie2
+endif
+
+samtools:brew
+ifdef sampath
+	@echo "samtools is already installed"
+else
+	brew install samtools
 endif
 
 orthofuser:brew
@@ -137,9 +145,7 @@ salmon:brew
 ifdef salmonpath
 	@echo "SALMON is already installed"
 else
-	cd ${DIR}/software && curl -LO https://github.com/COMBINE-lab/salmon/releases/download/v0.8.2/Salmon-0.8.2_linux_x86_64.tar.gz &&\
-	tar -zxf ${DIR}/software/Salmon-0.8.2_linux_x86_64.tar.gz
-	@echo PATH=\$$PATH:${DIR}/software/Salmon-0.8.2_linux_x86_64/bin >> pathfile
+	brew install salmon
 endif
 
 seqtk:brew
@@ -169,12 +175,12 @@ else
 		module load trimmomatic/0.36;\
 		echo "I just installed TRIMMOMATIC via the module system ";\
 	else\
-		brew install trimmomatic;\
+		brew install jdk trimmomatic;\
 		echo "I just installed TRIMMOMATIC via brew ";\
 	fi
 endif
 
-postscript:brew setup transrate rcorrector mcl hmmer bowtie2 orthofuser blast spades trinity shannon salmon seqtk busco trimmomatic
+postscript:brew setup mcl samtools hmmer quorum orthofuser rcorrector blast spades trinity shannon seqtk busco trimmomatic transrate bowtie2 salmon
 	@printf "\n\n*** The following location(s), if any print, need to be added to your PATH ***"
 	@printf "\n*** They will be automatically to your ~/.profile or ~/.bash_profile ***\n\n"
 	@cat pathfile
