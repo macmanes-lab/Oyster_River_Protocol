@@ -135,7 +135,7 @@ shannon:brew
 ifdef shannonpath
 	@echo "SHANNON is already installed"
 else
-	cd ${DIR}/software && git clone https://github.com/sreeramkannan/Shannon.git
+	cd ${DIR}/software && git clone https://github.com/macmanes-lab/Shannon.git
 	chmod +x software/Shannon/shannon.py
 	@echo PATH=\$$PATH:${DIR}/software/Shannon >> pathfile
 endif
