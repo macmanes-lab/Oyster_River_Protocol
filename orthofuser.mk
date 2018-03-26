@@ -58,7 +58,7 @@ ${FASTADIR}/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/orthotransrat
 	echo About to delete all the text files
 	find ${DIR}/orthofuse/${RUNOUT}/ -name '*groups' -delete
 	echo Search output files
-	find ${DIR}/orthofuse/${RUNOUT}/ -name '*orthout' 2> /dev/null | parallel -j $(CPU) "awk -F, -v max=0 '{if(\$$14>max){want=\$$1; max=\$$14}}END{print want}'" | tee -a ${DIR}/orthofuse/${RUNOUT}/good.list
+	find ${DIR}/orthofuse/${RUNOUT}/ -name '*orthout' 2> /dev/null | parallel -j $(CPU) "awk -F, -v max=0 '{if(\$$14>max){want=\$$1; max=\$$14}}END{print want}'" >> ${DIR}/orthofuse/${RUNOUT}/good.list
 	find ${DIR}/orthofuse/${RUNOUT}/ -name '*orthout' -delete
 	python ${MAKEDIR}/scripts/filter.py ${DIR}/orthofuse/${RUNOUT}/merged.fasta ${DIR}/orthofuse/${RUNOUT}/good.list > ${FASTADIR}/${RUNOUT}.orthomerged.fasta
 	rm ${DIR}/orthofuse/${RUNOUT}/good.list
@@ -71,6 +71,11 @@ ${DIR}/reports/busco.done:${FASTADIR}/${RUNOUT}.orthomerged.fasta
 ${DIR}/reports/transrate.done:${FASTADIR}/${RUNOUT}.orthomerged.fasta
 	transrate -o ${DIR}/reports/transrate_${RUNOUT}  -a ${FASTADIR}/${RUNOUT}.orthomerged.fasta --left ${READ1} --right ${READ2} -t $(CPU)
 	touch ${DIR}/reports/transrate.done
+
+${DIR}/quants/orthomerged/quant.sf:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
+	salmon index --no-version-check -t ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta  -i ${RUNOUT}.ortho.idx --type quasi -k 31
+	salmon quant --no-version-check -p $(CPU) -i ${RUNOUT}.ortho.idx --seqBias --gcBias -l a -1 ${READ1} -2 ${READ1} -o ${DIR}/quants/salmon_orthomerged_${RUNOUT}
+	rm -fr ${RUNOUT}.ortho.idx
 
 reportgen:
 	printf "\n\n*****  QUALITY REPORT FOR: ${RUNOUT} **** \n\n"
