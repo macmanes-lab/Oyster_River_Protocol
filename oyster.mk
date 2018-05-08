@@ -198,11 +198,11 @@ ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/orthotr
 ${DIR}/reports/busco.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}.orthomerged
 	mv run_${RUNOUT}* ${DIR}/reports/
-	touch ${DIR}/reports/busco.done
+	touch ${DIR}/reports/${RUNOUT}.busco.done
 
 ${DIR}/reports/transrate.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	${MAKEDIR}/software/orp-transrate/transrate -o ${DIR}/reports/transrate_${RUNOUT}  -a ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -t $(CPU)
-	touch ${DIR}/reports/transrate.done
+	touch ${DIR}/reports/${RUNOUT}.transrate.done
 
 ${DIR}/quants/orthomerged/quant.sf:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	salmon index --no-version-check -t ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta  -i ${RUNOUT}.ortho.idx --type quasi -k 31
