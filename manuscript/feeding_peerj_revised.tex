@@ -196,7 +196,7 @@ In addition to reporting synthetic metrics related to assembly structure, \textt
 Of note, consistent with all short-read assemblers \citep{Ungaro:2017kf}, the ORP assemblies may not accurately reflect the true isoform complexity. Specifically, because of the way that single representative transcripts are chosen from a cluster of related sequences, some transcriptional complexity may be lost. Consider the cluster containing contigs \{AB, A, B\} where AB is a false-chimera, selecting a single representative transcript with the best score could yield either A or B, thereby excluding an important transcript in the final output. I believe this type of transcript loss is not common, based on how contigs are scored (Table 1, Figure 3, \cite{SmithUnna:2016go}), though strict demonstration of this is not possible, given the lack of high-quality reference genomes for the majority of the datasets. More generally, mapping rates, \texttt{Detonate} and \texttt{TransRate} score improvements suggest that this type of loss is not widespread.
 
 \textbf{\hypertarget{Figure 2}{Figure 2}} \\
-\centerline{\includegraphics[width=25.0\baselineskip]{Fig2.png}}
+\centerline{\includegraphics[width=13.0\baselineskip]{Fig2.png}}
 \begin{quote}
 \small{Figure 2. \texttt{TransRate} and \texttt{Detonate} generated statistics. Split violin plots depict the relationship between \texttt{Trinity} assemblies (brown color) and ORP produced assemblies (blue color). Red and black dots indicate the value of a given metric for each assembly. Lines connecting the red and black dots connect datasets assembled via the two methods.}
 \end{quote} 
@@ -232,7 +232,7 @@ While the majority of the \texttt{BUSCO} metrics were unchanged, the number of o
 
 
 \textbf{\hypertarget{Figure 3}{Figure 3}} \\
-\centerline{\includegraphics[width=25.0\baselineskip]{Fig3.png}}
+\centerline{\includegraphics[width=15.0\baselineskip]{Fig3.png}}
 \begin{quote}
 \small{Figure 3. \texttt{Shmlast} and \texttt{BUSCO} generated statistics. Split violin plots depict the relationship between \texttt{Trinity} assemblies (brown color) and ORP produced assemblies (blue color). Red and black dots indicate the value of a given metric for each assembly. Lines connecting the red and black dots connect datasets assembled via the two methods.}
 \end{quote} 
@@ -244,7 +244,7 @@ To understand the relative contribution of each assembler to the final merged as
 \textbf{\hypertarget{Figure 4}{Figure 4}} \\
 \centerline{\includegraphics[width=25.0\baselineskip]{Fig4.png}}
 \begin{quote}
-\small{Figure 4 describes the percent contribution of each assembler to the final ORP assembly.}
+\small{Figure 4 describes the contribution of each assembler to the final ORP assembly. Violin plots illustrate that Shannon contributes on average the fewest number of transcripts to the final merged assembly, while Trinity contributes on average the most. Small dashed lines on each side of the plot mark the median of the distribution. }
 \end{quote} 
 
 
@@ -255,7 +255,7 @@ To further understand the potential biases intrinsic to each assembler, I plotte
 \textbf{\hypertarget{Figure 5}{Figure 5}} \\
 \centerline{\includegraphics[width=25.0\baselineskip]{Fig5.png}}
 \begin{quote}
-\small{Figure 5 depicts the distribution of gene expression (log(TPM+1)), broken down by individual assembly, for four representative datasets. As predicted, the use of a higher kmer value with the \texttt{SPAdes} assembler resulted in biasing reconstruction towards more highly expressed transcripts. Interestingly, \texttt{Shannon} uniquely exhibits a bias towards the reconstruction of high-expression transcripts (or away from low-abundance transcripts).}
+\small{Figure 5 depicts the density distribution of gene expression (log(TPM+1)), broken down by individual assembly, for four representative datasets. As predicted, the use of a higher kmer value with the \texttt{SPAdes} assembler resulted in biasing reconstruction towards more highly expressed transcripts. Interestingly, \texttt{Shannon} uniquely exhibits a bias towards the reconstruction of high-expression transcripts (or away from low-abundance transcripts).}
 \end{quote} 
 
 
@@ -327,5 +327,34 @@ This work was significantly improved by discussions with Richard Smith-Unna, Rob
 \printbibliography
 
 
+
+
+
 \end{document}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	
