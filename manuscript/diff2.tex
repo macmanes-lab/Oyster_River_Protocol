@@ -1,0 +1,528 @@
+\documentclass[10pt,letterpaper]{article}
+%DIF LATEXDIFF DIFFERENCE FILE
+%DIF DEL old.tex                     Fri May 11 10:07:32 2018
+%DIF ADD feeding_peerj_revised.tex   Fri May 11 09:59:01 2018
+\usepackage[top=0.85in,left=1in, right=1in, footskip=0.25in]{geometry}
+\usepackage{changepage}
+\usepackage{textcomp,marvosym}
+\usepackage{fixltx2e}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{color} 
+\usepackage{nameref,hyperref}
+\usepackage[left]{lineno}
+\usepackage{microtype}
+\usepackage{rotating}
+\usepackage{url}
+\usepackage{setspace} 
+\usepackage[sfdefault,light]{roboto}
+\usepackage[T1]{fontenc}
+\usepackage[aboveskip=1pt,labelfont=bf,labelsep=period,justification=raggedright,singlelinecheck=off]{caption}
+
+
+%bib stuff
+
+%DIF 22c22
+%DIF < \usepackage[style=authoryear, minbibnames=99, maxbibnames=9, maxcitenames=9, natbib=true, backend=biber]{biblatex}
+%DIF -------
+\usepackage[style=authoryear, minbibnames=9, maxbibnames=99, maxcitenames=9, natbib=true, backend=biber]{biblatex} %DIF > 
+%DIF -------
+\addbibresource{formatted.bib}
+
+
+% Text layout
+\raggedright
+\setlength{\parindent}{0.5cm}
+\textwidth 6.55in 
+\textheight 8.75in
+\doublespacing
+
+\date{}
+
+%% Include all macros below
+
+
+\newcommand{\tit}{\textit} 
+\newcommand{\peer}{\textit{Peromyscus eremicus}}
+\newcommand{\pecr}{\textit{Peromyscus crinitus}}
+\newcommand{\per}{\textit{P. eremicus}}
+\newcommand{\pcr}{\textit{P. crinitus}}
+\definecolor{carolinablue}{rgb}{0.6, 0.73, 0.89}
+\newcommand{\eg}{\textit{e.g.,}} 
+
+
+
+%begin document
+%DIF PREAMBLE EXTENSION ADDED BY LATEXDIFF
+%DIF UNDERLINE PREAMBLE %DIF PREAMBLE
+\RequirePackage[normalem]{ulem} %DIF PREAMBLE
+\RequirePackage{color}\definecolor{RED}{rgb}{1,0,0}\definecolor{BLUE}{rgb}{0,0,1} %DIF PREAMBLE
+\providecommand{\DIFaddtex}[1]{{\protect\color{blue}\uwave{#1}}} %DIF PREAMBLE
+\providecommand{\DIFdeltex}[1]{{\protect\color{red}\sout{#1}}}                      %DIF PREAMBLE
+%DIF SAFE PREAMBLE %DIF PREAMBLE
+\providecommand{\DIFaddbegin}{} %DIF PREAMBLE
+\providecommand{\DIFaddend}{} %DIF PREAMBLE
+\providecommand{\DIFdelbegin}{} %DIF PREAMBLE
+\providecommand{\DIFdelend}{} %DIF PREAMBLE
+%DIF FLOATSAFE PREAMBLE %DIF PREAMBLE
+\providecommand{\DIFaddFL}[1]{\DIFadd{#1}} %DIF PREAMBLE
+\providecommand{\DIFdelFL}[1]{\DIFdel{#1}} %DIF PREAMBLE
+\providecommand{\DIFaddbeginFL}{} %DIF PREAMBLE
+\providecommand{\DIFaddendFL}{} %DIF PREAMBLE
+\providecommand{\DIFdelbeginFL}{} %DIF PREAMBLE
+\providecommand{\DIFdelendFL}{} %DIF PREAMBLE
+%DIF HYPERREF PREAMBLE %DIF PREAMBLE
+\providecommand{\DIFadd}[1]{\texorpdfstring{\DIFaddtex{#1}}{#1}} %DIF PREAMBLE
+\providecommand{\DIFdel}[1]{\texorpdfstring{\DIFdeltex{#1}}{}} %DIF PREAMBLE
+\newcommand{\DIFscaledelfig}{0.5}
+%DIF HIGHLIGHTGRAPHICS PREAMBLE %DIF PREAMBLE
+\RequirePackage{settobox} %DIF PREAMBLE
+\RequirePackage{letltxmacro} %DIF PREAMBLE
+\newsavebox{\DIFdelgraphicsbox} %DIF PREAMBLE
+\newlength{\DIFdelgraphicswidth} %DIF PREAMBLE
+\newlength{\DIFdelgraphicsheight} %DIF PREAMBLE
+% store original definition of \includegraphics %DIF PREAMBLE
+\LetLtxMacro{\DIFOincludegraphics}{\includegraphics} %DIF PREAMBLE
+\newcommand{\DIFaddincludegraphics}[2][]{{\color{blue}\fbox{\DIFOincludegraphics[#1]{#2}}}} %DIF PREAMBLE
+\newcommand{\DIFdelincludegraphics}[2][]{% %DIF PREAMBLE
+\sbox{\DIFdelgraphicsbox}{\DIFOincludegraphics[#1]{#2}}% %DIF PREAMBLE
+\settoboxwidth{\DIFdelgraphicswidth}{\DIFdelgraphicsbox} %DIF PREAMBLE
+\settoboxtotalheight{\DIFdelgraphicsheight}{\DIFdelgraphicsbox} %DIF PREAMBLE
+\scalebox{\DIFscaledelfig}{% %DIF PREAMBLE
+\parbox[b]{\DIFdelgraphicswidth}{\usebox{\DIFdelgraphicsbox}\\[-\baselineskip] \rule{\DIFdelgraphicswidth}{0em}}\llap{\resizebox{\DIFdelgraphicswidth}{\DIFdelgraphicsheight}{% %DIF PREAMBLE
+\setlength{\unitlength}{\DIFdelgraphicswidth}% %DIF PREAMBLE
+\begin{picture}(1,1)% %DIF PREAMBLE
+\thicklines\linethickness{2pt} %DIF PREAMBLE
+{\color[rgb]{1,0,0}\put(0,0){\framebox(1,1){}}}% %DIF PREAMBLE
+{\color[rgb]{1,0,0}\put(0,0){\line( 1,1){1}}}% %DIF PREAMBLE
+{\color[rgb]{1,0,0}\put(0,1){\line(1,-1){1}}}% %DIF PREAMBLE
+\end{picture}% %DIF PREAMBLE
+}\hspace*{3pt}}} %DIF PREAMBLE
+} %DIF PREAMBLE
+\LetLtxMacro{\DIFOaddbegin}{\DIFaddbegin} %DIF PREAMBLE
+\LetLtxMacro{\DIFOaddend}{\DIFaddend} %DIF PREAMBLE
+\LetLtxMacro{\DIFOdelbegin}{\DIFdelbegin} %DIF PREAMBLE
+\LetLtxMacro{\DIFOdelend}{\DIFdelend} %DIF PREAMBLE
+\DeclareRobustCommand{\DIFaddbegin}{\DIFOaddbegin \let\includegraphics\DIFaddincludegraphics} %DIF PREAMBLE
+\DeclareRobustCommand{\DIFaddend}{\DIFOaddend \let\includegraphics\DIFOincludegraphics} %DIF PREAMBLE
+\DeclareRobustCommand{\DIFdelbegin}{\DIFOdelbegin \let\includegraphics\DIFdelincludegraphics} %DIF PREAMBLE
+\DeclareRobustCommand{\DIFdelend}{\DIFOaddend \let\includegraphics\DIFOincludegraphics} %DIF PREAMBLE
+\LetLtxMacro{\DIFOaddbeginFL}{\DIFaddbeginFL} %DIF PREAMBLE
+\LetLtxMacro{\DIFOaddendFL}{\DIFaddendFL} %DIF PREAMBLE
+\LetLtxMacro{\DIFOdelbeginFL}{\DIFdelbeginFL} %DIF PREAMBLE
+\LetLtxMacro{\DIFOdelendFL}{\DIFdelendFL} %DIF PREAMBLE
+\DeclareRobustCommand{\DIFaddbeginFL}{\DIFOaddbeginFL \let\includegraphics\DIFaddincludegraphics} %DIF PREAMBLE
+\DeclareRobustCommand{\DIFaddendFL}{\DIFOaddendFL \let\includegraphics\DIFOincludegraphics} %DIF PREAMBLE
+\DeclareRobustCommand{\DIFdelbeginFL}{\DIFOdelbeginFL \let\includegraphics\DIFdelincludegraphics} %DIF PREAMBLE
+\DeclareRobustCommand{\DIFdelendFL}{\DIFOaddendFL \let\includegraphics\DIFOincludegraphics} %DIF PREAMBLE
+%DIF END PREAMBLE EXTENSION ADDED BY LATEXDIFF
+
+\begin{document}
+\vspace*{0.35in}
+
+
+\begin{flushleft}
+
+{\Large
+\textbf{The Oyster River Protocol: A Multi Assembler and Kmer Approach For \textit{de novo} Transcriptome Assembly }}
+\\
+Matthew D. MacManes$^{1,}$ \DIFaddbegin \DIFadd{$^{2,}$ }\DIFaddend $^{\ast,}$ $^{\bullet,}$ $^\star$
+
+$^{1}$ Department of Molecular, Cellular and Biomedical Sciences, University of New Hampshire, Durham NH, USA
+\DIFaddbegin \DIFadd{$^{2}$ Hubbard Center For Genomic Studies
+}\DIFaddend 
+
+$^\ast$ E-mail: macmanes@gmail.com
+
+$^\bullet$ Twitter: \href{http://twitter.com/macmanes}{@MacManes}
+
+$\star$ Mailing Address: \DIFdelbegin \DIFdel{46 College Road, 189 Rudman }\DIFdelend \DIFaddbegin \DIFadd{35 Colovos Road, 434 Gregg }\DIFaddend Hall. Durham NH 03824
+\end{flushleft}
+
+
+\newpage
+
+\linenumbers
+
+% Please keep the abstract between 250 and 300 words
+\section*{Abstract}
+
+Characterizing transcriptomes in non-model organisms has resulted in a massive increase in the understanding of biological phenomena. This boon, largely made possible via high-throughput sequencing, means that studies of functional, evolutionary and population genomics are now being done by hundreds or even thousands of labs around the world. For many, these studies begin with a \textit{de novo} transcriptome assembly, which is a technically complicated process involving several discrete steps. The Oyster River Protocol (ORP), described here, implements a standardized and benchmarked set of bioinformatic processes, resulting in an assembly with enhanced qualities over other standard assembly methods. Specifically, ORP produced assemblies have higher \texttt{Detonate} and \texttt{TransRate} scores and mapping rates, which is largely a product of the fact that it leverages a multi-assembler and kmer assembly process, thereby bypassing the shortcomings of any one approach. These improvements are important, as previously unassembled transcripts are included in ORP assemblies, resulting in a significant enhancement of the power of downstream analysis. Further, as part of this study, I show that assembly quality is unrelated with the number of reads generated, above 30 million reads.  \textbf{Code Availability:} The version controlled open-source code is available at \url{https://github.com/macmanes-lab/Oyster_River_Protocol}.  Instructions for software installation and use, and other details are available at \url{http://oyster-river-protocol.rtfd.org/}.
+
+\section{Introduction}
+
+For all biology, modern sequencing technologies have provided for an unprecedented opportunity to gain a deep understanding of genome level processes that underlie a very wide array of natural phenomena, from intracellular metabolic processes to global patterns of population variability. Transcriptome sequencing has been influential \citep{Mortazavi:2008jj,Wang:2009di}, particularly in functional genomics \citep{Lappalainen:2013el,Cahoy:2008hm}, and has resulted in discoveries not possible even just a few years ago. This in large part is due to the scale at which these studies may be conducted \citep{Li:2017bq, Tan:2017ix}. Unlike studies of adaptation based on one or a small number of candidate genes (\eg\ \citep{Fitzpatrick:2005vd,Panhuis:2006kp}), modern studies may assay the entire suite of expressed transcripts -- the transcriptome -- simultaneously. In addition to issues of scale, as a direct result of enhanced dynamic range, newer sequencing studies have increased ability to simultaneously reconstruct and quantitate lowly- and highly-expressed transcripts \citep{Wolf:2013hd,Vijay:2012gy}. Lastly, improved methods for the detection of differences in gene expression (\eg\ \citep{Robinson:2010cw,Love:2014cf}) across experimental treatments have resulted in increased resolution for studies aimed at understanding changes in gene expression.    \\
+
+As a direct result of their widespread popularity, a diverse toolset for the assembly of transcriptome exists, with each potentially reconstructing transcripts others fail to reconstruct. Amongst the earliest of specialized \tit{de novo} transcriptome assemblers were the packages \texttt{Trans-ABySS} \citep{Robertson:2010ih}, \texttt{Oases} \citep{Schulz:2012je}, and \texttt{SOAPdenovoTrans} \citep{Xie:2013wu}, which were fundamentally based on the popular \tit{de Bruijn} graph-based genome assemblers \texttt{ABySS} \citep{Simpson:2009iv}, \texttt{Velvet} \citep{Zerbino:2008bm}, and \texttt{SOAP} \DIFdelbegin \DIFdel{\mbox{%DIFAUXCMD
+\cite{Li:2008in} }%DIFAUXCMD
+}\DIFdelend \DIFaddbegin \DIFadd{\mbox{%DIFAUXCMD
+\citep{Li:2008in} }%DIFAUXCMD
+}\DIFaddend respectively. These early efforts gave rise to a series of more specialized \tit{de novo} transcriptome assemblers, namely \texttt{Trinity} \citep{Haas:2013jq}, and \texttt{IDBA-Tran} \citep{Peng:2013eu}. While the \tit{de Bruijn} graph approach remains powerful, newly developed software explores novel parts of the algorithmic landscape, offering substantial benefits, assuming novel methods reconstruct different fractions of the transcriptome. \texttt{BinPacker} \citep{Liu:2016hh}, for instance, abandons the \tit{de Bruijn} graph approach to model the assembly problem after the classical bin packing problem, while \texttt{Shannon} \citep{Kannan:2016be} uses information theory, rather than a set of software engineer-decided heuristics. These newer assemblers, by implementing fundamentally different assembly algorithms, may reconstruct  fractions of the transcriptome that other assemblers fail to accurately assemble. 
+
+In addition to the variety of tools available for the \tit{de novo} assembly of transcripts, several tools are available for pre-processing of reads via read trimming ((\eg\ \texttt{Skewer} \citep{Jiang:2014cx}, \texttt{Trimmomatic} \citep{Bolger:2014ek}, \texttt{Cutadapt} \DIFdelbegin \DIFdel{\mbox{%DIFAUXCMD
+\cite{Martin:2011va}}%DIFAUXCMD
+}\DIFdelend \DIFaddbegin \DIFadd{\mbox{%DIFAUXCMD
+\citep{Martin:2011va}}%DIFAUXCMD
+}\DIFaddend ), read normalization (\texttt{khmer} \citep{Pell:2012id}), and read error correction (\texttt{SEECER} \citep{Le:2013dy} and \texttt{RCorrector} \citep{Song:2015in}, \texttt{Reptile} \DIFdelbegin \DIFdel{\mbox{%DIFAUXCMD
+\cite{Yang:2010kv}}%DIFAUXCMD
+}\DIFdelend \DIFaddbegin \DIFadd{\mbox{%DIFAUXCMD
+\citep{Yang:2010kv}}%DIFAUXCMD
+}\DIFaddend ). Similarly, benchmarking tools that evaluate the quality of assembled transcriptomes including \texttt{TransRate} \citep{SmithUnna:2016go}, \texttt{BUSCO} (\underline{B}enchmarking \underline{U}niversal \underline{S}ingle-\underline{C}opy \underline{O}rthologs - \citep{Simao:2015kk}), and \texttt{Detonate} \citep{Li:2014cm} have been developed. Despite the development of these evaluative tools, this manuscript describes the first systematic effort coupling them with the development of a \textit{de novo} transcriptome assembly pipeline.
+
+The ease with which these tools may be used to produce and characterize transcriptome assemblies belies the true complexity underlying the overall process \citep{Ungaro:2017kf, Wang:2017gc, Moreton:2015fw, Yang:2013iz}. Indeed, the subtle (and not so subtle) methodological challenges associated with transcriptome reconstruction may result in highly variable assembly quality. In particular, while most tools run using default settings, these defaults may be sensible only for one specific (often unspecified) use case or data type. Because parameter optimization is both dataset-dependent and factorial in nature, an exhaustive optimization particularly of entire pipelines, is never possible. Given this, the production of a \tit{de novo} transcriptome assembly requires a large investment in time and resources, with each step requiring careful consideration. Here, I propose an evidence-based protocol for assembly that results in the production of high quality transcriptome assemblies, across a variety of commonplace experimental conditions or taxonomic groups. \\
+
+This manuscript describes the development of The Oyster River Protocol\footnotemark\ for transcriptome assembly. It explicitly considers and attempts to address many of the shortcomings described in \citep{Vijay:2012gy}, by leveraging a multi-kmer and multi-assembler strategy. This innovation is critical, as all assembly solutions treat the sequence read data in ways that bias transcript recovery. Specifically, with the development of assembly software comes the use of a set of heuristics that are necessary given the scope of the assembly problem itself. Given each software development team carries with it a unique set of ideas related to these heuristics while implementing various assembly algorithms, individual assemblers exhibit unique assembly behavior. By leveraging a multi-assembler approach, the strengths of one assembler may complement the weaknesses of another. In addition to biases related to assembly heuristics, it is well known that assembly kmer-length has important effects on transcript reconstruction, with shorter kmers more efficiently reconstructing lower-abundance transcripts relative to more highly abundant transcripts. Given this, assembling with multiple different kmer lengths, then merging the resultant assemblies may effectively reduce this type of bias. Recognizing these issue, I hypothesize that an assembly that results from the combination of multiple different assemblers and lengths of assembly-kmers will be better than each individual assembly, across a variety of metrics. 
+
+In addition to developing an enhanced pipeline, the work suggests an exhaustive way of characterizing assemblies while making available a set of fully-benchmarked reference assemblies that may be used by other researchers in developing new assembly algorithms and pipelines. Although many other researchers have published comparisons of assembly methods, up until now these have been limited to single datasets assembled a few different ways \citep{Marchant:2016hl, Finseth:2014bl}, thereby failing to provide more general insights.     
+
+\footnotetext{Named the Oyster River Protocol because the ideas, and some of the code, was developed while overlooking the Oyster River, located in Durham, New Hampshire. NB, the naming assembly of protocols after bodies of water was, to the best of my knowledge, first done by C. Titus Brown (The Eel Pond Protocol: \url{http://khmer-protocols.readthedocs.io/en/latest/mrnaseq/index.html}), and may have subconsciously influenced me in naming this protocol.}
+
+%Currently, a very large number of labs and research programs depend, often critically, on the production of accurate transcriptomic resources. That no current best practices exits -- particularly for those working in non-model systems -- has resulted in an untenable situation where each laboratory makes up it's own computational pipeline. These pipelines, often devoid of rigorous quality evaluation, may have important downstream consequences. This manuscript describes a novel pipeline and approach for merging transcriptomes generated by multiple different assemblers, using multiple different values for kmer length. By proposing a specific evidence-based process, the quality and reproducibility of transcriptome studies, which is critical for this emerging field of research, is enhanced.
+
+
+\section{Methods}
+
+\subsection{Datasets}
+
+In an effort at benchmarking the assembly and merging protocols, I downloaded a set of publicly available RNAseq datasets (Table 1) that had been produced on the Illumina sequencing platform. These datasets were chosen to represent a variety of taxonomic groups, so as to demonstrate the broad utility of the developed methods. Because datasets were selected randomly with respect to sequencing center and read number, they are likely to represent the typical quality of Illumina data circa 2014-2017. 
+
+\begin{center}
+%\begin{adjustwidth}{-2.25in}{0in}% adjust the L and R margins by 1 inch
+\textbf{\hypertarget{Table 1}{Table 1}} \\
+\begin{tabular}{l l l c c }
+\textbf{Type} & \textbf{Accession} & \textbf{Species} & \textbf{Num. Reads} & \textbf{Read Length}  \\ \hline
+Animalia & ERR489297 & \textit{Anopheles gambiae} & 206M & 100bp \\ \hline
+Animalia & DRR030368 & \textit{Echinococcus multilocularis} & 73M & 100bp \\ \hline
+Animalia & ERR1016675 & \textit{Heterorhabditis indica} & 51M & 100bp \\ \hline
+Animalia & SRR2086412& \textit{Mus musculus} & 54M & 100bp \\ \hline
+Animalia & DRR036858 & \textit{Mus musculus} & 114M & 100bp \\ \hline
+Animalia & DRR046632& \textit{Oncorhynchus mykiss} & 82M & 76bp \\ \hline
+Animalia & SRR1789336& \textit{Oryctolagus cuniculus} & 31M & 100bp \\ \hline
+Animalia & SRR2016923 & \textit{Phyllodoce medipapillata} & 86M & 100bp \\ \hline
+Animalia & ERR1674585 & \textit{Schistosoma mansoni} & 39M & 100bp \\ \hline
+Plant & DRR082659& \textit{Aeginetia indica} & 69M & 90bp \\ \hline
+Plant & DRR053698& \textit{Cephalotus follicularis} & 126M & 90bp \\ \hline
+Plant & DRR069093& \textit{Hevea brasiliensis} & 103M & 100bp \\ \hline
+Plant & SRR3499127& \textit{Nicotiana tabacum} & 30M & 150bp \\ \hline
+Plant & DRR031870 & \textit{Vigna angularis} & 60M & 100bp \\ \hline
+Protozoa & ERR058009& \textit{Entamoeba histolytica} & 68M & 100bp \\ \hline
+
+\end{tabular}
+%\end{adjustwidth}
+\end{center}
+\begin{quote}
+\noindent{\small{Table 1 lists the datasets used in this study. All datasets are publicly available for download by accession number at the European Nucleotide Archive or NCBI Short Read Archive.
+
+  }}
+\end{quote}
+
+\subsection{Software}
+
+The Oyster River Protocol can be installed on the Linux platform, and does not require superuser privileges, assuming \texttt{Linuxbrew} \citep{Jackman:2016bx} is installed. The software is implemented as a stand-alone makefile which coordinates all steps described below. All scripts are available at \url{https://github.com/macmanes-lab/Oyster_River_Protocol}, and run on the Linux platform. The software is version controlled and openly-licensed to promote sharing and reuse. A guide for users is available at \url{http://oyster-river-protocol.rtfd.io}. 
+
+
+\subsection{Pre-assembly procedures}
+
+For all assemblies performed, Illumina sequencing adapters were removed from both ends of the sequencing reads, as were nucleotides with quality Phred $\leq$ 2, using the program \texttt{Trimmomatic} version 0.36 \DIFdelbegin \DIFdel{\mbox{%DIFAUXCMD
+\cite{Bolger:2014ek}}%DIFAUXCMD
+}\DIFdelend \DIFaddbegin \DIFadd{\mbox{%DIFAUXCMD
+\citep{Bolger:2014ek}}%DIFAUXCMD
+}\DIFaddend , following the recommendations from \DIFdelbegin \DIFdel{\mbox{%DIFAUXCMD
+\cite{MacManes:2014io}}%DIFAUXCMD
+}\DIFdelend \DIFaddbegin \DIFadd{\mbox{%DIFAUXCMD
+\citep{MacManes:2014io}}%DIFAUXCMD
+}\DIFaddend . After trimming, reads were error corrected using the software \texttt{RCorrector} version 1.0.2 \DIFdelbegin \DIFdel{\mbox{%DIFAUXCMD
+\cite{Song:2015in}}%DIFAUXCMD
+}\DIFdelend \DIFaddbegin \DIFadd{\mbox{%DIFAUXCMD
+\citep{Song:2015in}}%DIFAUXCMD
+}\DIFaddend , following recommendations from \DIFdelbegin \DIFdel{\mbox{%DIFAUXCMD
+\cite{MacManes:2013ec}}%DIFAUXCMD
+}\DIFdelend \DIFaddbegin \DIFadd{\mbox{%DIFAUXCMD
+\citep{MacManes:2013ec}}%DIFAUXCMD
+}\DIFaddend . The code for running this step of the Oyster River protocols is available at \url{https://github.com/macmanes-lab/Oyster_River_Protocol/blob/master/oyster.mk#L134}. The trimmed and error corrected reads were then subjected to \textit{de novo} assembly. 
+
+
+\subsection{Assembly}
+
+I assembled each trimmed and error corrected dataset using three different \textit{de novo} transcriptome assemblers and three different kmer lengths, producing 4 unique assemblies. First, I assembled the reads using \texttt{Trinity} release 2.4.0 \citep{Haas:2013jq}, and default settings (k=25), without read normalization. The decision to forgo normalization is based on previous work \citep{MacManes:2015iz} showing slightly worse performance of normalized datasets. Next, the \texttt{SPAdes} RNAseq assembler (version 3.10) \DIFdelbegin \DIFdel{\mbox{%DIFAUXCMD
+\cite{Chikhi:2013ep} }%DIFAUXCMD
+}\DIFdelend \DIFaddbegin \DIFadd{\mbox{%DIFAUXCMD
+\citep{Chikhi:2013ep} }%DIFAUXCMD
+}\DIFaddend was used, in two distinct runs, using kmer sizes 55 and 75. Lastly, reads were assembled using the assembler \texttt{Shannon} version 0.0.2 \DIFdelbegin \DIFdel{\mbox{%DIFAUXCMD
+\cite{Kannan:2016be}}%DIFAUXCMD
+}\DIFdelend \DIFaddbegin \DIFadd{\mbox{%DIFAUXCMD
+\citep{Kannan:2016be}}%DIFAUXCMD
+}\DIFaddend , using a kmer length of 75. These assemblers were chosen based on the fact that they [1] use an open-science development model, whereby end-users may contribute code, [2] are all actively maintained and are undergoing continuous development, and [3] occupy different parts of the algorithmic landscape. 
+
+This assembly process resulted in the production of four distinct assemblies. The code for running this step of the Oyster River protocols is available at \url{https://github.com/macmanes-lab/Oyster_River_Protocol/blob/master/oyster.mk#L142}.  
+
+
+\subsection{Assembly Merging via OrthoFuse}
+
+To merge the four assemblies produced as part of the Oyster River Protocol, I developed new software that effectively merges transcriptome assemblies. Described in brief, \texttt{OrthoFuse} begins by concatenating all assemblies together, then forms groups of transcripts by running a version of \texttt{OrthoFinder} \DIFdelbegin \DIFdel{\mbox{%DIFAUXCMD
+\cite{Emms:2015iga} }%DIFAUXCMD
+}\DIFdelend \DIFaddbegin \DIFadd{\mbox{%DIFAUXCMD
+\citep{Emms:2015iga} }%DIFAUXCMD
+}\DIFaddend packaged with the ORP, modified to accept nucleotide sequences from the merged assembly. These groupings represent groups of homologous transcripts. While isoform reconstruction using short-read data is notoriously poor, by increasing the inflation parameter by default to I=4, it attempts to prevent the collapsing of transcript isoforms into single groups. After \texttt{Orthofinder} has completed, a modified version of \texttt{TransRate} version 1.0.3 \DIFdelbegin \DIFdel{\mbox{%DIFAUXCMD
+\cite{SmithUnna:2016go} }%DIFAUXCMD
+}\DIFdelend \DIFaddbegin \DIFadd{\mbox{%DIFAUXCMD
+\citep{SmithUnna:2016go} }%DIFAUXCMD
+}\DIFaddend which is packaged with the ORP, is run on the merged assembly, after which the best (= highest contig score) transcript is selected from each group and placed in a new assembly file to represent the entire group. The resultant file, which contains the highest scoring contig for each orthogroup, may be used for all downstream analyses. \texttt{OrthoFuse} is run automatically as part of the Oyster River Protocol, and additionally is available as a stand alone script, \url{https://github.com/macmanes-lab/Oyster_River_Protocol/blob/master/orthofuser.mk}. 
+
+\subsection{Assembly Evaluation}
+
+All assemblies were evaluated using \texttt{ORP-TransRate}, \texttt{Detonate} version 1.11 \DIFdelbegin \DIFdel{\mbox{%DIFAUXCMD
+\cite{Li:2014cm}}%DIFAUXCMD
+}\DIFdelend \DIFaddbegin \DIFadd{\mbox{%DIFAUXCMD
+\citep{Li:2014cm}}%DIFAUXCMD
+}\DIFaddend , \texttt{shmlast} version 1.2 \citep{Scott:2017eg}, and \texttt{BUSCO} version 3.0.2 \citep{Simao:2015kk}. \texttt{TransRate} evaluates transcriptome assembly contiguity by producing a score based on length-based and mapping metrics, while \texttt{Detonate} conducts an orthogonal analysis, producing a score that is maximized by an assembly that is representative of input sequence read data. \texttt{BUSCO} evaluates assembly content by searching the assemblies for conserved single copy orthologs found in all Eukaryotes. I report default \texttt{BUSCO} metrics as described in \DIFdelbegin \DIFdel{\mbox{%DIFAUXCMD
+\cite{Simao:2015kk}}%DIFAUXCMD
+}\DIFdelend \DIFaddbegin \DIFadd{\mbox{%DIFAUXCMD
+\citep{Simao:2015kk}}%DIFAUXCMD
+}\DIFaddend . Specifically, "complete orthologs", are defined as query transcripts that are within 2 standard deviations of the length of the \texttt{BUSCO} group mean, while contigs falling short of this metric are listed as "fragmented". \texttt{Shmlast} implements the conditional reciprocal best hits (CRBH) test \citep{Aubry:2014en}, conducted in this case against the Swiss-Prot protein database (downloaded October, 2017) using an e-value of 1E-10.   \\
+
+In addition to the generation of metrics to evaluation the quality of transcriptome assemblies, I generated a distance matrix of assemblies for each dataset using the \texttt{sourmash} package \citep{TitusBrown:2016jg}, in an attempt at characterizing the algorithmic landscape of assemblers. Specifically, each assembly was characterized using the \texttt{compute} function using 5000 independent sketches. The distance between assemblies was calculated using the \texttt{compare} function and a kmer length of 51. These distance matrices were visualized using the \texttt{isoMDS} function of the MASS package (\url{https://CRAN.R-project.org/package=MASS}). 
+
+\subsection{Statistics}
+
+All statistical analyses were conducted in R version 3.4.0 \citep{RALanguageandEn:wf}. Violin plots were constructed using the beanplot \citep{Kampstra:2008vc} and the beeswarm R packages (\url{https://CRAN.R-project.org/package=beeswarm}). Expression distributions were plotted using the ggjoy package (\url{https://CRAN.R-project.org/package=ggjoy}).   
+
+\section{Results and Discussion}
+
+Fifteen RNAseq datasets, ranging in size from (30-206M paired end reads) were assembled using the Oyster River Protocol and with \texttt{Trinity}. Each assembly was evaluated using the software \texttt{BUSCO}, \texttt{shmlast}, \texttt{Detonate}, and \texttt{TransRate}. From these, several metrics were chosen to represent the quality of the produced assemblies. Of note, all the assemblies produced as part of this work are available at \url{https://www.dropbox.com/sh/ehxvd0ont9ge8id/AABZxRCwcpaxb7rXWclTBbJga}, and will be moved to dataDryad after acceptance. A file containing the evaluative metrics is available at \url{https://github.com/macmanes-lab/Oyster_River_Protocol/blob/master/manuscript/orp.csv}, while the distance matrices are available within the folder \url{https://github.com/macmanes-lab/Oyster_River_Protocol/blob/master/manuscript/}. R code used to conduct analyses and make figures is found at \url{https://github.com/macmanes-lab/Oyster_River_Protocol/blob/master/manuscript/R-analysis.Rmd}. 
+
+\subsection{Assembled transcriptomes} 
+
+The \texttt{Trinity} assembly of trimmed and error corrected reads generally completed on a standard Linux server using 24 cores, in less than 24 hours. RAM requirement is estimated to be close to 0.5Gb per million paired-end reads. The assemblies on average contained 176k transcripts (range 19k - 643k) and 97Mb (range 14MB - 198Mb). Other quality metrics will be discussed below, specifically in relation to the ORP produced assemblies.  
+
+ORP assemblies generally completed on a standard Linux server using 24 cores in three days. Typically \texttt{Trinity} was the longest running assembler, with the individual \texttt{SPAdes} assemblies being the shortest. RAM requirement is estimated to be 1.5Gb - 2Gb per million paired-end reads, with \texttt{SPAdes} requiring the most. The assemblies on average contained 153k transcripts (range 23k - 625k) and 64Mb (range 8MB - 181Mb).
+
+The distance between assemblies of a given dataset were calculated using \texttt{sourmash}, and a MDS plot was generated (Figure 1). Interestingly, each assembler tends to produce a specific signature which is relatively consistent between the fifteen datasets. \texttt{Shannon} differentiates itself from the other assemblers on the first (x) MDS axis, while the other assemblers (\texttt{SPAdes} and \texttt{Trinity}) are separated on the second (y) MDS axis. 
+
+\newpage
+\textbf{\hypertarget{Figure 1}{Figure 1}} \\
+\centerline{\includegraphics[width=25.0\baselineskip]{Fig1.png}}
+\begin{quote}
+\small{Figure 1. MDS plot describing the similarity within and between assemblers. Colored x's mark individual assemblies, with red marks corresponding to the ORP assemblies, green marks corresponding to the \texttt{Shannon} assemblies, blue marks corresponding to the \texttt{SPAdes55} assemblies, orange marks corresponding to the \texttt{SPAdes75} assemblies, and the black marks corresponding to the \texttt{Trinity} assemblies. In general assemblies produced by a given assembler tend to cluster together.}
+\end{quote} 
+
+  
+
+\subsubsection{Assembly Structure}
+
+The structural integrity of each assembly was evaluated using the \texttt{TransRate} and \texttt{Detonate} software packages. As many downstream applications depend critically on accurate read mapping, assembly quality is correlated with increased mapping rates. The split violin plot presented in figure 2A visually represents the mapping rates of each assembly, with lines connecting the mapping rates of datasets assembled with \texttt{Trinity} and with the ORP, respectively. The average mapping rate of the \texttt{Trinity} assembled datasets was 87\% (sd = 8\%), while the average mapping rates of the ORP assembled datasets was 93\% (sd=4\%). This test is statistically significant (one-sided Wilcoxon rank sum test, p = 2E-2). Mapping rates of the other assemblies are less than that of the ORP assembly, but in most cases, greater than that of the Trinity assembly. This aspect of assembly quality is critical. Specifically mapping rates measure how representative the assembly is of the reads. If I assume that the vast majority of generated reads come from the biological sample under study, when reads fail to map, that fraction of the biology is lost from all downstream analysis and inference. This study demonstrates that across a wide variety of taxa, assembling RNAseq reads with any single assembler alone may result in a decrease in mapping rate and in turn, the lost ability to draw conclusions from that fraction of the sample. 
+
+Figure 2B describes the distribution of \texttt{TransRate} assembly scores, which is a synthetic metric taking into account the quality of read mapping and coverage-based statistics. The \texttt{Trinity} assemblies had an average optimal score of 0.35 (sd = .14), while the ORP assembled datasets had an average score of 0.46 (sd = .07). This test is statistically significant (one-sided Wilcoxon rank sum test, p-value = 1.8E-2). Optimal scores of the other assemblies are less than that of the ORP assembly, but in most cases, greater than that of the \texttt{Trinity} assembly. Figure 2C describes the distribution of \texttt{Detonate} scores. The \texttt{Trinity} assemblies had an average score of -6.9E9 (sd = 5.2E9), while the ORP assembled datasets had an average score of -5.3E9 (sd = 3.5E9). This test not is statistically significant, though in all cases, relative to all other assemblies, scores of the ORP assemblies are improved (become less negative), indicating that the ORP produced assemblies of higher quality. 
+
+In addition to reporting synthetic metrics related to assembly structure, \texttt{TransRate} reports individual metrics related to specific elements of assembly quality. One such metric estimates the rate of chimerism, a phenomenon which is known to be problematic in \tit{de novo} assembly \citep{Ungaro:2017kf, Singhal:2013dq}. Rates of chimerism are relatively constant between all assemblers, ranging from 10\% for the \texttt{Shannon} assembly, to 12\% for the \texttt{SPAdes75} assembly. The chimerism rate for the ORP assemblies averaged 10.5\% ($\pm$ 4.7\%). While the new method would ideally improve this metric by exclusively selecting non-chimeric transcripts, this does not seem to be the case, and may be related to the inherent shortcomings of short-read transcriptome assembly.
+
+Of note, consistent with all short-read assemblers \citep{Ungaro:2017kf}, the ORP assemblies may not accurately reflect the true isoform complexity. Specifically, because of the way that single representative transcripts are chosen from a cluster of related sequences, some transcriptional complexity may be lost. Consider the cluster containing contigs \{AB, A, B\} where AB is a false-chimera, selecting a single representative transcript with the best score could yield either A or B, thereby excluding an important transcript in the final output. I believe this type of transcript loss is not common, based on how contigs are scored (Table 1, Figure 3, \DIFdelbegin \DIFdel{\mbox{%DIFAUXCMD
+\cite{SmithUnna:2016go}}%DIFAUXCMD
+}\DIFdelend \DIFaddbegin \DIFadd{\mbox{%DIFAUXCMD
+\citep{SmithUnna:2016go}}%DIFAUXCMD
+}\DIFaddend ), though strict demonstration of this is not possible, given the lack of high-quality reference genomes for the majority of the datasets. More generally, mapping rates, \texttt{Detonate} and \texttt{TransRate} score improvements suggest that this type of loss is not widespread.
+
+\textbf{\hypertarget{Figure 2}{Figure 2}} \\
+\DIFdelbegin %DIFDELCMD < \centerline{\includegraphics[width=25.0\baselineskip]{Fig2.png}}
+%DIFDELCMD < %%%
+\DIFdelend \DIFaddbegin \centerline{\includegraphics[width=13.0\baselineskip]{Fig2.png}}
+\DIFaddend \begin{quote}
+\small{Figure 2. \texttt{TransRate} and \texttt{Detonate} generated statistics. Split violin plots depict the relationship between \texttt{Trinity} assemblies (brown color) and ORP produced assemblies (blue color). Red and black dots indicate the value of a given metric for each assembly. Lines connecting the red and black dots connect datasets assembled via the two methods.}
+\end{quote} 
+
+\subsubsection{Assembly Content}
+
+The genic content of assemblies was measured using the software package \texttt{Shmlast}, which implements the conditional reciprocal blast test against the Swiss-prot database. Presented in Table 2 and in Figure 3A, ORP assemblies recovered on average 13364 (sd=3391) blast hits, while all other assemblies recovered fewer (minimum \texttt{Shannon}, mean=10299). In every case across all assemblers, the ORP assembler retained more reciprocal blast hits, though only the comparison between the ORP assembly and \texttt{Shannon} was significant (one-sided Wilcoxon rank sum test, p = 4E-3). Notably, in all cases, each assembler was both missing transcripts contained in other assemblies, and contributed unique transcripts to the final merged assembly (Table 2), highlighting the utility of using multiple assemblers. \\
+
+\begin{center}
+%\begin{adjustwidth}{-2.25in}{0in}% adjust the L and R margins by 1 inch
+\textbf{\hypertarget{Table 2}{Table 2}} \\
+\begin{tabular}{l l l c c }
+\textbf{Assembly} & \textbf{Genes} & \textbf{Delta} & \textbf{Unique}   \\ \hline
+Concatenated & 14674 $\pm$ 3590 &  &  \\ \hline
+SPAdes55 &  & $-$1739 $\pm$ 758  & 570 $\pm$ 266  \\ \hline
+SPAdes75 &  & $-$2711 $\pm$ 2047  & 301 $\pm$ 195  \\ \hline
+Shannon &  & $-$4375 $\pm$ 3508  & 302 $\pm$ 241  \\ \hline
+Trinity &  & $-$1952 $\pm$ 803  & 520 $\pm$ 301  \\ \hline
+
+
+\end{tabular}
+%\end{adjustwidth}
+\end{center}
+\begin{quote}
+\noindent{\small{Table 2 describes the number of genes contained in the assemblies, with the row labelled concatenated representing the combined average ($\pm$ standard deviation) number of genes contained in all assemblies of a given dataset. The other rows contain information about each assembly. The column labelled delta contains the average number ($\pm$ standard deviation) of genes missing, relative to the concatenated number. The unique column contains the average number of genes ($\pm$ standard deviation) unique to that assembly.     
+
+  }}
+\end{quote}
+
+Regarding \texttt{BUSCO} scores, \texttt{Trinity} assemblies contained on average 86\% (sd = 21\%) of the full-length orthologs as defined by the \texttt{BUSCO} developers, while the ORP assembled datasets contained on average 86\% (sd = 13\%) of the full length transcripts. Other assemblers contained fewer full-length orthologs. The \texttt{Trinity} and ORP assemblies were missing, on average 4.5\% (sd = 8.7\%) of orthologs. The \texttt{Trinity} assembled datasets contained 9.5\% (sd = 17\%) of fragmented transcripts while the ORP assemblies each contained on average 9.4\% (sd = 9\%) of fragmented orthologs. The other assemblers in all cases contained more fragmentation. The rate of transcript duplication, depicted in figure 3B is 47\% (sd = 20\%) for \texttt{Trinity} assemblies, and 34\% (sd = 15\%) for ORP assemblies.  This result is statistically significant (One sided Wilcoxon rank sum test, p-value = 0.02). Of note, all other assemblers produce less transcript duplication than does the ORP assembly, but none of these differences arise to the level of statistical significance. 
+
+While the majority of the \texttt{BUSCO} metrics were unchanged, the number of orthologs recovered in duplicate (\textgreater 1 copy), was decreased when using the ORP. This difference is important, given that the relative frequency of transcript duplication may have important implications for downstream abundance estimation, with less  duplication potentially resulting in more accurate estimation. Although gene expression quantitation software \citep{Patro:2017iv,Bray:2016ee} probabilistically assigns reads to transcripts in an attempt at mitigating this issue, a primary solution related to decreasing artificial transcript duplication could offer significant advantages.
+
+
+\textbf{\hypertarget{Figure 3}{Figure 3}} \\
+\DIFdelbegin %DIFDELCMD < \centerline{\includegraphics[width=25.0\baselineskip]{Fig3.png}}
+%DIFDELCMD < %%%
+\DIFdelend \DIFaddbegin \centerline{\includegraphics[width=15.0\baselineskip]{Fig3.png}}
+\DIFaddend \begin{quote}
+\small{Figure 3. \texttt{Shmlast} and \texttt{BUSCO} generated statistics. Split violin plots depict the relationship between \texttt{Trinity} assemblies (brown color) and ORP produced assemblies (blue color). Red and black dots indicate the value of a given metric for each assembly. Lines connecting the red and black dots connect datasets assembled via the two methods.}
+\end{quote} 
+
+\subsubsection{Assembler Contributions}
+
+To understand the relative contribution of each assembler to the final merged assembly produced by the Oyster River Protocol, I counted the number of transcripts in the final merged assembly that originated from a given assembler (Figure 4). On average, 36\% of transcripts in the merged assembly were produced by the \texttt{Trinity} assembler. 16\% were produced by \texttt{Shannon}. \texttt{SPAdes} run with a kmer value of length=55 produced 28\% of transcripts, while \texttt{SPAdes} run with a kmer value of length=75 produced 20\% of transcripts 
+
+\textbf{\hypertarget{Figure 4}{Figure 4}} \\
+\centerline{\includegraphics[width=25.0\baselineskip]{Fig4.png}}
+\begin{quote}
+\DIFdelbegin %DIFDELCMD < \small{Figure 4 describes the percent contribution of each assembler to the final ORP assembly.}
+%DIFDELCMD < %%%
+\DIFdelend \DIFaddbegin \small{Figure 4 describes the contribution of each assembler to the final ORP assembly. Violin plots illustrate that Shannon contributes on average the fewest number of transcripts to the final merged assembly, while Trinity contributes on average the most. Small dashed lines on each side of the plot mark the median of the distribution. }
+\DIFaddend \end{quote} 
+
+
+To further understand the potential biases intrinsic to each assembler, I plotted the distribution of gene expression estimates for each merged assembly, broken down by the assembler of origin (Figure 5, depicting four randomly selected representative assemblies). As is evident, most transcripts are lowly expressed, with \texttt{SPAdes} and \texttt{Trinity} both doing a sufficient job in reconstructing these transcripts. Of note, the \texttt{SPAdes} assemblies using kmer-length=75 is biased, as expected, towards more highly expressed transcripts relative to kmer-length 55 assemblies. \texttt{Shannon} demonstrates a unique profile, consisting of, almost exclusively high-expression transcripts, showing a previously undescribed bias against low-abundance transcripts. These differences may reflect a set of assembler-specific heuristics which translate into differential recovery of distinct fractions of the transcript community. Figure 5 and Table 2 describe the outcomes of these processes in terms of transcript recovery. Taken together, these expression profiles suggest a mechanism by which the ORP outperforms single-assembler assemblies. While there is substantial overlap in transcript recovery, each assembler recovers unique transcripts (Table 2 and Figure 5) based on expression (and potentially other properties), which when merged together into a final assembly, increases the completeness 
+
+ 
+
+\textbf{\hypertarget{Figure 5}{Figure 5}} \\
+\centerline{\includegraphics[width=25.0\baselineskip]{Fig5.png}}
+\begin{quote}
+\DIFdelbegin %DIFDELCMD < \small{Figure 5 depicts the distribution of gene expression (log(TPM+1)), broken down by individual assembly, for four representative datasets. As predicted, the use of a higher kmer value with the \texttt{SPAdes} assembler resulted in biasing reconstruction towards more highly expressed transcripts. Interestingly, \texttt{Shannon} uniquely exhibits a bias towards the reconstruction of high-expression transcripts (or away from low-abundance transcripts).}
+%DIFDELCMD < %%%
+\DIFdelend \DIFaddbegin \small{Figure 5 depicts the density distribution of gene expression (log(TPM+1)), broken down by individual assembly, for four representative datasets. As predicted, the use of a higher kmer value with the \texttt{SPAdes} assembler resulted in biasing reconstruction towards more highly expressed transcripts. Interestingly, \texttt{Shannon} uniquely exhibits a bias towards the reconstruction of high-expression transcripts (or away from low-abundance transcripts).}
+\DIFaddend \end{quote} 
+
+
+\subsection{Quality is independent of read depth}
+
+This study included read datasets of a variety of sizes. Because of this, I was interested in understanding if the number of reads used in assembly was strongly related to the quality of the resultant assembly. Conclusively, this study demonstrates that between 30 million paired-end reads and 200 million paired-end reads, no strong patterns in quality are evident (Figure 6). This finding is in line with previous work, \citep{MacManes:2015iz} suggesting that assembly metrics plateau at between 20M and 40M read pairs, with sequencing beyond this level resulting in minimal gain in performance.  
+
+
+\textbf{\hypertarget{Figure 6}{Figure 6}} \\
+\centerline{\includegraphics[width=25.0\baselineskip]{Fig6.png}}
+\begin{quote}
+\small{Figure 6 depicts the relationship between a subset of assembly metrics and the number of read pairs. There is no significant relationship. In all cases the x-axis is millions of paired-end reads. }
+\end{quote}
+
+
+    
+
+%DIF < Lastly, though the same read data were assembled, each assembler reconstructed unique transcripts. Using the dataset DRR069093 as an example, across the four different assemblies, a sum of 276852 SwissProt entries were matched. Of these 86\% were recovered in all four assemblies. The \texttt{SPAdes} assembly using a kmer value of 55 recovered 96\% of all transcripts, while the \texttt{SPAdes} assembly using a kmer value of 75 recovered 93\%. The \texttt{Trinity} assembly recovered 96\% of the transcripts, while \texttt{Shannon} recovered 90\%. Depicted in Figure 4, the \texttt{SPAdes} assembly using a kmer value of 55 recovered 3749 unique transcripts, \texttt{Trinity} recovered 3055, \texttt{Shannon} recovered 2526, and \texttt{SPAdes} assembly using a kmer value of 75 recovered 775. 
+\DIFdelbegin %DIFDELCMD < 
+
+%DIFDELCMD < %%%
+%DIF < \textbf{\hypertarget{Figure 4}{Figure 4}} \\
+%DIF < \centerline{\includegraphics[width=25.0\baselineskip]{upset.eps}}
+%DIF < \begin{quote}
+%DIF < \small{Figure 4 depicts the overlap in identified transcripts between the various assemblies for one representative (DRR069093) dataset.}
+%DIF < \end{quote}
+%DIFDELCMD < 
+
+%DIFDELCMD < %%%
+%DIF < \section{Discussion}
+%DIFDELCMD < 
+
+%DIFDELCMD < %%%
+%DIF < For non-model organisms lacking reference genomic resources, the error correction, adapter and quality trimmed reads may be assembled \textit{de novo} into transcripts. While the assembly package \texttt{Trinity} \citep{Haas:2013jq} is thought to be the most accurate stand-alone assembler \citep{Li:2014cm}, this study demonstrates that a merged assembly with multiple assemblers (and kmer lengths) results in a higher quality assembly. Specifically, the Oyster River Protocol, which contains a recipe for read error correction, quality trimming, assembly with multiple software packages and merging, resulted in a final assembly, the structure of which was greatly improved. 
+%DIFDELCMD < 
+
+%DIFDELCMD < %%%
+%DIF < Two packages used to evaluate the structure of assemblies, \texttt{TransRate} and \texttt{Detaonate}, demonstrated significant improvement of assembly quality by using the Oyster River Protocol for transcriptome assembly. One metric in particular, the read mapping metric, was vastly improved (Figure 1A). The aspect of quality that this metric assays is critical - specifically measuring how representative of the reads the assembly is. If we assume that the vast majority of generated reads come from the biological sample under study, when reads fail to map, that fraction of the biology is lost from all downstream analysis and inference. This study conclusively demonstrates that across a wide variety of taxa, assembling RNAseq reads with \texttt{Trinity} alone may result in a substantial decrease in mapping rate and in turn, the lost ability to draw conclusions from that fraction of the sample. 
+%DIFDELCMD < 
+
+%DIFDELCMD < %%%
+%DIF < Similar to the \texttt{TransRate} and \texttt{Detaonate} scores, the number of conditional reciprocal blast hits was increased by using the 
+%DIFDELCMD < 
+
+%DIFDELCMD < %%%
+%DIF < In contrast to \texttt{TransRate} scores, the \texttt{BUSCO} metrics were essentially unchanged by assembly with the Oyster River Protocol. The recovery of complete orthologs, the proportion of orthologs reconstructed in fragmented form, and missing orthologs were stable across both assembly methods. The number of orthologs recovered in duplicate (\textgreater 1 copy), was decreased when using the ORP. I hypothesize that the relative frequency of transcript duplication may have important implications for downstream abundance estimation, with less  duplication potentially resulting in more accurate estimation. While gene expression quantitation software \citep{Patro:2017iv,Bray:2016ee} probabilistically assigns reads to transcripts in an attempt at mitigating this issue, while not evaluated as part of this work, a primary solution related to decreasing artificial transcript duplication could offer significant advantages.
+%DIFDELCMD < 
+
+%DIFDELCMD < %%%
+%DIF < \subsection{Each Assembler Recovers Different Transcripts}
+%DIFDELCMD < 
+
+%DIFDELCMD < %%%
+%DIF < The main benefit of the Oyster River Protocol is related to the fact that assemblies are constructed four different ways, using three different assemblers (\texttt{Trinity}, \texttt{Shannon}, \texttt{SPAdes}) and three different values for kmer length (k=25,55,75). As described above, each assembler carries with it a set of heuristics, and these heuristics translate into differential recovery of distinct fractions of the transcript community. Figure 3 depicts this process. Looking at the distribution of gene expression, within the \texttt{SPAdes} assemblies, kmer length influences the recovery of transcripts, with longer kmers shifting the distribution to more highly expressed transcripts. Interestingly, \texttt{Shannon} seems to have a very different set of expression-based biases, demonstrating an apparent bias against low-abundance transcripts. Trinity exhibits a typical distribution, similar to the \texttt{SPAdes} assembler using a shorter value for kmer length. 
+%DIFDELCMD < 
+
+%DIFDELCMD < %%%
+%DIF < Taken together, these expression profiles suggest a mechanism by which the ORP outperforms, \texttt{Trinity}, and presumably other single-assembler assemblies. While there is substantial overlap in transcript recovery, each assembler recovers unique transcripts (Figure 5), based on expression (and potentially other properties), which when merged together into a final assembly, increases the completeness 
+%DIFDELCMD < 
+
+%DIFDELCMD < %%%
+%DIF < \subsection{Does Taxonomy Influence Assembly Quality?}
+%DIFDELCMD < 
+
+%DIFDELCMD < %%%
+%DIF < Because I was interested in designing a study with broad applicability, I chose read datasets that represented a variety of Eukaryotic groups. Although not originally designed for this purpose, this decision may allow me to understand the influence that intrinsic properties of transcription and transcriptome complexity in different taxonomic groupings may have on assembly. Figure 5 depicts several previously described assembly metrics, broken down by assembly method and by taxonomic group. Given the small sample (n=4 vertebrate, n=5 plant, n=6 invertebrate), it is impossible to draw strong conclusions, but generally, both \texttt{Trinity} and the Oyster River Protocol perform equally well across groups. Invertebrate assembly seems to be the most variable in resultant quality, though this may be driven by low sample size coupled with the specific (potentially low quality) datasets chosen at random. 
+%DIF < \newpage
+%DIF < \textbf{\hypertarget{Figure 6}{Figure 6}} \\
+%DIF < \centerline{\includegraphics[width=25.0\baselineskip]{bytaxa.eps}}
+%DIF < \begin{quote}
+%DIF < \small{Figure 6 depicts a subset of assembly metrics broken down by taxonomic group. In general, no consistent patterns are observed, suggesting that the described assembly protocol performs well across eukaryotic groups.}
+%DIF < \end{quote} 
+%DIFDELCMD < 
+
+%DIFDELCMD < %%%
+\section{\DIFdel{Conclusions}}
+%DIFAUXCMD
+\addtocounter{section}{-1}%DIFAUXCMD
+%DIFDELCMD < 
+
+%DIFDELCMD < %%%
+\DIFdel{For non-model organisms lacking reference genomic resources, the error corrected, adapter- and quality-trimmed reads must be assembled }\textit{\DIFdel{de novo}} %DIFAUXCMD
+\DIFdel{into transcripts. While the assembly package }\texttt{\DIFdel{Trinity}} %DIFAUXCMD
+\DIFdel{\mbox{%DIFAUXCMD
+\citep{Haas:2013jq} }%DIFAUXCMD
+is thought to currently be the most accurate stand-alone assembler \mbox{%DIFAUXCMD
+\citep{Li:2014cm}}%DIFAUXCMD
+, a merged assembly with multiple assemblers results in higher quality assemblies. Specifically, use of the Oyster River Protocol, which contains a recipe for read error correction, quality trimming, assembly with multiple software packages, and merging resulted in a final assembly, the structure of which was greatly improved. 
+}%DIFDELCMD < 
+
+%DIFDELCMD < %%%
+\DIFdel{Specifically, the improvements in assembly metrics described here are attributed to the multi-way approach, where three different assemblers and three different kmer lengths were used. This approach allows the strengths of one assembler to effectively complement the weaknesses of another, thereby resulting in a more complete assembly than otherwise possible. These enhancements are important, as unassembled transcripts are invisible to all downstream analysis.      
+}%DIFDELCMD < 
+
+%DIFDELCMD < %%%
+\DIFdelend \section*{Acknowledgments}
+
+This work was significantly improved by discussions with \DIFaddbegin \DIFadd{Anthony Westbrook, }\DIFaddend Richard Smith-Unna \DIFdelbegin \DIFdel{, Rob Patro , }\DIFdelend \DIFaddbegin \DIFadd{and Rob Patro and reviewers }\DIFaddend C. Titus Brown, Brian Haas\DIFdelbegin \DIFdel{and many others. More generally, the work and its presentation has been influenced by supporters of the Open Access and Open Science movements}\DIFdelend \DIFaddbegin \DIFadd{, and Nick Schurch. MacManes is supported by the NSF (IOS 1455960, OCE 1455960, DEB 1655585), XSEDE (MCB110134), and the UNH Research and Computing Center}\DIFaddend . 
+
+%\section*{References}
+
+\printbibliography
+
+
+
+
+
+\end{document}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		
