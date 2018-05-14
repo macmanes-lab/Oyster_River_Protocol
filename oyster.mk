@@ -211,12 +211,12 @@ ${DIR}/quants/orthomerged/quant.sf:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 
 ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta.gz.x.uniprot_sprot.fasta.crbl.csv:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta ${DIR}/assemblies/${RUNOUT}.shannon.fasta ${DIR}/assemblies/${RUNOUT}.spades75.fasta ${DIR}/assemblies/${RUNOUT}.spades55.fasta ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
 	( \
-	source ${DIR}/software/anaconda/install/bin/activate; \
-	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -d ${DIR}/assemblies/shmlast/uniprot_sprot.fasta --n_threads $(CPU); \
-	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.shannon.fasta -d ${DIR}/assemblies/shmlast/uniprot_sprot.fasta --n_threads $(CPU); \
-	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.spades75.fasta -d ${DIR}/assemblies/shmlast/uniprot_sprot.fasta --n_threads $(CPU); \
-	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.spades55.fasta -d ${DIR}/assemblies/shmlast/uniprot_sprot.fasta --n_threads $(CPU); \
-	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta -d ${DIR}/assemblies/shmlast/uniprot_sprot.fasta --n_threads $(CPU); \
+	source ${MAKEDIR}/software/anaconda/install/bin/activate; \
+	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -d ${MAKEDIR}/software/shmlast/uniprot_sprot.fasta --n_threads $(CPU); \
+	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.shannon.fasta -d ${MAKEDIR}/software/shmlast/uniprot_sprot.fasta --n_threads $(CPU); \
+	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.spades75.fasta -d ${MAKEDIR}/software/shmlast/uniprot_sprot.fasta --n_threads $(CPU); \
+	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.spades55.fasta -d ${MAKEDIR}/software/shmlast/uniprot_sprot.fasta --n_threads $(CPU); \
+	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta -d ${MAKEDIR}/software/shmlast/uniprot_sprot.fasta --n_threads $(CPU); \
 	source deactivate; \
 	)
 
