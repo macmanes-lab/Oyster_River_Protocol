@@ -51,7 +51,7 @@ run_shannon:${DIR}/assemblies/${RUNOUT}.shannon.fasta
 merge:${DIR}/orthofuse/${RUNOUT}/merged.fasta
 orthotransrate:${DIR}/orthofuse/${RUNOUT}/orthotransrate.done
 orthofusing:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
-salmon:${DIR}/quants/salmon_orthomerged_${RUNOUT}
+salmon:${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf
 shmlast:${DIR}/assemblies/shmlast/${RUNOUT}.trinity.crbl.csv
 main: setup check welcome run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_shannon merge orthotransrate orthofusing salmon shmlast report
 orthofuse:merge orthotransrate orthofusing
