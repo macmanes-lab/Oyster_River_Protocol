@@ -8,7 +8,7 @@ SHELL=/bin/bash -o pipefail
 # oyster.mk orthofuse FASTADIR= READ1= READ2= MEM=500 CPU=24 RUNOUT=runname
 #
 
-VERSION = 1.1.1
+VERSION = 1.2.0
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
 CPU=16
@@ -52,8 +52,8 @@ merge:${DIR}/orthofuse/${RUNOUT}/merged.fasta
 orthotransrate:${DIR}/orthofuse/${RUNOUT}/orthotransrate.done
 orthofusing:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 salmon:${DIR}/quants/orthomerged/quant.sf
-
-main: setup check welcome run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_shannon merge orthotransrate orthofusing salmon report
+shmlast:${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta.gz.x.uniprot_sprot.fasta.crbl.csv
+main: setup check welcome run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_shannon merge orthotransrate orthofusing salmon shmlast report
 orthofuse:merge orthotransrate orthofusing
 report:busco transrate reportgen
 busco:${DIR}/reports/busco.done
@@ -209,7 +209,7 @@ ${DIR}/quants/orthomerged/quant.sf:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	salmon quant --no-version-check -p $(CPU) -i ${RUNOUT}.ortho.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/salmon_orthomerged_${RUNOUT}
 	rm -fr ${RUNOUT}.ortho.idx
 
-${DIR}/assemblies/${RUNOUT}.orthomerged.fasta ${DIR}/assemblies/${RUNOUT}.shannon.fasta ${DIR}/assemblies/${RUNOUT}.spades75.fasta ${DIR}/assemblies/${RUNOUT}.spades55.fasta ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta:
+${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta.gz.x.uniprot_sprot.fasta.crbl.csv:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta ${DIR}/assemblies/${RUNOUT}.shannon.fasta ${DIR}/assemblies/${RUNOUT}.spades75.fasta ${DIR}/assemblies/${RUNOUT}.spades55.fasta ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
 	( \
 	source ${DIR}/software/anaconda/install/bin/activate; \
 	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -d ${DIR}/assemblies/shmlast/uniprot_sprot.fasta --n_threads $(CPU); \

@@ -207,7 +207,7 @@ else
 	fi
 endif
 
-postscript:brew setup mcl samtools hmmer quorum orthofuser rcorrector blast spades trinity shannon seqtk busco trimmomatic transrate bowtie2 salmon
+postscript:brew setup shmlast lastal mcl samtools hmmer quorum orthofuser rcorrector blast spades trinity shannon seqtk busco trimmomatic transrate bowtie2 salmon
 	@printf "\n\n*** The following location(s), if any print, need to be added to your PATH ***"
 	@printf "\n*** They will be automatically to your ~/.profile or ~/.bash_profile ***\n\n"
 	@cat pathfile
