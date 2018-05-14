@@ -209,6 +209,17 @@ ${DIR}/quants/orthomerged/quant.sf:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	salmon quant --no-version-check -p $(CPU) -i ${RUNOUT}.ortho.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/salmon_orthomerged_${RUNOUT}
 	rm -fr ${RUNOUT}.ortho.idx
 
+${DIR}/assemblies/${RUNOUT}.orthomerged.fasta ${DIR}/assemblies/${RUNOUT}.shannon.fasta ${DIR}/assemblies/${RUNOUT}.spades75.fasta ${DIR}/assemblies/${RUNOUT}.spades55.fasta ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta:
+	( \
+	source ${DIR}/software/anaconda/install/bin/activate; \
+	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -d ${DIR}/assemblies/shmlast/uniprot_sprot.fasta --n_threads $(CPU); \
+	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.shannon.fasta -d ${DIR}/assemblies/shmlast/uniprot_sprot.fasta --n_threads $(CPU); \
+	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.spades75.fasta -d ${DIR}/assemblies/shmlast/uniprot_sprot.fasta --n_threads $(CPU); \
+	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.spades55.fasta -d ${DIR}/assemblies/shmlast/uniprot_sprot.fasta --n_threads $(CPU); \
+	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta -d ${DIR}/assemblies/shmlast/uniprot_sprot.fasta --n_threads $(CPU); \
+	source deactivate; \
+	)
+
 reportgen:
 	printf "\n\n*****  QUALITY REPORT FOR: ${RUNOUT} using the ORP version ${VERSION} **** \n\n"
 	printf "*****  BUSCO SCORE ~~~~~>           " | tee -a ${DIR}/reports/qualreport.${RUNOUT}

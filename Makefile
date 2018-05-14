@@ -75,12 +75,7 @@ shmlast:brew
 			 pip install shmlast; \
 			 source deactivate; \
   )
-	#source ${DIR}/software/anaconda/install/bin/activate
-	#conda update -y -n base conda
-	#conda install -y --file <(curl https://raw.githubusercontent.com/camillescott/shmlast/master/environment.txt)
-	#pip install shmlast
-	#source deactivate
-	mkdir -p ${DIR}/software/shmlast && curl -LO ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz && gzip -d uniprot_sprot.fasta.gz
+	mkdir -p ${DIR}/software/shmlast && cd ${DIR}/software/shmlast && curl -LO ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz && gzip -d uniprot_sprot.fasta.gz
 
 transrate:brew
 	cd ${DIR}/software && tar -zxf orp-transrate.tar.gz
