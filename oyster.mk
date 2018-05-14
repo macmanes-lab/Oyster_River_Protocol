@@ -53,6 +53,7 @@ orthotransrate:${DIR}/orthofuse/${RUNOUT}/orthotransrate.done
 orthofusing:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 salmon:${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf
 shmlast:${DIR}/assemblies/shmlast/${RUNOUT}.trinity.crbl.csv
+posthack:${DIR}/assemblies/shmlast/newbies.fasta
 main: setup check welcome run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_shannon merge orthotransrate orthofusing shmlast posthack salmon busco transrate report
 orthofuse:merge orthotransrate orthofusing
 report:busco transrate reportgen
@@ -207,7 +208,7 @@ ${DIR}/assemblies/shmlast/${RUNOUT}.trinity.crbl.csv:${DIR}/assemblies/${RUNOUT}
 	source deactivate; \
 	)
 
-posthack:
+${DIR}/assemblies/shmlast/newbies.fasta:${DIR}/assemblies/shmlast/${RUNOUT}.trinity.crbl.csv
 	cd ${DIR}/assemblies/shmlast/ && cut -d, -f14 ${RUNOUT}.orthomerged.crbl.csv | cut -d "|" -f3 | cut -d "_" -f1 | sort --parallel=20 |uniq > list1
 	cd ${DIR}/assemblies/shmlast/ && cut -d, -f14 ${RUNOUT}.{shannon,spades75,spades55,trinity}.crbl.csv | cut -d "|" -f3 | cut -d "_" -f1 | sort --parallel=20 |uniq > list2
 	cd ${DIR}/assemblies/shmlast/ && grep -vwf list1 list2 > list3
