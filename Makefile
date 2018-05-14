@@ -28,8 +28,10 @@ quorumpath := $(shell which quorum 2>/dev/null)
 sampath := $(shell which samtools 2>/dev/null)
 parallel := $(shell which parallel 2>/dev/null)
 last := $(shell which lastal 2>/dev/null)
+shmlast := $(shell which shmlast 2>/dev/null)
 
-all: setup brew mcl samtools hmmer quorum orthofuser rcorrector blast spades trinity shannon seqtk busco trimmomatic transrate bowtie2 salmon postscript
+
+all: setup brew parallel last shmlast mcl samtools hmmer quorum orthofuser rcorrector blast spades trinity shannon seqtk busco trimmomatic transrate bowtie2 salmon postscript
 
 .DELETE_ON_ERROR:
 
