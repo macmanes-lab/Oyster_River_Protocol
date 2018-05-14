@@ -9,6 +9,7 @@ SHELL=/bin/bash -o pipefail
 
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
+CONDAROOT = ${DIR}/software/anaconda/install/
 shannonpath := $(shell which shannon.py 2>/dev/null)
 brewpath := $(shell which brew 2>/dev/null)
 rcorrpath := $(shell which rcorrector 2>/dev/null)
@@ -27,11 +28,11 @@ busco := $(shell which run_BUSCO.py 2>/dev/null)
 quorumpath := $(shell which quorum 2>/dev/null)
 sampath := $(shell which samtools 2>/dev/null)
 parallel := $(shell which parallel 2>/dev/null)
-last := $(shell which lastal 2>/dev/null)
+lastal := $(shell which lastal 2>/dev/null)
 shmlast := $(shell which shmlast 2>/dev/null)
 
 
-all: setup brew parallel last shmlast mcl samtools hmmer quorum orthofuser rcorrector blast spades trinity shannon seqtk busco trimmomatic transrate bowtie2 salmon postscript
+all: setup brew parallel lastal shmlast mcl samtools hmmer quorum orthofuser rcorrector blast spades trinity shannon seqtk busco trimmomatic transrate bowtie2 salmon postscript
 
 .DELETE_ON_ERROR:
 
@@ -50,7 +51,7 @@ else
 endif
 
 lastal:brew
-ifdef last
+ifdef lastal
 	@echo "last is already installed"
 else
 	brew install last
@@ -64,14 +65,21 @@ else
 endif
 
 shmlast:brew
-	${DIR}/software/anaconda
+	mkdir -p ${DIR}/software/anaconda
 	cd ${DIR}/software/anaconda && curl -LO https://repo.anaconda.com/archive/Anaconda3-5.1.0-Linux-x86_64.sh
-	cd ${DIR}/software/anaconda && bash Anaconda3-5.1.0-Linux-x86_64.sh -b -p ${DIR}/software/anaconda
-	source ${DIR}/software/anaconda/bin/activate
-	conda update -y -n base conda
-	conda install -y --file <(curl https://raw.githubusercontent.com/camillescott/shmlast/master/environment.txt)
-	pip install shmlast
-	source deactivate
+	cd ${DIR}/software/anaconda && bash Anaconda3-5.1.0-Linux-x86_64.sh -b -p ${DIR}/software/anaconda/install
+	( \
+       source ${DIR}/software/anaconda/install/bin/activate; \
+       conda update -y -n base conda; \
+			 conda install -y --file <(curl https://raw.githubusercontent.com/camillescott/shmlast/master/environment.txt); \
+			 pip install shmlast; \
+			 source deactivate; \
+  )
+	#source ${DIR}/software/anaconda/install/bin/activate
+	#conda update -y -n base conda
+	#conda install -y --file <(curl https://raw.githubusercontent.com/camillescott/shmlast/master/environment.txt)
+	#pip install shmlast
+	#source deactivate
 	mkdir -p ${DIR}/software/shmlast && curl -LO ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz && gzip -d uniprot_sprot.fasta.gz
 
 transrate:brew
