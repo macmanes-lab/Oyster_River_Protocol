@@ -62,9 +62,15 @@ else
 endif
 
 shmlast:brew
-	conda install --file <(curl https://raw.githubusercontent.com/camillescott/shmlast/master/environment.txt)
+	${DIR}/software/anaconda
+	cd ${DIR}/software/anaconda && curl -LO https://repo.anaconda.com/archive/Anaconda3-5.1.0-Linux-x86_64.sh
+	cd ${DIR}/software/anaconda && bash Anaconda3-5.1.0-Linux-x86_64.sh -b -p ${DIR}/software/anaconda
+	source ${DIR}/software/anaconda/bin/activate
+	conda update -y -n base conda
+	conda install -y --file <(curl https://raw.githubusercontent.com/camillescott/shmlast/master/environment.txt)
 	pip install shmlast
-
+	source deactivate
+	mkdir -p ${DIR}/software/shmlast && curl -LO ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz && gzip -d uniprot_sprot.fasta.gz
 
 transrate:brew
 	cd ${DIR}/software && tar -zxf orp-transrate.tar.gz
