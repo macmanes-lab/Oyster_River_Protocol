@@ -10,7 +10,7 @@ All Figures: I don't like the axes used in many of the figures - axes should spa
 
 > I have modified all of the figures. Axes should at this point be more acceptable.
 
-Figure 1: no axis labels - I realise the axes are not really meaningful for MDS plots but the labels should at least state what is being plotted - MDS parameter1 vs MDS parameter 2.
+Figure 1: no axis labels - I realize the axes are not really meaningful for MDS plots but the labels should at least state what is being plotted - MDS parameter1 vs MDS parameter 2.
 
 > I have added axis labels to figure 1.
 

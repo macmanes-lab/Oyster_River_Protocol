@@ -26,7 +26,8 @@ seqtk := $(shell which seqtk 2>/dev/null)
 busco := $(shell which run_BUSCO.py 2>/dev/null)
 quorumpath := $(shell which quorum 2>/dev/null)
 sampath := $(shell which samtools 2>/dev/null)
-
+parallel := $(shell which parallel 2>/dev/null)
+last := $(shell which lastal 2>/dev/null)
 
 all: setup brew mcl samtools hmmer quorum orthofuser rcorrector blast spades trinity shannon seqtk busco trimmomatic transrate bowtie2 salmon postscript
 
@@ -45,6 +46,25 @@ ifdef brewpath
 else
 	$error("*** BREW MUST BE PROPERLY INSTALLED BEFORE YOU CAN PROCEED, SEE: http://angus.readthedocs.io/en/2016/linuxbrew_install.html ***")
 endif
+
+lastal:brew
+ifdef last
+	@echo "last is already installed"
+else
+	brew install last
+endif
+
+parallel:brew
+ifdef parallel
+	@echo "parallel is already installed"
+else
+	brew install parallel
+endif
+
+shmlast:brew
+	conda install --file <(curl https://raw.githubusercontent.com/camillescott/shmlast/master/environment.txt)
+	pip install shmlast
+
 
 transrate:brew
 	cd ${DIR}/software && tar -zxf orp-transrate.tar.gz
