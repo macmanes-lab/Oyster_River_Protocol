@@ -52,7 +52,7 @@ merge:${DIR}/orthofuse/${RUNOUT}/merged.fasta
 orthotransrate:${DIR}/orthofuse/${RUNOUT}/orthotransrate.done
 orthofusing:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 salmon:${DIR}/quants/orthomerged/quant.sf
-shmlast:${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta.gz.x.uniprot_sprot.fasta.crbl.csv
+shmlast:${DIR}/assemblies/shmlast/${RUNOUT}.trinity.Trinity.fasta.gz.x.uniprot_sprot.fasta.crbl.csv
 main: setup check welcome run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_shannon merge orthotransrate orthofusing salmon shmlast report
 orthofuse:merge orthotransrate orthofusing
 report:busco transrate reportgen
