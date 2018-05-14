@@ -194,10 +194,10 @@ ${DIR}/assemblies/shmlast/newbies.fasta:${DIR}/assemblies/shmlast/${RUNOUT}.trin
 	cd ${DIR}/assemblies/shmlast/ && cut -d, -f14 ${RUNOUT}.{shannon,spades75,spades55,trinity}.crbl.csv | cut -d "|" -f3 | cut -d "_" -f1 | sort --parallel=20 |uniq > list2
 	cd ${DIR}/assemblies/shmlast/ && grep -vwf list1 list2 > list3
 	cd ${DIR}/assemblies/shmlast/ && for item in $$(cat list3); do grep $$item ${RUNOUT}.{shannon,spades75,spades55,trinity}.crbl.csv | head -1 | cut -d, -f9 >> list4 ; done; sort list4 | uniq >> list5
-	grep -wf list5 ${RUNOUT}.orthomerged.crbl.csv | cut -d, -f9 | sort | uniq > list6
-	grep -vwf list6 list5 > list7
+	cd ${DIR}/assemblies/shmlast/ && grep -wf list5 ${RUNOUT}.orthomerged.crbl.csv | cut -d, -f9 | sort | uniq > list6
+	cd ${DIR}/assemblies/shmlast/ && grep -vwf list6 list5 > list7
 	cd ${DIR}/assemblies/shmlast/ && python ${MAKEDIR}/scripts/filter.py <(cat ../${RUNOUT}.{spades55,spades75,shannon,trinity.Trinity}.fasta) list7 >> newbies.fasta
-	cat newbies.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta > tmp.fasta && mv tmp.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
+	cd ${DIR}/assemblies/shmlast/ &&  cat newbies.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta > tmp.fasta && mv tmp.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 
 
 ${DIR}/reports/busco.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
