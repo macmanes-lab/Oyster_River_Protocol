@@ -160,8 +160,8 @@ ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
 ${DIR}/orthofuse/${RUNOUT}/orthotransrate.done:${DIR}/orthofuse/${RUNOUT}/merged.fasta
 	export END=$$(wc -l $$(find ${DIR}/orthofuse/${RUNOUT}/working/ -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}') && \
 	export ORTHOINPUT=$$(find ${DIR}/orthofuse/${RUNOUT}/working/ -name Orthogroups.txt 2> /dev/null) && \
-	echo $$(eval echo "{1..$$END}") | tr ' ' '\n' > ${DIR}/orthofuse/${RUNOUT}/list && \
-	cat ${DIR}/orthofuse/${RUNOUT}/list | parallel  -j $(CPU) -k "sed -n ''{}'p' $$ORTHOINPUT | tr ' ' '\n' | sed '1d' > ${DIR}/orthofuse/${RUNOUT}/{1}.groups"
+	echo $$(eval echo "{1..$$END}") | tr ' ' '\n' > ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.list && \
+	cat ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.list | parallel  -j $(CPU) -k "sed -n ''{}'p' $$ORTHOINPUT | tr ' ' '\n' | sed '1d' > ${DIR}/orthofuse/${RUNOUT}/{1}.groups"
 	${MAKEDIR}/software/orp-transrate/transrate -o ${DIR}/orthofuse/${RUNOUT}/merged -t $(CPU) -a ${DIR}/orthofuse/${RUNOUT}/merged.fasta --left ${READ1} --right ${READ2}
 	touch ${DIR}/orthofuse/${RUNOUT}/orthotransrate.done
 
@@ -171,11 +171,11 @@ ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/orthotr
 	echo About to delete all the text files
 	find ${DIR}/orthofuse/${RUNOUT}/ -name '*groups' -delete
 	echo Search output files
-	find ${DIR}/orthofuse/${RUNOUT}/ -name '*orthout' 2> /dev/null | parallel -j $(CPU) "awk -F, -v max=0 '{if(\$$14>max){want=\$$1; max=\$$14}}END{print want}'" >> ${DIR}/orthofuse/${RUNOUT}/good.list
+	find ${DIR}/orthofuse/${RUNOUT}/ -name '*orthout' 2> /dev/null | parallel -j $(CPU) "awk -F, -v max=0 '{if(\$$14>max){want=\$$1; max=\$$14}}END{print want}'" >> ${DIR}/orthofuse/${RUNOUT}/good.${RUNOUT}.list
 	find ${DIR}/orthofuse/${RUNOUT}/ -name '*orthout' -delete
-	python ${MAKEDIR}/scripts/filter.py ${DIR}/orthofuse/${RUNOUT}/merged.fasta ${DIR}/orthofuse/${RUNOUT}/good.list > ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta
+	python ${MAKEDIR}/scripts/filter.py ${DIR}/orthofuse/${RUNOUT}/merged.fasta ${DIR}/orthofuse/${RUNOUT}/good.${RUNOUT}.list > ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta
 	cp ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
-	rm ${DIR}/orthofuse/${RUNOUT}/good.list
+	rm ${DIR}/orthofuse/${RUNOUT}/good.${RUNOUT}.list
 
 ${DIR}/assemblies/shmlast/${RUNOUT}.trinity.crbl.csv:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta ${DIR}/assemblies/${RUNOUT}.shannon.fasta ${DIR}/assemblies/${RUNOUT}.spades75.fasta ${DIR}/assemblies/${RUNOUT}.spades55.fasta ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
 	mkdir -p ${DIR}/assemblies/shmlast
@@ -190,13 +190,13 @@ ${DIR}/assemblies/shmlast/${RUNOUT}.trinity.crbl.csv:${DIR}/assemblies/${RUNOUT}
 	)
 
 ${DIR}/assemblies/shmlast/${RUNOUT}.newbies.fasta:${DIR}/assemblies/shmlast/${RUNOUT}.trinity.crbl.csv
-	cd ${DIR}/assemblies/shmlast/ && cut -d, -f14 ${RUNOUT}.orthomerged.crbl.csv | cut -d "|" -f3 | cut -d "_" -f1 | sort --parallel=20 |uniq > list1
-	cd ${DIR}/assemblies/shmlast/ && cut -d, -f14 ${RUNOUT}.{shannon,spades75,spades55,trinity}.crbl.csv | cut -d "|" -f3 | cut -d "_" -f1 | sort --parallel=20 |uniq > list2
-	cd ${DIR}/assemblies/shmlast/ && grep -vwf list1 list2 > list3
-	cd ${DIR}/assemblies/shmlast/ && for item in $$(cat list3); do grep $$item ${RUNOUT}.{shannon,spades75,spades55,trinity}.crbl.csv | head -1 | cut -d, -f9 >> list4 ; done; sort list4 | uniq >> list5
-	cd ${DIR}/assemblies/shmlast/ && grep ">" ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta | sed 's_>__' > list6
-	cd ${DIR}/assemblies/shmlast/ && grep -vwf list6 list5 > list7
-	cd ${DIR}/assemblies/shmlast/ && python ${MAKEDIR}/scripts/filter.py <(cat ../${RUNOUT}.{spades55,spades75,shannon,trinity.Trinity}.fasta) list7 >> ${RUNOUT}.newbies.fasta
+	cd ${DIR}/assemblies/shmlast/ && cut -d, -f14 ${RUNOUT}.orthomerged.crbl.csv | cut -d "|" -f3 | cut -d "_" -f1 | sort --parallel=20 |uniq > ${RUNOUT}.list1
+	cd ${DIR}/assemblies/shmlast/ && cut -d, -f14 ${RUNOUT}.{shannon,spades75,spades55,trinity}.crbl.csv | cut -d "|" -f3 | cut -d "_" -f1 | sort --parallel=20 |uniq > ${RUNOUT}.list2
+	cd ${DIR}/assemblies/shmlast/ && grep -xFvwf ${RUNOUT}.list1 ${RUNOUT}.list2 > ${RUNOUT}.list3
+	cd ${DIR}/assemblies/shmlast/ && for item in $$(cat ${RUNOUT}.list3); do grep $$item ${RUNOUT}.{shannon,spades75,spades55,trinity}.crbl.csv | head -1 | cut -d, -f9 >> ${RUNOUT}.list4 ; done; sort ${RUNOUT}.list4 | uniq >> ${RUNOUT}.list5
+	cd ${DIR}/assemblies/shmlast/ && grep ">" ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta | sed 's_>__' > ${RUNOUT}.list6
+	cd ${DIR}/assemblies/shmlast/ && grep -xFvwf ${RUNOUT}.list6 ${RUNOUT}.list5 > ${RUNOUT}.list7
+	cd ${DIR}/assemblies/shmlast/ && python ${MAKEDIR}/scripts/filter.py <(cat ../${RUNOUT}.{spades55,spades75,shannon,trinity.Trinity}.fasta) ${RUNOUT}.list7 >> ${RUNOUT}.newbies.fasta
 	cd ${DIR}/assemblies/shmlast/ &&  cat ${RUNOUT}.newbies.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta > tmp.fasta && mv tmp.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 
 
