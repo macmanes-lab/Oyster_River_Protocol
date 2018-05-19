@@ -99,20 +99,20 @@ else
 endif
 
 mcl:brew
-ifdef mclpath
+ifdef mclpath samtools hmmer
 	@echo "MCL is already installed"
 else
 	brew install mcl
 endif
 
-hmmer:brew
+hmmer:brew samtools
 ifdef hmmerpath
 	@echo "HMMER is already installed"
 else
 	brew install hmmer
 endif
 
-bowtie2:brew
+bowtie2:brew samtools
 ifdef bowtie2path
 	@echo "BOWTIE2 is already installed"
 else
@@ -149,7 +149,7 @@ else
 	@echo PATH=\$$PATH:${DIR}/software/SPAdes-3.11.1-Linux/bin >> pathfile
 endif
 
-trinity:brew
+trinity:brew salmon shmlast
 ifdef trinity
 	@echo "TRINITY is already installed"
 else
