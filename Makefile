@@ -98,8 +98,8 @@ else
 	@echo PATH=\$$PATH:${DIR}/software/quorum/bin >> pathfile
 endif
 
-mcl:brew
-ifdef mclpath samtools hmmer
+mcl:brew samtools hmmer
+ifdef mclpath
 	@echo "MCL is already installed"
 else
 	brew install mcl
