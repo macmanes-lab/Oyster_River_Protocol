@@ -30,6 +30,7 @@ sampath := $(shell which samtools 2>/dev/null)
 parallel := $(shell which parallel 2>/dev/null)
 lastal := $(shell which lastal 2>/dev/null)
 shmlast := $(shell which shmlast 2>/dev/null)
+conda := $(shell which ${DIR}/software/anaconda/install/bin/activate 2>/dev/null)
 
 
 all: setup brew parallel lastal shmlast mcl samtools hmmer quorum orthofuser rcorrector blast spades trinity shannon seqtk busco trimmomatic transrate bowtie2 salmon postscript
@@ -65,6 +66,9 @@ else
 endif
 
 shmlast:brew
+ifdef conda
+	@echo "conda is already installed"
+else
 	mkdir -p ${DIR}/software/anaconda
 	cd ${DIR}/software/anaconda && curl -LO https://repo.anaconda.com/archive/Anaconda3-5.1.0-Linux-x86_64.sh
 	cd ${DIR}/software/anaconda && bash Anaconda3-5.1.0-Linux-x86_64.sh -b -p ${DIR}/software/anaconda/install
@@ -76,6 +80,7 @@ shmlast:brew
 			 source deactivate; \
   )
 	mkdir -p ${DIR}/software/shmlast && cd ${DIR}/software/shmlast && curl -LO ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz && gzip -d uniprot_sprot.fasta.gz
+endif
 
 transrate:brew
 	cd ${DIR}/software && tar -zxf orp-transrate.tar.gz
