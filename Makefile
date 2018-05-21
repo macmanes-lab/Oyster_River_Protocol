@@ -145,7 +145,7 @@ ifdef spades
 	@echo "SPAdes is already installed"
 else
 	cd ${DIR}/software && \
-	curl -LO http://cab.spbu.ru/files/release3.12.0/SPAdes-3.12.0-Linux.tar.gz && tar -zxf SPAdes-3.12.0-Linux.tar.gz
+	curl -LO https://github.com/ablab/spades/releases/download/v3.12.0/SPAdes-3.12.0-Linux.tar.gz && tar -zxf SPAdes-3.12.0-Linux.tar.gz
 	@echo PATH=\$$PATH:${DIR}/software/SPAdes-3.12.0-Linux/bin >> pathfile
 endif
 
