@@ -19,8 +19,8 @@ salmonpath := $(shell which salmon 2>/dev/null)
 bowtie2path := $(shell which bowtie2 2>/dev/null)
 hmmerpath := $(shell which hmmscan 2>/dev/null)
 mclpath := $(shell which mcl 2>/dev/null)
-transrate := $(shell which transrate 2>/dev/null)
-blast := $(shell which blastp 2>/dev/null)
+transrate := $(shell which ${DIR}/software/orp-transrate 2>/dev/null)
+blast := $(shell which ${DIR}/software/ncbi-blast-2.7.1+/bin/blastp 2>/dev/null)
 spades := $(shell which spades.py 2>/dev/null)
 trinity := $(shell which Trinity 2>/dev/null)
 seqtk := $(shell which seqtk 2>/dev/null)
@@ -83,8 +83,12 @@ else
 endif
 
 transrate:brew
+ifdef transrate
+	@echo "transrate is already installed"
+else
 	cd ${DIR}/software && tar -zxf orp-transrate.tar.gz
 	@echo PATH=\$$PATH:${DIR}/software/orp-transrate >> pathfile
+endif
 
 rcorrector:brew
 ifdef rcorrpath
@@ -141,9 +145,12 @@ else
 endif
 
 blast:brew
-	@echo "blastp... installing now..."
+ifdef blast
+	@echo "blast is installed..."
+else
 	cd ${DIR}/software && curl -LO ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.7.1+-x64-linux.tar.gz && tar -zxf ncbi-blast-2.7.1+-x64-linux.tar.gz
 	@echo PATH=\$$PATH:${DIR}/software/ncbi-blast-2.7.1+/bin >> pathfile
+endif
 
 spades:brew
 ifdef spades
