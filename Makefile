@@ -24,6 +24,7 @@ blast := $(shell which ${DIR}/software/ncbi-blast-2.7.1+/bin/blastp 2>/dev/null)
 spades := $(shell which spades.py 2>/dev/null)
 trinity := $(shell which Trinity 2>/dev/null)
 trinityversion = $(shell Trinity --version | grep -m1 Trinity | awk -F ": " '{print $$2}')
+salmonversion = $(shell salmon --version 2>&1 | awk -F ": " '{print $$2}')
 seqtk := $(shell which seqtk 2>/dev/null)
 busco := $(shell which run_BUSCO.py 2>/dev/null)
 quorumpath := $(shell which quorum 2>/dev/null)
@@ -162,13 +163,21 @@ else
 	@echo PATH=\$$PATH:${DIR}/software/SPAdes-3.12.0-Linux/bin >> pathfile
 endif
 
+salmon:
+ifeq ($(salmonversion),0.9.1)
+	@echo "SALMON is already installed"
+else
+	curl -LO https://github.com/COMBINE-lab/salmon/releases/download/v0.9.1/Salmon-0.9.1_linux_x86_64.tar.gz && tar -zxf Salmon-0.9.1_linux_x86_64.tar.gz
+	@echo PATH=${DIR}/software/Salmon-latest_linux_x86_64/bin:\$$PATH: >> pathfile
+endif
+
 trinity:brew salmon shmlast
 ifeq ($(trinityversion),Trinity-v2.6.6)
 	@echo "TRINITY is already installed"
 else
 	cd ${DIR}/software && \
 	git clone https://github.com/trinityrnaseq/trinityrnaseq.git && cd trinityrnaseq && make -j4
-	@echo PATH=\$$PATH:${DIR}/software/trinityrnaseq >> pathfile
+	@echo PATH=${DIR}/software/trinityrnaseq:\$$PATH: >> pathfile
 endif
 
 shannon:brew
@@ -178,14 +187,6 @@ else
 	cd ${DIR}/software && git clone https://github.com/macmanes-lab/Shannon.git
 	chmod +x software/Shannon/shannon.py
 	@echo PATH=\$$PATH:${DIR}/software/Shannon >> pathfile
-endif
-
-
-salmon:brew
-ifdef salmonpath
-	@echo "SALMON is already installed"
-else
-	brew install salmon
 endif
 
 seqtk:brew
