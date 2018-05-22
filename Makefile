@@ -23,6 +23,7 @@ transrate := $(shell which ${DIR}/software/orp-transrate 2>/dev/null)
 blast := $(shell which ${DIR}/software/ncbi-blast-2.7.1+/bin/blastp 2>/dev/null)
 spades := $(shell which spades.py 2>/dev/null)
 trinity := $(shell which Trinity 2>/dev/null)
+trinityversion = $(shell Trinity --version | grep -m1 Trinity | awk -F ": " '{print $$2}')
 seqtk := $(shell which seqtk 2>/dev/null)
 busco := $(shell which run_BUSCO.py 2>/dev/null)
 quorumpath := $(shell which quorum 2>/dev/null)
@@ -162,7 +163,7 @@ else
 endif
 
 trinity:brew salmon shmlast
-ifdef trinity
+ifeq ($(trinityversion),Trinity-v2.6.6)
 	@echo "TRINITY is already installed"
 else
 	cd ${DIR}/software && \

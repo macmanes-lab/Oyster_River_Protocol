@@ -189,6 +189,14 @@ ${DIR}/assemblies/shmlast/${RUNOUT}.trinity.crbl.csv:${DIR}/assemblies/${RUNOUT}
 	source deactivate; \
 	)
 
+#list1 is unique in orthomerged
+#list2 is unique in other assemblies
+#list3 is what is in other assemblies but not orthomerged
+#list4 is contig IDs from list3
+#list5 is unique IDs contig IDs from list4
+#list6 is contig IDs from orthomerged FASTAs
+#list7 is stuff that is in 5 but not 6
+
 ${DIR}/assemblies/shmlast/${RUNOUT}.newbies.fasta:${DIR}/assemblies/shmlast/${RUNOUT}.trinity.crbl.csv
 	cd ${DIR}/assemblies/shmlast/ && cut -d, -f14 ${RUNOUT}.orthomerged.crbl.csv | cut -d "|" -f3 | cut -d "_" -f1 | sort --parallel=20 |uniq > ${RUNOUT}.list1
 	cd ${DIR}/assemblies/shmlast/ && cut -d, -f14 ${RUNOUT}.{shannon,spades75,spades55,trinity}.crbl.csv | cut -d "|" -f3 | cut -d "_" -f1 | sort --parallel=20 |uniq > ${RUNOUT}.list2
