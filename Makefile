@@ -167,6 +167,7 @@ salmon:
 ifeq ($(salmonversion),0.9.1)
 	@echo "SALMON is already installed"
 else
+	cd ${DIR}/software && \
 	curl -LO https://github.com/COMBINE-lab/salmon/releases/download/v0.9.1/Salmon-0.9.1_linux_x86_64.tar.gz && tar -zxf Salmon-0.9.1_linux_x86_64.tar.gz
 	@echo PATH=${DIR}/software/Salmon-latest_linux_x86_64/bin:\$$PATH: >> pathfile
 endif
