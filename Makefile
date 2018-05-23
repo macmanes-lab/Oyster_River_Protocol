@@ -185,11 +185,11 @@ ifdef trinity
 ifeq ($(trinityversion),Trinity-v2.6.6)
 	@echo "The right version of TRINITY is already installed"
 else
-  @echo "TRINITY is installed, but not the right version"
-  cd ${DIR}/software/trinityrnaseq/ && git pull
+	@echo "TRINITY is installed, but not the right version"
+	cd ${DIR}/software/trinityrnaseq/ && git pull
 endif
 else
-  @echo "trinity is not installed and needs to be installed"
+	@echo "trinity is not installed and needs to be installed"
 	cd ${DIR}/software && \
 	git clone https://github.com/trinityrnaseq/trinityrnaseq.git && cd trinityrnaseq && make -j4
 	@echo PATH=${DIR}/software/trinityrnaseq:\$$PATH: >> pathfile
