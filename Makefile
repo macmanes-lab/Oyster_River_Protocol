@@ -140,7 +140,6 @@ else
 endif
 
 orthofuser:brew
-orthofuser:
 ifeq ($(orthufuserversion),2.2.6)
 	@echo "orthofuser is already installed"
 else
@@ -175,7 +174,7 @@ else
 	@echo PATH=${DIR}/software/Salmon-latest_linux_x86_64/bin:\$$PATH: >> pathfile
 endif
 
-trinity:brew salmon shmlast
+trinity:brew salmon samtools shmlast
 ifeq ($(trinityversion),Trinity-v2.6.6)
 	@echo "TRINITY is already installed"
 else
