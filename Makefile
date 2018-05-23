@@ -13,8 +13,8 @@ CONDAROOT = ${DIR}/software/anaconda/install/
 shannonpath := $(shell which shannon.py 2>/dev/null)
 brewpath := $(shell which brew 2>/dev/null)
 rcorrpath := $(shell which rcorrector 2>/dev/null)
-orthopath := $(shell which orthofuser.py 2>/dev/null)
-orthufuserversion = $(shell orthofuser.py --help | sed -n 1p | awk '{print $$3}')
+orthopath := $(shell which ${DIR}/software/OrthoFinder/orthofinder/orthofuser.py 2>/dev/null)
+orthufuserversion = $(shell orthofuser.py --help | grep "OrthoFinder version" | awk '{print $$3}')
 trimmomaticpath := $(shell which trimmomatic 2>/dev/null)
 salmonpath := $(shell which salmon 2>/dev/null)
 bowtie2path := $(shell which bowtie2 2>/dev/null)
@@ -139,11 +139,17 @@ else
 	brew install samtools
 endif
 
-orthofuser:brew
+orthofuser:
+ifdef orthopath
 ifeq ($(orthufuserversion),2.2.6)
-	@echo "orthofuser is already installed"
+	@echo "orthofuser right version is already installed"
 else
-	@echo "orthofuser needs to be installed"
+	@echo "version ${orthufuserversion}"
+	@echo "orthofuser is installed, but not the right version"
+	cd ${DIR}/software/OrthoFinder/ && git pull
+endif
+else
+	@echo "orthofuser is not installed and needs to be installed"
 	cd ${DIR}/software && git clone https://github.com/macmanes-lab/OrthoFinder.git
 	@echo PATH=\$$PATH:${DIR}/software/OrthoFinder/orthofinder >> pathfile
 endif
