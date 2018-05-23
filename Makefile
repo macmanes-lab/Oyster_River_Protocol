@@ -14,6 +14,7 @@ shannonpath := $(shell which shannon.py 2>/dev/null)
 brewpath := $(shell which brew 2>/dev/null)
 rcorrpath := $(shell which rcorrector 2>/dev/null)
 orthopath := $(shell which orthofuser.py 2>/dev/null)
+orthufuserversion = $(shell orthofuser.py --help | sed -n 1p | awk '{print $$3}')
 trimmomaticpath := $(shell which trimmomatic 2>/dev/null)
 salmonpath := $(shell which salmon 2>/dev/null)
 bowtie2path := $(shell which bowtie2 2>/dev/null)
@@ -22,6 +23,7 @@ mclpath := $(shell which mcl 2>/dev/null)
 transrate := $(shell which ${DIR}/software/orp-transrate 2>/dev/null)
 blast := $(shell which ${DIR}/software/ncbi-blast-2.7.1+/bin/blastp 2>/dev/null)
 spades := $(shell which spades.py 2>/dev/null)
+spadesversion = $(shell rnaspades.py -v | awk '{print $$2}')
 trinity := $(shell which Trinity 2>/dev/null)
 trinityversion = $(shell Trinity --version | grep -m1 Trinity | awk -F ": " '{print $$2}')
 salmonversion = $(shell salmon --version 2>&1 | awk -F ": " '{print $$2}')
@@ -138,10 +140,11 @@ else
 endif
 
 orthofuser:brew
-ifdef orthopath
-	@echo "ORTHOFUSER is already installed"
+orthofuser:
+ifeq ($(orthufuserversion),2.2.6)
+	@echo "orthofuser is already installed"
 else
-	@touch pathfile
+	@echo "orthofuser needs to be installed"
 	cd ${DIR}/software && git clone https://github.com/macmanes-lab/OrthoFinder.git
 	@echo PATH=\$$PATH:${DIR}/software/OrthoFinder/orthofinder >> pathfile
 endif
@@ -155,8 +158,8 @@ else
 endif
 
 spades:brew
-ifdef spades
-	@echo "SPAdes is already installed"
+ifeq ($(spadesversion),v3.12.0)
+	@echo "spades is already installed"
 else
 	cd ${DIR}/software && \
 	curl -LO https://github.com/ablab/spades/releases/download/v3.12.0/SPAdes-3.12.0-Linux.tar.gz && tar -zxf SPAdes-3.12.0-Linux.tar.gz
