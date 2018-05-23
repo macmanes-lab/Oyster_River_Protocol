@@ -24,7 +24,7 @@ transrate := $(shell which ${DIR}/software/orp-transrate 2>/dev/null)
 blast := $(shell which ${DIR}/software/ncbi-blast-2.7.1+/bin/blastp 2>/dev/null)
 spades := $(shell which spades.py 2>/dev/null)
 spadesversion = $(shell rnaspades.py -v | awk '{print $$2}')
-trinity := $(shell which Trinity 2>/dev/null)
+trinity := $(shell which ${DIR}/software/trinityrnaseq/Trinity 2>/dev/null)
 trinityversion = $(shell Trinity --version | grep -m1 Trinity | awk -F ": " '{print $$2}')
 salmonversion = $(shell salmon --version 2>&1 | awk -F ": " '{print $$2}')
 seqtk := $(shell which seqtk 2>/dev/null)
@@ -181,9 +181,15 @@ else
 endif
 
 trinity:brew salmon samtools shmlast
+ifdef trinity
 ifeq ($(trinityversion),Trinity-v2.6.6)
-	@echo "TRINITY is already installed"
+	@echo "The right version of TRINITY is already installed"
 else
+  @echo "TRINITY is installed, but not the right version"
+  cd ${DIR}/software/trinityrnaseq/ && git pull
+endif
+else
+  @echo "trinity is not installed and needs to be installed"
 	cd ${DIR}/software && \
 	git clone https://github.com/trinityrnaseq/trinityrnaseq.git && cd trinityrnaseq && make -j4
 	@echo PATH=${DIR}/software/trinityrnaseq:\$$PATH: >> pathfile
