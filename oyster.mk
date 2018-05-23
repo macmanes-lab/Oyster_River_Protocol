@@ -228,7 +228,7 @@ clean:
 	${DIR}/assemblies/${RUNOUT}.spades55.fasta ${DIR}/assemblies/${RUNOUT}.spades75.fasta ${DIR}/assemblies/${RUNOUT}.shannon.fasta \
 	${DIR}/orthofuse/${RUNOUT}/merged.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta ${DIR}/assemblies/shmlast/${RUNOUT}.trinity.crbl.csv \
 	${DIR}/assemblies/shmlast/${RUNOUT}.newbies.fasta ${DIR}/reports/busco.done ${DIR}/reports/transrate.done ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf \
-	${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
+	${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq ${DIR}/reports/run_${RUNOUT}.orthomerged/
 
 reportgen:
 	printf "\n\n*****  QUALITY REPORT FOR: ${RUNOUT} using the ORP version ${VERSION} **** \n\n"
