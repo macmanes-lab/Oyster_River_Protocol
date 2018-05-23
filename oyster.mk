@@ -224,7 +224,7 @@ ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf:${DIR}/assemblies/${RUNOUT}.
 	rm -fr ${RUNOUT}.ortho.idx
 
 clean:
-	rm -f ${DIR}/rcorr/${RUNOUT}.TRIM_{1,2}P.fastq ${DIR}/rcorr/${RUNOUT}.TRIM_{1,2}P.cor.fq ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta \
+	rm -fr ${DIR}/orthofuse/${RUNOUT}/ ${DIR}/rcorr/${RUNOUT}.TRIM_{1,2}P.fastq ${DIR}/rcorr/${RUNOUT}.TRIM_{1,2}P.cor.fq ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta \
 	${DIR}/assemblies/${RUNOUT}.spades55.fasta ${DIR}/assemblies/${RUNOUT}.spades75.fasta ${DIR}/assemblies/${RUNOUT}.shannon.fasta \
 	${DIR}/orthofuse/${RUNOUT}/merged.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta ${DIR}/assemblies/shmlast/${RUNOUT}.trinity.crbl.csv \
 	${DIR}/assemblies/shmlast/${RUNOUT}.newbies.fasta ${DIR}/reports/busco.done ${DIR}/reports/transrate.done ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf
