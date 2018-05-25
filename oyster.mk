@@ -189,6 +189,7 @@ ${DIR}/assemblies/shmlast/${RUNOUT}.trinity.crbl.csv:${DIR}/assemblies/${RUNOUT}
 	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta -d ${MAKEDIR}/software/shmlast/uniprot_sprot.fasta --n_threads $(CPU) -o ${DIR}/assemblies/shmlast/${RUNOUT}.trinity.crbl.csv; \
 	source deactivate; \
 	)
+	rm -f ${DIR}/${RUNOUT}*csv ${DIR}/${RUNOUT}*pdf ${DIR}/assemblies/${RUNOUT}*map
 
 #list1 is unique in orthomerged
 #list2 is unique in other assemblies
