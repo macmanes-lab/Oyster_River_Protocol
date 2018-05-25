@@ -168,7 +168,7 @@ ${DIR}/orthofuse/${RUNOUT}/orthotransrate.done:${DIR}/orthofuse/${RUNOUT}/merged
 
 ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/orthotransrate.done
 	echo All the text files are made, start GREP
-	find ${DIR}/orthofuse/${RUNOUT}/ -name '*groups' 2> /dev/null | parallel -j $(CPU) "grep -wf {} $$(find ${DIR}/orthofuse/${RUNOUT}/ -name contigs.csv 2> /dev/null) > {1}.orthout 2> /dev/null"
+	find ${DIR}/orthofuse/${RUNOUT}/ -name '*groups' 2> /dev/null | parallel -j $(CPU) "grep -xFvwf {} $$(find ${DIR}/orthofuse/${RUNOUT}/ -name contigs.csv 2> /dev/null) > {1}.orthout 2> /dev/null"
 	echo About to delete all the text files
 	find ${DIR}/orthofuse/${RUNOUT}/ -name '*groups' -delete
 	echo Search output files
@@ -202,8 +202,8 @@ ${DIR}/assemblies/shmlast/${RUNOUT}.newbies.fasta:${DIR}/assemblies/shmlast/${RU
 	cd ${DIR}/assemblies/shmlast/ && cut -d, -f14 ${RUNOUT}.orthomerged.crbl.csv | cut -d "|" -f3 | cut -d "_" -f1 | sort --parallel=20 |uniq > ${RUNOUT}.list1
 	cd ${DIR}/assemblies/shmlast/ && cut -d, -f14 ${RUNOUT}.{shannon,spades75,spades55,trinity}.crbl.csv | cut -d "|" -f3 | cut -d "_" -f1 | sort --parallel=20 |uniq > ${RUNOUT}.list2
 	cd ${DIR}/assemblies/shmlast/ && grep -xFvwf ${RUNOUT}.list1 ${RUNOUT}.list2 > ${RUNOUT}.list3
-	cd ${DIR}/assemblies/shmlast/ && for item in $$(cat ${RUNOUT}.list3); do grep $$item ${RUNOUT}.{shannon,spades75,spades55,trinity}.crbl.csv | head -1 | cut -d, -f9 >> ${RUNOUT}.list4 ; done; sort ${RUNOUT}.list4 | uniq >> ${RUNOUT}.list5
-	cd ${DIR}/assemblies/shmlast/ && grep ">" ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta | sed 's_>__' > ${RUNOUT}.list6
+	cd ${DIR}/assemblies/shmlast/ && for item in $$(cat ${RUNOUT}.list3); do grep -xF $$item ${RUNOUT}.{shannon,spades75,spades55,trinity}.crbl.csv | head -1 | cut -d, -f9 >> ${RUNOUT}.list4 ; done; sort ${RUNOUT}.list4 | uniq >> ${RUNOUT}.list5
+	cd ${DIR}/assemblies/shmlast/ && grep -xF ">" ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta | sed 's_>__' > ${RUNOUT}.list6
 	cd ${DIR}/assemblies/shmlast/ && grep -xFvwf ${RUNOUT}.list6 ${RUNOUT}.list5 > ${RUNOUT}.list7
 	cd ${DIR}/assemblies/shmlast/ && python ${MAKEDIR}/scripts/filter.py <(cat ../${RUNOUT}.{spades55,spades75,shannon,trinity.Trinity}.fasta) ${RUNOUT}.list7 >> ${RUNOUT}.newbies.fasta
 	cd ${DIR}/assemblies/shmlast/ &&  cat ${RUNOUT}.newbies.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta > tmp.fasta && mv tmp.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
