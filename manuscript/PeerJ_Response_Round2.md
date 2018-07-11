@@ -1,5 +1,7 @@
 #Response To Review
 
+## Reviewer 1
+
 > Thanks Nick for the careful review. The figures have been significantly tightened up - thanks for pushing me to do this! They are much better as a result!
 
 The author has included a justification for why he chose these three tools for the ORP as opposed to any other of the myriad of different tools. I'd like to see a reference to the description of the characteristics of these tools in the introduction put in here so a reader who did not read the introduction knows where to look for this summary information!
@@ -29,3 +31,9 @@ Figure 5: I really don't like Joy plots (yes, I know they are the rage and peopl
  The conclusion section is completely lacking in quantitative detail and repeats much of what has been said earlier in the paper. I'd suggest either removing it completely or, if you want to keep it (or the journal require it), then be precise and quantitative in it. Where does ORP do better and y how much does it do better.
 
  > I have removed this section. I agree that it added nothing.
+
+ ## Reviewer 2
+
+Figure 1 is confusing and I question whether it is valid, as one would expect assemblies to cluster together according to organism type rather than by assembly method, and perhaps within each organism type, there might be some relationship among the methods with some being more similar to others. Instead, the distance metric appears to be showing a large batch effect where the primary difference is the program being used. Quite surprising...
+
+> I agree that this is a surprising result. I've looked at this many times (and shopped it to several colleagues), and at this point believe that it accurately represents the data, rather than it being an analytical artifact. I'm keen to see what readers think! 
