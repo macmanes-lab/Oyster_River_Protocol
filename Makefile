@@ -10,11 +10,13 @@ SHELL=/bin/bash -o pipefail
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
 CONDAROOT = ${DIR}/software/anaconda/install/
-orthopath := $(shell which ${DIR}/software/OrthoFinder/orthofinder/orthofuser.py 2>/dev/null)
+orthopath := $(shell which orthofuser.py 2>/dev/null)
 orthufuserversion = $(shell orthofuser.py --help | grep "OrthoFinder version" | awk '{print $$3}')
-transrate := $(shell which ${DIR}/software/orp-transrate 2>/dev/null)
+transrate := $(shell which ${DIR}/software/transrate 2>/dev/null)
 transabysspath := $(shell which ${DIR}/software/transabyss/transabyss 2>/dev/null)
 conda := $(shell which conda 2>/dev/null)
+shmlast_data := $(shell ls ${DIR}/software/shmlast/uniprot_sprot.fasta 2>/dev/null)
+busco_data := $(shell ls ${DIR}/busco_dbs/eukaryota_odb9 2>/dev/null)
 
 
 all: setup conda orthofuser transrate transabyss shmlast_data busco_data postscript
@@ -58,15 +60,11 @@ else
 endif
 
 busco_data:
+ifdef busco_data
+else
 	mkdir ${DIR}/busco_dbs && cd ${DIR}/busco_dbs
 	cd ${DIR}/busco_dbs && wget http://busco.ezlab.org/v2/datasets/eukaryota_odb9.tar.gz && tar -zxf eukaryota_odb9.tar.gz
-	cd ${DIR}/busco_dbs && wget http://busco.ezlab.org/v2/datasets/metazoa_odb9.tar.gz
-	cd ${DIR}/busco_dbs && wget http://busco.ezlab.org/v2/datasets/arthropoda_odb9.tar.gz
-	cd ${DIR}/busco_dbs && wget http://busco.ezlab.org/v2/datasets/insecta_odb9.tar.gz
-	cd ${DIR}/busco_dbs && wget http://busco.ezlab.org/v2/datasets/vertebrata_odb9.tar.gz
-	cd ${DIR}/busco_dbs && wget http://busco.ezlab.org/v2/datasets/tetrapoda_odb9.tar.gz
-	cd ${DIR}/busco_dbs && wget http://busco.ezlab.org/v2/datasets/aves_odb9.tar.gz
-	cd ${DIR}/busco_dbs && wget http://busco.ezlab.org/v2/datasets/mammalia_odb9.tar.gz
+endif
 
 transrate:
 ifdef transrate
