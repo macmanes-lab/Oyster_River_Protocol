@@ -10,66 +10,22 @@ SHELL=/bin/bash -o pipefail
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
 CONDAROOT = ${DIR}/software/anaconda/install/
-shannonpath := $(shell which shannon.py 2>/dev/null)
-brewpath := $(shell which brew 2>/dev/null)
-rcorrpath := $(shell which rcorrector 2>/dev/null)
 orthopath := $(shell which ${DIR}/software/OrthoFinder/orthofinder/orthofuser.py 2>/dev/null)
 orthufuserversion = $(shell orthofuser.py --help | grep "OrthoFinder version" | awk '{print $$3}')
-trimmomaticpath := $(shell which trimmomatic 2>/dev/null)
-salmonpath := $(shell which salmon 2>/dev/null)
-bowtie2path := $(shell which bowtie2 2>/dev/null)
-hmmerpath := $(shell which hmmscan 2>/dev/null)
-mclpath := $(shell which mcl 2>/dev/null)
 transrate := $(shell which ${DIR}/software/orp-transrate 2>/dev/null)
-blast := $(shell which ${DIR}/software/ncbi-blast-2.7.1+/bin/blastp 2>/dev/null)
-spades := $(shell which spades.py 2>/dev/null)
-spadesversion = $(shell rnaspades.py -v | awk '{print $$2}')
-trinity := $(shell which ${DIR}/software/trinityrnaseq/Trinity 2>/dev/null)
-trinityversion = $(shell Trinity --version | grep -m1 Trinity | awk -F ": " '{print $$2}')
-salmonversion = $(shell salmon --version 2>&1 | awk -F ": " '{print $$2}')
-seqtk := $(shell which seqtk 2>/dev/null)
-busco := $(shell which run_BUSCO.py 2>/dev/null)
-quorumpath := $(shell which quorum 2>/dev/null)
-sampath := $(shell which samtools 2>/dev/null)
-parallel := $(shell which parallel 2>/dev/null)
-lastal := $(shell which lastal 2>/dev/null)
-shmlast := $(shell which shmlast 2>/dev/null)
 conda := $(shell which ${DIR}/software/anaconda/install/bin/activate 2>/dev/null)
 
 
-all: setup brew parallel lastal shmlast mcl samtools hmmer quorum orthofuser rcorrector blast spades trinity shannon seqtk busco trimmomatic transrate bowtie2 salmon postscript
+all: setup conda orthofuser transrate shmlast_data busco_data postscript
 
 .DELETE_ON_ERROR:
-
-#need salmon, bowtie2, mcl, fix path designations
 
 setup:
 	@mkdir -p ${DIR}/scripts
 	@mkdir -p ${DIR}/shared
 	@rm -f pathfile
 
-brew:setup
-ifdef brewpath
-	@echo "BREW is already installed"
-else
-	$error("*** BREW MUST BE PROPERLY INSTALLED BEFORE YOU CAN PROCEED, SEE: http://angus.readthedocs.io/en/2016/linuxbrew_install.html ***")
-endif
-
-lastal:brew
-ifdef lastal
-	@echo "last is already installed"
-else
-	brew install last
-endif
-
-parallel:brew
-ifdef parallel
-	@echo "parallel is already installed"
-else
-	brew install parallel
-endif
-
-shmlast:brew
+conda:
 ifdef conda
 	@echo "conda is already installed"
 else
@@ -79,12 +35,29 @@ else
 	( \
        source ${DIR}/software/anaconda/install/bin/activate; \
        conda update -y -n base conda; \
-			 conda install -y --file <(curl https://raw.githubusercontent.com/camillescott/shmlast/master/environment.txt); \
-			 pip install shmlast; \
+			 conda install -y --file <(curl https://raw.githubusercontent.com/macmanes-lab/Oyster_River_Protocol/conda/environment.yml); \
 			 source deactivate; \
   )
 	mkdir -p ${DIR}/software/shmlast && cd ${DIR}/software/shmlast && curl -LO ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz && gzip -d uniprot_sprot.fasta.gz
 endif
+
+shmlast_data:
+ifdef shmlast_data
+	@echo "shmlast_data is already installed"
+else
+	mkdir -p ${DIR}/software/shmlast && cd ${DIR}/software/shmlast && curl -LO ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz && gzip -d uniprot_sprot.fasta.gz
+endif
+
+busco_data:
+	mkdir $HOME/Oyster_River_Protocol/busco_dbs && cd $HOME/Oyster_River_Protocol/busco_dbs
+	cd $HOME/Oyster_River_Protocol/busco_dbs && wget http://busco.ezlab.org/v2/datasets/eukaryota_odb9.tar.gz && tar -zxf eukaryota_odb9.tar.gz
+	cd $HOME/Oyster_River_Protocol/busco_dbs && wget http://busco.ezlab.org/v2/datasets/metazoa_odb9.tar.gz
+	cd $HOME/Oyster_River_Protocol/busco_dbs && wget http://busco.ezlab.org/v2/datasets/arthropoda_odb9.tar.gz
+	cd $HOME/Oyster_River_Protocol/busco_dbs && wget http://busco.ezlab.org/v2/datasets/insecta_odb9.tar.gz
+	cd $HOME/Oyster_River_Protocol/busco_dbs && wget http://busco.ezlab.org/v2/datasets/vertebrata_odb9.tar.gz
+	cd $HOME/Oyster_River_Protocol/busco_dbs && wget http://busco.ezlab.org/v2/datasets/tetrapoda_odb9.tar.gz
+	cd $HOME/Oyster_River_Protocol/busco_dbs && wget http://busco.ezlab.org/v2/datasets/aves_odb9.tar.gz
+	cd $HOME/Oyster_River_Protocol/busco_dbs && wget http://busco.ezlab.org/v2/datasets/mammalia_odb9.tar.gz
 
 transrate:brew
 ifdef transrate
@@ -92,51 +65,6 @@ ifdef transrate
 else
 	cd ${DIR}/software && tar -zxf orp-transrate.tar.gz
 	@echo PATH=\$$PATH:${DIR}/software/orp-transrate >> pathfile
-endif
-
-rcorrector:brew
-ifdef rcorrpath
-	@echo "RCORRECTOR is already installed"
-else
-	brew install rcorrector
-endif
-
-quorum:brew
-ifdef quorumpath
-	@echo "quorum is already installed"
-else
-	mkdir ${DIR}/software/quorum
-	cd ${DIR}/software/quorum && curl -LO ftp://ftp.genome.umd.edu/pub/QuorUM/quorum_easy_install
-	cd ${DIR}/software/quorum && sh ./quorum_easy_install
-	@echo PATH=\$$PATH:${DIR}/software/quorum/bin >> pathfile
-endif
-
-mcl:brew samtools hmmer
-ifdef mclpath
-	@echo "MCL is already installed"
-else
-	brew install mcl
-endif
-
-hmmer:brew samtools
-ifdef hmmerpath
-	@echo "HMMER is already installed"
-else
-	brew install hmmer
-endif
-
-bowtie2:brew samtools
-ifdef bowtie2path
-	@echo "BOWTIE2 is already installed"
-else
-	brew install bowtie2
-endif
-
-samtools:brew
-ifdef sampath
-	@echo "samtools is already installed"
-else
-	brew install samtools
 endif
 
 orthofuser:
@@ -152,88 +80,6 @@ else
 	@echo "orthofuser is not installed and needs to be installed"
 	cd ${DIR}/software && git clone https://github.com/macmanes-lab/OrthoFinder.git
 	@echo PATH=\$$PATH:${DIR}/software/OrthoFinder/orthofinder >> pathfile
-endif
-
-blast:brew
-ifdef blast
-	@echo "blast is installed..."
-else
-	cd ${DIR}/software && curl -LO ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.7.1+-x64-linux.tar.gz && tar -zxf ncbi-blast-2.7.1+-x64-linux.tar.gz
-	@echo PATH=\$$PATH:${DIR}/software/ncbi-blast-2.7.1+/bin >> pathfile
-endif
-
-spades:brew
-ifeq ($(spadesversion),v3.12.0)
-	@echo "spades is already installed"
-else
-	cd ${DIR}/software && \
-	curl -LO https://github.com/ablab/spades/releases/download/v3.12.0/SPAdes-3.12.0-Linux.tar.gz && tar -zxf SPAdes-3.12.0-Linux.tar.gz
-	@echo PATH=\$$PATH:${DIR}/software/SPAdes-3.12.0-Linux/bin >> pathfile
-endif
-
-salmon:
-ifeq ($(salmonversion),0.9.1)
-	@echo "SALMON is already installed"
-else
-	cd ${DIR}/software && \
-	curl -LO https://github.com/COMBINE-lab/salmon/releases/download/v0.9.1/Salmon-0.9.1_linux_x86_64.tar.gz && tar -zxf Salmon-0.9.1_linux_x86_64.tar.gz
-	@echo PATH=${DIR}/software/Salmon-latest_linux_x86_64/bin:\$$PATH: >> pathfile
-endif
-
-trinity:brew salmon samtools shmlast
-ifdef trinity
-ifeq ($(trinityversion),Trinity-v2.6.6)
-	@echo "The right version of TRINITY is already installed"
-else
-	@echo "TRINITY is installed, but not the right version"
-	cd ${DIR}/software/trinityrnaseq/ && git pull
-endif
-else
-	@echo "trinity is not installed and needs to be installed"
-	cd ${DIR}/software && \
-	git clone https://github.com/trinityrnaseq/trinityrnaseq.git && cd trinityrnaseq && make -j4
-	@echo PATH=${DIR}/software/trinityrnaseq:\$$PATH: >> pathfile
-endif
-
-shannon:brew
-ifdef shannonpath
-	@echo "SHANNON is already installed"
-else
-	cd ${DIR}/software && git clone https://github.com/macmanes-lab/Shannon.git
-	chmod +x software/Shannon/shannon.py
-	@echo PATH=\$$PATH:${DIR}/software/Shannon >> pathfile
-endif
-
-seqtk:brew
-ifdef seqtk
-	@echo "SEQTK is already installed"
-else
-	cd ${DIR}/software && \
-	git clone https://github.com/lh3/seqtk.git && cd seqtk && make
-	@echo PATH=\$$PATH:${DIR}/software/seqtk >> pathfile
-endif
-
-busco:brew
-ifdef busco
-	@echo "BUSCO is already installed"
-else
-	cd ${DIR}/software && \
-	git clone https://gitlab.com/ezlab/busco.git && cd busco && python setup.py install --user --prefix=
-	@echo PATH=\$$PATH:${DIR}/software/busco/scripts >> pathfile
-endif
-
-trimmomatic:brew bowtie2
-ifdef trimmomaticpath
-	@echo "TRIMMOMATIC is already installed"
-else
-	@if [ $$(hostname | cut -d. -f3-5) == 'bridges.psc.edu' ];\
-	then\
-		module load trimmomatic/0.36;\
-		echo "I just installed TRIMMOMATIC via the module system ";\
-	else\
-		brew install jdk trimmomatic;\
-		echo "I just installed TRIMMOMATIC via brew ";\
-	fi
 endif
 
 postscript:brew setup shmlast lastal mcl samtools hmmer quorum orthofuser rcorrector blast spades trinity shannon seqtk busco trimmomatic transrate bowtie2 salmon
