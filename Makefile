@@ -36,7 +36,7 @@ else
 	( \
        source ${DIR}/software/anaconda/install/bin/activate; \
        conda update -y -n base conda; \
-			 conda install -y --file environment.yml; \
+			 conda env create -f environment.yml; \
 			 source deactivate; \
   )
 	mkdir -p ${DIR}/software/shmlast && cd ${DIR}/software/shmlast && curl -LO ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz && gzip -d uniprot_sprot.fasta.gz
@@ -58,15 +58,15 @@ else
 endif
 
 busco_data:
-	mkdir $HOME/Oyster_River_Protocol/busco_dbs && cd $HOME/Oyster_River_Protocol/busco_dbs
-	cd $HOME/Oyster_River_Protocol/busco_dbs && wget http://busco.ezlab.org/v2/datasets/eukaryota_odb9.tar.gz && tar -zxf eukaryota_odb9.tar.gz
-	cd $HOME/Oyster_River_Protocol/busco_dbs && wget http://busco.ezlab.org/v2/datasets/metazoa_odb9.tar.gz
-	cd $HOME/Oyster_River_Protocol/busco_dbs && wget http://busco.ezlab.org/v2/datasets/arthropoda_odb9.tar.gz
-	cd $HOME/Oyster_River_Protocol/busco_dbs && wget http://busco.ezlab.org/v2/datasets/insecta_odb9.tar.gz
-	cd $HOME/Oyster_River_Protocol/busco_dbs && wget http://busco.ezlab.org/v2/datasets/vertebrata_odb9.tar.gz
-	cd $HOME/Oyster_River_Protocol/busco_dbs && wget http://busco.ezlab.org/v2/datasets/tetrapoda_odb9.tar.gz
-	cd $HOME/Oyster_River_Protocol/busco_dbs && wget http://busco.ezlab.org/v2/datasets/aves_odb9.tar.gz
-	cd $HOME/Oyster_River_Protocol/busco_dbs && wget http://busco.ezlab.org/v2/datasets/mammalia_odb9.tar.gz
+	mkdir ${DIR}/busco_dbs && cd ${DIR}/busco_dbs
+	cd ${DIR}/busco_dbs && wget http://busco.ezlab.org/v2/datasets/eukaryota_odb9.tar.gz && tar -zxf eukaryota_odb9.tar.gz
+	cd ${DIR}/busco_dbs && wget http://busco.ezlab.org/v2/datasets/metazoa_odb9.tar.gz
+	cd ${DIR}/busco_dbs && wget http://busco.ezlab.org/v2/datasets/arthropoda_odb9.tar.gz
+	cd ${DIR}/busco_dbs && wget http://busco.ezlab.org/v2/datasets/insecta_odb9.tar.gz
+	cd ${DIR}/busco_dbs && wget http://busco.ezlab.org/v2/datasets/vertebrata_odb9.tar.gz
+	cd ${DIR}/busco_dbs && wget http://busco.ezlab.org/v2/datasets/tetrapoda_odb9.tar.gz
+	cd ${DIR}/busco_dbs && wget http://busco.ezlab.org/v2/datasets/aves_odb9.tar.gz
+	cd ${DIR}/busco_dbs && wget http://busco.ezlab.org/v2/datasets/mammalia_odb9.tar.gz
 
 transrate:
 ifdef transrate
