@@ -13,23 +13,24 @@ CONDAROOT = ${DIR}/software/anaconda/install/
 orthopath := $(shell which ${DIR}/software/OrthoFinder/orthofinder/orthofuser.py 2>/dev/null)
 orthufuserversion = $(shell orthofuser.py --help | grep "OrthoFinder version" | awk '{print $$3}')
 transrate := $(shell which ${DIR}/software/orp-transrate 2>/dev/null)
+transabysspath := $(shell which ${DIR}/software/transabyss/transabyss 2>/dev/null)
 conda := $(shell which ${DIR}/software/anaconda/install/bin/activate 2>/dev/null)
 
 
-all: setup conda orthofuser transrate shmlast_data busco_data postscript
+all: setup conda orthofuser transrate transabyss shmlast_data busco_data postscript
 
 .DELETE_ON_ERROR:
 
 setup:
 	@mkdir -p ${DIR}/scripts
 	@mkdir -p ${DIR}/shared
+	@mkdir -p ${DIR}/software/anaconda
 	@rm -f pathfile
 
 conda:
 ifdef conda
 	@echo "conda is already installed"
 else
-	mkdir -p ${DIR}/software/anaconda
 	cd ${DIR}/software/anaconda && curl -LO https://repo.anaconda.com/archive/Anaconda3-5.1.0-Linux-x86_64.sh
 	cd ${DIR}/software/anaconda && bash Anaconda3-5.1.0-Linux-x86_64.sh -b -p ${DIR}/software/anaconda/install
 	( \
@@ -39,6 +40,14 @@ else
 			 source deactivate; \
   )
 	mkdir -p ${DIR}/software/shmlast && cd ${DIR}/software/shmlast && curl -LO ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz && gzip -d uniprot_sprot.fasta.gz
+endif
+
+transabyss:
+ifdef transabysspath
+	@echo "TransABySS is already installed"
+else
+	cd ${DIR}/software/ && git clone https://github.com/bcgsc/transabyss.git
+	@echo PATH=\$$PATH:${DIR}/software/transabyss >> pathfile
 endif
 
 shmlast_data:
