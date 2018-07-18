@@ -90,7 +90,7 @@ else
 	@echo PATH=\$$PATH:${DIR}/software/OrthoFinder/orthofinder >> pathfile
 endif
 
-postscript: setup shmlast orthofuser conda transrate
+postscript: setup shmlast_data busco_data orthofuser conda transrate
 	@printf "\n\n*** The following location(s), if any print, need to be added to your PATH ***"
 	@printf "\n*** They will be automatically to your ~/.profile or ~/.bash_profile ***\n\n"
 	@cat pathfile
