@@ -39,7 +39,7 @@ else
 			 conda env create -f environment.yml; \
 			 source deactivate; \
 			 @echo PATH=\$$PATH:${DIR}/software/anaconda/install/bin >> pathfile;
-  )
+  );
 endif
 
 transabyss:
