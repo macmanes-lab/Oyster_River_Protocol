@@ -10,8 +10,8 @@ SHELL=/bin/bash -o pipefail
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
 CONDAROOT = ${DIR}/software/anaconda/install/
-orthopath := $(shell which orthofuser.py 2>/dev/null)
-orthufuserversion = $(shell orthofuser.py --help | grep "OrthoFinder version" | awk '{print $$3}')
+orthopath := $(shell conda activate py27; which orthofuser.py 2>/dev/null; conda deactivate)
+orthufuserversion = $(shell conda activate py27; orthofuser.py --help | grep "OrthoFinder version" | awk '{print $$3}';conda deactivate)
 transrate := $(shell which ${DIR}/software/transrate 2>/dev/null)
 transabysspath := $(shell which ${DIR}/software/transabyss/transabyss 2>/dev/null)
 conda := $(shell which conda 2>/dev/null)
@@ -40,7 +40,7 @@ else
        conda update -y -n base conda; \
 			 source deactivate; \
 			 conda env create -f environment.yml; \
-			 conda create -n py27 python=2.7 anaconda \
+			 conda create -y -n py27 python=2.7 anaconda \
   )
 	@echo PATH=\$$PATH:${DIR}/software/anaconda/install/bin >> pathfile;
 endif
