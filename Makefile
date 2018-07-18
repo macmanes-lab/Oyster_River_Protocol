@@ -36,7 +36,7 @@ else
 	( \
        source ${DIR}/software/anaconda/install/bin/activate; \
        conda update -y -n base conda; \
-			 conda install -y --file <(curl https://raw.githubusercontent.com/macmanes-lab/Oyster_River_Protocol/conda/environment.yml); \
+			 conda install -y --file environment.yml; \
 			 source deactivate; \
   )
 	mkdir -p ${DIR}/software/shmlast && cd ${DIR}/software/shmlast && curl -LO ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz && gzip -d uniprot_sprot.fasta.gz
@@ -68,7 +68,7 @@ busco_data:
 	cd $HOME/Oyster_River_Protocol/busco_dbs && wget http://busco.ezlab.org/v2/datasets/aves_odb9.tar.gz
 	cd $HOME/Oyster_River_Protocol/busco_dbs && wget http://busco.ezlab.org/v2/datasets/mammalia_odb9.tar.gz
 
-transrate:brew
+transrate:
 ifdef transrate
 	@echo "transrate is already installed"
 else
@@ -91,7 +91,7 @@ else
 	@echo PATH=\$$PATH:${DIR}/software/OrthoFinder/orthofinder >> pathfile
 endif
 
-postscript:brew setup shmlast lastal mcl samtools hmmer quorum orthofuser rcorrector blast spades trinity shannon seqtk busco trimmomatic transrate bowtie2 salmon
+postscript: setup shmlast orthofuser conda transrate
 	@printf "\n\n*** The following location(s), if any print, need to be added to your PATH ***"
 	@printf "\n*** They will be automatically to your ~/.profile or ~/.bash_profile ***\n\n"
 	@cat pathfile
