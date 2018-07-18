@@ -14,7 +14,7 @@ orthopath := $(shell which ${DIR}/software/OrthoFinder/orthofinder/orthofuser.py
 orthufuserversion = $(shell orthofuser.py --help | grep "OrthoFinder version" | awk '{print $$3}')
 transrate := $(shell which ${DIR}/software/orp-transrate 2>/dev/null)
 transabysspath := $(shell which ${DIR}/software/transabyss/transabyss 2>/dev/null)
-conda := $(shell which ${DIR}/software/anaconda/install/bin/activate 2>/dev/null)
+conda := $(shell which conda 2>/dev/null)
 
 
 all: setup conda orthofuser transrate transabyss shmlast_data busco_data postscript
