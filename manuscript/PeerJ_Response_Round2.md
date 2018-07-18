@@ -36,4 +36,4 @@ Figure 5: I really don't like Joy plots (yes, I know they are the rage and peopl
 
 Figure 1 is confusing and I question whether it is valid, as one would expect assemblies to cluster together according to organism type rather than by assembly method, and perhaps within each organism type, there might be some relationship among the methods with some being more similar to others. Instead, the distance metric appears to be showing a large batch effect where the primary difference is the program being used. Quite surprising...
 
-> I agree that this is a surprising result. I've looked at this many times (and shopped it to several colleagues), and at this point believe that it accurately represents the data, rather than it being an analytical artifact. I'm keen to see what readers think! 
+> I agree that this is a surprising result. I've looked at this many times (and shopped it to several colleagues), and at this point believe that it accurately represents the data, rather than it being an analytical artifact. I'm keen to see what readers think!
