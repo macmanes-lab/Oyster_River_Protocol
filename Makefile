@@ -39,7 +39,6 @@ else
 			 conda env create -f environment.yml; \
 			 source deactivate; \
   )
-	mkdir -p ${DIR}/software/shmlast && cd ${DIR}/software/shmlast && curl -LO ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz && gzip -d uniprot_sprot.fasta.gz
 endif
 
 transabyss:
