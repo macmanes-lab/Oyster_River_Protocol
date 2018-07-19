@@ -158,7 +158,7 @@ ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
 	( \
 	source ${MAKEDIR}/software/anaconda/install/bin/activate py27; \
 	python $$(which orthofuser.py) -I 4 -f ${DIR}/orthofuse/${RUNOUT}/working/ -og -t $(CPU) -a $(CPU); \
-	source ${MAKEDIR}/software/anaconda/install/bin/activate orp;\
+	source ${MAKEDIR}/software/anaconda/install/bin/activate orp_v2;\
 	)
 	cat ${DIR}/orthofuse/${RUNOUT}/working/*short.fasta > ${DIR}/orthofuse/${RUNOUT}/merged.fasta
 
