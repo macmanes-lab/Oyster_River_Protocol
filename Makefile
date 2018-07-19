@@ -38,7 +38,7 @@ else
 	( \
        source ${DIR}/software/anaconda/install/bin/activate; \
        conda update -y -n base conda; \
-			 source deactivate; \
+			 source ${DIR}/software/anaconda/install/bin/deactivate; \
 			 conda env create -f environment.yml; \
 			 conda create -y -n py27 python=2.7 anaconda \
   )
