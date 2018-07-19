@@ -56,8 +56,8 @@ posthack:${DIR}/assemblies/shmlast/${RUNOUT}.newbies.fasta
 main: setup check welcome run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_transabyss merge orthotransrate orthofusing shmlast posthack salmon busco transrate report
 orthofuse:merge orthotransrate orthofusing
 report:busco transrate reportgen
-busco:${DIR}/reports/busco.done
-transrate:${DIR}/reports/transrate.done
+busco:${DIR}/reports/${RUNOUT}.busco.done
+transrate:${DIR}/reports/${RUNOUT}.transrate.done
 clean:
 
 .DELETE_ON_ERROR:
@@ -216,7 +216,7 @@ ${DIR}/reports/busco.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	mv run_${RUNOUT}* ${DIR}/reports/
 	touch ${DIR}/reports/${RUNOUT}.busco.done
 
-${DIR}/reports/transrate.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
+${DIR}/reports/${RUNOUT}.transrate.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	${MAKEDIR}/software/orp-transrate/transrate -o ${DIR}/reports/transrate_${RUNOUT}  -a ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -t $(CPU)
 	touch ${DIR}/reports/${RUNOUT}.transrate.done
 
