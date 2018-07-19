@@ -37,6 +37,8 @@ mclpath := $(shell which mcl 2>/dev/null)
 buscopath := $(shell which run_BUSCO.py 2>/dev/null)
 seqtkpath := $(shell which seqtk 2>/dev/null)
 transratepath := $(shell which transrate 2>/dev/null)
+transabyss := $(shell which transabyss 2>/dev/null)
+
 
 run_trimmomatic:
 run_rcorrector:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
