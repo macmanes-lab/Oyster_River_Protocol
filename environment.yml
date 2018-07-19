@@ -63,6 +63,7 @@ dependencies:
   - rcorrector
   - mcl
   - abyss>=2.0.1
+  - python-igraph
   - pip:
     - shmlast
     - bioformats==0.1.15
@@ -76,7 +77,6 @@ dependencies:
     - pip==10.0.1
     - pyfaidx==0.5.3.1
     - python-dateutil==2.7.3
-    - python-igraph
     - pyvcf==0.6.8
     - scipy
     - setuptools
