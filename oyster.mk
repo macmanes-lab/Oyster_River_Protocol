@@ -148,6 +148,7 @@ ${DIR}/assemblies/${RUNOUT}.spades75.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 
 ${DIR}/assemblies/${RUNOUT}.transabyss.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	transabyss --threads $(CPU) --outdir ${DIR}/assemblies/ --kmer 32 --length 250 --name ${RUNOUT}.transabyss.fasta --pe ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
+	mv ${DIR}/assemblies/${RUNOUT}.transabyss.fasta-final.fa ${DIR}/sampledata/assemblies/${RUNOUT}.transabyss.fasta
 
 ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
 	mkdir -p ${DIR}/orthofuse/${RUNOUT}/working
