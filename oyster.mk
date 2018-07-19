@@ -38,7 +38,8 @@ buscopath := $(shell which run_BUSCO.py 2>/dev/null)
 seqtkpath := $(shell which seqtk 2>/dev/null)
 transratepath := $(shell which transrate 2>/dev/null)
 transabyss := $(shell which transabyss 2>/dev/null)
-
+BUSCO_CONFIG_FILE := ${MAKEDIR}/software/config.ini
+export BUSCO_CONFIG_FILE
 
 run_trimmomatic:
 run_rcorrector:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
@@ -209,7 +210,7 @@ ${DIR}/assemblies/shmlast/${RUNOUT}.newbies.fasta:${DIR}/assemblies/shmlast/${RU
 	cd ${DIR}/assemblies/shmlast/ && rm -f ${RUNOUT}.list*
 
 ${DIR}/reports/busco.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
-	export BUSCO_CONFIG_FILE=${MAKEDIR}/software/config.ini 
+	export BUSCO_CONFIG_FILE=${MAKEDIR}/software/config.ini
 	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}.orthomerged
 	mv run_${RUNOUT}* ${DIR}/reports/
 	touch ${DIR}/reports/${RUNOUT}.busco.done
