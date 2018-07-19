@@ -16,7 +16,7 @@ dependencies:
   - openssl=1.0.2l=0
   - cairo=1.12.18=6
   - cycler=0.10.0=py35_0
-  - dbus=1.10.10=0
+  - dbus=1.10.10=2
   - expat=2.1.0=0
   - fontconfig=2.11.1=6
   - freetype=2.5.5=1
@@ -43,7 +43,7 @@ dependencies:
   - sqlite=3.13.0=0
   - tk=8.5.18=0
   - xz=5.2.2=0
-  - readline=6.2=0
+  - readline=6.2=2
   - yaml=0.1.6=0
   - zlib=1.2.11=0
   - cloog=0.18.0=0
