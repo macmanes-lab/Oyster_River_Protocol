@@ -148,8 +148,9 @@ ${DIR}/assemblies/${RUNOUT}.spades75.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 ### ADD TRANSABYSS STARTING HERE
 
 ${DIR}/assemblies/${RUNOUT}.transabyss.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
-	transabyss --threads $(CPU) --outdir ${DIR}/assemblies/ --kmer 32 --length 250 --name ${RUNOUT}.transabyss.fasta --pe ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
-	mv ${DIR}/assemblies/${RUNOUT}.transabyss.fasta-final.fa ${DIR}/assemblies/${RUNOUT}.transabyss.fasta
+	transabyss --threads $(CPU) --outdir ${DIR}/assemblies/${RUNOUT}.transabyss --kmer 32 --length 250 --name ${RUNOUT}.transabyss.fasta --pe ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
+	mv ${DIR}/assemblies/${RUNOUT}.transabyss/${RUNOUT}.transabyss.fasta-final.fa ${DIR}/assemblies/${RUNOUT}.transabyss.fasta
+	rm -fr ${DIR}/assemblies/${RUNOUT}.transabyss/
 
 ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
 	mkdir -p ${DIR}/orthofuse/${RUNOUT}/working
