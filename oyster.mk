@@ -183,7 +183,7 @@ ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/orthotr
 	cp ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	rm ${DIR}/orthofuse/${RUNOUT}/good.${RUNOUT}.list
 
-${DIR}/assemblies/shmlast/${RUNOUT}.trinity.crbl.csv ${DIR}/assemblies/${RUNOUT}.transabyss.fasta ${DIR}/assemblies/${RUNOUT}.spades75.fasta ${DIR}/assemblies/${RUNOUT}.spades55.fasta ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
+${DIR}/assemblies/shmlast/${RUNOUT}.trinity.crbl.csv: ${DIR}/assemblies/${RUNOUT}.transabyss.fasta ${DIR}/assemblies/${RUNOUT}.spades75.fasta ${DIR}/assemblies/${RUNOUT}.spades55.fasta ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
 	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -d ${MAKEDIR}/software/shmlast/uniprot_sprot.fasta --n_threads $(CPU) -o ${DIR}/assemblies/shmlast/${RUNOUT}.orthomerged.crbl.csv ; \
 	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.transabyss.fasta -d ${MAKEDIR}/software/shmlast/uniprot_sprot.fasta --n_threads $(CPU) -o ${DIR}/assemblies/shmlast/${RUNOUT}.transabyss.crbl.csv; \
 	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.spades75.fasta -d ${MAKEDIR}/software/shmlast/uniprot_sprot.fasta --n_threads $(CPU) -o ${DIR}/assemblies/shmlast/${RUNOUT}.spades75.crbl.csv; \
