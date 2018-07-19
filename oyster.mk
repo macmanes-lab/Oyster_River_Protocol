@@ -124,6 +124,7 @@ ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq:
 	then\
 		java -jar $$TRIMMOMATIC_HOME/trimmomatic-0.36.jar PE -threads $(CPU) -baseout ${DIR}/rcorr/${RUNOUT}.TRIM.fastq ${READ1} ${READ2} LEADING:3 TRAILING:3 ILLUMINACLIP:${MAKEDIR}/barcodes/barcodes.fa:2:30:10 MINLEN:25;\
 	else\
+		conda activate orp
 		trimmomatic PE -threads $(CPU) -baseout ${DIR}/rcorr/${RUNOUT}.TRIM.fastq ${READ1} ${READ2} LEADING:3 TRAILING:3 ILLUMINACLIP:${MAKEDIR}/barcodes/barcodes.fa:2:30:10 MINLEN:25;\
 	fi
 
@@ -152,7 +153,11 @@ ${DIR}/assemblies/${RUNOUT}.transabyss.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.
 ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
 	mkdir -p ${DIR}/orthofuse/${RUNOUT}/working
 	for fasta in $$(ls ${DIR}/assemblies/${RUNOUT}*fasta); do python ${MAKEDIR}/scripts/long.seq.py ${DIR}/assemblies/$$(basename $$fasta) ${DIR}/orthofuse/${RUNOUT}/working/$$(basename $$fasta).short.fasta 200; done
-	python $$(which orthofuser.py) -I 4 -f ${DIR}/orthofuse/${RUNOUT}/working/ -og -t $(CPU) -a $(CPU)
+	( \
+	conda activate py27; \
+	python $$(which orthofuser.py) -I 4 -f ${DIR}/orthofuse/${RUNOUT}/working/ -og -t $(CPU) -a $(CPU) \
+	source activate orp;
+	)
 	cat ${DIR}/orthofuse/${RUNOUT}/working/*short.fasta > ${DIR}/orthofuse/${RUNOUT}/merged.fasta
 
 ${DIR}/orthofuse/${RUNOUT}/orthotransrate.done:${DIR}/orthofuse/${RUNOUT}/merged.fasta
@@ -177,15 +182,11 @@ ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/orthotr
 
 ${DIR}/assemblies/shmlast/${RUNOUT}.trinity.crbl.csv:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta ${DIR}/assemblies/${RUNOUT}.transabyss.fasta ${DIR}/assemblies/${RUNOUT}.spades75.fasta ${DIR}/assemblies/${RUNOUT}.spades55.fasta ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
 	mkdir -p ${DIR}/assemblies/shmlast
-	( \
-	source ${MAKEDIR}/software/anaconda/install/bin/activate; \
 	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -d ${MAKEDIR}/software/shmlast/uniprot_sprot.fasta --n_threads $(CPU) -o ${DIR}/assemblies/shmlast/${RUNOUT}.orthomerged.crbl.csv ; \
 	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.transabyss.fasta -d ${MAKEDIR}/software/shmlast/uniprot_sprot.fasta --n_threads $(CPU) -o ${DIR}/assemblies/shmlast/${RUNOUT}.transabyss.crbl.csv; \
 	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.spades75.fasta -d ${MAKEDIR}/software/shmlast/uniprot_sprot.fasta --n_threads $(CPU) -o ${DIR}/assemblies/shmlast/${RUNOUT}.spades75.crbl.csv; \
 	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.spades55.fasta -d ${MAKEDIR}/software/shmlast/uniprot_sprot.fasta --n_threads $(CPU) -o ${DIR}/assemblies/shmlast/${RUNOUT}.spades55.crbl.csv; \
 	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta -d ${MAKEDIR}/software/shmlast/uniprot_sprot.fasta --n_threads $(CPU) -o ${DIR}/assemblies/shmlast/${RUNOUT}.trinity.crbl.csv; \
-	source deactivate; \
-	)
 	rm -f ${DIR}/${RUNOUT}*csv ${DIR}/${RUNOUT}*pdf ${DIR}/assemblies/${RUNOUT}*map
 
 #list1 is unique in orthomerged
@@ -237,3 +238,4 @@ reportgen:
 	printf "*****  TRANSRATE OPTIMAL SCORE ~~~~~>   " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	cat $$(find reports/transrate_${RUNOUT} -name assemblies.csv) | awk -F , '{print $$38}' | sed -n 2p | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	printf " \n\n"
+	conda deactivate
