@@ -240,4 +240,4 @@ reportgen:
 	printf "*****  TRANSRATE OPTIMAL SCORE ~~~~~>   " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	cat $$(find reports/transrate_${RUNOUT} -name assemblies.csv) | awk -F , '{print $$38}' | sed -n 2p | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	printf " \n\n"
-	source ${DIR}/software/anaconda/install/bin/deactivate
+	source ${MAKEDIR}/software/anaconda/install/bin/deactivate

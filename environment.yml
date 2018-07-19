@@ -6,7 +6,7 @@ channels:
 dependencies:
   - libiconv
   - ruby
-  - ca-certificates=2017.7.27.1=0
+  - ca-certificates
   - gmp=6.1.2=0
   - jemalloc>=5.1.0
   - make=4.2.1=0
@@ -35,7 +35,6 @@ dependencies:
   - pixman=0.32.6=0
   - pyparsing=2.1.4=py35_0
   - pyqt=4.11.4=py35_4
-  - python-dateutil=2.5.3=py35_0
   - pytz=2016.7=py35_0
   - qt=4.8.7=4
   - seaborn=0.7.1=py35_0
@@ -80,6 +79,6 @@ dependencies:
     - python-igraph==0.7.1.post6
     - pyvcf==0.6.8
     - scipy
-    - setuptools==32.1.0
-    - wheel==0.29.0
+    - setuptools
+    - wheel
     - matplotlib
