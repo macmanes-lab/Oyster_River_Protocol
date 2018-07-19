@@ -155,7 +155,7 @@ ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
 	( \
 	conda activate py27; \
 	python $$(which orthofuser.py) -I 4 -f ${DIR}/orthofuse/${RUNOUT}/working/ -og -t $(CPU) -a $(CPU) \
-	source activate orp;
+	source activate orp;\
 	)
 	cat ${DIR}/orthofuse/${RUNOUT}/working/*short.fasta > ${DIR}/orthofuse/${RUNOUT}/merged.fasta
 
