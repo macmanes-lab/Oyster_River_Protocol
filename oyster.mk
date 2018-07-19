@@ -154,9 +154,9 @@ ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
 	mkdir -p ${DIR}/orthofuse/${RUNOUT}/working
 	for fasta in $$(ls ${DIR}/assemblies/${RUNOUT}*fasta); do python ${MAKEDIR}/scripts/long.seq.py ${DIR}/assemblies/$$(basename $$fasta) ${DIR}/orthofuse/${RUNOUT}/working/$$(basename $$fasta).short.fasta 200; done
 	( \
-	source ${DIR}/software/anaconda/install/bin/activate py27; \
+	source ${MAKEDIR}/software/anaconda/install/bin/activate py27; \
 	python $$(which orthofuser.py) -I 4 -f ${DIR}/orthofuse/${RUNOUT}/working/ -og -t $(CPU) -a $(CPU) \
-	source ${DIR}/software/anaconda/install/bin/activate orp;\
+	source ${MAKEDIR}/software/anaconda/install/bin/activate orp;\
 	)
 	cat ${DIR}/orthofuse/${RUNOUT}/working/*short.fasta > ${DIR}/orthofuse/${RUNOUT}/merged.fasta
 
