@@ -1,53 +1,55 @@
-name: orp
+name: orp_v4
 channels:
   - bioconda
   - conda-forge
   - defaults
+  - r
 dependencies:
   - libiconv
+  - python>=3.6
   - ruby
   - ca-certificates
-  - gmp=6.1.2=0
+  - gmp
   - jemalloc>=5.1.0
   - make=4.2.1=0
-  - mpc=1.0.3=4
-  - mpfr=3.1.5=0
-  - ncurses=5.9=10
-  - openssl=1.0.2l=0
-  - cairo=1.12.18=6
-  - cycler=0.10.0=py35_0
-  - dbus=1.10.10=2
-  - expat=2.1.0=0
+  - mpc
+  - mpfr
+  - ncurses
+  - openssl
+  - cairo
+  - cycler
+  - dbus
+  - expat
   - fontconfig
-  - freetype=2.5.5=1
-  - glib=2.43.0=1
+  - freetype
+  - glib
   - gst-plugins-base=1.8.0=0
   - gstreamer=1.8.0=0
-  - harfbuzz=0.9.39=1
+  - harfbuzz
   - icu
-  - libffi=3.2.1=0
-  - libgfortran=3.0.0=1
-  - libpng=1.6.22=0
-  - libxcb=1.12=1
-  - libxml2=2.9.2=0
-  - mkl=11.3.3=0
-  - pango=1.39.0=1
-  - pixman=0.32.6=0
-  - pyparsing=2.1.4=py35_0
-  - pyqt=4.11.4=py35_4
-  - pytz=2016.7=py35_0
-  - qt=4.8.7=4
-  - seaborn=0.7.1=py35_0
-  - sip=4.18=py35_0
-  - six=1.10.0=py35_0
-  - sqlite=3.13.0=0
-  - tk=8.5.18=0
-  - xz=5.2.2=0
-  - readline=6.2=2
-  - yaml=0.1.6=0
-  - zlib=1.2.11=0
-  - cloog=0.18.0=0
-  - isl=0.12.2=0
+  - libffi
+  - libgfortran
+  - libpng
+  - libxcb
+  - libxml2
+  - mkl
+  - pango
+  - pixman
+  - pyparsing
+  - pyqt
+  - pytz
+  - qt
+  - seaborn
+  - sip
+  - six
+  - sqlite
+  - tk==8.6.8
+  - xz==5.2.3
+  - readline
+  - yaml==0.1.7
+  - zlib==1.2.11=0
+  - cloog
+  - isl
   - libgcc>=7.2.0
   - salmon>=0.10.2
   - seqtk
@@ -64,6 +66,8 @@ dependencies:
   - mcl
   - abyss>=2.0.1
   - python-igraph
+  - r-base==3.4.3
+  - r==3.4.3
   - pip:
     - shmlast
     - bioformats==0.1.15
