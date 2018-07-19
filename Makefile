@@ -29,7 +29,7 @@ setup:
 	@mkdir -p ${DIR}/software/anaconda
 	@rm -f pathfile
 
-conda:
+conda:environment.yml
 ifdef conda
 	@echo "conda is already installed"
 else
