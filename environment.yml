@@ -18,7 +18,7 @@ dependencies:
   - cycler=0.10.0=py35_0
   - dbus=1.10.10=2
   - expat=2.1.0=0
-  - fontconfig=2.11.1=6
+  - fontconfig
   - freetype=2.5.5=1
   - glib=2.43.0=1
   - gst-plugins-base=1.8.0=0
