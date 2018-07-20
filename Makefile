@@ -68,9 +68,6 @@ else
 endif
 
 transrate:
-ifdef transrate
-	@echo "transrate is already installed"
-else
 	cd ${DIR}/software && tar -zxf orp-transrate.tar.gz
 	@echo PATH=\$$PATH:${DIR}/software/orp-transrate >> pathfile
 endif
