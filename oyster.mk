@@ -210,7 +210,7 @@ ${DIR}/assemblies/shmlast/${RUNOUT}.newbies.fasta:${DIR}/assemblies/shmlast/${RU
 	cd ${DIR}/assemblies/shmlast/ &&  cat ${RUNOUT}.newbies.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta > tmp.fasta && mv tmp.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	cd ${DIR}/assemblies/shmlast/ && rm -f ${RUNOUT}.list*
 
-${DIR}/reports/busco.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
+${DIR}/reports/${RUNOUT}.busco.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	export BUSCO_CONFIG_FILE=${MAKEDIR}/software/config.ini
 	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}.orthomerged
 	mv run_${RUNOUT}* ${DIR}/reports/
