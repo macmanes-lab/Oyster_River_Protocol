@@ -183,10 +183,10 @@ ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/orthotr
 	rm ${DIR}/orthofuse/${RUNOUT}/good.${RUNOUT}.list
 
 ${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt: ${DIR}/assemblies/${RUNOUT}.transabyss.fasta ${DIR}/assemblies/${RUNOUT}.spades75.fasta ${DIR}/assemblies/${RUNOUT}.spades55.fasta ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
-	echo "diamond blastx -p 5 -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -d ${MAKEDIR}/software/diamond/uniprot_sprot.fasta -o ${DIR}/assemblies/diamond/${RUNOUT}.orthomerged.diamond.txt
-	diamond blastx -p 4 -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.transabyss.fasta -d ${MAKEDIR}/software/diamond/uniprot_sprot.fasta -o ${DIR}/assemblies/diamond/${RUNOUT}.transabyss.diamond.txt
-	diamond blastx -p 4 -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.spades75.fasta -d ${MAKEDIR}/software/diamond/uniprot_sprot.fasta  -o ${DIR}/assemblies/diamond/${RUNOUT}.spades75.diamond.txt
-	diamond blastx -p 4 -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.spades55.fasta -d ${MAKEDIR}/software/diamond/uniprot_sprot.fasta -o ${DIR}/assemblies/diamond/${RUNOUT}.spades55.diamond.txt
+	echo "diamond blastx -p 5 -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -d ${MAKEDIR}/software/diamond/uniprot_sprot.fasta -o ${DIR}/assemblies/diamond/${RUNOUT}.orthomerged.diamond.txt \
+	diamond blastx -p 4 -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.transabyss.fasta -d ${MAKEDIR}/software/diamond/uniprot_sprot.fasta -o ${DIR}/assemblies/diamond/${RUNOUT}.transabyss.diamond.txt \
+	diamond blastx -p 4 -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.spades75.fasta -d ${MAKEDIR}/software/diamond/uniprot_sprot.fasta  -o ${DIR}/assemblies/diamond/${RUNOUT}.spades75.diamond.txt \
+	diamond blastx -p 4 -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.spades55.fasta -d ${MAKEDIR}/software/diamond/uniprot_sprot.fasta -o ${DIR}/assemblies/diamond/${RUNOUT}.spades55.diamond.txt \
 	diamond blastx -p 5 -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta -d ${MAKEDIR}/software/diamond/uniprot_sprot.fasta  -o ${RUNOUT}.trinity.diamond.txt" \
 	| parallel
 
