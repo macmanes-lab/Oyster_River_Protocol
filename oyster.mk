@@ -59,11 +59,12 @@ report:busco transrate reportgen
 busco:${DIR}/reports/${RUNOUT}.busco.done
 transrate:${DIR}/reports/${RUNOUT}.transrate.done
 clean:
+setup:${DIR}/setup.done
 
 .DELETE_ON_ERROR:
 .PHONY:report check clean
 
-setup:
+${DIR}/setup.done:
 	@mkdir -p ${DIR}/scripts
 	@mkdir -p ${DIR}/reads
 	@mkdir -p ${DIR}/assemblies
@@ -72,6 +73,7 @@ setup:
 	@mkdir -p ${DIR}/orthofuse
 	@mkdir -p ${DIR}/quants
 	@mkdir -p ${DIR}/assemblies/shmlast
+	touch ${DIR}/setup.done
 
 check:
 ifdef salmonpath
