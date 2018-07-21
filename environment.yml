@@ -68,6 +68,7 @@ dependencies:
   - python-igraph
   - r-base==3.4.3
   - r==3.4.3
+  - diamond
   - pip:
     - shmlast
     - bioformats==0.1.15

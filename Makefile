@@ -15,18 +15,18 @@ orthufuserversion = $(shell source ${DIR}/software/anaconda/install/bin/activate
 transrate := $(shell which transrate 2>/dev/null)
 transabysspath := $(shell which ${DIR}/software/transabyss/transabyss 2>/dev/null)
 conda := $(shell which conda 2>/dev/null)
-shmlast_data := $(shell ls ${DIR}/software/shmlast/uniprot_sprot.fasta 2>/dev/null)
+diamond_data := $(shell ls ${DIR}/software/diamond/uniprot_sprot.fasta 2>/dev/null)
 busco_data := $(shell ls ${DIR}/busco_dbs/eukaryota_odb9 2>/dev/null)
 
 
-all: setup conda orthofuser transrate transabyss shmlast_data busco_data postscript
+all: setup conda orthofuser transrate transabyss diamond_data busco_data postscript
 
 .DELETE_ON_ERROR:
 
 setup:
-	@mkdir -p ${DIR}/scripts
 	@mkdir -p ${DIR}/shared
 	@mkdir -p ${DIR}/software/anaconda
+	@mkdir -p ${DIR}/software/diamond
 	@rm -f pathfile
 
 conda:environment.yml
@@ -53,11 +53,11 @@ else
 	@echo PATH=\$$PATH:${DIR}/software/transabyss >> pathfile
 endif
 
-shmlast_data:
-ifdef shmlast_data
-	@echo "shmlast_data is already installed"
+diamond_data:
+ifdef diamond_data
+	@echo "diamond_data is already installed"
 else
-	mkdir -p ${DIR}/software/shmlast && cd ${DIR}/software/shmlast && curl -LO ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz && gzip -d uniprot_sprot.fasta.gz
+	 cd ${DIR}/software/diamond && curl -LO ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz && gzip -d uniprot_sprot.fasta.gz
 endif
 
 busco_data:
@@ -87,7 +87,7 @@ else
 	@echo PATH=\$$PATH:${DIR}/software/OrthoFinder/orthofinder >> pathfile
 endif
 
-postscript: setup shmlast_data busco_data orthofuser conda transrate
+postscript: setup diamond_data busco_data orthofuser conda transrate
 	@printf "\n\n*** The following location(s), if any print, need to be added to your PATH ***"
 	@printf "\n*** They will be automatically to your ~/.profile or ~/.bash_profile ***\n\n"
 	@cat pathfile

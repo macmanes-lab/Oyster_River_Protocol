@@ -51,9 +51,9 @@ merge:${DIR}/orthofuse/${RUNOUT}/merged.fasta
 orthotransrate:${DIR}/orthofuse/${RUNOUT}/orthotransrate.done
 orthofusing:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 salmon:${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf
-shmlast:${DIR}/assemblies/shmlast/${RUNOUT}.trinity.crbl.csv
-posthack:${DIR}/assemblies/shmlast/${RUNOUT}.newbies.fasta
-main: setup check welcome run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_transabyss merge orthotransrate orthofusing shmlast posthack salmon busco transrate report
+diamond:${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt
+posthack:${DIR}/assemblies/diamond/${RUNOUT}.newbies.fasta
+main: setup check welcome run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_transabyss merge orthotransrate orthofusing diamond posthack salmon busco transrate report
 orthofuse:merge orthotransrate orthofusing
 report:busco transrate reportgen
 busco:${DIR}/reports/${RUNOUT}.busco.done
@@ -65,14 +65,13 @@ setup:${DIR}/setup.done
 .PHONY:report check clean
 
 ${DIR}/setup.done:
-	@mkdir -p ${DIR}/scripts
 	@mkdir -p ${DIR}/reads
 	@mkdir -p ${DIR}/assemblies
 	@mkdir -p ${DIR}/rcorr
 	@mkdir -p ${DIR}/reports
 	@mkdir -p ${DIR}/orthofuse
 	@mkdir -p ${DIR}/quants
-	@mkdir -p ${DIR}/assemblies/shmlast
+	@mkdir -p ${DIR}/assemblies/diamond
 	touch ${DIR}/setup.done
 
 check:
@@ -148,8 +147,6 @@ ${DIR}/assemblies/${RUNOUT}.spades75.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	mv ${DIR}/assemblies/${RUNOUT}.spades_k75/transcripts.fasta ${DIR}/assemblies/${RUNOUT}.spades75.fasta
 	rm -fr ${DIR}/assemblies/${RUNOUT}.spades_k75
 
-### ADD TRANSABYSS STARTING HERE
-
 ${DIR}/assemblies/${RUNOUT}.transabyss.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	transabyss --threads $(CPU) --outdir ${DIR}/assemblies/${RUNOUT}.transabyss --kmer 32 --length 250 --name ${RUNOUT}.transabyss.fasta --pe ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
 	awk '{print $$1}' ${DIR}/assemblies/${RUNOUT}.transabyss/${RUNOUT}.transabyss.fasta-final.fa >  ${DIR}/assemblies/${RUNOUT}.transabyss.fasta
@@ -185,32 +182,32 @@ ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/orthotr
 	cp ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.orthomerged.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	rm ${DIR}/orthofuse/${RUNOUT}/good.${RUNOUT}.list
 
-${DIR}/assemblies/shmlast/${RUNOUT}.trinity.crbl.csv: ${DIR}/assemblies/${RUNOUT}.transabyss.fasta ${DIR}/assemblies/${RUNOUT}.spades75.fasta ${DIR}/assemblies/${RUNOUT}.spades55.fasta ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
-	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -d ${MAKEDIR}/software/shmlast/uniprot_sprot.fasta --n_threads $(CPU) -o ${DIR}/assemblies/shmlast/${RUNOUT}.orthomerged.crbl.csv ; \
-	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.transabyss.fasta -d ${MAKEDIR}/software/shmlast/uniprot_sprot.fasta --n_threads $(CPU) -o ${DIR}/assemblies/shmlast/${RUNOUT}.transabyss.crbl.csv; \
-	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.spades75.fasta -d ${MAKEDIR}/software/shmlast/uniprot_sprot.fasta --n_threads $(CPU) -o ${DIR}/assemblies/shmlast/${RUNOUT}.spades75.crbl.csv; \
-	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.spades55.fasta -d ${MAKEDIR}/software/shmlast/uniprot_sprot.fasta --n_threads $(CPU) -o ${DIR}/assemblies/shmlast/${RUNOUT}.spades55.crbl.csv; \
-	shmlast crbl -q ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta -d ${MAKEDIR}/software/shmlast/uniprot_sprot.fasta --n_threads $(CPU) -o ${DIR}/assemblies/shmlast/${RUNOUT}.trinity.crbl.csv; \
-	rm -f ${DIR}/${RUNOUT}*csv ${DIR}/${RUNOUT}*pdf ${DIR}/assemblies/${RUNOUT}*map
+${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt: ${DIR}/assemblies/${RUNOUT}.transabyss.fasta ${DIR}/assemblies/${RUNOUT}.spades75.fasta ${DIR}/assemblies/${RUNOUT}.spades55.fasta ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
+	echo "diamond blastx -p 5 -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -d ${MAKEDIR}/software/diamond/uniprot_sprot.fasta -o ${DIR}/assemblies/diamond/${RUNOUT}.orthomerged.diamond.txt \
+	diamond blastx -p 4 -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.transabyss.fasta -d ${MAKEDIR}/software/diamond/uniprot_sprot.fasta -o ${DIR}/assemblies/diamond/${RUNOUT}.transabyss.diamond.txt \
+	diamond blastx -p 4 -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.spades75.fasta -d ${MAKEDIR}/software/diamond/uniprot_sprot.fasta  -o ${DIR}/assemblies/diamond/${RUNOUT}.spades75.diamond.txt \
+	diamond blastx -p 4 -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.spades55.fasta -d ${MAKEDIR}/software/diamond/uniprot_sprot.fasta -o ${DIR}/assemblies/diamond/${RUNOUT}.spades55.diamond.txt \
+	diamond blastx -p 5 -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta -d ${MAKEDIR}/software/diamond/uniprot_sprot.fasta  -o ${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt" \
+	| parallel
 
-#list1 is unique in orthomerged
-#list2 is unique in other assemblies
-#list3 is what is in other assemblies but not orthomerged
-#list4 is contig IDs from list3
+#list1 is unique geneIDs in orthomerged
+#list2 is unique  geneIDs in other assemblies
+#list3 is which genes are in other assemblies but not in orthomerged
+#list4 are the contig IDs from {sp55,sp75,trin,ta} from list3
 #list5 is unique IDs contig IDs from list4
 #list6 is contig IDs from orthomerged FASTAs
 #list7 is stuff that is in 5 but not 6
 
-${DIR}/assemblies/shmlast/${RUNOUT}.newbies.fasta:${DIR}/assemblies/shmlast/${RUNOUT}.trinity.crbl.csv
-	cd ${DIR}/assemblies/shmlast/ && cut -d, -f14 ${RUNOUT}.orthomerged.crbl.csv | cut -d "|" -f3 | cut -d "_" -f1 | sort --parallel=20 |uniq > ${RUNOUT}.list1
-	cd ${DIR}/assemblies/shmlast/ && cut -d, -f14 ${RUNOUT}.{transabyss,spades75,spades55,trinity}.crbl.csv | cut -d "|" -f3 | cut -d "_" -f1 | sort --parallel=20 |uniq > ${RUNOUT}.list2
-	cd ${DIR}/assemblies/shmlast/ && grep -xFvwf ${RUNOUT}.list1 ${RUNOUT}.list2 > ${RUNOUT}.list3
-	cd ${DIR}/assemblies/shmlast/ && for item in $$(cat ${RUNOUT}.list3); do grep -F $$item ${RUNOUT}.{transabyss,spades75,spades55,trinity}.crbl.csv | head -1 | cut -d, -f9 >> ${RUNOUT}.list4 ; done; sort ${RUNOUT}.list4 | uniq >> ${RUNOUT}.list5
-	cd ${DIR}/assemblies/shmlast/ && grep -F ">" ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta | sed 's_>__' > ${RUNOUT}.list6
-	cd ${DIR}/assemblies/shmlast/ && grep -xFvwf ${RUNOUT}.list6 ${RUNOUT}.list5 > ${RUNOUT}.list7
-	cd ${DIR}/assemblies/shmlast/ && python ${MAKEDIR}/scripts/filter.py <(cat ../${RUNOUT}.{spades55,spades75,transabyss,trinity.Trinity}.fasta) ${RUNOUT}.list7 >> ${RUNOUT}.newbies.fasta
-	cd ${DIR}/assemblies/shmlast/ &&  cat ${RUNOUT}.newbies.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta > tmp.fasta && mv tmp.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
-	cd ${DIR}/assemblies/shmlast/ && rm -f ${RUNOUT}.list*
+${DIR}/assemblies/diamond/${RUNOUT}.newbies.fasta:${DIR}/assemblies/diamond/${RUNOUT}.trinity.crbl.csv
+	cd ${DIR}/assemblies/diamond/ && cut -f2 ${RUNOUT}.orthomerged.crbl.csv | cut -d "|" -f3 | cut -d "_" -f1 | sort --parallel=20 |uniq > ${RUNOUT}.list1
+	cd ${DIR}/assemblies/diamond/ && cut -f2 ${RUNOUT}.{transabyss,spades75,spades55,trinity}.crbl.csv | cut -d "|" -f3 | cut -d "_" -f1 | sort --parallel=20 |uniq > ${RUNOUT}.list2
+	cd ${DIR}/assemblies/diamond/ && grep -xFvwf ${RUNOUT}.list1 ${RUNOUT}.list2 > ${RUNOUT}.list3
+	cd ${DIR}/assemblies/diamond/ && for item in $$(cat ${RUNOUT}.list3); do grep -F $$item ${RUNOUT}.{transabyss,spades75,spades55,trinity}.crbl.csv | head -1 | cut -d ":" -f2 | sort | uniq >> ${RUNOUT}.list5
+	cd ${DIR}/assemblies/diamond/ && grep -F ">" ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta | sed 's_>__' > ${RUNOUT}.list6
+	cd ${DIR}/assemblies/diamond/ && grep -xFvwf ${RUNOUT}.list6 ${RUNOUT}.list5 > ${RUNOUT}.list7
+	cd ${DIR}/assemblies/diamond/ && python ${MAKEDIR}/scripts/filter.py <(cat ../${RUNOUT}.{spades55,spades75,transabyss,trinity.Trinity}.fasta) ${RUNOUT}.list7 >> ${RUNOUT}.newbies.fasta
+	cd ${DIR}/assemblies/diamond/ &&  cat ${RUNOUT}.newbies.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta > tmp.fasta && mv tmp.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
+	cd ${DIR}/assemblies/diamond/ && rm -f ${RUNOUT}.list*
 
 ${DIR}/reports/${RUNOUT}.busco.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	export BUSCO_CONFIG_FILE=${MAKEDIR}/software/config.ini
@@ -230,8 +227,8 @@ ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf:${DIR}/assemblies/${RUNOUT}.
 clean:
 	rm -fr ${DIR}/orthofuse/${RUNOUT}/ ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta \
 	${DIR}/assemblies/${RUNOUT}.spades55.fasta ${DIR}/assemblies/${RUNOUT}.spades75.fasta ${DIR}/assemblies/${RUNOUT}.transabyss.fasta \
-	${DIR}/orthofuse/${RUNOUT}/merged.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta ${DIR}/assemblies/shmlast/${RUNOUT}.trinity.crbl.csv \
-	${DIR}/assemblies/shmlast/${RUNOUT}.newbies.fasta ${DIR}/reports/busco.done ${DIR}/reports/transrate.done ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf \
+	${DIR}/orthofuse/${RUNOUT}/merged.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta ${DIR}/assemblies/diamond/${RUNOUT}.trinity.crbl.csv \
+	${DIR}/assemblies/diamond/${RUNOUT}.newbies.fasta ${DIR}/reports/busco.done ${DIR}/reports/transrate.done ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf \
 	${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq ${DIR}/reports/run_${RUNOUT}.orthomerged/ ${DIR}/reports/transrate_${RUNOUT}/
 
 reportgen:
