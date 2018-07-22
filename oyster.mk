@@ -236,8 +236,8 @@ clean:
 	${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq ${DIR}/reports/run_${RUNOUT}.orthomerged/ ${DIR}/reports/transrate_${RUNOUT}/
 
 reportgen:
-	printf "\n\n*****  QUALITY REPORT FOR: ${RUNOUT} using the ORP version ${VERSION} **** \n\n"
-	printf "\n\n*****  THE ASSEMBLY CAN BE FOUND HERE: ${DIR}/assemblies/${RUNOUT}.ORP.fasta **** \n\n"
+	printf "\n\n*****  QUALITY REPORT FOR: ${RUNOUT} using the ORP version ${VERSION} ****"
+	printf "\n*****  THE ASSEMBLY CAN BE FOUND HERE: ${DIR}/assemblies/${RUNOUT}.ORP.fasta **** \n\n"
 	printf "*****  BUSCO SCORE ~~~~~>           " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	cat $$(find reports/run_${RUNOUT}.orthomerged -name 'short*') | sed -n 8p  | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	printf "*****  TRANSRATE SCORE ~~~~~>           " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
