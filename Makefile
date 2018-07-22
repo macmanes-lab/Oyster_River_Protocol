@@ -14,6 +14,7 @@ orthopath := $(shell source ${DIR}/software/anaconda/install/bin/activate py27; 
 orthufuserversion = $(shell source ${DIR}/software/anaconda/install/bin/activate py27; orthofuser.py --help | grep "OrthoFinder version" | awk '{print $$3}';conda deactivate)
 transrate := $(shell which transrate 2>/dev/null)
 transabysspath := $(shell which ${DIR}/software/transabyss/transabyss 2>/dev/null)
+orthufuserversion = $(shell transabyss --version)
 diamond_data := $(shell ls ${DIR}/software/diamond/uniprot_sprot.fasta 2>/dev/null)
 busco_data := $(shell ls ${DIR}/busco_dbs/eukaryota_odb9 2>/dev/null)
 
@@ -42,6 +43,7 @@ conda:environment.yml
 
 transabyss:
 ifdef transabysspath
+ifeq ($(transabyssversion),2.0.1)
 	@echo "TransABySS is already installed"
 else
 	cd ${DIR}/software/ && git clone https://github.com/bcgsc/transabyss.git
