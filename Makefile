@@ -50,11 +50,12 @@ else
 	@echo PATH=\$$PATH:${DIR}/software/transabyss >> pathfile
 endif
 
-diamond_data:
+diamond_data:conda
 ifdef diamond_data
 	@echo "diamond_data is already installed"
 else
 	 cd ${DIR}/software/diamond && curl -LO ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz && gzip -d uniprot_sprot.fasta.gz
+	 cd ${DIR}/software/diamond && diamond makedb --in uniprot_sprot.fasta -d swissprot
 endif
 
 busco_data:
