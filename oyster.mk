@@ -53,13 +53,14 @@ orthofusing:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 salmon:${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf
 diamond:${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt
 posthack:${DIR}/assemblies/diamond/${RUNOUT}.newbies.fasta
-main: setup check welcome run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_transabyss merge orthotransrate orthofusing diamond posthack salmon busco transrate report
+main: setup check welcome run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_transabyss merge orthotransrate orthofusing diamond posthack cdhit salmon busco transrate report
 orthofuse:merge orthotransrate orthofusing
 report:busco transrate reportgen
 busco:${DIR}/reports/${RUNOUT}.busco.done
 transrate:${DIR}/reports/${RUNOUT}.transrate.done
 clean:
 setup:${DIR}/setup.done
+cdhit:${DIR}/assemblies/${RUNOUT}.ORP.fasta
 
 .DELETE_ON_ERROR:
 .PHONY:report check clean
@@ -208,18 +209,22 @@ ${DIR}/assemblies/diamond/${RUNOUT}.newbies.fasta:${DIR}/assemblies/diamond/${RU
 	cd ${DIR}/assemblies/diamond/ &&  cat ${RUNOUT}.newbies.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta > tmp.fasta && mv tmp.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	cd ${DIR}/assemblies/diamond/ && rm -f ${RUNOUT}.list*
 
-${DIR}/reports/${RUNOUT}.busco.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
+${DIR}/assemblies/${RUNOUT}.ORP.fasta:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
+	cd ${DIR}/assemblies/ && cd-hit-est -M 5000 -T $(CPU) -c .98 -i ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -o ${DIR}/assemblies/${RUNOUT}.ORP.fasta
+	rm ${DIR}/assemblies/${RUNOUT}.ORP.fasta.clstr
+
+${DIR}/reports/${RUNOUT}.busco.done:${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	export BUSCO_CONFIG_FILE=${MAKEDIR}/software/config.ini
-	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}.orthomerged
+	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.ORP.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}.orthomerged
 	mv run_${RUNOUT}* ${DIR}/reports/
 	touch ${DIR}/reports/${RUNOUT}.busco.done
 
-${DIR}/reports/${RUNOUT}.transrate.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
-	${MAKEDIR}/software/orp-transrate/transrate -o ${DIR}/reports/transrate_${RUNOUT}  -a ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -t $(CPU)
+${DIR}/reports/${RUNOUT}.transrate.done:${DIR}/assemblies/${RUNOUT}.ORP.fasta
+	${MAKEDIR}/software/orp-transrate/transrate -o ${DIR}/reports/transrate_${RUNOUT}  -a ${DIR}/assemblies/${RUNOUT}.ORP.fasta --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -t $(CPU)
 	touch ${DIR}/reports/${RUNOUT}.transrate.done
 
-${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
-	salmon index --no-version-check -t ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta  -i ${RUNOUT}.ortho.idx --type quasi -k 31
+${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf:${DIR}/assemblies/${RUNOUT}.ORP.fasta
+	salmon index --no-version-check -t ${DIR}/assemblies/${RUNOUT}.ORP.fasta  -i ${RUNOUT}.ortho.idx --type quasi -k 31
 	salmon quant --no-version-check -p $(CPU) -i ${RUNOUT}.ortho.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/salmon_orthomerged_${RUNOUT}
 	rm -fr ${RUNOUT}.ortho.idx
 
@@ -232,6 +237,7 @@ clean:
 
 reportgen:
 	printf "\n\n*****  QUALITY REPORT FOR: ${RUNOUT} using the ORP version ${VERSION} **** \n\n"
+	printf "\n\n*****  THE ASSEMBLY CAN BE FOUND HERE: ${DIR}/assemblies/${RUNOUT}.ORP.fasta **** \n\n"
 	printf "*****  BUSCO SCORE ~~~~~>           " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	cat $$(find reports/run_${RUNOUT}.orthomerged -name 'short*') | sed -n 8p  | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	printf "*****  TRANSRATE SCORE ~~~~~>           " | tee -a ${DIR}/reports/qualreport.${RUNOUT}

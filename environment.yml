@@ -69,6 +69,7 @@ dependencies:
   - r-base==3.4.3
   - r==3.4.3
   - diamond
+  - cd-hit
   - pip:
     - shmlast
     - bioformats==0.1.15
