@@ -14,7 +14,6 @@ orthopath := $(shell source ${DIR}/software/anaconda/install/bin/activate py27; 
 orthufuserversion = $(shell source ${DIR}/software/anaconda/install/bin/activate py27; orthofuser.py --help | grep "OrthoFinder version" | awk '{print $$3}';conda deactivate)
 transrate := $(shell which transrate 2>/dev/null)
 transabysspath := $(shell which ${DIR}/software/transabyss/transabyss 2>/dev/null)
-conda := $(shell which conda 2>/dev/null)
 diamond_data := $(shell ls ${DIR}/software/diamond/uniprot_sprot.fasta 2>/dev/null)
 busco_data := $(shell ls ${DIR}/busco_dbs/eukaryota_odb9 2>/dev/null)
 
@@ -30,9 +29,6 @@ setup:
 	@rm -f pathfile
 
 conda:environment.yml
-ifdef conda
-	@echo "conda is already installed"
-else
 	cd ${DIR}/software/anaconda && curl -LO https://repo.anaconda.com/archive/Anaconda3-5.1.0-Linux-x86_64.sh
 	cd ${DIR}/software/anaconda && bash Anaconda3-5.1.0-Linux-x86_64.sh -b -p ${DIR}/software/anaconda/install
 	( \
@@ -43,7 +39,6 @@ else
 			 conda create -y -n py27 python=2.7 anaconda; \
   )
 	@echo PATH=\$$PATH:${DIR}/software/anaconda/install/bin >> pathfile;
-endif
 
 transabyss:
 ifdef transabysspath
