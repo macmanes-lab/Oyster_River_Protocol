@@ -22,7 +22,7 @@ orp_v2 := $(shell conda info --envs | grep orp_v2 2>/dev/null)
 py27 := $(shell conda info --envs | grep py27 2>/dev/null)
 
 
-all: setup conda environment orthofuser transrate transabyss diamond_data busco_data postscript
+all: setup conda orp_v2 py27 orthofuser transrate transabyss diamond_data busco_data postscript
 
 .DELETE_ON_ERROR:
 
@@ -85,7 +85,7 @@ else
 	 cd ${DIR}/software/diamond && ${DIR}/software/anaconda/install/envs/orp_v2/bin/diamond makedb --in uniprot_sprot.fasta -d swissprot
 endif
 
-busco_data:
+busco_data:conda
 ifdef busco_data
 else
 	mkdir ${DIR}/busco_dbs && cd ${DIR}/busco_dbs
