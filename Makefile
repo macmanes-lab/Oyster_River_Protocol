@@ -128,3 +128,4 @@ ifdef pathfile
 	@printf "\n*** type <<source ~/.profile>> to complete the install ***\n\n"
 else
 	@printf "\n\n*** It looks like everything is installed ***"
+endif
