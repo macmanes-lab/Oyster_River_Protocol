@@ -49,6 +49,7 @@ else
 			 conda env create -f environment.yml python=3.6; \
   )
 	@echo PATH=\$$PATH:${DIR}/software/anaconda/install/bin >> pathfile;
+endif
 
 py27:conda
 ifdef py27
@@ -60,7 +61,7 @@ else
 			 conda create -y -n py27 python=2.7 anaconda; \
   )
 	@echo PATH=\$$PATH:${DIR}/software/anaconda/install/bin >> pathfile;
-
+endif
 
 transabyss:
 ifdef transabysspath
