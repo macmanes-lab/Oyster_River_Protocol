@@ -17,9 +17,10 @@ transabysspath := $(shell which ${DIR}/software/transabyss/transabyss 2>/dev/nul
 transabyssversion = $(shell transabyss --version)
 diamond_data := $(shell ls ${DIR}/software/diamond/uniprot_sprot.fasta 2>/dev/null)
 busco_data := $(shell ls ${DIR}/busco_dbs/eukaryota_odb9 2>/dev/null)
+conda := $(shell ls ${DIR}/software/anaconda/install/bin/activate 2>/dev/null)
 
 
-all: setup conda orthofuser transrate transabyss diamond_data busco_data postscript
+all: setup conda environment orthofuser transrate transabyss diamond_data busco_data postscript
 
 .DELETE_ON_ERROR:
 
@@ -29,9 +30,14 @@ setup:
 	@mkdir -p ${DIR}/software/diamond
 	@rm -f pathfile
 
-conda:environment.yml
+conda:
+ifdef conda
+else
 	cd ${DIR}/software/anaconda && curl -LO https://repo.anaconda.com/archive/Anaconda3-5.1.0-Linux-x86_64.sh
 	cd ${DIR}/software/anaconda && bash Anaconda3-5.1.0-Linux-x86_64.sh -b -p ${DIR}/software/anaconda/install
+endif
+
+environment:environment.yml conda
 	( \
        source ${DIR}/software/anaconda/install/bin/activate; \
        conda update -y -n base conda; \
