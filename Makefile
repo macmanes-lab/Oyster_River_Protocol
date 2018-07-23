@@ -46,6 +46,11 @@ ifdef transabysspath
 ifeq ($(transabyssversion),2.0.1)
 	@echo "TransABySS is already installed"
 else
+	@echo "version ${transabyssversion}"
+	@echo "TransABySS is installed, but not the right version"
+	cd ${DIR}/software/transabyss && git pull
+endif
+else
 	cd ${DIR}/software/ && git clone https://github.com/bcgsc/transabyss.git
 	@echo PATH=\$$PATH:${DIR}/software/transabyss >> pathfile
 endif
