@@ -32,7 +32,6 @@ dependencies:
   - libpng
   - libxcb
   - libxml2
-  - mkl
   - pango
   - pixman
   - pyparsing
@@ -71,7 +70,6 @@ dependencies:
   - diamond
   - cd-hit
   - pip:
-    - shmlast
     - bioformats==0.1.15
     - biopython
     - cvxopt
