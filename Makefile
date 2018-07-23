@@ -34,20 +34,17 @@ setup:
 	@rm -f pathfile
 
 conda:
-ifdef conda
-else
 	cd ${DIR}/software/anaconda && curl -LO https://repo.anaconda.com/archive/Anaconda3-5.1.0-Linux-x86_64.sh
 	cd ${DIR}/software/anaconda && bash Anaconda3-5.1.0-Linux-x86_64.sh -b -p ${DIR}/software/anaconda/install
-endif
 
 orp_v2:environment.yml conda
 ifdef orp_v2
 else
 	( \
        source ${DIR}/software/anaconda/install/bin/activate; \
-       conda update -y -n base conda; \
+       ${DIR}/software/anaconda/install/bin/conda update -y -n base conda; \
 			 source ${DIR}/software/anaconda/install/bin/deactivate; \
-			 conda env create -f environment.yml python=3.6; \
+			 ${DIR}/software/anaconda/install/bin/conda env create -f environment.yml python=3.6; \
   )
 	@echo PATH=\$$PATH:${DIR}/software/anaconda/install/bin >> pathfile;
 endif
@@ -57,9 +54,9 @@ ifdef py27
 else
 	( \
        source ${DIR}/software/anaconda/install/bin/activate; \
-       conda update -y -n base conda; \
+       ${DIR}/software/anaconda/install/bin/conda update -y -n base conda; \
 			 source ${DIR}/software/anaconda/install/bin/deactivate; \
-			 conda create -y -n py27 python=2.7 anaconda; \
+			 ${DIR}/software/anaconda/install/bin/conda create -y -n py27 python=2.7 anaconda; \
   )
 	@echo PATH=\$$PATH:${DIR}/software/anaconda/install/bin >> pathfile;
 endif
