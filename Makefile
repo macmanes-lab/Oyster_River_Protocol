@@ -14,12 +14,13 @@ orthopath := $(shell source ${DIR}/software/anaconda/install/bin/activate py27; 
 orthufuserversion = $(shell source ${DIR}/software/anaconda/install/bin/activate py27; orthofuser.py --help | grep "OrthoFinder version" | awk '{print $$3}';conda deactivate)
 transrate := $(shell ls ${DIR}/software/orp-transrate/transrate 2>/dev/null)
 transabysspath := $(shell which ${DIR}/software/transabyss/transabyss 2>/dev/null)
-transabyssversion = $(shell transabyss --version)
+transabyssversion = $(shell source ${DIR}/software/anaconda/install/bin/activate orp_v2; transabyss --version; source deactivate)
 diamond_data := $(shell ls ${DIR}/software/diamond/uniprot_sprot.fasta 2>/dev/null)
 busco_data := $(shell ls ${DIR}/busco_dbs/eukaryota_odb9 2>/dev/null)
 conda := $(shell conda info 2>/dev/null)
 orp_v2 := $(shell conda info --envs | grep orp_v2 2>/dev/null)
 py27 := $(shell conda info --envs | grep py27 2>/dev/null)
+pathfile := $(shell ls pathfile 2>/dev/null)
 
 
 all: setup conda orp_v2 py27 orthofuser transrate transabyss diamond_data busco_data postscript
@@ -114,7 +115,8 @@ else
 	@echo PATH=\$$PATH:${DIR}/software/OrthoFinder/orthofinder >> pathfile
 endif
 
-postscript: setup diamond_data busco_data orthofuser conda transrate
+postscript: setup py27 orp_v2 diamond_data busco_data orthofuser conda transrate
+ifdef pathfile
 	@printf "\n\n*** The following location(s), if any print, need to be added to your PATH ***"
 	@printf "\n*** They will be automatically to your ~/.profile or ~/.bash_profile ***\n\n"
 	@cat pathfile
@@ -124,3 +126,5 @@ postscript: setup diamond_data busco_data orthofuser conda transrate
 	source $$HOME/.profile
 	@printf "\n\n\n"
 	@printf "\n*** type <<source ~/.profile>> to complete the install ***\n\n"
+else
+	@printf "\n\n*** It looks like everything is installed ***"
