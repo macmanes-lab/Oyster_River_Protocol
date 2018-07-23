@@ -17,7 +17,9 @@ transabysspath := $(shell which ${DIR}/software/transabyss/transabyss 2>/dev/nul
 transabyssversion = $(shell transabyss --version)
 diamond_data := $(shell ls ${DIR}/software/diamond/uniprot_sprot.fasta 2>/dev/null)
 busco_data := $(shell ls ${DIR}/busco_dbs/eukaryota_odb9 2>/dev/null)
-conda := $(shell ls ${DIR}/software/anaconda/install/bin/activate 2>/dev/null)
+conda := $(shell conda info 2>/dev/null)
+orp_v2 := $(shell conda info --envs | grep orp_v2 2>/dev/null)
+py27 := $(shell conda info --envs | grep py27 2>/dev/null)
 
 
 all: setup conda environment orthofuser transrate transabyss diamond_data busco_data postscript
@@ -37,15 +39,28 @@ else
 	cd ${DIR}/software/anaconda && bash Anaconda3-5.1.0-Linux-x86_64.sh -b -p ${DIR}/software/anaconda/install
 endif
 
-environment:environment.yml conda
+orp_v2:environment.yml conda
+ifdef orp_v2
+else
 	( \
        source ${DIR}/software/anaconda/install/bin/activate; \
        conda update -y -n base conda; \
 			 source ${DIR}/software/anaconda/install/bin/deactivate; \
 			 conda env create -f environment.yml python=3.6; \
+  )
+	@echo PATH=\$$PATH:${DIR}/software/anaconda/install/bin >> pathfile;
+
+py27:conda
+ifdef py27
+else
+	( \
+       source ${DIR}/software/anaconda/install/bin/activate; \
+       conda update -y -n base conda; \
+			 source ${DIR}/software/anaconda/install/bin/deactivate; \
 			 conda create -y -n py27 python=2.7 anaconda; \
   )
 	@echo PATH=\$$PATH:${DIR}/software/anaconda/install/bin >> pathfile;
+
 
 transabyss:
 ifdef transabysspath
