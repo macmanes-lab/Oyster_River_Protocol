@@ -12,7 +12,7 @@ DIR := ${CURDIR}
 CONDAROOT = ${DIR}/software/anaconda/install/
 orthopath := $(shell source ${DIR}/software/anaconda/install/bin/activate py27; which orthofuser.py 2>/dev/null; conda deactivate)
 orthufuserversion = $(shell source ${DIR}/software/anaconda/install/bin/activate py27; orthofuser.py --help | grep "OrthoFinder version" | awk '{print $$3}';conda deactivate)
-transrate := $(shell which transrate 2>/dev/null)
+transrate := $(shell ls ${DIR}/software/orp-transrate/transrate 2>/dev/null)
 transabysspath := $(shell which ${DIR}/software/transabyss/transabyss 2>/dev/null)
 transabyssversion = $(shell transabyss --version)
 diamond_data := $(shell ls ${DIR}/software/diamond/uniprot_sprot.fasta 2>/dev/null)
@@ -93,8 +93,11 @@ else
 endif
 
 transrate:
+ifdef transrate
+else
 	cd ${DIR}/software && tar -zxf orp-transrate.tar.gz
 	@echo PATH=\$$PATH:${DIR}/software/orp-transrate >> pathfile
+endif
 
 orthofuser:
 ifdef orthopath
