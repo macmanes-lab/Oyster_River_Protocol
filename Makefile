@@ -123,5 +123,5 @@ ifeq ($(pathfile),pathfile)
 	@printf "\n\n\n"
 	@printf "\n*** type <<source ~/.profile>> to complete the install ***\n\n"
 else
-	@printf "\n\n*** It looks like everything is installed \n\n***"
+	@printf "\n\n*** It looks like everything is installed *** \n\n"
 endif
