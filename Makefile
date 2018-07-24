@@ -31,7 +31,6 @@ setup:
 	@mkdir -p ${DIR}/shared
 	@mkdir -p ${DIR}/software/anaconda
 	@mkdir -p ${DIR}/software/diamond
-	@rm -f pathfile
 
 conda:
 ifdef conda
@@ -49,7 +48,7 @@ else
 			 source ${DIR}/software/anaconda/install/bin/deactivate; \
 			 ${DIR}/software/anaconda/install/bin/conda env create -f environment.yml python=3.6; \
   )
-	@echo PATH=\$$PATH:${DIR}/software/anaconda/install/bin >> pathfile;
+	@echo PATH=\$$PATH:${DIR}/software/anaconda/install/bin > pathfile;
 endif
 
 py27:conda
