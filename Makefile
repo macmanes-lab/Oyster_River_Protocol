@@ -113,16 +113,14 @@ endif
 
 postscript: setup py27 orp_v2 diamond_data busco_data orthofuser conda transrate
 	@if [ -f pathfile ]; then\
-		@printf "\n\n*** The following location(s), if any print, need to be added to your PATH ***";\
-		@printf "\n*** They will be automatically to your ~/.profile or ~/.bash_profile ***\n\n";\
-		@cat pathfile;\
-		@cat pathfile >> ~/.profile;\
-		@cat pathfile >> ~/.bash_profile;\
-		@export PATH=$$PATH:$$(cat pathfile);\
-		@printf "\n\n\n";\
-		@printf "\n*** type ``source ~/.profile`` to complete the install ***\n\n";\
-	else;\
-	@printf "\n\n*** It looks like everything is installed *** \n\n";\
+		printf "\n\n*** The following location(s), if any print, need to be added to your PATH ***";\
+		printf "\n*** They will be automatically to your ~/.profile or ~/.bash_profile ***\n\n";\
+		cat pathfile;\
+		cat pathfile >> ~/.profile;\
+		cat pathfile >> ~/.bash_profile;\
+		export PATH=$$PATH:$$(cat pathfile);\
+		printf "\n\n\n";\
+		printf "\n*** type ``source ~/.profile`` to complete the install ***\n\n";\
 	fi
 
 clean:
