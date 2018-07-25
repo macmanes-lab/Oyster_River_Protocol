@@ -7,7 +7,7 @@ channels:
 dependencies:
   - python>=3.6
   - ruby
-  - make=4.2.1=0
+  - make
   - glib
   - zlib==1.2.11=0
   - libgcc>=7.2.0
@@ -32,7 +32,7 @@ dependencies:
     - biopython
     - cvxopt
     - cython
-    - numpy>=1.15.0
+    - numpy
     - pandas
-    - pip==10.0.1
-    - scipy>=1.1.0
+    - pip
+    - scipy
