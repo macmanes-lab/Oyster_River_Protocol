@@ -114,6 +114,7 @@ else
 endif
 
 postscript: setup py27 orp_v2 diamond_data busco_data orthofuser conda transrate
+	touch pathfile
 ifeq ($(pathfile),pathfile)
 	@printf "\n\n*** The following location(s), if any print, need to be added to your PATH ***"
 	@printf "\n*** They will be automatically to your ~/.profile or ~/.bash_profile ***\n\n"
