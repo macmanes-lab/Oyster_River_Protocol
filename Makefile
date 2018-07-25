@@ -127,3 +127,12 @@ ifeq ($(pathfile),pathfile)
 else
 	@printf "\n\n*** It looks like everything is installed *** \n\n"
 endif
+
+clean:
+	conda remove -y --name py27 --all
+	conda remove -y --name orp_v2 --all
+	rm -fr ${DIR}/software/anaconda/install
+	rm -fr ${DIR}/software/OrthoFinder/
+	rm -fr ${DIR}/software/orp-transrate
+	rm -fr ${DIR}/software/transabyss
+	rm -fr ${DIR}/software/anaconda/
