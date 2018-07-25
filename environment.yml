@@ -31,15 +31,15 @@ dependencies:
   - salmon>=0.10.2
   - seqtk
   - trinity>=2.6.0
-  - spades
-  - busco
-  - blast
+  - spades>=3.12.0
+  - busco>=3.0.1
+  - blast>=2.6.0
   - hmmer
-  - samtools
+  - samtools>=1.9
   - blat
   - parallel
   - last
-  - rcorrector
+  - rcorrector>=1.0.2
   - mcl
   - abyss>=2.1.0
   - python-igraph
