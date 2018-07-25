@@ -20,7 +20,7 @@ busco_data := $(shell ls ${DIR}/busco_dbs/eukaryota_odb9 2>/dev/null)
 conda := $(shell ${DIR}/software/anaconda/install/bin/conda info 2>/dev/null)
 orp_v2 := $(shell ${DIR}/software/anaconda/install/bin/conda info --envs | grep orp_v2 2>/dev/null)
 py27 := $(shell ${DIR}/software/anaconda/install/bin/conda info --envs | grep py27 2>/dev/null)
-pathfile := $(shell ls ${DIR}/pathfile 2>/dev/null)
+pathfile := $(shell ls pathfile 2>/dev/null)
 
 
 all: setup conda orp_v2 py27 orthofuser transrate transabyss diamond_data busco_data postscript
@@ -60,7 +60,6 @@ else
 			 source ${DIR}/software/anaconda/install/bin/deactivate; \
 			 ${DIR}/software/anaconda/install/bin/conda create -y -n py27 python=2.7 anaconda; \
   )
-	@echo PATH=\$$PATH:${DIR}/software/anaconda/install/bin >> pathfile;
 endif
 
 transabyss:
