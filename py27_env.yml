@@ -1,4 +1,4 @@
-name: orp_v2
+name: py27
 channels:
   - bioconda
   - conda-forge
