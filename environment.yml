@@ -29,8 +29,6 @@ dependencies:
   - mcl
   - abyss>=2.1.0
   - python-igraph
-  - r-base
-  - r==3.4.3
   - diamond
   - cd-hit
   - pip:
