@@ -13,8 +13,8 @@ dependencies:
     - biopython
     - cvxopt
     - cython
-    - numpy>=1.14.3
+    - numpy>=1.15.0
     - pandas
     - pip==10.0.1
-    - scipy
+    - scipy>=1.14.4
     - matplotlib
