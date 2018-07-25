@@ -8,9 +8,9 @@ dependencies:
   - python=2.7.14
   - make=4.2.1=0
   - python-igraph
+  - mcl
   - pip:
     - biopython
-    - mcl
     - cvxopt
     - cython
     - numpy>=1.14.3
