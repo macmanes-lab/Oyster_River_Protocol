@@ -4,9 +4,7 @@ channels:
   - conda-forge
   - defaults
   - r
-  - activisiongamescience
 dependencies:
-  - zsh>=5.2
   - python>=3.6
   - ruby
   - ca-certificates
@@ -18,15 +16,6 @@ dependencies:
   - ncurses
   - openssl
   - glib
-  - icu
-  - libffi
-  - libgfortran
-  - libpng
-  - libxcb
-  - libxml2
-  - qt
-  - seaborn
-  - readline
   - yaml==0.1.7
   - zlib==1.2.11=0
   - cloog
