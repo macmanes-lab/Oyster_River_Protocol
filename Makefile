@@ -112,18 +112,19 @@ else
 endif
 
 postscript: setup py27 orp_v2 diamond_data busco_data orthofuser conda transrate
-ifeq ($(shell ls pathfile),pathfile)
-	@printf "\n\n*** The following location(s), if any print, need to be added to your PATH ***"
-	@printf "\n*** They will be automatically to your ~/.profile or ~/.bash_profile ***\n\n"
-	@cat pathfile
-	@cat pathfile >> ~/.profile
-	@cat pathfile >> ~/.bash_profile
-	@export PATH=$$PATH:$$(cat pathfile)
-	@printf "\n\n\n"
-	@printf "\n*** type ``source ~/.profile`` to complete the install ***\n\n"
-else
-	@printf "\n\n*** It looks like everything is installed *** \n\n"
-endif
+	if [ -a pathfile ] ; \
+	then \
+		@printf "\n\n*** The following location(s), if any print, need to be added to your PATH ***"
+		@printf "\n*** They will be automatically to your ~/.profile or ~/.bash_profile ***\n\n"
+		@cat pathfile
+		@cat pathfile >> ~/.profile
+		@cat pathfile >> ~/.bash_profile
+		@export PATH=$$PATH:$$(cat pathfile)
+		@printf "\n\n\n"
+		@printf "\n*** type ``source ~/.profile`` to complete the install ***\n\n"
+	else \
+		@printf "\n\n*** It looks like everything is installed *** \n\n"
+	fi;
 
 clean:
 	${DIR}/software/anaconda/install/bin/conda remove -y --name py27 --all
