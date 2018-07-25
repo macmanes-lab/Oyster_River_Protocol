@@ -33,7 +33,7 @@ dependencies:
   - libgcc>=5.6.0
   - salmon>=0.10.2
   - seqtk
-  - trinity
+  - trinity>=2.6.0
   - spades
   - busco
   - blast
@@ -44,7 +44,7 @@ dependencies:
   - last
   - rcorrector
   - mcl
-  - abyss>=2.0.1
+  - abyss>=2.1.0
   - python-igraph
   - r-base==3.4.3
   - r==3.4.3
