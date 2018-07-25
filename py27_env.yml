@@ -1,0 +1,20 @@
+name: orp_v2
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+  - r
+dependencies:
+  - python==2.7
+  - make=4.2.1=0
+  - python-igraph
+  - pip:
+    - biopython
+    - mcl
+    - cvxopt
+    - cython
+    - numpy>=1.14.3
+    - pandas
+    - pip==10.0.1
+    - scipy
+    - matplotlib
