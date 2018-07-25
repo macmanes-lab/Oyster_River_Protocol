@@ -121,8 +121,8 @@ postscript: setup py27 orp_v2 diamond_data busco_data orthofuser conda transrate
 		@export PATH=$$PATH:$$(cat pathfile);\
 		@printf "\n\n\n";\
 		@printf "\n*** type ``source ~/.profile`` to complete the install ***\n\n";\
-	else \
-	@printf "\n\n*** It looks like everything is installed *** \n\n" \
+	else;\
+	@printf "\n\n*** It looks like everything is installed *** \n\n";\
 	fi
 
 clean:
