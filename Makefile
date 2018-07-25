@@ -128,8 +128,8 @@ else
 endif
 
 clean:
-	conda remove -y --name py27 --all
-	conda remove -y --name orp_v2 --all
+	${DIR}/software/anaconda/install/bin/conda remove -y --name py27 --all
+	${DIR}/software/anaconda/install/bin/conda remove -y --name orp_v2 --all
 	rm -fr ${DIR}/software/anaconda/install
 	rm -fr ${DIR}/software/OrthoFinder/
 	rm -fr ${DIR}/software/orp-transrate
