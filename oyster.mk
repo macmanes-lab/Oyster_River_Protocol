@@ -116,7 +116,7 @@ ifdef rcorrpath
 else
 	$(error "\n\n *** RCORRECTOR is not installed, must fix ***")
 endif
-ifeq ($(shell zsh --version | awk '{print $2}'),5.0.2)
+ifeq ($(shell zsh --version | awk '{print $$2}'),5.0.2)
 else
 	$(error "\n\n *** TRANSABySS Requires at least ZSH 5.0.8, you have 5.0.2 and must upgrade ***")
 endif
