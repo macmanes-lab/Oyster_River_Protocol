@@ -116,7 +116,22 @@ ifdef rcorrpath
 else
 	$error("*** RCORRECTOR is not installed, must fix ***")
 endif
-
+ifeq ($(shell zsh --version | awk '{$$print $2}'),5.0.2)
+else
+	$error("*** TRANSABySS Requires at least ZSH 5.0.8, you have 5.0.2 and must upgrade ***")
+endif
+ifeq ($(shell zsh --version | awk '{$$print $2}'),5.0.5)
+else
+	$error("*** TRANSABySS Requires at least ZSH 5.0.8, you have 5.0.5 and must upgrade ***")
+endif
+ifeq ($(shell zsh --version | awk '{$$print $2}'),5.0.6)
+else
+	$error("*** TRANSABySS Requires at least ZSH 5.0.8, you have 5.0.6 and must upgrade ***")
+endif
+ifeq ($(shell zsh --version | awk '{$$print $2}'),5.0.7)
+else
+	$error("*** TRANSABySS Requires at least ZSH 5.0.8, you have 5.0.7 and must upgrade ***")
+endif
 
 welcome:
 	printf "\n\n*****  Welcome to the Oyster River ***** \n"
