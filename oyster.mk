@@ -78,47 +78,47 @@ ${DIR}/setup.done:
 check:
 ifdef salmonpath
 else
-	$(error "*** SALMON is not installed, must fix ***")
+	$(error "\n\n*** SALMON is not installed, must fix ***")
 endif
 ifdef transratepath
 else
-	$(error "*** TRANSRATE is not installed, must fix ***")
+	$(error "\n\n*** TRANSRATE is not installed, must fix ***")
 endif
 ifdef seqtkpath
 else
-	$(error "*** SEQTK is not installed, must fix ***")
+	$(error "\n\n*** SEQTK is not installed, must fix ***")
 endif
 ifdef buscopath
 else
-	$(error "*** BUSCO is not installed, must fix ***")
+	$(error "\n\n*** BUSCO is not installed, must fix ***")
 endif
 ifdef mclpath
 else
-	$(error "*** MCL is not installed, must fix ***")
+	$(error "\n\n*** MCL is not installed, must fix ***")
 endif
 ifdef spadespath
 else
-	$(error "*** SPADES is not installed, must fix ***")
+	$(error "\n\n*** SPADES is not installed, must fix ***")
 endif
 ifdef trinitypath
 else
-	$(error "*** TRINITY is not installed, must fix ***")
+	$(error "\n\n*** TRINITY is not installed, must fix ***")
 endif
 ifdef trimmomaticpath
 else
-	$(error  "Maybe TRIMMOMATIC is not installed, or maybe you are working on Bridges")
+	$(error  "\n\n Maybe TRIMMOMATIC is not installed, or maybe you are working on Bridges")
 endif
 ifdef transabyss
 else
-	$(error "*** transabyss is not installed, must fix ***")
+	$(error "\n\n *** transabyss is not installed, must fix ***")
 endif
 ifdef rcorrpath
 else
-	$(error "*** RCORRECTOR is not installed, must fix ***")
+	$(error "\n\n *** RCORRECTOR is not installed, must fix ***")
 endif
 ifeq ($(shell zsh --version | awk '{print $$2}'),5.0.2)
 else
-	$(error "*** TRANSABySS Requires at least ZSH 5.0.8, you have 5.0.2 and must upgrade ***")
+	$(error "\n\n *** TRANSABySS Requires at least ZSH 5.0.8, you have 5.0.2 and must upgrade ***")
 endif
 ifeq ($(shell zsh --version | awk '{print $$2}'),5.0.5)
 else
@@ -126,11 +126,11 @@ else
 endif
 ifeq ($(shell zsh --version | awk '{print $$2}'),5.0.6)
 else
-	$(error "*** TRANSABySS Requires at least ZSH 5.0.8, you have 5.0.6 and must upgrade ***")
+	$(error "\n\n *** TRANSABySS Requires at least ZSH 5.0.8, you have 5.0.6 and must upgrade ***")
 endif
 ifeq ($(shell zsh --version | awk '{print $$2}'),5.0.7)
 else
-	$(error "*** TRANSABySS Requires at least ZSH 5.0.8, you have 5.0.7 and must upgrade ***")
+	$(error "\n\n *** TRANSABySS Requires at least ZSH 5.0.8, you have 5.0.7 and must upgrade ***")
 endif
 
 welcome:
