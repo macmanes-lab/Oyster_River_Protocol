@@ -4,8 +4,10 @@ channels:
   - conda-forge
   - defaults
   - r
+  - antoined
 dependencies:
   - python>=3.6
+  - zsh
   - ruby
   - make
   - glib
