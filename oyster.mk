@@ -263,15 +263,15 @@ reportgen:
 	cat $$(find reports/transrate_${RUNOUT} -name assemblies.csv) | awk -F , '{print $$37}' | sed -n 2p | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	printf "*****  TRANSRATE OPTIMAL SCORE ~~~~~>   " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	cat $$(find reports/transrate_${RUNOUT} -name assemblies.csv) | awk -F , '{print $$38}' | sed -n 2p | tee -a ${DIR}/reports/qualreport.${RUNOUT}
-	printf "*****  UNIQUE GENES ORP ~~~~~>             " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
+	printf "*****  UNIQUE GENES ORP ~~~~~>          " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	cat ${DIR}/assemblies/${RUNOUT}.unique.ORP.txt | tee -a ${DIR}/reports/qualreport.${RUNOUT}
-	printf "*****  UNIQUE GENES TRINITY ~~~~~>             " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
+	printf "*****  UNIQUE GENES TRINITY ~~~~~>        " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	cat ${DIR}/assemblies/diamond/${RUNOUT}.unique.trinity.txt | tee -a ${DIR}/reports/qualreport.${RUNOUT}
-	printf "*****  UNIQUE GENES SPADES55 ~~~~~>             " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
+	printf "*****  UNIQUE GENES SPADES55 ~~~~~>       " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	cat ${DIR}/assemblies/diamond/${RUNOUT}.unique.sp55.txt | tee -a ${DIR}/reports/qualreport.${RUNOUT}
-	printf "*****  UNIQUE GENES SPADES75 ~~~~~>             " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
+	printf "*****  UNIQUE GENES SPADES75 ~~~~~>       " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	cat ${DIR}/assemblies/diamond/${RUNOUT}.unique.sp75.txt | tee -a ${DIR}/reports/qualreport.${RUNOUT}
-	printf "*****  UNIQUE GENES TRANSABYSS ~~~~~>             " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
+	printf "*****  UNIQUE GENES TRANSABYSS ~~~~~>      " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	cat ${DIR}/assemblies/diamond/${RUNOUT}.unique.transabyss.txt | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 
 	printf " \n\n"
