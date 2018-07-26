@@ -200,6 +200,12 @@ ${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt: ${DIR}/assemblies/${RUN
 	diamond blastx -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.spades75.fasta -d ${MAKEDIR}/software/diamond/swissprot  -o ${DIR}/assemblies/diamond/${RUNOUT}.spades75.diamond.txt
 	diamond blastx -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.spades55.fasta -d ${MAKEDIR}/software/diamond/swissprot -o ${DIR}/assemblies/diamond/${RUNOUT}.spades55.diamond.txt
 	diamond blastx -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta -d ${MAKEDIR}/software/diamond/swissprot  -o ${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt
+	awk '{print $$2}' ${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/${RUNOUT}.unique.trinity.txt
+	awk '{print $$2}' ${DIR}/assemblies/diamond/${RUNOUT}.spades75.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/${RUNOUT}.unique.sp75.txt
+	awk '{print $$2}' ${DIR}/assemblies/diamond/${RUNOUT}.spades55.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/${RUNOUT}.unique.sp55.txt
+	awk '{print $$2}' ${DIR}/assemblies/diamond/${RUNOUT}.transabyss.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/${RUNOUT}.unique.transabyss.txt
+
+
 
 #list1 is unique geneIDs in orthomerged
 #list2 is unique  geneIDs in other assemblies
@@ -222,6 +228,8 @@ ${DIR}/assemblies/diamond/${RUNOUT}.newbies.fasta:${DIR}/assemblies/diamond/${RU
 
 ${DIR}/assemblies/${RUNOUT}.ORP.fasta:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	cd ${DIR}/assemblies/ && cd-hit-est -M 5000 -T $(CPU) -c .98 -i ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -o ${DIR}/assemblies/${RUNOUT}.ORP.fasta
+	diamond blastx -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.ORP.fasta -d ${MAKEDIR}/software/diamond/swissprot  -o ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
+	awk '{print $$2}' ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/${RUNOUT}.unique.ORP.txt
 	rm ${DIR}/assemblies/${RUNOUT}.ORP.fasta.clstr
 
 ${DIR}/reports/${RUNOUT}.busco.done:${DIR}/assemblies/${RUNOUT}.ORP.fasta
@@ -255,5 +263,16 @@ reportgen:
 	cat $$(find reports/transrate_${RUNOUT} -name assemblies.csv) | awk -F , '{print $$37}' | sed -n 2p | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	printf "*****  TRANSRATE OPTIMAL SCORE ~~~~~>   " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	cat $$(find reports/transrate_${RUNOUT} -name assemblies.csv) | awk -F , '{print $$38}' | sed -n 2p | tee -a ${DIR}/reports/qualreport.${RUNOUT}
+	printf "*****  UNIQUE GENES ORP ~~~~~>             " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
+	cat ${DIR}/assemblies/${RUNOUT}.unique.ORP.txt | tee -a ${DIR}/reports/qualreport.${RUNOUT}
+	printf "*****  UNIQUE GENES TRINITY ~~~~~>             " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
+	cat ${DIR}/assemblies/diamond/${RUNOUT}.unique.trinity.txt | tee -a ${DIR}/reports/qualreport.${RUNOUT}
+	printf "*****  UNIQUE GENES SPADES55 ~~~~~>             " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
+	cat ${DIR}/assemblies/diamond/${RUNOUT}.unique.sp55.txt | tee -a ${DIR}/reports/qualreport.${RUNOUT}
+	printf "*****  UNIQUE GENES SPADES75 ~~~~~>             " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
+	cat ${DIR}/assemblies/diamond/${RUNOUT}.unique.sp75.txt | tee -a ${DIR}/reports/qualreport.${RUNOUT}
+	printf "*****  UNIQUE GENES TRANSABYSS ~~~~~>             " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
+	cat ${DIR}/assemblies/diamond/${RUNOUT}.unique.transabyss.txt | tee -a ${DIR}/reports/qualreport.${RUNOUT}
+
 	printf " \n\n"
 	source ${MAKEDIR}/software/anaconda/install/bin/deactivate
