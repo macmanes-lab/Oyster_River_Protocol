@@ -122,7 +122,7 @@ else
 endif
 ifeq ($(shell zsh --version | awk '{print $$2}'),5.0.5)
 else
-	$(error "\n\n *** TRANSABySS Requires at least ZSH 5.0.8, you have 5.0.5 and must upgrade ***")
+	$(error \n\n "\n\n *** TRANSABySS Requires at least ZSH 5.0.8, you have 5.0.5 and must upgrade ***")
 endif
 ifeq ($(shell zsh --version | awk '{print $$2}'),5.0.6)
 else
