@@ -30,7 +30,7 @@ busco:${DIR}/reports/busco.done
 transrate:${DIR}/reports/transrate.done
 report:busco transrate reportgen
 
-
+source ${MAKEDIR}/software/anaconda/install/bin/activate py27
 
 .DELETE_ON_ERROR:
 .PHONY:report
