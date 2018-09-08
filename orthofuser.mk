@@ -19,6 +19,8 @@ LINEAGE=
 BUSCODB :=
 INPUT := $(shell basename ${READ1})
 FASTADIR=
+BUSCO_CONFIG_FILE := ${MAKEDIR}/software/config.ini
+export BUSCO_CONFIG_FILE
 
 
 merge:${DIR}/orthofuse/${RUNOUT}/merged.fasta
