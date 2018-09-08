@@ -62,6 +62,9 @@ ${FASTADIR}/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/orthotransrat
 	find ${DIR}/orthofuse/${RUNOUT}/ -name '*orthout' -delete
 	python ${MAKEDIR}/scripts/filter.py ${DIR}/orthofuse/${RUNOUT}/merged.fasta ${DIR}/orthofuse/${RUNOUT}/good.list > ${FASTADIR}/${RUNOUT}.orthomerged.fasta
 	rm ${DIR}/orthofuse/${RUNOUT}/good.list
+	
+source ${MAKEDIR}/software/anaconda/install/bin/activate orp_v2
+
 
 ${DIR}/reports/busco.done:${FASTADIR}/${RUNOUT}.orthomerged.fasta
 	python $$(which run_BUSCO.py) -i ${FASTADIR}/${RUNOUT}.orthomerged.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}
