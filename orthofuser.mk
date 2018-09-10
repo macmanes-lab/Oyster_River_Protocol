@@ -68,18 +68,23 @@ ${FASTADIR}/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/orthotransrat
 	
 source ${MAKEDIR}/software/anaconda/install/bin/activate orp_v2
 
+${DIR}/assemblies/${RUNOUT}.ORP.fasta:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
+	cd ${DIR}/assemblies/ && cd-hit-est -M 5000 -T $(CPU) -c .98 -i ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -o ${DIR}/assemblies/${RUNOUT}.ORP.fasta
+	diamond blastx -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.ORP.fasta -d ${MAKEDIR}/software/diamond/swissprot  -o ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
+	awk '{print $$2}' ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/${RUNOUT}.unique.ORP.txt
+	rm ${DIR}/assemblies/${RUNOUT}.ORP.fasta.clstr
 
-${DIR}/reports/busco.done:${FASTADIR}/${RUNOUT}.orthomerged.fasta
-	python $$(which run_BUSCO.py) -i ${FASTADIR}/${RUNOUT}.orthomerged.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}
+${DIR}/reports/busco.done:${FASTADIR}/${RUNOUT}.ORP.fasta
+	python $$(which run_BUSCO.py) -i ${FASTADIR}/${RUNOUT}.ORP.fasta -m transcriptome --cpu $(CPU) -o ${RUNOUT}
 	mv run_${RUNOUT} ${DIR}/reports/
 	touch ${DIR}/reports/busco.done
 
-${DIR}/reports/transrate.done:${FASTADIR}/${RUNOUT}.orthomerged.fasta
-	transrate -o ${DIR}/reports/transrate_${RUNOUT}  -a ${FASTADIR}/${RUNOUT}.orthomerged.fasta --left ${READ1} --right ${READ2} -t $(CPU)
+${DIR}/reports/transrate.done:${FASTADIR}/${RUNOUT}.ORP.fasta
+	transrate -o ${DIR}/reports/transrate_${RUNOUT}  -a ${FASTADIR}/${RUNOUT}.ORP.fasta --left ${READ1} --right ${READ2} -t $(CPU)
 	touch ${DIR}/reports/transrate.done
 
-${DIR}/quants/orthomerged/quant.sf:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
-	salmon index --no-version-check -t ${FASTADIR}/${RUNOUT}.orthomerged.fasta  -i ${RUNOUT}.ortho.idx --type quasi -k 31
+${DIR}/quants/orthomerged/quant.sf:${DIR}/assemblies/${RUNOUT}.ORP.fasta
+	salmon index --no-version-check -t ${FASTADIR}/${RUNOUT}.ORP.fasta  -i ${RUNOUT}.ortho.idx --type quasi -k 31
 	salmon quant --no-version-check -p $(CPU) -i ${RUNOUT}.ortho.idx --seqBias --gcBias -l a -1 ${READ1} -2 ${READ1} -o ${DIR}/quants/salmon_orthomerged_${RUNOUT}
 	rm -fr ${RUNOUT}.ortho.idx
 
