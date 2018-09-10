@@ -32,8 +32,6 @@ busco:${DIR}/reports/busco.done
 transrate:${DIR}/reports/transrate.done
 report:busco transrate reportgen
 
-source ${MAKEDIR}/software/anaconda/install/bin/activate py27
-
 .DELETE_ON_ERROR:
 .PHONY:report
 
@@ -44,7 +42,11 @@ setup:
 ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
 	mkdir -p ${DIR}/orthofuse/${RUNOUT}/working
 	for fasta in $$(ls ${FASTADIR}); do python ${MAKEDIR}/scripts/long.seq.py ${FASTADIR}/$$fasta ${DIR}/orthofuse/${RUNOUT}/working/$$fasta.short.fasta 200; done
-	python $$(which orthofuser.py) -I 4 -f ${DIR}/orthofuse/${RUNOUT}/working/ -og -t $(CPU) -a $(CPU)
+	( \
+	source ${MAKEDIR}/software/anaconda/install/bin/activate py27; \
+	python $$(which orthofuser.py) -I 4 -f ${DIR}/orthofuse/${RUNOUT}/working/ -og -t $(CPU) -a $(CPU); \
+	source ${MAKEDIR}/software/anaconda/install/bin/activate orp_v2;\
+	)
 	cat ${DIR}/orthofuse/${RUNOUT}/working/*short.fasta > ${DIR}/orthofuse/${RUNOUT}/merged.fasta
 
 ${DIR}/orthofuse/${RUNOUT}/orthotransrate.done:${DIR}/orthofuse/${RUNOUT}/merged.fasta
@@ -66,7 +68,7 @@ ${FASTADIR}/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/orthotransrat
 	python ${MAKEDIR}/scripts/filter.py ${DIR}/orthofuse/${RUNOUT}/merged.fasta ${DIR}/orthofuse/${RUNOUT}/good.list > ${FASTADIR}/${RUNOUT}.orthomerged.fasta
 	rm ${DIR}/orthofuse/${RUNOUT}/good.list
 	
-source ${MAKEDIR}/software/anaconda/install/bin/activate orp_v2
+# source ${MAKEDIR}/software/anaconda/install/bin/activate orp_v2
 
 ${DIR}/assemblies/${RUNOUT}.ORP.fasta:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	cd ${DIR}/assemblies/ && cd-hit-est -M 5000 -T $(CPU) -c .98 -i ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -o ${DIR}/assemblies/${RUNOUT}.ORP.fasta
