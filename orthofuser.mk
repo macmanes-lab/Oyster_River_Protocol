@@ -39,6 +39,7 @@ source ${MAKEDIR}/software/anaconda/install/bin/activate py27
 
 setup:
 	@mkdir -p ${DIR}/reports
+	@mkdir -p ${DIR}/quants
 
 ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
 	mkdir -p ${DIR}/orthofuse/${RUNOUT}/working
@@ -78,7 +79,7 @@ ${DIR}/reports/transrate.done:${FASTADIR}/${RUNOUT}.orthomerged.fasta
 	touch ${DIR}/reports/transrate.done
 
 ${DIR}/quants/orthomerged/quant.sf:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
-	salmon index --no-version-check -t ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta  -i ${RUNOUT}.ortho.idx --type quasi -k 31
+	salmon index --no-version-check -t ${FASTADIR}/${RUNOUT}.orthomerged.fasta  -i ${RUNOUT}.ortho.idx --type quasi -k 31
 	salmon quant --no-version-check -p $(CPU) -i ${RUNOUT}.ortho.idx --seqBias --gcBias -l a -1 ${READ1} -2 ${READ1} -o ${DIR}/quants/salmon_orthomerged_${RUNOUT}
 	rm -fr ${RUNOUT}.ortho.idx
 
