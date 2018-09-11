@@ -45,7 +45,7 @@ orthofusing:${FASTADIR}/${RUNOUT}.orthomerged.fasta
 setup:
 	@mkdir -p ${DIR}/reports
 	@mkdir -p ${DIR}/quants
-    touch ${DIR}/ortho_setup.done
+	touch ${DIR}/ortho_setup.done
 
 ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
 	mkdir -p ${DIR}/orthofuse/${RUNOUT}/working
