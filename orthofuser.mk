@@ -34,10 +34,7 @@ transrate:${DIR}/reports/${RUNOUT}.transrate.done
 salmon:${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf
 clean:
 
-
-merge:${DIR}/orthofuse/${RUNOUT}/merged.fasta
-orthotransrate:${DIR}/orthofuse/${RUNOUT}/orthotransrate.done
-orthofusing:${FASTADIR}/${RUNOUT}.orthomerged.fasta
+all: setup merge orthotransrate orthofusing cdhit busco transrate salmon clean
 
 .DELETE_ON_ERROR:
 .PHONY:report
