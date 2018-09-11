@@ -23,14 +23,21 @@ BUSCO_CONFIG_FILE := ${MAKEDIR}/software/config.ini
 export BUSCO_CONFIG_FILE
 
 
+
+setup:${DIR}/ortho_setup.done
+merge:${DIR}/orthofuse/${RUNOUT}/merged.fasta:
+orthotransrate:${DIR}/orthofuse/${RUNOUT}/orthotransrate.done
+orthofusing:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
+cdhit:${DIR}/assemblies/${RUNOUT}.ORP.fasta
+busco:${DIR}/reports/${RUNOUT}.busco.done
+transrate:${DIR}/reports/${RUNOUT}.transrate.done
+salmon:${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf
+clean:
+
+
 merge:${DIR}/orthofuse/${RUNOUT}/merged.fasta
 orthotransrate:${DIR}/orthofuse/${RUNOUT}/orthotransrate.done
 orthofusing:${FASTADIR}/${RUNOUT}.orthomerged.fasta
-
-all: setup merge orthotransrate orthofusing report
-busco:${DIR}/reports/busco.done
-transrate:${DIR}/reports/transrate.done
-report:busco transrate reportgen
 
 .DELETE_ON_ERROR:
 .PHONY:report
@@ -38,6 +45,7 @@ report:busco transrate reportgen
 setup:
 	@mkdir -p ${DIR}/reports
 	@mkdir -p ${DIR}/quants
+    touch ${DIR}/ortho_setup.done
 
 ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
 	mkdir -p ${DIR}/orthofuse/${RUNOUT}/working
@@ -68,8 +76,6 @@ ${FASTADIR}/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/orthotransrat
 	python ${MAKEDIR}/scripts/filter.py ${DIR}/orthofuse/${RUNOUT}/merged.fasta ${DIR}/orthofuse/${RUNOUT}/good.list > ${FASTADIR}/${RUNOUT}.orthomerged.fasta
 	rm ${DIR}/orthofuse/${RUNOUT}/good.list
 	
-# source ${MAKEDIR}/software/anaconda/install/bin/activate orp_v2
-
 ${DIR}/assemblies/${RUNOUT}.ORP.fasta:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	cd ${DIR}/assemblies/ && cd-hit-est -M 5000 -T $(CPU) -c .98 -i ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -o ${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	diamond blastx -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.ORP.fasta -d ${MAKEDIR}/software/diamond/swissprot  -o ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
@@ -99,3 +105,6 @@ reportgen:
 	printf "*****  TRANSRATE OPTIMAL SCORE ~~~~~>   " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	cat $$(find reports/transrate_${RUNOUT} -name assemblies.csv) | awk -F , '{print $$38}' | sed -n 2p | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	printf " \n\n"
+
+    printf " \n\n"
+	source ${MAKEDIR}/software/anaconda/install/bin/deactivate
