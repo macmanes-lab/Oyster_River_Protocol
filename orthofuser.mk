@@ -25,7 +25,7 @@ export BUSCO_CONFIG_FILE
 
 
 setup:${DIR}/ortho_setup.done
-merge:${DIR}/orthofuse/${RUNOUT}/merged.fasta:
+merge:${DIR}/orthofuse/${RUNOUT}/merged.fasta
 orthotransrate:${DIR}/orthofuse/${RUNOUT}/orthotransrate.done
 orthofusing:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 cdhit:${DIR}/assemblies/${RUNOUT}.ORP.fasta
