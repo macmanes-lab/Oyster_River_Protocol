@@ -39,7 +39,7 @@ all: setup merge orthotransrate orthofusing cdhit busco transrate salmon clean
 .DELETE_ON_ERROR:
 .PHONY:report
 
-setup:
+${DIR}/ortho_setup.done:
 	@mkdir -p ${DIR}/reports
 	@mkdir -p ${DIR}/quants
 	touch ${DIR}/ortho_setup.done
