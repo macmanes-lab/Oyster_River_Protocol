@@ -7,9 +7,6 @@ SHELL=/bin/bash -o pipefail
 #       quant.mk all MEM= CPU= JOBS= SAMPLE= SUFFIX= TRANSCRIPTOME=
 #
 
-###############################################################
-## More detailed information about the job
-###############################################################
 
 VERSION = 2.0.0 # suggest we move to 2.1.0
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
@@ -19,20 +16,15 @@ MEM=128
 JOBS=1
 RCORR := ${shell which rcorrector}
 RCORRDIR := $(dir $(firstword $(RCORR)))
-# RUNOUT =
 TRANSCRIPTOME=
-# READS=
 SAMPLE=
 SUFFIX=
 START=1
-INPUT := $(shell basename ${READ1})  ## NOT NEEDED?
-# FASTADIR=
 brewpath := $(shell which brew 2>/dev/null)
 rcorrpath := $(shell which rcorrector 2>/dev/null)
 trimmomaticpath := $(shell which trimmomatic 2>/dev/null)
 salmonpath := $(shell which salmon 2>/dev/null)
-seqtkpath := $(shell which seqtk 2>/dev/null)    ### needed?
-#THREADS := $(${CPUS} / ${JOBS})    ###### add the math here (cpus/jobs)
+seqtkpath := $(shell which seqtk 2>/dev/null)
 
 
 check:
