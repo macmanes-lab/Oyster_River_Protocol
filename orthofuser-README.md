@@ -1,6 +1,6 @@
 # General usage for orthofuser.mk
 
-This make fiel is meant to merge multiple transcriptomes together. In practice, this is the same functionality as when assemblies from Trinity, SPades, and TransAbyss are merged together in  `oyster.mk`. However, this make file was created specifically to increase the general applicability of assembled transcriptomes, and allow a user to merge together transcriptomes that have already been assembled (for example, from multiple species or treatments).
+This make file is meant to merge multiple transcriptomes together. In practice, this is the same functionality as when assemblies from Trinity, SPades, and TransAbyss are merged together in  `oyster.mk`. However, this make file was created specifically to increase the general applicability of assembled transcriptomes, and allow a user to merge together transcriptomes that have already been assembled (for example, from multiple species or treatments).
 
 # Usage:
 First, the user needs to activate the relevant conda environment using `source activate orp_v2`
