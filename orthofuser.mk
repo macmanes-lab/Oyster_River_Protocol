@@ -42,6 +42,7 @@ all: setup merge orthotransrate orthofusing cdhit busco transrate salmon clean
 ${DIR}/ortho_setup.done:
 	@mkdir -p ${DIR}/reports
 	@mkdir -p ${DIR}/quants
+	@mkdir -p ${DIR}/assemblies
 	touch ${DIR}/ortho_setup.done
 
 ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
@@ -80,16 +81,16 @@ ${DIR}/assemblies/${RUNOUT}.ORP.fasta:${DIR}/assemblies/${RUNOUT}.orthomerged.fa
 	rm ${DIR}/assemblies/${RUNOUT}.ORP.fasta.clstr
 
 ${DIR}/reports/${RUNOUT}.busco.done:${DIR}/assemblies/${RUNOUT}.ORP.fasta
-	python $$(which run_BUSCO.py) -i ${FASTADIR}/${RUNOUT}.ORP.fasta -m transcriptome -f --cpu $(CPU) -o ${RUNOUT}
+	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.ORP.fasta -m transcriptome -f --cpu $(CPU) -o ${RUNOUT}
 	mv run_${RUNOUT} ${DIR}/reports/
 	touch ${DIR}/reports/${RUNOUT}busco.done
 
 ${DIR}/reports/${RUNOUT}.transrate.done:${DIR}/reports/${RUNOUT}.busco.done
-	transrate -o ${DIR}/reports/transrate_${RUNOUT}  -a ${FASTADIR}/${RUNOUT}.ORP.fasta --left ${READ1} --right ${READ2} -t $(CPU)
+	transrate -o ${DIR}/reports/transrate_${RUNOUT}  -a ${DIR}/assemblies/${RUNOUT}.ORP.fasta --left ${READ1} --right ${READ2} -t $(CPU)
 	touch ${DIR}/reports/${RUNOUT}.transrate.done
 
 ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf:${DIR}/reports/${RUNOUT}.transrate.done
-	salmon index --no-version-check -t ${FASTADIR}/${RUNOUT}.ORP.fasta  -i ${RUNOUT}.ortho.idx --type quasi -k 31
+	salmon index --no-version-check -t ${DIR}/assemblies/${RUNOUT}.ORP.fasta  -i ${RUNOUT}.ortho.idx --type quasi -k 31
 	salmon quant --no-version-check -p $(CPU) -i ${RUNOUT}.ortho.idx --seqBias --gcBias -l a -1 ${READ1} -2 ${READ2} -o ${DIR}/quants/salmon_orthomerged_${RUNOUT}
 	rm -fr ${RUNOUT}.ortho.idx
 
