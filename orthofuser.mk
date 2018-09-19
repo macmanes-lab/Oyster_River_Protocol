@@ -32,9 +32,9 @@ cdhit:${DIR}/assemblies/${RUNOUT}.ORP.fasta
 busco:${DIR}/reports/${RUNOUT}.busco.done
 transrate:${DIR}/reports/${RUNOUT}.transrate.done
 salmon:${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf
-clean:
+reportgen:
 
-all: setup merge orthotransrate orthofusing cdhit busco transrate salmon clean
+all: setup merge orthotransrate orthofusing cdhit busco transrate salmon reportgen
 
 .DELETE_ON_ERROR:
 .PHONY:report
@@ -104,5 +104,5 @@ reportgen:
 	cat $$(find reports/transrate_${RUNOUT} -name assemblies.csv) | awk -F , '{print $$38}' | sed -n 2p | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	printf " \n\n"
 
-	printf " \n\n"
+	printf " \n Orthofuser complete, your \n"
 	source ${MAKEDIR}/software/anaconda/install/bin/deactivate
