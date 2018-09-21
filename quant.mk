@@ -59,7 +59,7 @@ else
 endif
 
 ${DIR}/${SAMPLE}salmonquant.done:
-	salmon index --no-version-check -t ${DIR}/${TRANSCRIPTOME}  -i ${TRANSCRIPTOME}.ortho.idx --type quasi -k 31
+	salmon index --no-version-check -t ${TRANSCRIPTOME}  -i ${TRANSCRIPTOME}.ortho.idx --type quasi -k 31
 	salmon quant --no-version-check -p ${CPU} -i ${TRANSCRIPTOME}.ortho.idx --seqBias --gcBias -l a -1 ${DIR}/${SAMPLE}1${SUFFIX} -2 ${DIR}/${SAMPLE}2${SUFFIX} -o ${DIR}/quants/{};\
 	touch ${DIR}/${SAMPLE}salmonquant.done
 
