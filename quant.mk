@@ -67,4 +67,4 @@ ${DIR}/${SAMPLE}salmonquant.done:
 	echo ${SAMPLE} quantification complete
 	runtime=$(shell time)
 	echo $(runtime)
-	source ${MAKEDIR}/software/anaconda/install/bin/deactivate orp_v2
+	source ${MAKEDIR}/software/anaconda/install/bin/deactivate 
