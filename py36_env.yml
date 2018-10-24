@@ -24,7 +24,7 @@ dependencies:
   - blat
   - parallel
   - last
-  - rcorrector
+  - rcorrector==1.0.3
   - mcl
   - abyss>=2.0.1
   - python-igraph
