@@ -32,7 +32,7 @@ BUSCO_CONFIG_FILE := ${MAKEDIR}/software/config.ini
 export BUSCO_CONFIG_FILE
 
 
-main: setup check welcome diamond busco transrate report
+main: setup check welcome diamond busco transrate reportgen
 diamond:${DIR}/reports/${RUNOUT}.unique.txt
 busco:${DIR}/reports/${RUNOUT}.busco.done
 transrate:${DIR}/reports/${RUNOUT}.transrate.done
@@ -75,6 +75,7 @@ ${DIR}/reports/${RUNOUT}.busco.done:${ASSEMBLY}
 ${DIR}/reports/${RUNOUT}.transrate.done:${ASSEMBLY}
 	${MAKEDIR}/software/orp-transrate/transrate -o ${DIR}/reports/transrate_${RUNOUT}  -a ${ASSEMBLY} --left ${READ1} --right ${READ2} -t $(CPU)
 	touch ${DIR}/reports/${RUNOUT}.transrate.done
+	find ${DIR}/reports/transrate_${RUNOUT}/ -name "*bam" -delete
 
 ${DIR}/reports/${RUNOUT}.unique.txt:${ASSEMBLY}
 	diamond blastx -p $(CPU) -e 1e-8 --top 0.1 -q ${ASSEMBLY} -d ${MAKEDIR}/software/diamond/swissprot -o ${DIR}/reports/${RUNOUT}.diamond.txt
