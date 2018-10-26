@@ -25,10 +25,6 @@ RUNOUT =
 ASSEMBLY=
 LINEAGE=
 BUSCOUT := BUSCO_$(shell basename ${ASSEMBLY} .fasta)
-BUSCODB :=
-SS := n
-INPUT := $(shell basename ${READ1})
-FASTADIR=
 salmonpath := $(shell which salmon 2>/dev/null)
 buscopath := $(shell which run_BUSCO.py 2>/dev/null)
 transratepath := $(shell which transrate 2>/dev/null)
@@ -90,7 +86,7 @@ clean:
 	${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq ${DIR}/reports/run_${RUNOUT}.orthomerged/ ${DIR}/reports/transrate_${RUNOUT}/
 
 reportgen:
-	printf "\n\n*****  QUALITY REPORT FOR: ${RUNOUT} using the ORP version ${VERSION} ****"
+	printf "\n\n*****  QUALITY REPORT FOR: ${RUNOUT} ****"
 	printf "\n*****  THE ASSEMBLY CAN BE FOUND HERE: ${ASSEMBLY} **** \n\n"
 	printf "*****  BUSCO SCORE ~~~~~>           " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	cat $$(find reports/run_${RUNOUT}.orthomerged -name 'short*') | sed -n 8p  | tee -a ${DIR}/reports/qualreport.${RUNOUT}
