@@ -53,7 +53,7 @@ welcome:
 	printf " \n\n"
 
 
-{DIR}/reports/${RUNOUT}.strandeval.done:${ASSEMBLY}
+{DIR}/reports/${RUNOUT}.strandeval.done:
 	bwa index -p ${RUNOUT} ${ASSEMBLY}
 	bwa mem -t $(CPU) ${RUNOUT} \
 	<(seqtk sample -s 23894 ${READ1} 200000) \
