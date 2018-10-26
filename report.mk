@@ -8,7 +8,7 @@ SHELL=/bin/bash -o pipefail
 #  ASSEMBLY=test.fasta \
 #  READ1=1.subsamp_1.cor.fq \
 #  READ2=1.subsamp_2.cor.fq \
-#  LINEAGE=eukaryota \
+#  LINEAGE=eukaryota_odb9 \
 #  RUNOUT=test
 #
 
