@@ -30,6 +30,7 @@ dependencies:
   - python-igraph
   - diamond
   - cd-hit
+  - bwa
   - pip:
     - biopython
     - cvxopt
@@ -38,3 +39,4 @@ dependencies:
     - pandas
     - pip
     - scipy
+    - bashplotlib
