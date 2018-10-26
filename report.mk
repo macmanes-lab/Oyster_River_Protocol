@@ -24,6 +24,7 @@ BUSCODIR := $(dir $(firstword $(BUSCO)))
 RUNOUT =
 ASSEMBLY=
 LINEAGE=
+BUSCODBDIR := ${MAKEDIR}/busco_dbs/
 BUSCOUT := BUSCO_$(shell basename ${ASSEMBLY} .fasta)
 salmonpath := $(shell which salmon 2>/dev/null)
 buscopath := $(shell which run_BUSCO.py 2>/dev/null)
@@ -68,7 +69,7 @@ welcome:
 
 ${DIR}/reports/${RUNOUT}.busco.done:${ASSEMBLY}
 	export BUSCO_CONFIG_FILE=${MAKEDIR}/software/config.ini
-	python $$(which run_BUSCO.py) -i ${ASSEMBLY} -m transcriptome --cpu $(CPU) -o ${RUNOUT} --lineage_path ${BUSCODIR}/${LINEAGE}
+	python $$(which run_BUSCO.py) -i ${ASSEMBLY} -m transcriptome --cpu $(CPU) -o ${RUNOUT} --lineage_path ${BUSCODBDIR}/${LINEAGE}
 	mv run_${RUNOUT} ${DIR}/reports/
 	touch ${DIR}/reports/${RUNOUT}.busco.done
 
