@@ -49,7 +49,7 @@ endif
 
 welcome:
 	printf "\n\n*****  Welcome to the Oyster River Stand Evaluation Tool ***** \n"
-	printf "*****  This is version ${VERSION} ***** \n\n "
+	printf "*****  This is version ${VERSION} *****"
 	printf "***** This is adapted from https://github.com/trinityrnaseq/trinityrnaseq/wiki/Examine-Strand-Specificity ***** \n\n"
 	printf " \n\n"
 
