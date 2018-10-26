@@ -49,7 +49,7 @@ endif
 
 welcome:
 	printf "\n\n*****  Welcome to the Oyster River Stand Evaluation Tool ***** \n"
-	printf "*****  This is version ${VERSION} *****"
+	printf "*****  This is version ${VERSION} *****\n"
 	printf "***** This is adapted from https://github.com/trinityrnaseq/trinityrnaseq/wiki/Examine-Strand-Specificity ***** \n\n"
 	printf " \n\n"
 
@@ -65,4 +65,4 @@ welcome:
 	hist  -p '#' -c red <(cat ${RUNOUT}.dat | awk '{print $$5}' | sed  1d)
 	touch ${DIR}/reports/${RUNOUT}.strandeval.done
 	printf "\n\n*****  See the following link for interpretation ***** \n"
-	printf "*****  LINK ***** \n\n "
+	printf "*****  LINK ***** \n\n"
