@@ -4,8 +4,12 @@ SHELL=/bin/bash -o pipefail
 
 #USAGE:
 #
-#	oyster.mk main READ1= READ2= MEM=500 CPU=24 RUNOUT=runname
-# oyster.mk orthofuse FASTADIR= READ1= READ2= MEM=500 CPU=24 RUNOUT=runname
+#	 $HOME/Oyster_River/Protocol/report.mk main CPU=24 \
+#  ASSEMBLY=test.fasta \
+#  READ1=1.subsamp_1.cor.fq \
+#  READ2=1.subsamp_2.cor.fq \
+#  LINEAGE=eukaryota \
+#  RUNOUT=test
 #
 
 VERSION = 2.1.0
@@ -13,8 +17,6 @@ MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
 CPU=24
 MEM=120
-RCORR := ${shell which rcorrector}
-RCORRDIR := $(dir $(firstword $(RCORR)))
 READ1=
 READ2=
 BUSCO := ${shell which run_BUSCO.py}
@@ -24,7 +26,6 @@ ASSEMBLY=
 LINEAGE=
 BUSCOUT := BUSCO_$(shell basename ${ASSEMBLY} .fasta)
 BUSCODB :=
-START=1
 SS := n
 INPUT := $(shell basename ${READ1})
 FASTADIR=
@@ -71,7 +72,7 @@ welcome:
 
 ${DIR}/reports/${RUNOUT}.busco.done:${ASSEMBLY}
 	export BUSCO_CONFIG_FILE=${MAKEDIR}/software/config.ini
-	python $$(which run_BUSCO.py) -i ${ASSEMBLY} -m transcriptome --cpu $(CPU) -o ${RUNOUT} --lineage_path ${LINEAGE}
+	python $$(which run_BUSCO.py) -i ${ASSEMBLY} -m transcriptome --cpu $(CPU) -o ${RUNOUT}
 	mv run_${RUNOUT} ${DIR}/reports/
 	touch ${DIR}/reports/${RUNOUT}.busco.done
 
