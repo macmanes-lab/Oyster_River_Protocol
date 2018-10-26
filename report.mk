@@ -82,8 +82,7 @@ ${DIR}/reports/${RUNOUT}.unique.txt:${ASSEMBLY}
 
 
 clean:
-	rm -fr ${DIR}/reports/busco.done ${DIR}/reports/transrate.done ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf \
-	${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq ${DIR}/reports/run_${RUNOUT}.orthomerged/ ${DIR}/reports/transrate_${RUNOUT}/
+	rm -fr ${DIR}/reports/busco.done ${DIR}/reports/transrate.done ${DIR}/reports/${RUNOUT}.unique.txt ${DIR}/reports/run_${RUNOUT} ${DIR}/reports/transrate_${RUNOUT}/
 
 reportgen:
 	printf "\n\n*****  QUALITY REPORT FOR: ${RUNOUT} ****"
@@ -96,7 +95,4 @@ reportgen:
 	cat $$(find reports/transrate_${RUNOUT} -name assemblies.csv) | awk -F , '{print $$38}' | sed -n 2p | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	printf "*****  UNIQUE GENES ~~~~~>          " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	cat ${DIR}/reports/${RUNOUT}.unique.txt | tee -a ${DIR}/reports/qualreport.${RUNOUT}
-
-
 	printf " \n\n"
-	source ${MAKEDIR}/software/anaconda/install/bin/deactivate
