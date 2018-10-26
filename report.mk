@@ -93,7 +93,7 @@ reportgen:
 	printf "*****  TRANSRATE SCORE ~~~~~>           " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	cat $$(find ${DIR}/reports/transrate_${RUNOUT} -name assemblies.csv) | awk -F , '{print $$37}' | sed -n 2p | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	printf "*****  TRANSRATE OPTIMAL SCORE ~~~~~>   " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
-	cat $$(find reports/transrate_${RUNOUT} -name assemblies.csv) | awk -F , '{print $$38}' | sed -n 2p | tee -a ${DIR}/reports/qualreport.${RUNOUT}
-	printf "*****  UNIQUE GENES ~~~~~>          " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
+	cat $$(find ${DIR}/reports/transrate_${RUNOUT} -name assemblies.csv) | awk -F , '{print $$38}' | sed -n 2p | tee -a ${DIR}/reports/qualreport.${RUNOUT}
+	printf "*****  UNIQUE GENES ~~~~~~~~~>          " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	cat ${DIR}/reports/${RUNOUT}.unique.txt | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	printf " \n\n"
