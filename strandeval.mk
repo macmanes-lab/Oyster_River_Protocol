@@ -39,17 +39,18 @@ ${DIR}/setup.done:
 check:
 ifdef bwapath
 else
-	$(error "\n\n*** SALMON is not installed, must fix ***")
+	$(error "\n\n*** BWA is not installed, must fix ***")
 endif
 ifdef seqtkpath
 else
-	$(error "\n\n*** TRANSRATE is not installed, must fix ***")
+	$(error "\n\n*** SEQTK is not installed, must fix ***")
 endif
 
 
 welcome:
 	printf "\n\n*****  Welcome to the Oyster River Stand Evaluation Tool ***** \n"
 	printf "*****  This is version ${VERSION} ***** \n\n "
+	printf "***** This is adapted from https://github.com/trinityrnaseq/trinityrnaseq/wiki/Examine-Strand-Specificity ***** \n\n"
 	printf " \n\n"
 
 
@@ -63,3 +64,5 @@ welcome:
 	$$(dirname $$(readlink -f $$(which Trinity)))/util/misc/examine_strand_specificity.pl "${RUNOUT}".sorted.bam ${RUNOUT}
 	hist  -p '#' -c red <(cat ${RUNOUT}.dat | awk '{print $$5}' | sed  1d)
 	touch ${DIR}/reports/${RUNOUT}.strandeval.done
+	printf "\n\n*****  See the following link for interpretation ***** \n"
+	printf "*****  LINK ***** \n\n "
