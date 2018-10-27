@@ -1,5 +1,7 @@
 #!/usr/bin/env perl
 
+#This is a script modified from https://github.com/trinityrnaseq/trinityrnaseq/blob/Trinity-v2.8.3/util/misc/examine_strand_specificity.pl
+
 use strict;
 use warnings;
 use FindBin;
