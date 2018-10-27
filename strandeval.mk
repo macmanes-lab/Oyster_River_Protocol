@@ -61,7 +61,7 @@ welcome:
 	<(seqtk sample -s 23894 ${READ2} 200000) \
 	| samtools view -@10 -Sb - \
 	| samtools sort -T ${RUNOUT} -O bam -@10 -o "${RUNOUT}".sorted.bam -
-	$$(dirname $$(readlink -f $$(which Trinity)))/util/misc/examine_strand_specificity.pl "${RUNOUT}".sorted.bam ${RUNOUT}
+	${MAKEDIR}/scripts/examine_strand.pl "${RUNOUT}".sorted.bam ${RUNOUT}
 	hist  -p '#' -c red <(cat ${RUNOUT}.dat | awk '{print $$5}' | sed  1d)
 	touch ${DIR}/reports/${RUNOUT}.strandeval.done
 	printf "\n\n*****  See the following link for interpretation ***** \n"
