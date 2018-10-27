@@ -80,6 +80,7 @@ ifdef diamond_data
 else
 	 cd ${DIR}/software/diamond && curl -LO ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz && gzip -d uniprot_sprot.fasta.gz
 	 cd ${DIR}/software/diamond && ${DIR}/software/anaconda/install/envs/orp_v2/bin/diamond makedb --in uniprot_sprot.fasta -d swissprot
+	 Rscript -e 'install.packages("vioplot", repo="https://cloud.r-project.org")'
 endif
 
 busco_data:conda
