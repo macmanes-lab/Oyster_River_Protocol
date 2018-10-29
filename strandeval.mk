@@ -11,7 +11,6 @@ SHELL=/bin/bash -o pipefail
 #  RUNOUT=test
 #
 
-VERSION = 2.1.0
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
 CPU=24
@@ -21,6 +20,7 @@ RUNOUT =
 ASSEMBLY=
 bwapath := $(shell which bwa 2>/dev/null)
 seqtkpath := $(shell which seqtk 2>/dev/null)
+VERSION := ${shell cat  ${MAKEDIR}version.txt}
 
 
 

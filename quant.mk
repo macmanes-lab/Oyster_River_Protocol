@@ -11,7 +11,6 @@ SHELL=/bin/bash -o pipefail
 ## More detailed information about the job
 ###############################################################
 
-VERSION = 2.0.0 # suggest we move to 2.1.0
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
 CPU=16
@@ -28,6 +27,7 @@ brewpath := $(shell which brew 2>/dev/null)
 rcorrpath := $(shell which rcorrector 2>/dev/null)
 trimmomaticpath := $(shell which trimmomatic 2>/dev/null)
 salmonpath := $(shell which salmon 2>/dev/null)
+VERSION := ${shell cat  ${MAKEDIR}version.txt}
 
 
 check:
@@ -67,4 +67,4 @@ ${DIR}/${SAMPLE}salmonquant.done:
 	echo ${SAMPLE} quantification complete
 	runtime=$(shell time)
 	echo $(runtime)
-	source ${MAKEDIR}/software/anaconda/install/bin/deactivate 
+	source ${MAKEDIR}/software/anaconda/install/bin/deactivate

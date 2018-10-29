@@ -8,7 +8,6 @@ SHELL=/bin/bash -o pipefail
 # oyster.mk orthofuse FASTADIR= READ1= READ2= MEM=500 CPU=24 RUNOUT=runname
 #
 
-VERSION = 2.1.0
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
 CPU=16
@@ -41,6 +40,8 @@ transratepath := $(shell which transrate 2>/dev/null)
 transabyss := $(shell which transabyss 2>/dev/null)
 BUSCO_CONFIG_FILE := ${MAKEDIR}/software/config.ini
 export BUSCO_CONFIG_FILE
+VERSION := ${shell cat  ${MAKEDIR}version.txt}
+
 
 run_trimmomatic:
 run_rcorrector:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq

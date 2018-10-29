@@ -21,6 +21,7 @@ INPUT := $(shell basename ${READ1})
 FASTADIR=
 BUSCO_CONFIG_FILE := ${MAKEDIR}/software/config.ini
 export BUSCO_CONFIG_FILE
+VERSION := ${shell cat  ${MAKEDIR}version.txt}
 
 
 
