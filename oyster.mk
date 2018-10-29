@@ -19,7 +19,6 @@ BUSCO := ${shell which run_BUSCO.py}
 BUSCODIR := $(dir $(firstword $(BUSCO)))
 RUNOUT =
 LINEAGE=
-BUSCOUT := BUSCO_$(shell basename ${ASSEMBLY} .fasta)
 BUSCODB :=
 START=1
 STRAND :=
