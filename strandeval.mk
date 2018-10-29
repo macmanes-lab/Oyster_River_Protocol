@@ -51,10 +51,10 @@ help:
 	printf "\n\n*****  Welcome to the Oyster River Stand Evaluation Tool ***** \n"
 	printf "*****  This is version ${VERSION} *****\n\n"
 	printf "Usage:\n"
-	printf "/path/to/Oyster_River/Protocol/strandeval.mk main"
-	printf "ASSEMBLY=test.fasta"
-	printf "READ1=1.subsamp_1.cor.fq"
-	printf "READ2=1.subsamp_2.cor.fq"
+	printf "/path/to/Oyster_River/Protocol/strandeval.mk main\n"
+	printf "ASSEMBLY=test.fasta\n"
+	printf "READ1=1.subsamp_1.cor.fq\n"
+	printf "READ2=1.subsamp_2.cor.fq\n"
 	printf "RUNOUT=test\n\n"
 
 
