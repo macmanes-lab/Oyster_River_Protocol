@@ -40,6 +40,7 @@ BUSCO_CONFIG_FILE := ${MAKEDIR}/software/config.ini
 export BUSCO_CONFIG_FILE
 VERSION := ${shell cat  ${MAKEDIR}version.txt}
 
+help:
 main: setup check welcome run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_transabyss merge orthotransrate orthofusing diamond posthack cdhit salmon busco transrate strandeval report
 run_trimmomatic:
 run_rcorrector:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
