@@ -23,14 +23,14 @@ seqtkpath := $(shell which seqtk 2>/dev/null)
 VERSION := ${shell cat  ${MAKEDIR}version.txt}
 
 
-
-main: setup check help welcome strandeval
+help:
+main: setup check welcome strandeval
 clean:
 setup:${DIR}/setup.done
 strandeval:{DIR}/reports/${RUNOUT}.strandeval.done
 
 .DELETE_ON_ERROR:
-.PHONY:report check clean
+.PHONY:report check clean help
 
 ${DIR}/setup.done:
 	@mkdir -p ${DIR}/reports
@@ -48,10 +48,7 @@ endif
 
 
 help:
-ifneq (,$(findstring h,$(MAKEFLAGS)))
-else
-        printf "I think the help docs should go here"
-endif
+	printf "I think the help docs should go here"
 
 welcome:
 	printf "\n\n*****  Welcome to the Oyster River Stand Evaluation Tool ***** \n"
