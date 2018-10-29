@@ -32,6 +32,7 @@ BUSCO_CONFIG_FILE := ${MAKEDIR}/software/config.ini
 export BUSCO_CONFIG_FILE
 VERSION := ${shell cat  ${MAKEDIR}version.txt}
 
+help:
 main: setup check welcome diamond busco transrate strandeval reportgen
 diamond:${DIR}/reports/${RUNOUT}.unique.txt
 busco:${DIR}/reports/${RUNOUT}.busco.done
@@ -60,6 +61,18 @@ ifdef buscopath
 else
 	$(error "\n\n*** BUSCO is not installed, must fix ***")
 endif
+
+
+help:
+	printf "\n\n*****  Welcome to the Oyster River Report Generation Tool ***** \n"
+	printf "*****  This is version ${VERSION} *****\n\n"
+	printf "Usage:\n\n"
+	printf "/path/to/Oyster_River/Protocol/report.mk main CPU=24\n"
+	printf "ASSEMBLY=test.fasta\n"
+	printf "LINEAGE=eukaryota_odb9\n"
+	printf "READ1=1.subsamp_1.cor.fq\n"
+	printf "READ2=1.subsamp_2.cor.fq\n"
+	printf "RUNOUT=test\n\n"
 
 welcome:
 	printf "\n\n*****  Welcome to the Oyster River Report Generation Tool ***** \n"

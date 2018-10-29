@@ -18,7 +18,6 @@ READ2=
 BUSCO := ${shell which run_BUSCO.py}
 BUSCODIR := $(dir $(firstword $(BUSCO)))
 RUNOUT =
-ASSEMBLY=
 LINEAGE=
 BUSCOUT := BUSCO_$(shell basename ${ASSEMBLY} .fasta)
 BUSCODB :=
@@ -129,6 +128,17 @@ endif
 ifeq ($(shell zsh --version | awk '{print $$2}'),5.0.7)
 	$(error "\n\n *** TRANSABySS Requires at least ZSH 5.0.8, you have 5.0.7 and must upgrade ***")
 endif
+
+help:
+	printf "\n\n*****  Welcome to the Oyster River Prptocol ***** \n"
+	printf "*****  This is version ${VERSION} *****\n\n"
+	printf "Usage:\n\n"
+	printf "/path/to/Oyster_River/Protocol/oyster.mk main CPU=24 \n"
+	printf "MEM=128 STRAND=RF\n"
+	printf "STRAND=RF\n"
+	printf "READ1=1.subsamp_1.cor.fq\n"
+	printf "READ2=1.subsamp_2.cor.fq\n"
+	printf "RUNOUT=test\n\n"
 
 welcome:
 	printf "\n\n*****  Welcome to the Oyster River ***** \n"
