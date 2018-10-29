@@ -24,7 +24,7 @@ VERSION := ${shell cat  ${MAKEDIR}version.txt}
 
 
 
-main: setup check welcome strandeval
+main: setup check help welcome strandeval
 clean:
 setup:${DIR}/setup.done
 strandeval:{DIR}/reports/${RUNOUT}.strandeval.done
@@ -46,6 +46,12 @@ else
 	$(error "\n\n*** SEQTK is not installed, must fix ***")
 endif
 
+
+help:
+ifneq (,$(findstring h,$(MAKEFLAGS)))
+else
+        printf "I think the help docs should go here"
+endif
 
 welcome:
 	printf "\n\n*****  Welcome to the Oyster River Stand Evaluation Tool ***** \n"
