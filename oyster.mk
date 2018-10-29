@@ -4,8 +4,7 @@ SHELL=/bin/bash -o pipefail
 
 #USAGE:
 #
-#	oyster.mk main READ1= READ2= MEM=500 CPU=24 RUNOUT=runname
-# oyster.mk orthofuse FASTADIR= READ1= READ2= MEM=500 CPU=24 RUNOUT=runname
+#	oyster.mk main READ1= READ2= MEM=110 CPU=24 RUNOUT=runname STRAND=RF
 #
 
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
@@ -24,7 +23,7 @@ LINEAGE=
 BUSCOUT := BUSCO_$(shell basename ${ASSEMBLY} .fasta)
 BUSCODB :=
 START=1
-SS := n
+STRAND :=
 INPUT := $(shell basename ${READ1})
 FASTADIR=
 brewpath := $(shell which brew 2>/dev/null)
@@ -148,7 +147,7 @@ ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq:${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq
 	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 31 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq -od ${DIR}/rcorr
 
 ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
-	@if [ $(SS) == 'y' ];\
+	@if [ $(STRAND) == 'RF' ];\
 	then\
 		Trinity --SS_lib_type RF --no_version_check --bypass_java_version_check --no_normalize_reads --seqType fq --output ${DIR}/assemblies/${RUNOUT}.trinity --max_memory $(MEM)G --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq --CPU $(CPU) --inchworm_cpu 10 --full_cleanup;\
 		awk '{print $$1}' ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta > ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fa && mv -f ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fa ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta;\
@@ -158,7 +157,7 @@ ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P
 	fi
 
 ${DIR}/assemblies/${RUNOUT}.spades55.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
-	@if [ $(SS) == 'y' ];\
+	@if [ $(STRAND) == 'RF' ];\
 	then\
 		rnaspades.py --ss-rf --only-assembler -o ${DIR}/assemblies/${RUNOUT}.spades_k55 --threads $(CPU) --memory $(MEM) -k 55 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq;\
 		mv ${DIR}/assemblies/${RUNOUT}.spades_k55/transcripts.fasta ${DIR}/assemblies/${RUNOUT}.spades55.fasta;\
@@ -170,7 +169,7 @@ ${DIR}/assemblies/${RUNOUT}.spades55.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	fi
 
 ${DIR}/assemblies/${RUNOUT}.spades75.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
-	@if [ $(SS) == 'y' ];\
+	@if [ $(STRAND) == 'RF' ];\
 	then\
 		rnaspades.py --ss-rf --only-assembler -o ${DIR}/assemblies/${RUNOUT}.spades_k75 --threads $(CPU) --memory $(MEM) -k 75 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq;\
 		mv ${DIR}/assemblies/${RUNOUT}.spades_k75/transcripts.fasta ${DIR}/assemblies/${RUNOUT}.spades75.fasta;\
@@ -182,7 +181,7 @@ ${DIR}/assemblies/${RUNOUT}.spades75.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 	fi
 
 ${DIR}/assemblies/${RUNOUT}.transabyss.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
-	@if [ $(SS) == 'y' ];\
+	@if [ $(STRAND) == 'RF' ];\
 	then\
 		transabyss --SS --threads $(CPU) --outdir ${DIR}/assemblies/${RUNOUT}.transabyss --kmer 32 --length 250 --name ${RUNOUT}.transabyss.fasta --pe ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq;\
 		awk '{print $$1}' ${DIR}/assemblies/${RUNOUT}.transabyss/${RUNOUT}.transabyss.fasta-final.fa >  ${DIR}/assemblies/${RUNOUT}.transabyss.fasta;\
