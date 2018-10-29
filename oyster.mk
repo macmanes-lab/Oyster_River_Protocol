@@ -41,7 +41,7 @@ BUSCO_CONFIG_FILE := ${MAKEDIR}/software/config.ini
 export BUSCO_CONFIG_FILE
 VERSION := ${shell cat  ${MAKEDIR}version.txt}
 
-
+main: setup check welcome run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_transabyss merge orthotransrate orthofusing diamond posthack cdhit salmon busco transrate strandeval report
 run_trimmomatic:
 run_rcorrector:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 run_trinity:${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
@@ -54,7 +54,6 @@ orthofusing:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 salmon:${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf
 diamond:${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt
 posthack:${DIR}/assemblies/diamond/${RUNOUT}.newbies.fasta
-main: setup check welcome run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_transabyss merge orthotransrate orthofusing diamond posthack cdhit salmon busco transrate report
 orthofuse:merge orthotransrate orthofusing
 report:busco transrate reportgen
 busco:${DIR}/reports/${RUNOUT}.busco.done
@@ -62,6 +61,7 @@ transrate:${DIR}/reports/${RUNOUT}.transrate.done
 clean:
 setup:${DIR}/setup.done
 cdhit:${DIR}/assemblies/${RUNOUT}.ORP.fasta
+strandeval:{DIR}/reports/${RUNOUT}.strandeval.done
 
 .DELETE_ON_ERROR:
 .PHONY:report check clean
@@ -276,6 +276,21 @@ ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf:${DIR}/assemblies/${RUNOUT}.
 	salmon index --no-version-check -t ${DIR}/assemblies/${RUNOUT}.ORP.fasta  -i ${RUNOUT}.ortho.idx --type quasi -k 31
 	salmon quant --no-version-check -p $(CPU) -i ${RUNOUT}.ortho.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/salmon_orthomerged_${RUNOUT}
 	rm -fr ${RUNOUT}.ortho.idx
+
+{DIR}/reports/${RUNOUT}.strandeval.done:
+	bwa index -p ${RUNOUT} ${ASSEMBLY}
+	bwa mem -t $(CPU) ${RUNOUT} \
+	<(seqtk sample -s 23894 ${READ1} 200000) \
+	<(seqtk sample -s 23894 ${READ2} 200000) \
+	| samtools view -@10 -Sb - \
+	| samtools sort -T ${RUNOUT} -O bam -@10 -o "${RUNOUT}".sorted.bam -
+	perl -I $$(dirname $$(readlink -f $$(which Trinity)))/PerlLib ${MAKEDIR}/scripts/examine_strand.pl "${RUNOUT}".sorted.bam ${RUNOUT}
+	hist  -p '#' -c red <(cat ${RUNOUT}.dat | awk '{print $$5}' | sed  1d)
+	rm -f "${RUNOUT}".sorted.bam
+	touch ${DIR}/reports/${RUNOUT}.strandeval.done
+	printf "\n\n*****  See the following link for interpretation ***** \n"
+	printf "*****  LINK ***** \n\n"
+
 
 clean:
 	rm -fr ${DIR}/orthofuse/${RUNOUT}/ ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta \

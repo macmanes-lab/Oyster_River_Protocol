@@ -32,12 +32,13 @@ BUSCO_CONFIG_FILE := ${MAKEDIR}/software/config.ini
 export BUSCO_CONFIG_FILE
 VERSION := ${shell cat  ${MAKEDIR}version.txt}
 
-main: setup check welcome diamond busco transrate reportgen
+main: setup check welcome diamond busco transrate strandeval reportgen
 diamond:${DIR}/reports/${RUNOUT}.unique.txt
 busco:${DIR}/reports/${RUNOUT}.busco.done
 transrate:${DIR}/reports/${RUNOUT}.transrate.done
 clean:
 setup:${DIR}/setup.done
+strandeval:{DIR}/reports/${RUNOUT}.strandeval.done
 
 .DELETE_ON_ERROR:
 .PHONY:report check clean
@@ -84,6 +85,20 @@ ${DIR}/reports/${RUNOUT}.unique.txt:${ASSEMBLY}
 
 clean:
 	rm -fr ${DIR}/reports/busco.done ${DIR}/reports/transrate.done ${DIR}/reports/${RUNOUT}.unique.txt ${DIR}/reports/run_${RUNOUT} ${DIR}/reports/transrate_${RUNOUT}/
+
+{DIR}/reports/${RUNOUT}.strandeval.done:
+	bwa index -p ${RUNOUT} ${ASSEMBLY}
+	bwa mem -t $(CPU) ${RUNOUT} \
+	<(seqtk sample -s 23894 ${READ1} 200000) \
+	<(seqtk sample -s 23894 ${READ2} 200000) \
+	| samtools view -@10 -Sb - \
+	| samtools sort -T ${RUNOUT} -O bam -@10 -o "${RUNOUT}".sorted.bam -
+	perl -I $$(dirname $$(readlink -f $$(which Trinity)))/PerlLib ${MAKEDIR}/scripts/examine_strand.pl "${RUNOUT}".sorted.bam ${RUNOUT}
+	hist  -p '#' -c red <(cat ${RUNOUT}.dat | awk '{print $$5}' | sed  1d)
+	rm -f "${RUNOUT}".sorted.bam
+	touch ${DIR}/reports/${RUNOUT}.strandeval.done
+	printf "\n\n*****  See the following link for interpretation ***** \n"
+	printf "*****  LINK ***** \n\n"
 
 reportgen:
 	printf "\n\n*****  QUALITY REPORT FOR: ${RUNOUT} ****"
