@@ -278,7 +278,7 @@ ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf:${DIR}/assemblies/${RUNOUT}.
 	rm -fr ${RUNOUT}.ortho.idx
 
 {DIR}/reports/${RUNOUT}.strandeval.done:
-	bwa index -p ${RUNOUT} ${ASSEMBLY}
+	bwa index -p ${RUNOUT} ${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	bwa mem -t $(CPU) ${RUNOUT} \
 	<(seqtk sample -s 23894 ${READ1} 200000) \
 	<(seqtk sample -s 23894 ${READ2} 200000) \
