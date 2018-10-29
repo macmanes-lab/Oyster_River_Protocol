@@ -12,7 +12,7 @@ SHELL=/bin/bash -o pipefail
 #  RUNOUT=test
 #
 
-VERSION = 2.1.0
+VERSION = $(shell cat version.txt)
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
 CPU=24
