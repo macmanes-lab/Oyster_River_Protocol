@@ -22,7 +22,6 @@ LINEAGE=
 BUSCODB :=
 START=1
 STRAND :=
-INPUT := $(shell basename ${READ1})
 FASTADIR=
 brewpath := $(shell which brew 2>/dev/null)
 rcorrpath := $(shell which rcorrector 2>/dev/null)
