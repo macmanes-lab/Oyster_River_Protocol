@@ -4,7 +4,7 @@ SHELL=/bin/bash -o pipefail
 
 #USAGE:
 #
-#	 $HOME/Oyster_River/Protocol/report.mk main CPU=24 \
+#  $HOME/Oyster_River/Protocol/report.mk main CPU=24 \
 #  ASSEMBLY=test.fasta \
 #  READ1=1.subsamp_1.cor.fq \
 #  READ2=1.subsamp_2.cor.fq \
@@ -12,7 +12,6 @@ SHELL=/bin/bash -o pipefail
 #  RUNOUT=test
 #
 
-VERSION = $(shell cat version.txt)
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
 CPU=24
@@ -31,7 +30,7 @@ buscopath := $(shell which run_BUSCO.py 2>/dev/null)
 transratepath := $(shell which transrate 2>/dev/null)
 BUSCO_CONFIG_FILE := ${MAKEDIR}/software/config.ini
 export BUSCO_CONFIG_FILE
-
+VERSION := ${shell cat  ${MAKEDIR}version.txt}
 
 main: setup check welcome diamond busco transrate reportgen
 diamond:${DIR}/reports/${RUNOUT}.unique.txt
