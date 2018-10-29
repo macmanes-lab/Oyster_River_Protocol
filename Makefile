@@ -132,3 +132,4 @@ clean:
 	rm -fr ${DIR}/software/orp-transrate
 	rm -fr ${DIR}/software/transabyss
 	rm -fr ${DIR}/software/anaconda/
+	rm -fr ${DIR}/pathfile
