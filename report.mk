@@ -111,7 +111,7 @@ clean:
 	rm -f "${RUNOUT}".sorted.bam
 	touch ${DIR}/reports/${RUNOUT}.strandeval.done
 	printf "\n\n*****  See the following link for interpretation ***** \n"
-	printf "*****  LINK ***** \n\n"
+	printf "***** https://oyster-river-protocol.readthedocs.io/en/latest/strandexamine.html ***** \n\n"
 
 reportgen:
 	printf "\n\n*****  QUALITY REPORT FOR: ${RUNOUT} ****"

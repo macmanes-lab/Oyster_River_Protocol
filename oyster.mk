@@ -309,7 +309,7 @@ ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf:${DIR}/assemblies/${RUNOUT}.
 	rm -f "${RUNOUT}".sorted.bam
 	touch ${DIR}/reports/${RUNOUT}.strandeval.done
 	printf "\n\n*****  See the following link for interpretation ***** \n"
-	printf "*****  LINK ***** \n\n"
+	printf "***** https://oyster-river-protocol.readthedocs.io/en/latest/strandexamine.html ***** \n\n"
 
 
 clean:
