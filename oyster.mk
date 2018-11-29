@@ -152,7 +152,7 @@ ifeq ($(shell file ${READ1} | awk '{print $$2}'),gzip)
 		fi
 else
 	printf "this is a gzip file"
-	if [ $$(head -n400 test.1.fq | awk '{if(NR%4==2) {count++; bases += length} } END{print bases/count}') -gt 75 ] && [ $(head -n400 test.2.fq | awk '{if(NR%4==2) {count++; bases += length} } END{print bases/count}') -gt 75 ]; then \
+	if [ $$(head -n400 test.1.fq | awk '{if(NR%4==2) {count++; bases += length} } END{print bases/count}') -gt 75 ] && [ $$(head -n400 test.2.fq | awk '{if(NR%4==2) {count++; bases += length} } END{print bases/count}') -gt 75 ]; then \
 	printf "\n\n reads greater \n\n"; \
 	else \
 	printf "\n\n reads less \n\n";
