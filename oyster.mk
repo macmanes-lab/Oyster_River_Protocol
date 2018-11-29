@@ -43,7 +43,7 @@ export BUSCO_CONFIG_FILE
 VERSION := ${shell cat  ${MAKEDIR}version.txt}
 
 help:
-main: setup check welcome run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_transabyss merge orthotransrate orthofusing diamond posthack cdhit salmon busco transrate strandeval report
+main: setup check welcome readcheck run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_transabyss merge orthotransrate orthofusing diamond posthack cdhit salmon busco transrate strandeval report
 run_trimmomatic:
 run_rcorrector:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 run_trinity:${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
@@ -142,6 +142,19 @@ help:
 	printf "READ1=1.subsamp_1.cor.fq\n"
 	printf "READ2=1.subsamp_2.cor.fq\n"
 	printf "RUNOUT=test\n\n"
+
+readcheck:
+ifeq ($(file ${READ1} | awk '{print $$2}'),gzip)
+	READ1LEN=$(gzip -cd ${READ1} | head -n400 | awk '{if(NR%4==2) {count++; bases += length} } END{print bases/count}')
+	READ2LEN=$(gzip -cd ${READ2} | head -n400 | awk '{if(NR%4==2) {count++; bases += length} } END{print bases/count}')
+else
+	READ1LEN=$(head -n400 ${READ1} | awk '{if(NR%4==2) {count++; bases += length} } END{print bases/count}')
+	READ2LEN=$(head -n400 ${READ2} | awk '{if(NR%4==2) {count++; bases += length} } END{print bases/count}')
+endif
+ifeq ($(shell [[ $(READ1LEN) -gt 75 && $(READ2LEN) -gt 75 ]] && echo true ),true)
+else
+	$(error IT LOOKS LIKE YOU READS ARE NOT AT LEAST 75 BP LONG, PLEASE EDIT YOUR COMMAND USING THE `SPADES2_KMER=INT` FLAGS)
+endif
 
 welcome:
 	printf "\n\n*****  Welcome to the Oyster River ***** \n"
