@@ -144,17 +144,18 @@ help:
 	printf "RUNOUT=test\n\n"
 
 readcheck:
-ifeq ($(file ${READ1} | awk '{print $$2}'),gzip)
-	READ1LEN=$(gzip -cd ${READ1} | head -n400 | awk '{if(NR%4==2) {count++; bases += length} } END{print bases/count}')
-	READ2LEN=$(gzip -cd ${READ2} | head -n400 | awk '{if(NR%4==2) {count++; bases += length} } END{print bases/count}')
-else
-	READ1LEN=$(head -n400 ${READ1} | awk '{if(NR%4==2) {count++; bases += length} } END{print bases/count}')
-	READ2LEN=$(head -n400 ${READ2} | awk '{if(NR%4==2) {count++; bases += length} } END{print bases/count}')
-endif
-ifeq ($(shell [[ $(READ1LEN) -gt 75 && $(READ2LEN) -gt 75 ]] && echo true ),true)
-else
+ifeq ($(shell file ${READ1} | awk '{print $$2}'),gzip)
+	printf "this is a gzip file"
+	ifeq ($(shell [[ $(gzip -cd ${READ1} | head -n400 | awk '{if(NR%4==2) {count++; bases += length} } END{print bases/count}') -gt 75 && $(gzip -cd ${READ2} | head -n400 | awk '{if(NR%4==2) {count++; bases += length} } END{print bases/count}') -gt 75 ]] && echo true ),true)
+	else
 	$(error IT LOOKS LIKE YOU READS ARE NOT AT LEAST 75 BP LONG, PLEASE EDIT YOUR COMMAND USING THE `SPADES2_KMER=INT` FLAGS)
-endif
+	endif
+else
+	printf "this is a gzip file"
+	ifeq ($(shell [[ $(head -n400 ${READ1} | awk '{if(NR%4==2) {count++; bases += length} } END{print bases/count}') -gt 75 && $(head -n400 ${READ2} | awk '{if(NR%4==2) {count++; bases += length} } END{print bases/count}') -gt 75 ]] && echo true ),true)
+	else
+	$(error IT LOOKS LIKE YOU READS ARE NOT AT LEAST 75 BP LONG, PLEASE EDIT YOUR COMMAND USING THE `SPADES2_KMER=INT` FLAGS)
+	endif
 
 welcome:
 	printf "\n\n*****  Welcome to the Oyster River ***** \n"
