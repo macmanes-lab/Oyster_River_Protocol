@@ -34,8 +34,8 @@ setup:
 conda:
 ifdef conda
 else
-	cd ${DIR}/software/anaconda && curl -LO https://repo.anaconda.com/archive/Anaconda3-5.1.0-Linux-x86_64.sh
-	cd ${DIR}/software/anaconda && bash Anaconda3-5.1.0-Linux-x86_64.sh -b -p ${DIR}/software/anaconda/install
+	cd ${DIR}/software/anaconda && curl -LO https://repo.anaconda.com/archive/Anaconda3-5.3.1-Linux-x86_64.sh
+	cd ${DIR}/software/anaconda && bash Anaconda3-5.3.1-Linux-x86_64.sh -b -p ${DIR}/software/anaconda/install
 endif
 
 orp_v2:py36_env.yml conda
