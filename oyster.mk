@@ -157,7 +157,7 @@ else
 	then\
 		printf "\n\n reads greater \n\n";\
 	else\
-		printf "\n\n reads less \n\n";\
+		$(error IT LOOKS LIKE YOUR READS ARE NOT AT LEAST 75 BP LONG, PLEASE EDIT YOUR COMMAND USING THE `SPADES2_KMER=INT` FLAGS);\
 	fi
 endif
 
