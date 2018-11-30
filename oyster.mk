@@ -145,7 +145,7 @@ help:
 
 readcheck:
 ifeq ($(shell file ${READ1} | awk '{print $$2}'),gzip)
-	if [ $$(gzip -cd $${READ1} | head -n 400 | awk '{if(NR%4==2) {count++; bases += length} } END{print bases/count}') -gt 75 ] && [ $$(gzip -cd $${READ2} | head -n 400 | awk '{if(NR%4==2) {count++; bases += length} } END{print bases/count}') -gt 75 ];\
+	if [ $$(gzip -cd $${READ1} | head -n 400 | awk '{if(NR%4==2) {count++; bases += length} } END{print int(bases/count)}') -gt 75 ] && [ $$(gzip -cd $${READ2} | head -n 400 | awk '{if(NR%4==2) {count++; bases += length} } END{print int(bases/count)}') -gt 75 ];\
 	then\
 		printf " ";\
 	else\
@@ -155,7 +155,7 @@ ifeq ($(shell file ${READ1} | awk '{print $$2}'),gzip)
 		$$(shell exit);\
 	fi
 else
-	if [ $$(head -n400 $${READ1} | awk '{if(NR%4==2) {count++; bases += length} } END{print bases/count}') -gt 75 ] && [ $$(head -n400 $${READ2} | awk '{if(NR%4==2) {count++; bases += length} } END{print bases/count}') -gt 75 ];\
+	if [ $$(head -n400 $${READ1} | awk '{if(NR%4==2) {count++; bases += length} } END{print int(bases/count)}') -gt 75 ] && [ $$(head -n400 $${READ2} | awk '{if(NR%4==2) {count++; bases += length} } END{print int(bases/count)}') -gt 75 ];\
 	then\
 		printf " ";\
 	else\
