@@ -6,7 +6,7 @@ channels:
   - r
   - antoined
 dependencies:
-  - python==3.7.2
+  - python==3.6
   - theano
   - zsh
   - ruby
