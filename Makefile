@@ -45,7 +45,7 @@ else
        source ${DIR}/software/anaconda/install/bin/activate; \
        ${DIR}/software/anaconda/install/bin/conda update -y -n base conda; \
 			 source ${DIR}/software/anaconda/install/bin/deactivate; \
-			 ${DIR}/software/anaconda/install/bin/conda env create -f py36_env.yml python=3.7; \
+			 ${DIR}/software/anaconda/install/bin/conda env create -f py37_env.yml python=3.7; \
   )
 	@echo PATH=\$$PATH:${DIR}/software/anaconda/install/bin > pathfile;
 endif
