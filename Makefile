@@ -14,11 +14,11 @@ orthopath := $(shell source ${DIR}/software/anaconda/install/bin/activate py27 2
 orthufuserversion = $(shell source ${DIR}/software/anaconda/install/bin/activate py27 2>/dev/null; orthofuser.py --help | grep "OrthoFinder version" | awk '{print $$3}';conda deactivate 2> /dev/null)
 transrate := $(shell ls ${DIR}/software/orp-transrate/transrate 2>/dev/null)
 transabysspath := $(shell which ${DIR}/software/transabyss/transabyss 2>/dev/null)
-transabyssversion = $(shell source ${DIR}/software/anaconda/install/bin/activate orp_v2 2>/dev/null; transabyss --version 2>/dev/null; source deactivate 2> /dev/null)
+transabyssversion = $(shell source ${DIR}/software/anaconda/install/bin/activate orp 2>/dev/null; transabyss --version 2>/dev/null; source deactivate 2> /dev/null)
 diamond_data := $(shell ls ${DIR}/software/diamond/uniprot_sprot.fasta 2>/dev/null)
 busco_data := $(shell ls ${DIR}/busco_dbs/eukaryota_odb9 2>/dev/null)
 conda := $(shell ${DIR}/software/anaconda/install/bin/conda info 2>/dev/null)
-orp_v2 := $(shell ${DIR}/software/anaconda/install/bin/conda info --envs | grep orp_v2 2>/dev/null)
+orp := $(shell ${DIR}/software/anaconda/install/bin/conda info --envs | grep orp 2>/dev/null)
 py27 := $(shell ${DIR}/software/anaconda/install/bin/conda info --envs | grep py27 2>/dev/null)
 VERSION := ${shell cat  ${MAKEDIR}version.txt}
 
@@ -39,7 +39,7 @@ else
 endif
 
 orp:py37_env.yml conda
-ifdef orp_v2
+ifdef orp
 else
 	( \
        source ${DIR}/software/anaconda/install/bin/activate; \
@@ -69,7 +69,7 @@ ifdef diamond_data
 	@echo "diamond_data is already installed"
 else
 	 cd ${DIR}/software/diamond && curl -LO ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz && gzip -d uniprot_sprot.fasta.gz
-	 cd ${DIR}/software/diamond && ${DIR}/software/anaconda/install/envs/orp_v2/bin/diamond makedb --in uniprot_sprot.fasta -d swissprot
+	 cd ${DIR}/software/diamond && ${DIR}/software/anaconda/install/envs/orp/bin/diamond makedb --in uniprot_sprot.fasta -d swissprot
 endif
 
 busco_data:conda
@@ -101,7 +101,7 @@ else
 	@echo PATH=\$$PATH:${DIR}/software/OrthoFinder/orthofinder >> pathfile
 endif
 
-postscript: setup py27 orp_v2 diamond_data busco_data orthofuser conda transrate
+postscript: setup orp diamond_data busco_data orthofuser conda transrate
 	@if [ -f pathfile ]; then\
 		printf "\n\n*** The following location(s), if any print, need to be added to your PATH ***";\
 		printf "\n*** They will be automatically to your ~/.profile or ~/.bash_profile ***\n\n";\
@@ -115,7 +115,7 @@ postscript: setup py27 orp_v2 diamond_data busco_data orthofuser conda transrate
 
 clean:
 	${DIR}/software/anaconda/install/bin/conda remove -y --name py27 --all
-	${DIR}/software/anaconda/install/bin/conda remove -y --name orp_v2 --all
+	${DIR}/software/anaconda/install/bin/conda remove -y --name orp --all
 	rm -fr ${DIR}/software/anaconda/install
 	rm -fr ${DIR}/software/OrthoFinder/
 	rm -fr ${DIR}/software/orp-transrate
