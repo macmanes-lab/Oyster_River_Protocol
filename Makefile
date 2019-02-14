@@ -42,9 +42,9 @@ orp:py37_env.yml conda
 ifdef orp_v2
 else
 	( \
-       conda ${DIR}/software/anaconda/install/bin/activate; \
+       source ${DIR}/software/anaconda/install/bin/activate; \
        ${DIR}/software/anaconda/install/bin/conda update -y -n base conda; \
-			 conda ${DIR}/software/anaconda/install/bin/deactivate; \
+			 source ${DIR}/software/anaconda/install/bin/deactivate; \
 			 ${DIR}/software/anaconda/install/bin/conda env create -f py36_env.yml python=3.7; \
   )
 	@echo PATH=\$$PATH:${DIR}/software/anaconda/install/bin > pathfile;
