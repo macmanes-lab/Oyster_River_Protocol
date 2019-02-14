@@ -242,11 +242,7 @@ endif
 ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
 	mkdir -p ${DIR}/orthofuse/${RUNOUT}/working
 	for fasta in $$(ls ${DIR}/assemblies/${RUNOUT}*fasta); do python ${MAKEDIR}/scripts/long.seq.py ${DIR}/assemblies/$$(basename $$fasta) ${DIR}/orthofuse/${RUNOUT}/working/$$(basename $$fasta).short.fasta 200; done
-	( \
-	source ${MAKEDIR}/software/anaconda/install/bin/activate py27; \
-		python $$(which orthofuser.py) -I 4 -f ${DIR}/orthofuse/${RUNOUT}/working/ -og -t $(CPU) -a $(CPU); \
-	source ${MAKEDIR}/software/anaconda/install/bin/activate orp_v2;\
-	)
+	python2 $$(which orthofuser.py) -I 4 -f ${DIR}/orthofuse/${RUNOUT}/working/ -og -t $(CPU) -a $(CPU); \
 	cat ${DIR}/orthofuse/${RUNOUT}/working/*short.fasta > ${DIR}/orthofuse/${RUNOUT}/merged.fasta
 
 ${DIR}/orthofuse/${RUNOUT}/orthotransrate.done:${DIR}/orthofuse/${RUNOUT}/merged.fasta
@@ -367,4 +363,3 @@ reportgen:
 	cat ${DIR}/assemblies/diamond/${RUNOUT}.unique.transabyss.txt | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 
 	printf " \n\n"
-	source ${MAKEDIR}/software/anaconda/install/bin/deactivate

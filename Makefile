@@ -22,7 +22,7 @@ orp_v2 := $(shell ${DIR}/software/anaconda/install/bin/conda info --envs | grep 
 py27 := $(shell ${DIR}/software/anaconda/install/bin/conda info --envs | grep py27 2>/dev/null)
 VERSION := ${shell cat  ${MAKEDIR}version.txt}
 
-all: setup conda orp_v2 py27 orthofuser transrate transabyss diamond_data busco_data postscript
+all: setup conda orp orthofuser transrate transabyss diamond_data busco_data postscript
 
 .DELETE_ON_ERROR:
 
@@ -38,27 +38,16 @@ else
 	cd ${DIR}/software/anaconda && bash Anaconda3-2018.12-Linux-x86_64.sh -b -p ${DIR}/software/anaconda/install
 endif
 
-orp_v2:py36_env.yml conda
+orp:py37_env.yml conda
 ifdef orp_v2
 else
 	( \
-       source ${DIR}/software/anaconda/install/bin/activate; \
+       conda ${DIR}/software/anaconda/install/bin/activate; \
        ${DIR}/software/anaconda/install/bin/conda update -y -n base conda; \
-			 source ${DIR}/software/anaconda/install/bin/deactivate; \
-			 ${DIR}/software/anaconda/install/bin/conda env create -f py36_env.yml python=3.6; \
+			 conda ${DIR}/software/anaconda/install/bin/deactivate; \
+			 ${DIR}/software/anaconda/install/bin/conda env create -f py36_env.yml python=3.7; \
   )
 	@echo PATH=\$$PATH:${DIR}/software/anaconda/install/bin > pathfile;
-endif
-
-py27:py27_env.yml conda
-ifdef py27
-else
-	( \
-       source ${DIR}/software/anaconda/install/bin/activate; \
-       ${DIR}/software/anaconda/install/bin/conda update -y -n base conda; \
-			 source ${DIR}/software/anaconda/install/bin/deactivate; \
-			 ${DIR}/software/anaconda/install/bin/conda env create -f py27_env.yml python=2.7; \
-  )
 endif
 
 transabyss:
