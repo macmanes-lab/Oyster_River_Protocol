@@ -60,6 +60,7 @@ else
 	cd ${DIR}/software/transabyss && git pull
 endif
 else
+	pip install python-igraph
 	cd ${DIR}/software/ && git clone https://github.com/bcgsc/transabyss.git
 	@echo PATH=\$$PATH:${DIR}/software/transabyss >> pathfile
 endif
