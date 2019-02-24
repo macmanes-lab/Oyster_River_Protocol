@@ -84,7 +84,7 @@ ${DIR}/assemblies/${RUNOUT}.ORP.fasta:${DIR}/assemblies/${RUNOUT}.orthomerged.fa
 ${DIR}/reports/${RUNOUT}.busco.done:${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.ORP.fasta -m transcriptome -f --cpu $(CPU) -o ${RUNOUT}
 	mv run_${RUNOUT} ${DIR}/reports/
-	touch ${DIR}/reports/${RUNOUT}busco.done
+	touch ${DIR}/reports/${RUNOUT}.busco.done
 
 ${DIR}/reports/${RUNOUT}.transrate.done:${DIR}/reports/${RUNOUT}.busco.done
 	transrate -o ${DIR}/reports/transrate_${RUNOUT}  -a ${DIR}/assemblies/${RUNOUT}.ORP.fasta --left ${READ1} --right ${READ2} -t $(CPU)
