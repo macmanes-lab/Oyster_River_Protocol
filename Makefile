@@ -46,8 +46,8 @@ else
        ${DIR}/software/anaconda/install/bin/conda update -y -n base conda; \
 			 ${DIR}/software/anaconda/install/bin/conda ${DIR}/software/anaconda/install/bin/deactivate; \
 			 ${DIR}/software/anaconda/install/bin/conda config --set channel_priority strict; \
-			 ${DIR}/software/anaconda/install/bin/conda install pycryptosat
-			 ${DIR}/software/anaconda/install/bin/ config --set sat_solver pycryptosat
+			 ${DIR}/software/anaconda/install/bin/conda install pycryptosat; \
+			 ${DIR}/software/anaconda/install/bin/ config --set sat_solver pycryptosat; \
 			 ${DIR}/software/anaconda/install/bin/conda env create -f py37_env.yml python=3.7; \
   )
 	@echo PATH=\$$PATH:${DIR}/software/anaconda/install/bin > pathfile;
