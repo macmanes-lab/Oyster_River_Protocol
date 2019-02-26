@@ -44,7 +44,12 @@ else
 	( \
        source ${DIR}/software/anaconda/install/bin/activate; \
        ${DIR}/software/anaconda/install/bin/conda update -y -n base conda; \
+			 echo ". ${DIR}/Oyster_River_Protocol/software/anaconda/install/etc/profile.d/conda.sh" >> ~/.bashrc; \
+			 source ~/.bashrc;\
 			 ${DIR}/software/anaconda/install/bin/conda deactivate; \
+			 ${DIR}/software/anaconda/install/bin/conda config --set channel_priority strict; \
+			 ${DIR}/software/anaconda/install/bin/conda install -y pycryptosat; \
+			 ${DIR}/software/anaconda/install/bin/conda config --set sat_solver pycryptosat; \
 			 ${DIR}/software/anaconda/install/bin/conda env create -f py37_env.yml python=3.7; \
   )
 	@echo PATH=\$$PATH:${DIR}/software/anaconda/install/bin > pathfile;
