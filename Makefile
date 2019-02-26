@@ -46,9 +46,7 @@ else
 				${DIR}/software/anaconda/install/bin/conda update -y -n base conda; \
 				echo ". ${DIR}/Oyster_River_Protocol/software/anaconda/install/etc/profile.d/conda.sh" >> ~/.bashrc; \
 				source ~/.bashrc; \
-				${DIR}/software/anaconda/install/bin/conda init bash; \
-				source ~/.bashrc; \
-				${DIR}/software/anaconda/install/bin/conda deactivate; \
+				source ${DIR}/software/anaconda/install/bin/deactivate; \
 	 )
 	 ( \
 				${DIR}/software/anaconda/install/bin/conda install -y pycryptosat; \
