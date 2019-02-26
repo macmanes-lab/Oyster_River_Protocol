@@ -46,10 +46,11 @@ else
 				${DIR}/software/anaconda/install/bin/conda update -y -n base conda; \
 				echo ". ${DIR}/Oyster_River_Protocol/software/anaconda/install/etc/profile.d/conda.sh" >> ~/.bashrc; \
 				source ~/.bashrc; \
+				${DIR}/software/anaconda/install/bin/conda init bash; \
+				source ~/.bashrc; \
 				${DIR}/software/anaconda/install/bin/conda deactivate; \
 	 )
 	 ( \
-	 			${DIR}/software/anaconda/install/bin/conda config --set channel_priority strict; \
 				${DIR}/software/anaconda/install/bin/conda install -y pycryptosat; \
 				${DIR}/software/anaconda/install/bin/conda config --set sat_solver pycryptosat; \
 				${DIR}/software/anaconda/install/bin/conda env create -f py37_env.yml python=3.7; \
@@ -122,7 +123,6 @@ postscript: setup orp diamond_data busco_data orthofuser conda transrate
 	fi
 
 clean:
-	${DIR}/software/anaconda/install/bin/conda remove -y --name py27 --all
 	${DIR}/software/anaconda/install/bin/conda remove -y --name orp --all
 	rm -fr ${DIR}/software/anaconda/install
 	rm -fr ${DIR}/software/OrthoFinder/
