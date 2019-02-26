@@ -31,20 +31,20 @@ setup:
 	@mkdir -p ${DIR}/software/anaconda
 	@mkdir -p ${DIR}/software/diamond
 
-conda:
+conda:setup
 ifdef conda
 else
 	cd ${DIR}/software/anaconda && curl -LO https://repo.anaconda.com/archive/Anaconda3-2018.12-Linux-x86_64.sh
 	cd ${DIR}/software/anaconda && bash Anaconda3-2018.12-Linux-x86_64.sh -b -p ${DIR}/software/anaconda/install
 endif
 
-orp:py37_env.yml conda
+orp:py37_env.yml conda setup
 ifdef orp
 else
 	( \
 				source ${DIR}/software/anaconda/install/bin/activate; \
 				${DIR}/software/anaconda/install/bin/conda update -y -n base conda; \
-				echo ". ${DIR}/Oyster_River_Protocol/software/anaconda/install/etc/profile.d/conda.sh" >> ~/.bashrc; \
+				echo ". ${DIR}/software/anaconda/install/etc/profile.d/conda.sh" >> ~/.bashrc; \
 				source ~/.bashrc; \
 				source ${DIR}/software/anaconda/install/bin/deactivate; \
 	 )
