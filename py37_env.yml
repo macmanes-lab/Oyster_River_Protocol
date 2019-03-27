@@ -40,7 +40,7 @@ dependencies:
   - mako=1.0.7
   - spades=3.13.0
   - boost=1.67.0
-  - busco=3.0.1
+  - busco=3.0.2
   - blast=2.7.1
   - hmmer=3.2.1
   - samtools=1.9

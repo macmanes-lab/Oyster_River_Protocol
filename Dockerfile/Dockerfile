@@ -1,5 +1,5 @@
-FROM delhomme/upscb-ngs-preprocessing
-MAINTAINER Nicolas Delhomme (nicolas.delhomme@umu.se)
+FROM ubuntu:18.04
+MAINTAINER Matthew MacManes (Matthew.MacManes@unh.edu)
 
 #########
 ### Working dir
@@ -10,9 +10,7 @@ WORKDIR /build
 #########
 ### Aptitude packages
 #########
-RUN apt update && apt install -y automake autotools-dev cmake emboss hmmer infernal libboost-all-dev \
-libfontconfig1 libsm6 liburi-escape-xs-perl liburi-perl libxrender1 mcl ncbi-blast+ parallel python-numpy \
-ruby unzip && gem install crb-blast
+RUN apt update && apt install -y build-essential git python python-pip libxml2-dev libz-dev
 
 
 #########
@@ -27,14 +25,15 @@ RUN pip install --upgrade pip
 WORKDIR /home/training
 RUN git clone https://github.com/macmanes-lab/Oyster_River_Protocol.git
 RUN cd Oyster_River_Protocol && make
+RUN sed -i  's_ubuntu_$(whoami)_g' $HOME/Oyster_River_Protocol/software/config.ini
 USER root
 
 #########
 ### Path
 #########
-RUN echo 'PATH=$PATH:/home/training/miniconda/bin' >> /home/training/.profile
-RUN echo 'PATH=$PATH:/home/training/miniconda/bin' >> /home/training/.bash_profile
-ENV PATH=/home/training/miniconda/bin:${PATH}
+RUN cat pathfile >> ~/.profile
+RUN cat pathfile >> ~/.bash_profile
+RUN source ~/.profile
 
 
 #########
