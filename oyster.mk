@@ -314,6 +314,7 @@ ${DIR}/assemblies/${RUNOUT}.ORP.fasta:${DIR}/assemblies/${RUNOUT}.orthomerged.fa
 ${DIR}/assemblies/${RUNOUT}.filter.done:${DIR}/assemblies/${RUNOUT}.ORP.fasta
 ifdef TPM_FILT
 	cat ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf| awk '$$4 > $(TPM_FILT)' | cut -f1 | sed 1d > ${DIR}/assemblies/${RUNOUT}.HIGHEXP.txt
+	cat ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf| awk '$$4 < $(TPM_FILT)' | cut -f1 | sed 1d > ${DIR}/assemblies/${RUNOUT}.LOWEXP.txt
 	python ${MAKEDIR}/scripts/filter.py ${DIR}/assemblies/${RUNOUT}.ORP.fasta ${DIR}/assemblies/${RUNOUT}.HIGHEXP.txt > ${DIR}/assemblies/${RUNOUT}.ORP.HIGHEXP.fasta
 	mv ${DIR}/assemblies/${RUNOUT}.ORP.HIGHEXP.fasta ${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	touch ${DIR}/assemblies/${RUNOUT}.filter.done
