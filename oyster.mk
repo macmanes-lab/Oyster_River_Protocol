@@ -317,7 +317,6 @@ ifdef TPM_FILT
 	python ${MAKEDIR}/scripts/filter.py ${DIR}/assemblies/${RUNOUT}.ORP.fasta ${DIR}/assemblies/${RUNOUT}.HIGHEXP.txt > ${DIR}/assemblies/${RUNOUT}.ORP.HIGHEXP.fasta
 	mv ${DIR}/assemblies/${RUNOUT}.ORP.HIGHEXP.fasta ${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	touch ${DIR}/assemblies/${RUNOUT}.filter.done
-	rm -f ${DIR}/assemblies/${RUNOUT}.HIGHEXP.txt
 else
 endif
 
