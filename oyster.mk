@@ -319,7 +319,7 @@ ifdef TPM_FILT
 	python ${MAKEDIR}/scripts/filter.py ${DIR}/assemblies/${RUNOUT}.ORP.fasta ${DIR}/assemblies/${RUNOUT}.HIGHEXP.txt > ${DIR}/assemblies/${RUNOUT}.ORP.HIGHEXP.fasta
 	printf "\nMADE HIGHEXP FASTA\n"
 	for entry in $$(cat ${DIR}/assemblies/${RUNOUT}.LOWEXP.txt); do grep $$entry ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt >> ${DIR}/assemblies/${RUNOUT}.blasted; done
-	cat ${DIR}/assemblies/${RUNOUT}.blasted | cut -f1 | sort | uniq >> ${DIR}/assemblies/${RUNOUT}.donotremove.list
+	cat ${DIR}/assemblies/${RUNOUT}.blasted | cut -f1 | sort | uniq | tee -a ${DIR}/assemblies/${RUNOUT}.donotremove.list
 	printf "\nMADE DO NOT REMOVE LIST\n"
 	python ${MAKEDIR}/scripts/filter.py ${DIR}/assemblies/${RUNOUT}.ORP.fasta ${DIR}/assemblies/${RUNOUT}.donotremove.list > ${DIR}/assemblies/${RUNOUT}.saveme.fasta
 	printf "\nMADE SAVEME FASTA\n"
