@@ -318,7 +318,7 @@ ifdef TPM_FILT
 	printf "MADE HIGH AND LOW EXP FILES\n"
 	python ${MAKEDIR}/scripts/filter.py ${DIR}/assemblies/${RUNOUT}.ORP.fasta ${DIR}/assemblies/${RUNOUT}.HIGHEXP.txt > ${DIR}/assemblies/${RUNOUT}.ORP.HIGHEXP.fasta
 	printf "\nMADE HIGHEXP FASTA\n"
-	grep -f ${DIR}/assemblies/${RUNOUT}.LOWEXP.txt ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt >> ${DIR}/assemblies/${RUNOUT}.blasted; done
+	grep -f ${DIR}/assemblies/${RUNOUT}.LOWEXP.txt ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt >> ${DIR}/assemblies/${RUNOUT}.blasted
 	printf "\nMADE BLASTED FILE VIA GREP\n"
 	awk '{print $$1}' ${DIR}/assemblies/${RUNOUT}.blasted | sort | uniq | tee -a ${DIR}/assemblies/${RUNOUT}.donotremove.list
 	printf "\nMADE DO NOT REMOVE LIST\n"
