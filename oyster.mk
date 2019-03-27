@@ -309,7 +309,7 @@ ${DIR}/assemblies/${RUNOUT}.ORP.fasta:${DIR}/assemblies/${RUNOUT}.orthomerged.fa
 	cd ${DIR}/assemblies/ && cd-hit-est -M 5000 -T $(CPU) -c .98 -i ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -o ${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	diamond blastx -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.ORP.fasta -d ${MAKEDIR}/software/diamond/swissprot  -o ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
 	awk '{print $$2}' ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/${RUNOUT}.unique.ORP.txt
-	rm ${DIR}/assemblies/${RUNOUT}.ORP.fasta.clstr
+	rm ${DIR}/assemblies/${RUNOUT}.ORP.fasta.clstr ${DIR}/assemblies/${RUNOUT}.unique.ORP.txt
 
 ${DIR}/assemblies/${RUNOUT}.filter.done:${DIR}/assemblies/${RUNOUT}.ORP.fasta
 ifdef $(TPM_FILT)
@@ -317,6 +317,7 @@ ifdef $(TPM_FILT)
 	python ${MAKEDIR}/scripts/filter.py ${DIR}/assemblies/${RUNOUT}.ORP.fasta ${DIR}/assemblies/${RUNOUT}.HIGHEXP.txt > ${DIR}/assemblies/${RUNOUT}.ORP.HIGHEXP.fasta
 	mv ${DIR}/assemblies/${RUNOUT}.ORP.HIGHEXP.fasta ${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	touch ${DIR}/assemblies/${RUNOUT}.filter.done
+	rm -f ${DIR}/assemblies/${RUNOUT}.HIGHEXP.txt
 else
 endif
 
@@ -346,6 +347,7 @@ ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf:${DIR}/assemblies/${RUNOUT}.
 	perl -I $$(dirname $$(readlink -f $$(which Trinity)))/PerlLib ${MAKEDIR}/scripts/examine_strand.pl "${RUNOUT}".sorted.bam ${RUNOUT}
 	hist  -p '#' -c red <(cat ${RUNOUT}.dat | awk '{print $$5}' | sed  1d)
 	rm -f "${RUNOUT}".sorted.bam
+	rm -fr ${RUNOUT}.{bwt,pac,ann,amb,sa,dat}
 	touch ${DIR}/reports/${RUNOUT}.strandeval.done
 	printf "\n\n*****  See the following link for interpretation ***** \n"
 	printf "*****  https://oyster-river-protocol.readthedocs.io/en/latest/strandexamine.html ***** \n\n"
