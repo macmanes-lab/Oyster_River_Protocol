@@ -149,18 +149,8 @@ help:
 	printf "RUNOUT=test\n\n"
 
 readcheck:
-	if [ -a ${READ1} ] ; \
-	then \
-	else \
-		printf "\n\n\n\n ERROR: YOUR READ1 FILE DOES NOT EXIST AT THE LOCATION YOU SPECIFIED\n ";\
-		$$(shell exit);\
-	fi ;
-	if [ -a ${READ2} ] ; \
-	then \
-	else \
-		printf "\n\n\n\n ERROR: YOUR READ2 FILE DOES NOT EXIST AT THE LOCATION YOU SPECIFIED\n ";\
-		$$(shell exit);\
-	fi ;
+	if [ -a ${READ1} ]; then; else printf "\n\n\n\n ERROR: YOUR READ1 FILE DOES NOT EXIST AT THE LOCATION YOU SPECIFIED\n "; $$(shell exit); fi ;
+	if [ -a ${READ2} ]; then; else printf "\n\n\n\n ERROR: YOUR READ2 FILE DOES NOT EXIST AT THE LOCATION YOU SPECIFIED\n "; $$(shell exit); fi ;
 ifeq ($(shell file ${READ1} | awk '{print $$2}'),gzip)
 	if [ $$(gzip -cd $${READ1} | head -n 400 | awk '{if(NR%4==2) {count++; bases += length} } END{print int(bases/count)}') -gt 75 ] && [ $$(gzip -cd $${READ2} | head -n 400 | awk '{if(NR%4==2) {count++; bases += length} } END{print int(bases/count)}') -gt 75 ];\
 	then\
