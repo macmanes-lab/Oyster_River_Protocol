@@ -25,7 +25,7 @@ RUN pip install --upgrade pip
 WORKDIR /home/training
 RUN git clone https://github.com/macmanes-lab/Oyster_River_Protocol.git
 RUN cd Oyster_River_Protocol && make
-RUN sed -i  's_ubuntu_$(whoami)_g' $HOME/Oyster_River_Protocol/software/config.ini
+RUN sed -i  "s_ubuntu_$(whoami)_g" $HOME/Oyster_River_Protocol/software/config.ini
 USER root
 
 #########
