@@ -284,8 +284,6 @@ ${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt: ${DIR}/assemblies/${RUN
 	awk '{print $$2}' ${DIR}/assemblies/diamond/${RUNOUT}.spades55.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/${RUNOUT}.unique.sp55.txt
 	awk '{print $$2}' ${DIR}/assemblies/diamond/${RUNOUT}.transabyss.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/${RUNOUT}.unique.transabyss.txt
 
-
-
 #list1 is unique geneIDs in orthomerged
 #list2 is unique  geneIDs in other assemblies
 #list3 is which genes are in other assemblies but not in orthomerged
@@ -315,15 +313,10 @@ ${DIR}/assemblies/${RUNOUT}.filter.done:${DIR}/assemblies/${RUNOUT}.ORP.fasta
 ifdef TPM_FILT
 	cat ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf| awk '$$4 > $(TPM_FILT)' | cut -f1 | sed 1d > ${DIR}/assemblies/${RUNOUT}.HIGHEXP.txt
 	cat ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf| awk '$$4 < $(TPM_FILT)' | cut -f1 | sed 1d > ${DIR}/assemblies/${RUNOUT}.LOWEXP.txt
-	printf "MADE HIGH AND LOW EXP FILES\n"
 	python ${MAKEDIR}/scripts/filter.py ${DIR}/assemblies/${RUNOUT}.ORP.fasta ${DIR}/assemblies/${RUNOUT}.HIGHEXP.txt > ${DIR}/assemblies/${RUNOUT}.ORP.HIGHEXP.fasta
-	printf "\nMADE HIGHEXP FASTA\n"
-	grep -f ${DIR}/assemblies/${RUNOUT}.LOWEXP.txt ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt >> ${DIR}/assemblies/${RUNOUT}.blasted
-	printf "\nMADE BLASTED FILE VIA GREP\n"
+	grep -Fwf ${DIR}/assemblies/${RUNOUT}.LOWEXP.txt ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt >> ${DIR}/assemblies/${RUNOUT}.blasted
 	awk '{print $$1}' ${DIR}/assemblies/${RUNOUT}.blasted | sort | uniq | tee -a ${DIR}/assemblies/${RUNOUT}.donotremove.list
-	printf "\nMADE DO NOT REMOVE LIST\n"
 	python ${MAKEDIR}/scripts/filter.py ${DIR}/assemblies/${RUNOUT}.ORP.fasta ${DIR}/assemblies/${RUNOUT}.donotremove.list > ${DIR}/assemblies/${RUNOUT}.saveme.fasta
-	printf "\nMADE SAVEME FASTA\n"
 	cat ${DIR}/assemblies/${RUNOUT}.saveme.fasta ${DIR}/assemblies/${RUNOUT}.ORP.HIGHEXP.fasta > ${DIR}/assemblies/${RUNOUT}.tmp.fasta
 	mv ${DIR}/assemblies/${RUNOUT}.tmp.fasta ${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	touch ${DIR}/assemblies/${RUNOUT}.filter.done
@@ -344,7 +337,7 @@ ${DIR}/reports/${RUNOUT}.transrate.done:${DIR}/assemblies/${RUNOUT}.ORP.fasta
 
 ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf:${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	salmon index --no-version-check -t ${DIR}/assemblies/${RUNOUT}.ORP.fasta  -i ${RUNOUT}.ortho.idx --type quasi -k 31
-	salmon quant --no-version-check -p $(CPU) -i ${RUNOUT}.ortho.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/salmon_orthomerged_${RUNOUT}
+	salmon quant --no-version-check --validateMappings -p $(CPU) -i ${RUNOUT}.ortho.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/salmon_orthomerged_${RUNOUT}
 	rm -fr ${RUNOUT}.ortho.idx
 
 {DIR}/reports/${RUNOUT}.strandeval.done:
