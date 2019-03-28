@@ -80,6 +80,7 @@ ${DIR}/setup.done:
 	@mkdir -p ${DIR}/orthofuse
 	@mkdir -p ${DIR}/quants
 	@mkdir -p ${DIR}/assemblies/diamond
+	@mkdir -p ${DIR}/assemblies/working
 	touch ${DIR}/setup.done
 
 check:
@@ -311,14 +312,14 @@ ${DIR}/assemblies/${RUNOUT}.ORP.fasta:${DIR}/assemblies/${RUNOUT}.orthomerged.fa
 
 ${DIR}/assemblies/${RUNOUT}.filter.done:${DIR}/assemblies/${RUNOUT}.ORP.fasta
 ifdef TPM_FILT
-	cat ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf| awk '$$4 > $(TPM_FILT)' | cut -f1 | sed 1d > ${DIR}/assemblies/${RUNOUT}.HIGHEXP.txt
-	cat ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf| awk '$$4 < $(TPM_FILT)' | cut -f1 | sed 1d > ${DIR}/assemblies/${RUNOUT}.LOWEXP.txt
-	python ${MAKEDIR}/scripts/filter.py ${DIR}/assemblies/${RUNOUT}.ORP.fasta ${DIR}/assemblies/${RUNOUT}.HIGHEXP.txt > ${DIR}/assemblies/${RUNOUT}.ORP.HIGHEXP.fasta
-	grep -Fwf ${DIR}/assemblies/${RUNOUT}.LOWEXP.txt ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt >> ${DIR}/assemblies/${RUNOUT}.blasted
-	awk '{print $$1}' ${DIR}/assemblies/${RUNOUT}.blasted | sort | uniq | tee -a ${DIR}/assemblies/${RUNOUT}.donotremove.list
-	python ${MAKEDIR}/scripts/filter.py ${DIR}/assemblies/${RUNOUT}.ORP.fasta ${DIR}/assemblies/${RUNOUT}.donotremove.list > ${DIR}/assemblies/${RUNOUT}.saveme.fasta
-	cat ${DIR}/assemblies/${RUNOUT}.saveme.fasta ${DIR}/assemblies/${RUNOUT}.ORP.HIGHEXP.fasta > ${DIR}/assemblies/${RUNOUT}.tmp.fasta
-	mv ${DIR}/assemblies/${RUNOUT}.tmp.fasta ${DIR}/assemblies/${RUNOUT}.ORP.fasta
+	cat ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf| awk '$$4 > $(TPM_FILT)' | cut -f1 | sed 1d > ${DIR}/assemblies/working/${RUNOUT}.HIGHEXP.txt
+	cat ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf| awk '$$4 < $(TPM_FILT)' | cut -f1 | sed 1d > ${DIR}/assemblies/working/${RUNOUT}.LOWEXP.txt
+	python ${MAKEDIR}/scripts/filter.py ${DIR}/assemblies/${RUNOUT}.ORP.fasta ${DIR}/assemblies/working/${RUNOUT}.HIGHEXP.txt > ${DIR}/assemblies/working/${RUNOUT}.ORP.HIGHEXP.fasta
+	grep -Fwf ${DIR}/assemblies/working/${RUNOUT}.LOWEXP.txt ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt >> ${DIR}/assemblies/working/${RUNOUT}.blasted
+	awk '{print $$1}' ${DIR}/assemblies/working/${RUNOUT}.blasted | sort | uniq | tee -a ${DIR}/assemblies/working/${RUNOUT}.donotremove.list
+	python ${MAKEDIR}/scripts/filter.py ${DIR}/assemblies/${RUNOUT}.ORP.fasta ${DIR}/assemblies/working/${RUNOUT}.donotremove.list > ${DIR}/assemblies/working/${RUNOUT}.saveme.fasta
+	cat ${DIR}/assemblies/working/${RUNOUT}.saveme.fasta ${DIR}/assemblies/working/${RUNOUT}.ORP.HIGHEXP.fasta > ${DIR}/assemblies/working/${RUNOUT}.tmp.fasta
+	mv ${DIR}/assemblies/working/${RUNOUT}.tmp.fasta ${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	touch ${DIR}/assemblies/${RUNOUT}.filter.done
 else
 	touch ${DIR}/assemblies/${RUNOUT}.filter.done

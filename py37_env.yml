@@ -30,7 +30,7 @@ dependencies:
   - make=4.2.1
   - cairo=1.16.0
   - pillow=5.4.1
-  - glib
+  - glib=2.58.3
   - ncurses=6.1
   - zlib=1.2.11
   - libgcc=7.2.0
@@ -44,7 +44,7 @@ dependencies:
   - blast=2.7.1
   - hmmer=3.2.1
   - samtools=1.9
-  - tbb=2019.3
+  - tbb=2019.4
   - gettext=0.19.8.1
   - jpeg=9c
   - pango=1.40.14
