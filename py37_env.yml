@@ -89,10 +89,10 @@ dependencies:
   - icu=58.2
   - ca-certificates=2018
   - six=1.12.0
-  - pip=19.0.3
   - nettle=3.3
   - pixman=0.34.0
   - pip=19.0.3
   - pip:
+    - pip
     - biopython
     - bashplotlib
