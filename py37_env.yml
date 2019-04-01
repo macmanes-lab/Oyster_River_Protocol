@@ -6,12 +6,12 @@ channels:
   - r
   - antoined
 dependencies:
-  - python=3.6.3
+  - python
+  - openssl=1.1.1a
   - markupsafe=1.1.1
   - readline=7.0
   - olefile=0.46
   - trimmomatic=0.38
-  - openssl=1.0.2q
   - openjdk=11.0.1
   - krb5=1.16.3
   - bowtie=1.2.2
@@ -66,7 +66,7 @@ dependencies:
   - rcorrector=1.0.3
   - mcl=14.137
   - libuuid=2.32.1
-  - abyss=2.1.5
+  - abyss=2.0
   - xz=5.2.4
   - mkl_random=1.0.2
   - bzip2=1.0.6
