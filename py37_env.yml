@@ -7,7 +7,7 @@ channels:
   - antoined
 dependencies:
   - python=3.6.3
-  - openssl=1.1.1a
+  - openssl=1.0
   - markupsafe=1.1.1
   - readline=7.0
   - olefile=0.46
