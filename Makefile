@@ -13,6 +13,8 @@ CONDAROOT = ${DIR}/software/anaconda/install/
 orthopath := $(shell source ${DIR}/software/anaconda/install/bin/activate py27 2>/dev/null; which orthofuser.py 2>/dev/null; conda deactivate 2> /dev/null)
 orthufuserversion = $(shell source ${DIR}/software/anaconda/install/bin/activate py27 2>/dev/null; orthofuser.py --help | grep "OrthoFinder version" | awk '{print $$3}';conda deactivate 2> /dev/null)
 transrate := $(shell ls ${DIR}/software/orp-transrate/transrate 2>/dev/null)
+transabysspath := $(shell which ${DIR}/software/transabyss/transabyss 2>/dev/null)
+transabyssversion = $(shell source ${DIR}/software/anaconda/install/bin/activate orp 2>/dev/null; transabyss --version 2>/dev/null; source deactivate 2> /dev/null)
 diamond_data := $(shell ls ${DIR}/software/diamond/uniprot_sprot.fasta 2>/dev/null)
 busco_data := $(shell ls ${DIR}/busco_dbs/eukaryota_odb9 2>/dev/null)
 conda := $(shell ${DIR}/software/anaconda/install/bin/conda info 2>/dev/null)
@@ -20,7 +22,7 @@ orp := $(shell ${DIR}/software/anaconda/install/bin/conda info --envs | grep orp
 py27 := $(shell ${DIR}/software/anaconda/install/bin/conda info --envs | grep py27 2>/dev/null)
 VERSION := ${shell cat  ${MAKEDIR}version.txt}
 
-all: setup conda orp orthofuser transrate diamond_data busco_data postscript
+all: setup conda orp orthofuser transrate transabyss diamond_data busco_data postscript
 
 .DELETE_ON_ERROR:
 
@@ -52,6 +54,21 @@ else
 				${DIR}/software/anaconda/install/bin/conda env create -f py37_env.yml python=3.7; \
   )
 	@echo PATH=\$$PATH:${DIR}/software/anaconda/install/bin > pathfile;
+endif
+
+transabyss:
+ifdef transabysspath
+ifeq ($(transabyssversion),2.0.1)
+	@echo "TransABySS is already installed"
+else
+	@echo "version ${transabyssversion}"
+	@echo "TransABySS is installed, but not the right version"
+	cd ${DIR}/software/transabyss && git pull
+endif
+else
+	pip2 install python-igraph scipy numpy
+	cd ${DIR}/software/ && git clone https://github.com/bcgsc/transabyss.git
+	@echo PATH=\$$PATH:${DIR}/software/transabyss >> pathfile
 endif
 
 diamond_data:conda

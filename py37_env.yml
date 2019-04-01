@@ -6,7 +6,7 @@ channels:
   - r
   - antoined
 dependencies:
-  - python
+  - python=3.6.3
   - openssl=1.1.1a
   - markupsafe=1.1.1
   - readline=7.0
@@ -89,7 +89,6 @@ dependencies:
   - pip=19.0.3
   - nettle=3.3
   - pixman=0.34.0
-  - transabyss=2.0.1
   - pip:
     - biopython
     - bashplotlib
