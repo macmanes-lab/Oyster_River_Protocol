@@ -10,6 +10,7 @@ SHELL=/bin/bash -o pipefail
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
 CPU=16
+BUSCO_THREADS=${CPU}
 MEM=110
 TRINITY_KMER=25
 SPADES1_KMER=55
@@ -330,7 +331,7 @@ endif
 
 ${DIR}/reports/${RUNOUT}.busco.done:${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	export BUSCO_CONFIG_FILE=${MAKEDIR}/software/config.ini
-	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.ORP.fasta -m transcriptome --cpu 6 -o ${RUNOUT}.ORP
+	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.ORP.fasta -m transcriptome --cpu ${BUSCO_THREADS} -o ${RUNOUT}.ORP
 	mv run_${RUNOUT}* ${DIR}/reports/
 	touch ${DIR}/reports/${RUNOUT}.busco.done
 

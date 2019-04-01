@@ -48,7 +48,7 @@ RUN usermod -aG sudo,audio,video training \
 WORKDIR /home/training
 USER training
 RUN git clone https://github.com/macmanes-lab/Oyster_River_Protocol.git
-RUN cd Oyster_River_Protocol && make
+RUN cd Oyster_River_Protocol && sudo make
 RUN sed -i  "s_ubuntu_training_g" /home/training/Oyster_River_Protocol/software/config.ini
 
 #########
@@ -73,3 +73,4 @@ RUN rm -rf /build
 #########
 WORKDIR $HOME
 USER training
+RUN /bin/bash -c "source activate orp"
