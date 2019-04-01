@@ -22,7 +22,7 @@ RUN apt update \
     && apt -y upgrade \
     && apt install -y --reinstall language-pack-en \
     && locale-gen en_GB.UTF-8
-RUN apt update && apt install -y build-essential git python python-pip libxml2-dev libz-dev curl wget
+RUN apt update && apt install -y build-essential git python python-pip libxml2-dev libz-dev curl wget sudo
 
 
 #########
