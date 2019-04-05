@@ -84,21 +84,21 @@ ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/orthotr
 ${DIR}/diamond/diamond.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	# need a for loop to do the number of fastas in the fastadir folder
 	# define blastx command and awk command
-	blastx_cmnd = $(diamond blastx -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/${FASTADIR}/$(fasta) -d ${MAKEDIR}/software/diamond/swissprot -o ${DIR}/assemblies/diamond/$(basename $(fasta)).diamond.txt)
-	awk_cmd = $(awk '{print $$2}' ${DIR}/assemblies/diamond/$(fasta).diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/$(basename $(fasta)).unique.txt)
+	blastx_cmnd = $(diamond blastx -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/${FASTADIR}/$(fasta) -d ${MAKEDIR}/software/diamond/swissprot -o ${DIR}/assemblies/diamond/$(basename $(fasta)).inputfasta.diamond.txt)
+	awk_cmd = $(awk '{print $$2}' ${DIR}/assemblies/diamond/$(fasta).inputfasta.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/$(basename $(fasta)).unique.txt)
 	# run diamond for input fastas
 	$(foreach fasta, ${INPUT_FASTAS}, blastx_cmnd)
 	$(foreach fasta, ${INPUT_FASTAS},awk_cmnd)
 	# run for orthomerged assembly 
 	diamond blastx -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -d ${MAKEDIR}/software/diamond/swissprot -o ${DIR}/assemblies/diamond/${RUNOUT}.orthomerged.diamond.txt)
-	awk '{print $$2}' ${DIR}/assemblies/diamond/$(fasta).diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/$(fasta).unique.txt
+	awk '{print $$2}' ${DIR}/assemblies/diamond/${RUNOUT}.orthomerged.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/${RUNOUT}.orthomerged.unique.txt
 	# touch to signal end of command.
 	touch ${DIR}/diamond/diamond.done
 
-#list1 is unique geneIDs in orthomerged
+# list1 is unique geneIDs in orthomerged
 #list2 is unique  geneIDs in other assemblies
 #list3 is which genes are in other assemblies but not in orthomerged
-#list4 are the contig IDs from {sp55,sp75,trin,ta} from list3
+#list4 are the contig IDs from input_fastas from list3
 #list5 is unique IDs contig IDs from list4
 #list6 is contig IDs from orthomerged FASTAs
 #list7 is stuff that is in 5 but not 6
@@ -106,12 +106,12 @@ ${DIR}/diamond/diamond.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 # oh fuck what do I do here?
 ${DIR}/assemblies/diamond/${RUNOUT}.newbies.fasta:${DIR}/assemblies/diamond/diamond.done
 	cd ${DIR}/assemblies/diamond/ && cut -f2 ${RUNOUT}.orthomerged.diamond.txt | cut -d "|" -f3 | cut -d "_" -f1 | sort --parallel=20 |uniq > ${RUNOUT}.list1
-	cd ${DIR}/assemblies/diamond/ && cut -f2 ${RUNOUT}.{transabyss,spades75,spades55,trinity}.diamond.txt | cut -d "|" -f3 | cut -d "_" -f1 | sort --parallel=20 |uniq > ${RUNOUT}.list2
+	cd ${DIR}/assemblies/diamond/ && cut -f2 *inputfasta.diamond.txt | cut -d "|" -f3 | cut -d "_" -f1 > sort --parallel=20 | uniq > ${RUNOUT}.list2
 	cd ${DIR}/assemblies/diamond/ && grep -xFvwf ${RUNOUT}.list1 ${RUNOUT}.list2 > ${RUNOUT}.list3
-	cd ${DIR}/assemblies/diamond/ && for item in $$(cat ${RUNOUT}.list3); do grep -F $$item ${RUNOUT}.{transabyss,spades75,spades55,trinity}.diamond.txt | head -1 | cut -f1; done | cut -d ":" -f2 | sort | uniq >> ${RUNOUT}.list5
+	cd ${DIR}/assemblies/diamond/ && for item in $$(cat ${RUNOUT}.list3); do grep -F $$item *inputfasta.diamond.txt | head -1 | cut -f1; done | cut -d ":" -f2 | sort | uniq >> ${RUNOUT}.list5
 	cd ${DIR}/assemblies/diamond/ && grep -F ">" ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta | sed 's_>__' > ${RUNOUT}.list6
 	cd ${DIR}/assemblies/diamond/ && grep -xFvwf ${RUNOUT}.list6 ${RUNOUT}.list5 > ${RUNOUT}.list7
-	cd ${DIR}/assemblies/diamond/ && python ${MAKEDIR}/scripts/filter.py <(cat ../${RUNOUT}.{spades55,spades75,transabyss,trinity.Trinity}.fasta) ${RUNOUT}.list7 >> ${RUNOUT}.newbies.fasta
+	cd ${DIR}/assemblies/diamond/ && python ${MAKEDIR}/scripts/filter.py <(cat ${DIR}/${FASTADIR}/*) ${RUNOUT}.list7 >> ${RUNOUT}.newbies.fasta
 	cd ${DIR}/assemblies/diamond/ &&  cat ${RUNOUT}.newbies.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta > tmp.fasta && mv tmp.fasta ${DIR}/assemblies/working/${RUNOUT}.orthomerged.fasta
 	cd ${DIR}/assemblies/diamond/ && rm -f ${RUNOUT}.list*
 
@@ -120,6 +120,11 @@ ${DIR}/assemblies/${RUNOUT}.ORP.fasta:${DIR}/assemblies/${RUNOUT}.orthomerged.fa
 	diamond blastx -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.ORP.fasta -d ${MAKEDIR}/software/diamond/swissprot  -o ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
 	awk '{print $$2}' ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/working/${RUNOUT}.unique.ORP.txt
 	rm ${DIR}/assemblies/${RUNOUT}.ORP.fasta.clstr
+	
+${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf:${DIR}/assemblies/${RUNOUT}.ORP.fasta
+	salmon index --no-version-check -t ${DIR}/assemblies/${RUNOUT}.ORP.fasta  -i ${RUNOUT}.ortho.idx --type quasi -k 31
+	salmon quant --no-version-check -p $(CPU) -i ${RUNOUT}.ortho.idx --seqBias --gcBias -l a -1 ${READ1} -2 ${READ2} -o ${DIR}/quants/salmon_orthomerged_${RUNOUT}
+	rm -fr ${RUNOUT}.ortho.idx
 
 ${DIR}/assemblies/${RUNOUT}.filter.done ${DIR}/assemblies/working/${RUNOUT}.saveme.fasta:${DIR}/assemblies/${RUNOUT}.ORP.fasta ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf
 ifdef TPM_FILT
@@ -152,10 +157,6 @@ ${DIR}/reports/${RUNOUT}.transrate.done:${DIR}/reports/${RUNOUT}.busco.done
 	transrate -o ${DIR}/reports/transrate_${RUNOUT}  -a ${DIR}/assemblies/${RUNOUT}.ORP.fasta --left ${READ1} --right ${READ2} -t $(CPU)
 	touch ${DIR}/reports/${RUNOUT}.transrate.done
 
-${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf:${DIR}/reports/${RUNOUT}.transrate.done
-	salmon index --no-version-check -t ${DIR}/assemblies/${RUNOUT}.ORP.fasta  -i ${RUNOUT}.ortho.idx --type quasi -k 31
-	salmon quant --no-version-check -p $(CPU) -i ${RUNOUT}.ortho.idx --seqBias --gcBias -l a -1 ${READ1} -2 ${READ2} -o ${DIR}/quants/salmon_orthomerged_${RUNOUT}
-	rm -fr ${RUNOUT}.ortho.idx
 
 reportgen:
 	printf "\n\n*****  QUALITY REPORT FOR: ${RUNOUT} **** \n\n"
