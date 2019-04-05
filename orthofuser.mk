@@ -81,7 +81,7 @@ ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/orthotr
 	python ${MAKEDIR}/scripts/filter.py ${DIR}/orthofuse/${RUNOUT}/merged.fasta ${DIR}/orthofuse/${RUNOUT}/good.list > ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	rm ${DIR}/orthofuse/${RUNOUT}/good.list
 
-${DIR}/diamond/diamond.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
+${DIR}/assemblies/diamond/diamond.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	# need a for loop to do the number of fastas in the fastadir folder
 	# define blastx command and awk command
 	blastx_cmnd = $(diamond blastx -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/${FASTADIR}/$(fasta) -d ${MAKEDIR}/software/diamond/swissprot -o ${DIR}/assemblies/diamond/$(basename $(fasta)).inputfasta.diamond.txt)
