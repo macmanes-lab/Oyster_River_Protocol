@@ -73,7 +73,7 @@ filter:${DIR}/assemblies/${RUNOUT}.filter.done
 .DELETE_ON_ERROR:
 .PHONY:report check clean
 
-${DIR}/assemblies/working ${DIR}/reads ${DIR}/rcorr ${DIR}/assemblies/diamond ${DIR}/quants ${DIR}/assemblies ${DIR}/reports ${DIR}/orthofuse ${DIR}/quants:
+${DIR}/assemblies/working ${DIR}/reads ${DIR}/rcorr ${DIR}/assemblies/diamond ${DIR}/assemblies ${DIR}/reports ${DIR}/orthofuse ${DIR}/quants:
 	@mkdir -p ${DIR}/reads
 	@mkdir -p ${DIR}/assemblies
 	@mkdir -p ${DIR}/rcorr
