@@ -47,7 +47,7 @@ RUN usermod -aG sudo,audio,video training \
 #########
 WORKDIR /home/training
 USER training
-RUN git clone https://github.com/macmanes-lab/Oyster_River_Protocol.git
+RUN git clone --branch ebi2019 https://github.com/macmanes-lab/Oyster_River_Protocol.git
 RUN cd Oyster_River_Protocol && sudo make
 RUN sed -i  "s_ubuntu_training_g" /home/training/Oyster_River_Protocol/software/config.ini
 
