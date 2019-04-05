@@ -65,7 +65,7 @@ report:busco transrate reportgen
 busco:${DIR}/reports/${RUNOUT}.busco.done
 transrate:${DIR}/reports/${RUNOUT}.transrate.done
 clean:
-setup:${DIR}/setup.done
+setup:${DIR}/assemblies/working ${DIR}/reads ${DIR}/rcorr ${DIR}/assemblies/diamond ${DIR}/quants ${DIR}/assemblies ${DIR}/reports ${DIR}/orthofuse ${DIR}/quants
 cdhit:${DIR}/assemblies/${RUNOUT}.ORP.fasta
 strandeval:{DIR}/reports/${RUNOUT}.strandeval.done
 filter:${DIR}/assemblies/${RUNOUT}.filter.done
