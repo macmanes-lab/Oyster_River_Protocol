@@ -81,14 +81,18 @@ ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/orthotr
 	python ${MAKEDIR}/scripts/filter.py ${DIR}/orthofuse/${RUNOUT}/merged.fasta ${DIR}/orthofuse/${RUNOUT}/good.list > ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	rm ${DIR}/orthofuse/${RUNOUT}/good.list
 
-# need a for loop to do the number of fastas in the fastadir folder
-:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
-${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.unique.transabyss.txt ${DIR}/assemblies/diamond/${RUNOUT}.unique.sp55.txt ${DIR}/assemblies/diamond/${RUNOUT}.unique.sp75.txt: ${DIR}/assemblies/${RUNOUT}.transabyss.fasta ${DIR}/assemblies/${RUNOUT}.spades75.fasta ${DIR}/assemblies/${RUNOUT}.spades55.fasta ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
-	for fasta in $INPUT_FASTAS
-	do
-	diamond blastx -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/${FASTADIR}/$VARIABLE -d ${MAKEDIR}/software/diamond/swissprot -o ${DIR}/assemblies/diamond/$VARIABLE.diamond.txt
-	awk '{print $$2}' ${DIR}/assemblies/diamond/$VARIABLE.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/$VARIABLE.unique.txt
-	done
+${DIR}/diamond/diamond.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
+	# need a for loop to do the number of fastas in the fastadir folder
+	# define blastx command and awk command
+	blastx_cmnd = $(diamond blastx -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/${FASTADIR}/$(fasta) -d ${MAKEDIR}/software/diamond/swissprot -o ${DIR}/assemblies/diamond/$(basename $(fasta)).diamond.txt)
+	awk_cmd = $(awk '{print $$2}' ${DIR}/assemblies/diamond/$(fasta).diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/$(basename $(fasta)).unique.txt)
+	# run diamond for input fastas
+	$(foreach fasta, ${INPUT_FASTAS}, blastx_cmnd)
+	$(foreach fasta, ${INPUT_FASTAS},awk_cmnd)
+	# run for orthomerged assembly 
+	diamond blastx -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -d ${MAKEDIR}/software/diamond/swissprot -o ${DIR}/assemblies/diamond/${RUNOUT}.orthomerged.diamond.txt)
+	awk '{print $$2}' ${DIR}/assemblies/diamond/$(fasta).diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/$(fasta).unique.txt
+	# touch to signal end of command.
 	touch ${DIR}/diamond/diamond.done
 
 #list1 is unique geneIDs in orthomerged
@@ -99,7 +103,8 @@ ${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt ${DIR}/assemblies/diamon
 #list6 is contig IDs from orthomerged FASTAs
 #list7 is stuff that is in 5 but not 6
 
-${DIR}/assemblies/diamond/${RUNOUT}.newbies.fasta:${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt
+# oh fuck what do I do here?
+${DIR}/assemblies/diamond/${RUNOUT}.newbies.fasta:${DIR}/assemblies/diamond/diamond.done
 	cd ${DIR}/assemblies/diamond/ && cut -f2 ${RUNOUT}.orthomerged.diamond.txt | cut -d "|" -f3 | cut -d "_" -f1 | sort --parallel=20 |uniq > ${RUNOUT}.list1
 	cd ${DIR}/assemblies/diamond/ && cut -f2 ${RUNOUT}.{transabyss,spades75,spades55,trinity}.diamond.txt | cut -d "|" -f3 | cut -d "_" -f1 | sort --parallel=20 |uniq > ${RUNOUT}.list2
 	cd ${DIR}/assemblies/diamond/ && grep -xFvwf ${RUNOUT}.list1 ${RUNOUT}.list2 > ${RUNOUT}.list3
