@@ -93,7 +93,7 @@ ${DIR}/assemblies/diamond/diamond.done:${DIR}/assemblies/${RUNOUT}.orthomerged.f
 	diamond blastx -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -d ${MAKEDIR}/software/diamond/swissprot -o ${DIR}/assemblies/diamond/${RUNOUT}.orthomerged.diamond.txt)
 	awk '{print $$2}' ${DIR}/assemblies/diamond/${RUNOUT}.orthomerged.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/${RUNOUT}.orthomerged.unique.txt
 	# touch to signal end of command.
-	touch ${DIR}/diamond/diamond.done
+	touch ${DIR}/assemblies/diamond/diamond.done
 
 # list1 is unique geneIDs in orthomerged
 #list2 is unique  geneIDs in other assemblies
@@ -142,7 +142,7 @@ else
 	touch ${DIR}/assemblies/${RUNOUT}.filter.done
 endif
 
-${DIR}/reports/${RUNOUT}.busco.done:${DIR}/assemblies/${RUNOUT}.ORP.fasta
+${DIR}/reports/${RUNOUT}.busco.done:${DIR}/assemblies/${RUNOUT}.filter.done
 	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.ORP.fasta -m transcriptome -f --cpu $(CPU) -o ${RUNOUT}
 	mv run_${RUNOUT} ${DIR}/reports/
 	touch ${DIR}/reports/${RUNOUT}.busco.done
