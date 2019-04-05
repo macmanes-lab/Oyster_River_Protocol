@@ -30,7 +30,7 @@ setup:${DIR}/ortho_setup.done
 merge:${DIR}/orthofuse/${RUNOUT}/merged.fasta
 orthotransrate:${DIR}/orthofuse/${RUNOUT}/orthotransrate.done
 orthofusing:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
-diamond:${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt
+diamond:${DIR}/assemblies/diamond/diamond.done
 posthack:${DIR}/assemblies/diamond/${RUNOUT}.newbies.fasta
 cdhit:${DIR}/assemblies/${RUNOUT}.ORP.fasta
 filter:${DIR}/assemblies/${RUNOUT}.filter.done
