@@ -48,6 +48,8 @@ VERSION := ${shell cat  ${MAKEDIR}version.txt}
 
 help:
 main: setup check welcome readcheck run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_transabyss merge orthotransrate orthofusing diamond posthack cdhit salmon filter busco transrate strandeval report
+preprocess:setup check welcome readcheck run_trimmomatic run_rcorrector
+update_merge:setup check welcome readcheck merge orthotransrate orthofusing diamond posthack cdhit salmon filter busco transrate strandeval report
 run_trimmomatic:${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq
 run_rcorrector:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
 run_trinity:${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
