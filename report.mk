@@ -32,6 +32,8 @@ BUSCO_CONFIG_FILE := ${MAKEDIR}/software/config.ini
 export BUSCO_CONFIG_FILE
 VERSION := ${shell cat  ${MAKEDIR}version.txt}
 
+.DEFAULT_GOAL := main
+
 help:
 main: setup check welcome diamond busco transrate strandeval reportgen
 diamond:${DIR}/reports/${RUNOUT}.unique.txt
