@@ -4,7 +4,7 @@ SHELL=/bin/bash -o pipefail
 
 #USAGE:
 #
-#       orthofuser.mk all READ1= READ2= CPU= RUNOUT= FASTADIR= LINEAGE=
+#       orthofuser.mk all READ1= READ2= CPU= RUNOUT= FASTADIR= LINEAGE= TPM_FILT=
 #
 
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
@@ -83,14 +83,6 @@ ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/orthotr
 	rm ${DIR}/orthofuse/${RUNOUT}/good.list
 
 ${DIR}/assemblies/diamond/diamond.done:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
-	# need a for loop to do the number of fastas in the fastadir folder
-	# define blastx command and awk command
-	#blastx_cmnd = $(diamond blastx -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/${FASTADIR}/$(fasta) -d ${MAKEDIR}/software/diamond/swissprot -o ${DIR}/assemblies/diamond/$(basename $(fasta)).inputfasta.diamond.txt)
-	#awk_cmd = $(awk '{print $$2}' ${DIR}/assemblies/diamond/$(fasta).inputfasta.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/$(basename $(fasta)).unique.txt)
-	# run diamond for input fastas
-	#$(foreach fasta, ${INPUT_FASTAS}, $(blastx_cmnd))
-	#$(foreach fasta, ${INPUT_FASTAS}, $(awk_cmnd))
-	echo Starting diamond 
         echo Starting diamond
         for fasta in $$(ls ${FASTADIR}); do echo Running diamond on $$fasta assembly; diamond blastx -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/${FASTADIR}/$$fasta -d ${MAKEDIR}/software/diamond/swissprot -o ${DIR}/assemblies/diamond/$$(basename $$fasta).inputfasta.diamond.txt; awk '{print $$2}' ${DIR}/assemblies/diamond/$$(basename $$fasta).inputfasta.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/$$(basename $$fasta).unique.txt; done
 	# run for orthomerged assembly 
@@ -107,12 +99,13 @@ ${DIR}/assemblies/diamond/diamond.done:${DIR}/assemblies/${RUNOUT}.orthomerged.f
 #list6 is contig IDs from orthomerged FASTAs
 #list7 is stuff that is in 5 but not 6
 
-# oh fuck what do I do here?
 ${DIR}/assemblies/diamond/${RUNOUT}.newbies.fasta:${DIR}/assemblies/diamond/diamond.done
 	cd ${DIR}/assemblies/diamond/ && cut -f2 ${RUNOUT}.orthomerged.diamond.txt | cut -d "|" -f3 | cut -d "_" -f1 | sort --parallel=20 |uniq > ${RUNOUT}.list1
-	cd ${DIR}/assemblies/diamond/ && cut -f2 *inputfasta.diamond.txt | cut -d "|" -f3 | cut -d "_" -f1 > sort --parallel=20 | uniq > ${RUNOUT}.list2
+	cd ${DIR}/assemblies/diamond/ && touch inputfastaIDs.diamond.txt
+	cd ${DIR}/assemblies/diamond/ && for file in $$(ls *inputfasta.diamond.txt); do cat $$file >> inputfastaIDs.diamond.txt; done
+	cd ${DIR}/assemblies/diamond/ && cut -f2 inputfastaIDs.diamond.txt | cut -d "|" -f3 | cut -d "_" -f1 | sort --parallel=20 | uniq > ${RUNOUT}.list2
 	cd ${DIR}/assemblies/diamond/ && grep -xFvwf ${RUNOUT}.list1 ${RUNOUT}.list2 > ${RUNOUT}.list3
-	cd ${DIR}/assemblies/diamond/ && for item in $$(cat ${RUNOUT}.list3); do grep -F $$item *inputfasta.diamond.txt | head -1 | cut -f1; done | cut -d ":" -f2 | sort | uniq >> ${RUNOUT}.list5
+	cd ${DIR}/assemblies/diamond/ && for item in $$(cat ${RUNOUT}.list3); do grep -F $$item inputfastaIDs.diamond.txt | head -1 | cut -f1; done | cut -d ":" -f2 | sort | uniq >> ${RUNOUT}.list5
 	cd ${DIR}/assemblies/diamond/ && grep -F ">" ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta | sed 's_>__' > ${RUNOUT}.list6
 	cd ${DIR}/assemblies/diamond/ && grep -xFvwf ${RUNOUT}.list6 ${RUNOUT}.list5 > ${RUNOUT}.list7
 	cd ${DIR}/assemblies/diamond/ && python ${MAKEDIR}/scripts/filter.py <(cat ${DIR}/${FASTADIR}/*) ${RUNOUT}.list7 >> ${RUNOUT}.newbies.fasta
@@ -132,6 +125,7 @@ ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf:${DIR}/assemblies/${RUNOUT}.
 
 ${DIR}/assemblies/${RUNOUT}.filter.done ${DIR}/assemblies/working/${RUNOUT}.saveme.fasta:${DIR}/assemblies/${RUNOUT}.ORP.fasta ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf
 ifdef TPM_FILT
+	echo Filtering out transcripts with lower than $TPM_FILT TPM
 	cat ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf| awk '$$4 > $(TPM_FILT)' | cut -f1 | sed 1d > ${DIR}/assemblies/working/${RUNOUT}.HIGHEXP.txt
 	cat ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf| awk '$$4 < $(TPM_FILT)' | cut -f1 | sed 1d > ${DIR}/assemblies/working/${RUNOUT}.LOWEXP.txt
 	cp ${DIR}/assemblies/${RUNOUT}.ORP.fasta ${DIR}/assemblies/working/${RUNOUT}.ORP_BEFORE_TPM_FILT.fasta
