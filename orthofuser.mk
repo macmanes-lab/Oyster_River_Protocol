@@ -51,6 +51,7 @@ ${DIR}/ortho_setup.done:
 	@mkdir -p ${DIR}/assemblies
 	touch ${DIR}/ortho_setup.done
 	@mkdir -p ${DIR}/assemblies/working
+	@mkdir -p ${DIR}/assemblies/diamond
 
 ${DIR}/orthofuse/${RUNOUT}/merged.fasta:
 	mkdir -p ${DIR}/orthofuse/${RUNOUT}/working
@@ -90,12 +91,8 @@ ${DIR}/assemblies/diamond/diamond.done:${DIR}/assemblies/${RUNOUT}.orthomerged.f
 	#$(foreach fasta, ${INPUT_FASTAS}, $(blastx_cmnd))
 	#$(foreach fasta, ${INPUT_FASTAS}, $(awk_cmnd))
 	echo Starting diamond 
-	for fasta in $$(ls ${FASTADIR})
-	do
-	echo Running diamond on $$fasta assembly
-	diamond blastx -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/${FASTADIR}/$$fasta -d ${MAKEDIR}/software/diamond/swissprot -o ${DIR}/assemblies/diamond/$$(basename $$fasta).inputfasta.diamond.txt
-	awk '{print $$2}' ${DIR}/assemblies/diamond/$$(basename $fasta).inputfasta.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/$$(basename $$fasta).unique.txt
-	done
+        echo Starting diamond
+        for fasta in $$(ls ${FASTADIR}); do echo Running diamond on $$fasta assembly; diamond blastx -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/${FASTADIR}/$$fasta -d ${MAKEDIR}/software/diamond/swissprot -o ${DIR}/assemblies/diamond/$$(basename $$fasta).inputfasta.diamond.txt; awk '{print $$2}' ${DIR}/assemblies/diamond/$$(basename $$fasta).inputfasta.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/$$(basename $$fasta).unique.txt; done
 	# run for orthomerged assembly 
 	diamond blastx -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -d ${MAKEDIR}/software/diamond/swissprot -o ${DIR}/assemblies/diamond/${RUNOUT}.orthomerged.diamond.txt)
 	awk '{print $$2}' ${DIR}/assemblies/diamond/${RUNOUT}.orthomerged.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/${RUNOUT}.orthomerged.unique.txt
