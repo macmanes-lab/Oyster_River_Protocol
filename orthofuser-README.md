@@ -1,6 +1,8 @@
 # General usage for orthofuser.mk
 
-This make file is meant to merge multiple transcriptomes together. In practice, this is the same functionality as when assemblies from Trinity, SPades, and TransAbyss are merged together in  `oyster.mk`. However, this make file was created specifically to increase the general applicability of assembled transcriptomes, and allow a user to merge together transcriptomes that have already been assembled (for example, from multiple species or treatments).
+This make file is meant to merge multiple transcriptomes together. In practice, this is the similar functionality as when assemblies from Trinity, SPades, and TransAbyss are merged together in  `oyster.mk`. However, this make file was created specifically to increase the general applicability of assembled transcriptomes, and allow a user to merge together transcriptomes that have already been assembled (for example, from multiple species or treatments).
+
+An important consideration in merging multiple assemblies is that it tends to drastically and artificially inflate the number of contigs in the transcriptome (sometimes into many hundreds of thousands of contigs). We deal with this by removing contigs that are expressed below a user-specified threshold (`TPM_FILT=`). There is a possibility to lose contigs that are actually legitimate contigs. To reduce the possibility of that and to recover and lowly expressed "real" contigs we save any contigs from the original merged assembly that annotate to the swissprot database. Preliminary runs with this method have been able to remove these nonsense contigs at a high rate ( > 80% reduction in the overall number of contigs).
 
 # Usage:
 First, the user needs to activate the relevant conda environment using `source activate orp_v2`
