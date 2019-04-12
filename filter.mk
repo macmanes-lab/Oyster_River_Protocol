@@ -20,6 +20,7 @@ START=1
 STRAND :=
 TPM_FILT =
 FASTADIR=
+salmonpath := $(shell which salmon 2>/dev/null)
 VERSION := ${shell cat  ${MAKEDIR}version.txt}
 
 .DEFAULT_GOAL := main
