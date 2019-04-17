@@ -160,7 +160,7 @@ ifeq ($(shell file ${READ1} | awk '{print $$2}'),gzip)
 	then\
 		printf " ";\
 	else\
-		printf "\n\n\n\n IT LOOKS LIKE YOUR READS ARE NOT AT LEAST 76 BP LONG,\n ";\
+		printf "\n\n\n\n IT LOOKS LIKE YOUR READS ARE NOT AT LEAST $(SPADES2_KMER) BP LONG,\n ";\
 		printf "PLEASE EDIT YOUR COMMAND USING THE "SPADES2_KMER=INT" FLAGS,\n";\
 		printf " SETTING THE ASSEMBLY KMER LENGTH TO AN ODD NUMBER LESS THAN YOUR READ LENGTH \n\n\n\n";\
 		$$(shell exit);\
@@ -170,7 +170,7 @@ else
 	then\
 		printf " ";\
 	else\
-		printf "\n\n\n\n IT LOOKS LIKE YOUR READS ARE NOT AT LEAST 75 BP LONG,\n ";\
+		printf "\n\n\n\n IT LOOKS LIKE YOUR READS ARE NOT AT LEAST $(SPADES2_KMER) BP LONG,\n ";\
 		printf "PLEASE EDIT YOUR COMMAND USING THE "SPADES2_KMER=INT" FLAGS,\n";\
 		printf " SETTING THE ASSEMBLY KMER LENGTH LESS THAN YOUR READ LENGTH \n\n\n\n";\
 		$$(shell exit);\
