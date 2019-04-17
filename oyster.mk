@@ -47,9 +47,9 @@ VERSION := ${shell cat  ${MAKEDIR}version.txt}
 .DEFAULT_GOAL := main
 
 help:
-main: setup check welcome readcheck run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_transabyss merge orthotransrate orthofusing diamond posthack cdhit salmon filter busco transrate strandeval report
+main: setup check welcome readcheck run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_transabyss merge makelist orthotransrate orthofusing diamond posthack cdhit salmon filter busco transrate strandeval report
 preprocess:setup check welcome readcheck run_trimmomatic run_rcorrector
-update_merge:setup check welcome readcheck merge orthotransrate orthofusing diamond posthack cdhit salmon filter busco transrate strandeval report
+update_merge:setup check welcome readcheck merge makelist orthotransrate orthofusing diamond posthack cdhit salmon filter busco transrate strandeval report
 run_trimmomatic:${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq
 run_rcorrector:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
 run_trinity:${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
@@ -57,7 +57,7 @@ run_spades55:${DIR}/assemblies/${RUNOUT}.spades55.fasta
 run_spades75:${DIR}/assemblies/${RUNOUT}.spades75.fasta
 run_transabyss:${DIR}/assemblies/${RUNOUT}.transabyss.fasta
 merge:${DIR}/orthofuse/${RUNOUT}/merged.fasta
-orthotransrate:${DIR}/orthofuse/${RUNOUT}/orthotransrate.done
+orthotransrate:${DIR}/orthofuse/${RUNOUT}/merged/assemblies.csv
 orthofusing:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 salmon:${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf
 diamond:${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt
@@ -72,6 +72,7 @@ setup:${DIR}/assemblies/working ${DIR}/reads ${DIR}/rcorr ${DIR}/assemblies/diam
 cdhit:${DIR}/assemblies/${RUNOUT}.ORP.fasta
 strandeval:{DIR}/reports/${RUNOUT}.strandeval.done
 filter:${DIR}/assemblies/${RUNOUT}.filter.done
+makelist:${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.list
 
 .DELETE_ON_ERROR:
 .PHONY:report check clean
@@ -155,7 +156,7 @@ readcheck:
 	if [ -e ${READ1} ]; then printf ""; else printf "\n\n\n\n ERROR: YOUR READ1 FILE DOES NOT EXIST AT THE LOCATION YOU SPECIFIED\n\n\n\n "; $$(shell exit); fi;
 	if [ -e ${READ2} ]; then printf ""; else printf "\n\n\n\n ERROR: YOUR READ2 FILE DOES NOT EXIST AT THE LOCATION YOU SPECIFIED\n\n\n\n "; $$(shell exit); fi;
 ifeq ($(shell file ${READ1} | awk '{print $$2}'),gzip)
-	if [ $$(gzip -cd $${READ1} | head -n 400 | awk '{if(NR%4==2) {count++; bases += length} } END{print int(bases/count)}') -gt 75 ] && [ $$(gzip -cd $${READ2} | head -n 400 | awk '{if(NR%4==2) {count++; bases += length} } END{print int(bases/count)}') -gt 75 ];\
+	if [ $$(gzip -cd $${READ1} | head -n 400 | awk '{if(NR%4==2) {count++; bases += length} } END{print int(bases/count)}') -gt $(SPADES2_KMER) ] && [ $$(gzip -cd $${READ2} | head -n 400 | awk '{if(NR%4==2) {count++; bases += length} } END{print int(bases/count)}') -gt $(SPADES2_KMER) ];\
 	then\
 		printf " ";\
 	else\
@@ -165,7 +166,7 @@ ifeq ($(shell file ${READ1} | awk '{print $$2}'),gzip)
 		$$(shell exit);\
 	fi
 else
-	if [ $$(head -n400 $${READ1} | awk '{if(NR%4==2) {count++; bases += length} } END{print int(bases/count)}') -gt 75 ] && [ $$(head -n400 $${READ2} | awk '{if(NR%4==2) {count++; bases += length} } END{print int(bases/count)}') -gt 75 ];\
+	if [ $$(head -n400 $${READ1} | awk '{if(NR%4==2) {count++; bases += length} } END{print int(bases/count)}') -gt $(SPADES2_KMER) ] && [ $$(head -n400 $${READ2} | awk '{if(NR%4==2) {count++; bases += length} } END{print int(bases/count)}') -gt $(SPADES2_KMER) ];\
 	then\
 		printf " ";\
 	else\
@@ -256,18 +257,19 @@ ${DIR}/orthofuse/${RUNOUT}/merged.fasta:${DIR}/assemblies/${RUNOUT}.transabyss.f
 	mkdir -p ${DIR}/orthofuse/${RUNOUT}/working
 	for fasta in $$(ls ${DIR}/assemblies/${RUNOUT}.transabyss.fasta ${DIR}/assemblies/${RUNOUT}.spades75.fasta ${DIR}/assemblies/${RUNOUT}.spades55.fasta ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta); do python ${MAKEDIR}/scripts/long.seq.py ${DIR}/assemblies/$$(basename $$fasta) ${DIR}/orthofuse/${RUNOUT}/working/$$(basename $$fasta).short.fasta 200; done
 	python2 $$(which orthofuser.py) -I 4 -f ${DIR}/orthofuse/${RUNOUT}/working/ -og -t $(CPU) -a $(CPU); \
-	cat ${DIR}/orthofuse/${RUNOUT}/working/*short.fasta > ${DIR}/orthofuse/${RUNOUT}/merged.fasta
+	cat ${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.spades55.fasta.short.fasta ${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.spades75.fasta.short.fasta ${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.transabyss.fasta.short.fasta ${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.trinity.Trinity.fasta.short.fasta > ${DIR}/orthofuse/${RUNOUT}/merged.fasta
 
-${DIR}/orthofuse/${RUNOUT}/orthotransrate.done:${DIR}/orthofuse/${RUNOUT}/merged.fasta ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
+${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.list:${DIR}/orthofuse/${RUNOUT}/merged.fasta ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
 	export END=$$(wc -l $$(find ${DIR}/orthofuse/${RUNOUT}/working/ -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}') && \
 	export ORTHOINPUT=$$(find ${DIR}/orthofuse/${RUNOUT}/working/ -name Orthogroups.txt 2> /dev/null) && \
 	echo $$(eval echo "{1..$$END}") | tr ' ' '\n' > ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.list && \
 	cat ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.list | parallel  -j $(CPU) -k "sed -n ''{}'p' $$ORTHOINPUT | tr ' ' '\n' | sed '1d' > ${DIR}/orthofuse/${RUNOUT}/{1}.groups"
+
+${DIR}/orthofuse/${RUNOUT}/merged/assemblies.csv:${DIR}/orthofuse/${RUNOUT}/merged.fasta ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
 	${MAKEDIR}/software/orp-transrate/transrate -o ${DIR}/orthofuse/${RUNOUT}/merged -t $(CPU) -a ${DIR}/orthofuse/${RUNOUT}/merged.fasta --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
-	touch ${DIR}/orthofuse/${RUNOUT}/orthotransrate.done
 	find ${DIR}/orthofuse/${RUNOUT}/merged -name "*bam" -delete
 
-${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/orthotransrate.done
+${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/merged/assemblies.csv
 	echo All the text files are made, start GREP
 	find ${DIR}/orthofuse/${RUNOUT}/ -name '*groups' 2> /dev/null | parallel -j $(CPU) "grep -Fwf {} $$(find ${DIR}/orthofuse/${RUNOUT}/ -name contigs.csv 2> /dev/null) > {1}.orthout 2> /dev/null"
 	echo About to delete all the text files
@@ -315,6 +317,11 @@ ${DIR}/assemblies/${RUNOUT}.ORP.fasta:${DIR}/assemblies/working/${RUNOUT}.orthom
 	awk '{print $$2}' ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/working/${RUNOUT}.unique.ORP.txt
 	rm ${DIR}/assemblies/${RUNOUT}.ORP.fasta.clstr
 
+${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf:${DIR}/assemblies/${RUNOUT}.ORP.fasta ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
+	salmon index --no-version-check -t ${DIR}/assemblies/${RUNOUT}.ORP.fasta  -i ${RUNOUT}.ortho.idx --type quasi -k 31
+	salmon quant --no-version-check --validateMappings -p $(CPU) -i ${RUNOUT}.ortho.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/salmon_orthomerged_${RUNOUT}
+	rm -fr ${RUNOUT}.ortho.idx
+
 ${DIR}/assemblies/${RUNOUT}.filter.done ${DIR}/assemblies/working/${RUNOUT}.saveme.fasta:${DIR}/assemblies/${RUNOUT}.ORP.fasta ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf
 ifdef TPM_FILT
 	cat ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf| awk '$$4 > $(TPM_FILT)' | cut -f1 | sed 1d > ${DIR}/assemblies/working/${RUNOUT}.HIGHEXP.txt
@@ -342,11 +349,6 @@ ${DIR}/reports/${RUNOUT}.transrate.done:${DIR}/assemblies/${RUNOUT}.ORP.fasta ${
 	touch ${DIR}/reports/${RUNOUT}.transrate.done
 	find ${DIR}/reports/transrate_${RUNOUT} -name "*bam" -delete
 
-${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf:${DIR}/assemblies/${RUNOUT}.ORP.fasta ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
-	salmon index --no-version-check -t ${DIR}/assemblies/${RUNOUT}.ORP.fasta  -i ${RUNOUT}.ortho.idx --type quasi -k 31
-	salmon quant --no-version-check --validateMappings -p $(CPU) -i ${RUNOUT}.ortho.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/salmon_orthomerged_${RUNOUT}
-	rm -fr ${RUNOUT}.ortho.idx
-
 {DIR}/reports/${RUNOUT}.strandeval.done:${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	bwa index -p ${RUNOUT} ${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	bwa mem -t $(CPU) ${RUNOUT} \
@@ -370,7 +372,7 @@ clean:
 	${DIR}/assemblies/diamond/${RUNOUT}.newbies.fasta ${DIR}/reports/busco.done ${DIR}/reports/transrate.done ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf \
 	${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq ${DIR}/reports/run_${RUNOUT}.orthomerged/ ${DIR}/reports/transrate_${RUNOUT}/
 
-reportgen ${DIR}/reports/qualreport.${RUNOUT}:
+${DIR}/reports/qualreport.${RUNOUT}:
 	printf "\n\n*****  QUALITY REPORT FOR: ${RUNOUT} using the ORP version ${VERSION} ****"
 	printf "\n*****  THE ASSEMBLY CAN BE FOUND HERE: ${DIR}/assemblies/${RUNOUT}.ORP.fasta **** \n\n"
 	printf "*****  BUSCO SCORE ~~~~~>           " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
