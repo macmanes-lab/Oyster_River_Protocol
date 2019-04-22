@@ -33,10 +33,10 @@ orthofusing:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 diamond:${DIR}/assemblies/diamond/diamond.done
 posthack:${DIR}/assemblies/diamond/${RUNOUT}.newbies.fasta
 cdhit:${DIR}/assemblies/${RUNOUT}.ORP.fasta
+salmon:${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf
 filter:${DIR}/assemblies/${RUNOUT}.filter.done
 busco:${DIR}/reports/${RUNOUT}.busco.done
 transrate:${DIR}/reports/${RUNOUT}.transrate.done
-salmon:${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf
 reportgen:
 
 
