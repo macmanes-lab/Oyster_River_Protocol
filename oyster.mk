@@ -145,11 +145,11 @@ help:
 	printf "\n\n*****  Welcome to the Oyster River Prptocol ***** \n"
 	printf "*****  This is version ${VERSION} *****\n\n"
 	printf "Usage:\n\n"
-	printf "/path/to/Oyster_River/Protocol/oyster.mk main CPU=24 \n"
-	printf "MEM=128\n"
-	printf "STRAND=RF\n"
-	printf "READ1=1.subsamp_1.cor.fq\n"
-	printf "READ2=1.subsamp_2.cor.fq\n"
+	printf "/path/to/Oyster_River/Protocol/oyster.mk main CPU=24 \\n"
+	printf "MEM=128 \\n"
+	printf "STRAND=RF \\n"
+	printf "READ1=1.subsamp_1.cor.fq \\n"
+	printf "READ2=1.subsamp_2.cor.fq \\n"
 	printf "RUNOUT=test\n\n"
 
 readcheck:

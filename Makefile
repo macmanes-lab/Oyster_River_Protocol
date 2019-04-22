@@ -10,8 +10,8 @@ SHELL=/bin/bash -o pipefail
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
 CONDAROOT = ${DIR}/software/anaconda/install/
-orthopath := $(shell source ${DIR}/software/anaconda/install/bin/activate py27 2>/dev/null; which orthofuser.py 2>/dev/null; conda deactivate 2> /dev/null)
-orthufuserversion = $(shell source ${DIR}/software/anaconda/install/bin/activate py27 2>/dev/null; orthofuser.py --help | grep "OrthoFinder version" | awk '{print $$3}';conda deactivate 2> /dev/null)
+orthopath := $(shell ls ${DIR}/software/OrthoFinder/orthofinder/orthofuser.py 2>/dev/null)
+orthufuserversion = $(shell orthofuser.py --help | grep "OrthoFinder version" | awk '{print $$3}')
 transrate := $(shell ls ${DIR}/software/orp-transrate/transrate 2>/dev/null)
 transabysspath := $(shell which ${DIR}/software/transabyss/transabyss 2>/dev/null)
 transabyssversion = $(shell source ${DIR}/software/anaconda/install/bin/activate orp 2>/dev/null; transabyss --version 2>/dev/null; source deactivate 2> /dev/null)
@@ -19,7 +19,6 @@ diamond_data := $(shell ls ${DIR}/software/diamond/uniprot_sprot.fasta 2>/dev/nu
 busco_data := $(shell ls ${DIR}/busco_dbs/eukaryota_odb9 2>/dev/null)
 conda := $(shell ${DIR}/software/anaconda/install/bin/conda info 2>/dev/null)
 orp := $(shell ${DIR}/software/anaconda/install/bin/conda info --envs | grep orp 2>/dev/null)
-py27 := $(shell ${DIR}/software/anaconda/install/bin/conda info --envs | grep py27 2>/dev/null)
 VERSION := ${shell cat  ${MAKEDIR}version.txt}
 
 all: setup conda orp orthofuser transrate transabyss diamond_data busco_data postscript
