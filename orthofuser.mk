@@ -108,7 +108,7 @@ ${DIR}/assemblies/diamond/${RUNOUT}.newbies.fasta:${DIR}/assemblies/diamond/diam
 	cd ${DIR}/assemblies/diamond/ && for item in $$(cat ${RUNOUT}.list3); do grep -F $$item inputfastaIDs.diamond.txt | head -1 | cut -f1; done | cut -d ":" -f2 | sort | uniq >> ${RUNOUT}.list5
 	cd ${DIR}/assemblies/diamond/ && grep -F ">" ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta | sed 's_>__' > ${RUNOUT}.list6
 	cd ${DIR}/assemblies/diamond/ && grep -xFvwf ${RUNOUT}.list6 ${RUNOUT}.list5 > ${RUNOUT}.list7
-	cd ${DIR}/assemblies/diamond/ && python ${MAKEDIR}/scripts/filter.py <(cat ${DIR}/${FASTADIR}/*) ${RUNOUT}.list7 >> ${RUNOUT}.newbies.fasta
+	cd ${DIR}/assemblies/diamond/ && python ${MAKEDIR}/scripts/filter.py <(for fasta in ${INPUT_FASTAS}; do cat ${DIR}/${FASTADIR}/$$fasta) ${RUNOUT}.list7 >> ${RUNOUT}.newbies.fasta
 	cd ${DIR}/assemblies/diamond/ &&  cat ${RUNOUT}.newbies.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta > tmp.fasta && mv tmp.fasta ${DIR}/assemblies/working/${RUNOUT}.orthomerged.fasta
 	cd ${DIR}/assemblies/diamond/ && rm -f ${RUNOUT}.list*
 
