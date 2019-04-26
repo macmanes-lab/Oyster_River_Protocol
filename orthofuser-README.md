@@ -17,6 +17,7 @@ source activate orp_v2
 /PATH_TO_ORP/Oyster_River_Protocol/orthofuser.mk all \
 READ1=merged_reads_1P.fq READ2=merged_reads_2P.fq CPU=24 MEM=500 \
 RUNOUT=multispecies FASTADIR=assemblies \
+TPM_FILT=1 \
 LINEAGE=/PATH_TO_ORP/Oyster_River_Protocol/busco_dbs/eukaryota_odb9
 ```
 
