@@ -46,11 +46,11 @@ VERSION := ${shell cat  ${MAKEDIR}version.txt}
 .DEFAULT_GOAL := main
 
 help:
-main: setup check welcome readcheck run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_transabyss run_filtershort run_orthofuser merge makelist
-	makegroups orthotransrate makeorthout make_goodlist orthofusing diamond make_list1 make_list2 make_list3 make_list5 make_list6 make_list7 posthack cdhit salmon filter
+main: setup check welcome readcheck run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_transabyss run_filtershort run_orthofuser merge makelist \
+	makegroups orthotransrate makeorthout make_goodlist orthofusing diamond make_list1 make_list2 make_list3 make_list5 make_list6 make_list7 posthack cdhit salmon filter \
 	busco transrate strandeval report
 preprocess:setup check welcome readcheck run_trimmomatic run_rcorrector
-update_merge:setup check welcome readcheck run_filtershort run_orthofuser merge makelist makegroups orthotransrate makeorthout make_goodlist orthofusing diamond
+update_merge:setup check welcome readcheck run_filtershort run_orthofuser merge makelist makegroups orthotransrate makeorthout make_goodlist orthofusing diamond \
 	make_list1 make_list2 make_list3 make_list5 make_list6 make_list7 posthack cdhit salmon filter busco transrate strandeval report
 run_trimmomatic:${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq
 run_rcorrector:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
@@ -58,7 +58,8 @@ run_trinity:${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
 run_spades55:${DIR}/assemblies/${RUNOUT}.spades55.fasta
 run_spades75:${DIR}/assemblies/${RUNOUT}.spades75.fasta
 run_transabyss:${DIR}/assemblies/${RUNOUT}.transabyss.fasta
-run_filtershort:${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.spades55.fasta.short.fasta ${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.spades75.fasta.short.fasta ${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.transabyss.fasta.short.fasta ${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.trinity.Trinity.fasta.short.fasta
+run_filtershort:${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.spades55.fasta.short.fasta ${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.spades75.fasta.short.fasta \
+	${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.transabyss.fasta.short.fasta ${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.trinity.Trinity.fasta.short.fasta
 run_orthofuser:${DIR}/orthofuse/${RUNOUT}/orthofuser.done
 merge:${DIR}/orthofuse/${RUNOUT}/merged.fasta
 orthotransrate:${DIR}/orthofuse/${RUNOUT}/merged/assemblies.csv
