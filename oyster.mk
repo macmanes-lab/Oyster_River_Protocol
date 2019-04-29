@@ -22,14 +22,13 @@ READ1=
 READ2=
 BUSCO := ${shell which run_BUSCO.py}
 BUSCODIR := $(dir $(firstword $(BUSCO)))
-RUNOUT =
+RUNOUT=USER_RUN
 LINEAGE=
 BUSCODB :=
 START=1
 STRAND :=
 TPM_FILT =
 FASTADIR=
-brewpath := $(shell which brew 2>/dev/null)
 rcorrpath := $(shell which rcorrector 2>/dev/null)
 trimmomaticpath := $(shell which trimmomatic 2>/dev/null)
 trinitypath := $(shell which Trinity 2>/dev/null)
@@ -47,15 +46,17 @@ VERSION := ${shell cat  ${MAKEDIR}version.txt}
 .DEFAULT_GOAL := main
 
 help:
-main: setup check welcome readcheck run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_transabyss merge makelist orthotransrate orthofusing diamond posthack cdhit salmon filter busco transrate strandeval report
+main: setup check welcome readcheck run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_transabyss run_filtershort run_orthofuser merge makelist makegroups orthotransrate orthofusing diamond posthack cdhit salmon filter busco transrate strandeval report
 preprocess:setup check welcome readcheck run_trimmomatic run_rcorrector
-update_merge:setup check welcome readcheck merge makelist orthotransrate orthofusing diamond posthack cdhit salmon filter busco transrate strandeval report
+update_merge:setup check welcome readcheck run_filtershort run_orthofuser merge makelist makegroups orthotransrate orthofusing diamond posthack cdhit salmon filter busco transrate strandeval report
 run_trimmomatic:${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq
 run_rcorrector:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
 run_trinity:${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
 run_spades55:${DIR}/assemblies/${RUNOUT}.spades55.fasta
 run_spades75:${DIR}/assemblies/${RUNOUT}.spades75.fasta
 run_transabyss:${DIR}/assemblies/${RUNOUT}.transabyss.fasta
+run_filtershort:${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.spades55.fasta.short.fasta ${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.spades75.fasta.short.fasta ${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.transabyss.fasta.short.fasta ${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.trinity.Trinity.fasta.short.fasta
+run_orthofuser:${DIR}/orthofuse/${RUNOUT}/orthofuser.done
 merge:${DIR}/orthofuse/${RUNOUT}/merged.fasta
 orthotransrate:${DIR}/orthofuse/${RUNOUT}/merged/assemblies.csv
 orthofusing:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
@@ -73,6 +74,7 @@ cdhit:${DIR}/assemblies/${RUNOUT}.ORP.fasta
 strandeval:{DIR}/reports/${RUNOUT}.strandeval.done
 filter:${DIR}/assemblies/${RUNOUT}.filter.done
 makelist:${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.list
+makegroups:${DIR}/orthofuse/${RUNOUT}/%.groups
 
 .DELETE_ON_ERROR:
 .PHONY:report check clean
@@ -253,16 +255,24 @@ else
 	rm -fr ${DIR}/assemblies/${RUNOUT}.transabyss/ ${DIR}/assemblies/${RUNOUT}.transabyss/${RUNOUT}.transabyss.fasta-final.fa
 endif
 
-${DIR}/orthofuse/${RUNOUT}/merged.fasta:${DIR}/assemblies/${RUNOUT}.transabyss.fasta ${DIR}/assemblies/${RUNOUT}.spades75.fasta ${DIR}/assemblies/${RUNOUT}.spades55.fasta ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
+${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.spades55.fasta.short.fasta ${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.spades75.fasta.short.fasta ${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.transabyss.fasta.short.fasta ${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.trinity.Trinity.fasta.short.fasta:${DIR}/assemblies/${RUNOUT}.transabyss.fasta ${DIR}/assemblies/${RUNOUT}.spades75.fasta ${DIR}/assemblies/${RUNOUT}.spades55.fasta ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
 	mkdir -p ${DIR}/orthofuse/${RUNOUT}/working
 	for fasta in $$(ls ${DIR}/assemblies/${RUNOUT}.transabyss.fasta ${DIR}/assemblies/${RUNOUT}.spades75.fasta ${DIR}/assemblies/${RUNOUT}.spades55.fasta ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta); do python ${MAKEDIR}/scripts/long.seq.py ${DIR}/assemblies/$$(basename $$fasta) ${DIR}/orthofuse/${RUNOUT}/working/$$(basename $$fasta).short.fasta 200; done
-	python2 $$(which orthofuser.py) -I 4 -f ${DIR}/orthofuse/${RUNOUT}/working/ -og -t $(CPU) -a $(CPU); \
+
+${DIR}/orthofuse/${RUNOUT}/orthofuser.done:${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.spades55.fasta.short.fasta ${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.spades75.fasta.short.fasta ${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.transabyss.fasta.short.fasta ${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.trinity.Trinity.fasta.short.fasta
+	python2 $$(which orthofuser.py) -I 4 -f ${DIR}/orthofuse/${RUNOUT}/working/ -og -t $(CPU) -a $(CPU)
+	touch ${DIR}/orthofuse/${RUNOUT}/orthofuser.done
+
+${DIR}/orthofuse/${RUNOUT}/merged.fasta:${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.spades55.fasta.short.fasta ${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.spades75.fasta.short.fasta ${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.transabyss.fasta.short.fasta ${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.trinity.Trinity.fasta.short.fasta
 	cat ${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.spades55.fasta.short.fasta ${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.spades75.fasta.short.fasta ${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.transabyss.fasta.short.fasta ${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.trinity.Trinity.fasta.short.fasta > ${DIR}/orthofuse/${RUNOUT}/merged.fasta
 
-${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.list:${DIR}/orthofuse/${RUNOUT}/merged.fasta ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
+
+${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.list:${DIR}/orthofuse/${RUNOUT}/orthofuser.done
 	export END=$$(wc -l $$(find ${DIR}/orthofuse/${RUNOUT}/working/ -name Orthogroups.txt 2> /dev/null) | awk '{print $$1}') && \
 	export ORTHOINPUT=$$(find ${DIR}/orthofuse/${RUNOUT}/working/ -name Orthogroups.txt 2> /dev/null) && \
-	echo $$(eval echo "{1..$$END}") | tr ' ' '\n' > ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.list && \
+	echo $$(eval echo "{1..$$END}") | tr ' ' '\n' > ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.list
+
+${DIR}/orthofuse/${RUNOUT}/%.groups:${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.list
 	cat ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.list | parallel  -j $(CPU) -k "sed -n ''{}'p' $$ORTHOINPUT | tr ' ' '\n' | sed '1d' > ${DIR}/orthofuse/${RUNOUT}/{1}.groups"
 
 ${DIR}/orthofuse/${RUNOUT}/merged/assemblies.csv:${DIR}/orthofuse/${RUNOUT}/merged.fasta ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
