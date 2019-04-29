@@ -354,7 +354,7 @@ ${DIR}/assemblies/diamond/${RUNOUT}.newbies.fasta ${DIR}/assemblies/working/${RU
 ${DIR}/assemblies/${RUNOUT}.ORP.fasta:${DIR}/assemblies/working/${RUNOUT}.orthomerged.fasta
 	cd-hit-est -M 5000 -T $(CPU) -c .98 -i ${DIR}/assemblies/working/${RUNOUT}.orthomerged.fasta -o ${DIR}/assemblies/${RUNOUT}.ORP.fasta
 
-${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt:${DIR}/assemblies/${RUNOUT}.ORP.fasta
+${DIR}/assemblies/${RUNOUT}.ORP.diamond.done:${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	diamond blastx -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.ORP.fasta -d ${MAKEDIR}/software/diamond/swissprot  -o ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
 	touch ${DIR}/assemblies/${RUNOUT}.ORP.diamond.done
 
