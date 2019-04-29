@@ -47,11 +47,11 @@ VERSION := ${shell cat  ${MAKEDIR}version.txt}
 
 help:
 main: setup check welcome readcheck run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_transabyss run_filtershort run_orthofuser merge makelist \
-	makegroups orthotransrate makeorthout make_goodlist orthofusing diamond make_list1 make_list2 make_list3 make_list5 make_list6 make_list7 posthack cdhit salmon filter \
+	makegroups orthotransrate makeorthout make_goodlist orthofusing diamond make_list1 make_list2 make_list3 make_list5 make_list6 make_list7 posthack cdhit orp_diamond orp_uniq salmon filter \
 	busco transrate strandeval report
 preprocess:setup check welcome readcheck run_trimmomatic run_rcorrector
 update_merge:setup check welcome readcheck run_filtershort run_orthofuser merge makelist makegroups orthotransrate makeorthout make_goodlist orthofusing diamond \
-	make_list1 make_list2 make_list3 make_list5 make_list6 make_list7 posthack cdhit salmon filter busco transrate strandeval report
+	make_list1 make_list2 make_list3 make_list5 make_list6 make_list7 posthack cdhit orp_diamond orp_uniq salmon filter busco transrate strandeval report
 run_trimmomatic:${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq
 run_rcorrector:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
 run_trinity:${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
@@ -76,7 +76,6 @@ transrate:${DIR}/reports/${RUNOUT}.transrate.done
 reportgen:${DIR}/reports/qualreport.${RUNOUT}
 clean:
 setup:${DIR}/assemblies/working ${DIR}/reads ${DIR}/rcorr ${DIR}/assemblies/diamond ${DIR}/assemblies ${DIR}/reports ${DIR}/orthofuse ${DIR}/quants ${DIR}/assemblies/working
-cdhit:${DIR}/assemblies/${RUNOUT}.ORP.fasta
 strandeval:{DIR}/reports/${RUNOUT}.strandeval.done
 filter:${DIR}/assemblies/${RUNOUT}.filter.done
 makelist:${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.list
@@ -87,7 +86,9 @@ make_list3:${DIR}/assemblies/diamond/${RUNOUT}.list3
 make_list5:${DIR}/assemblies/diamond/${RUNOUT}.list5
 make_list6:${DIR}/assemblies/diamond/${RUNOUT}.list6
 make_list7:${DIR}/assemblies/diamond/${RUNOUT}.list7
-
+cdhit:${DIR}/assemblies/${RUNOUT}.ORP.fasta
+orp_diamond:${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
+orp_uniq:${DIR}/assemblies/working/${RUNOUT}.unique.ORP.txt
 
 .DELETE_ON_ERROR:
 .PHONY:report check clean
@@ -352,7 +353,11 @@ ${DIR}/assemblies/diamond/${RUNOUT}.newbies.fasta ${DIR}/assemblies/working/${RU
 
 ${DIR}/assemblies/${RUNOUT}.ORP.fasta:${DIR}/assemblies/working/${RUNOUT}.orthomerged.fasta
 	cd-hit-est -M 5000 -T $(CPU) -c .98 -i ${DIR}/assemblies/working/${RUNOUT}.orthomerged.fasta -o ${DIR}/assemblies/${RUNOUT}.ORP.fasta
+
+${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt:${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	diamond blastx -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.ORP.fasta -d ${MAKEDIR}/software/diamond/swissprot  -o ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
+
+${DIR}/assemblies/working/${RUNOUT}.unique.ORP.txt:${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
 	awk '{print $$2}' ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/working/${RUNOUT}.unique.ORP.txt
 	rm ${DIR}/assemblies/${RUNOUT}.ORP.fasta.clstr
 
