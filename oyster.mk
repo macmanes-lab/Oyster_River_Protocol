@@ -284,7 +284,7 @@ ${DIR}/orthofuse/${RUNOUT}/merged/assemblies.csv:${DIR}/orthofuse/${RUNOUT}/merg
 
 ${DIR}/orthofuse/${RUNOUT}/%.orthout:${DIR}/orthofuse/${RUNOUT}/%.groups
 	echo All the text files are made, start GREP
-	find ${DIR}/orthofuse/${RUNOUT}/ -name '*groups' 2> /dev/null | parallel -j $(CPU) "grep -Fwf {} $$(find ${DIR}/orthofuse/${RUNOUT}/ -name contigs.csv 2> /dev/null) > ${DIR}/orthofuse/${RUNOUT}/{1}.orthout 2> /dev/null"
+	find ${DIR}/orthofuse/${RUNOUT}/ -name '*groups' 2> /dev/null | parallel -j $(CPU) "grep -Fwf {} $$(find ${DIR}/orthofuse/${RUNOUT}/ -name contigs.csv 2> /dev/null) > {1}.orthout 2> /dev/null"
 	echo About to delete all the text files
 	find ${DIR}/orthofuse/${RUNOUT}/ -name '*groups' -delete
 
