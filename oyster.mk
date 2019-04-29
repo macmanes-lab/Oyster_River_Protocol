@@ -87,7 +87,7 @@ make_list5:${DIR}/assemblies/diamond/${RUNOUT}.list5
 make_list6:${DIR}/assemblies/diamond/${RUNOUT}.list6
 make_list7:${DIR}/assemblies/diamond/${RUNOUT}.list7
 cdhit:${DIR}/assemblies/${RUNOUT}.ORP.fasta
-orp_diamond:${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
+orp_diamond:${DIR}/assemblies/${RUNOUT}.ORP.diamond.done
 orp_uniq:${DIR}/assemblies/working/${RUNOUT}.unique.ORP.txt
 
 .DELETE_ON_ERROR:
@@ -354,10 +354,11 @@ ${DIR}/assemblies/diamond/${RUNOUT}.newbies.fasta ${DIR}/assemblies/working/${RU
 ${DIR}/assemblies/${RUNOUT}.ORP.fasta:${DIR}/assemblies/working/${RUNOUT}.orthomerged.fasta
 	cd-hit-est -M 5000 -T $(CPU) -c .98 -i ${DIR}/assemblies/working/${RUNOUT}.orthomerged.fasta -o ${DIR}/assemblies/${RUNOUT}.ORP.fasta
 
-${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt:${DIR}/assemblies/${RUNOUT}.ORP.fasta
+${DIR}/assemblies/${RUNOUT}.ORP.diamond.done:${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	diamond blastx -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.ORP.fasta -d ${MAKEDIR}/software/diamond/swissprot  -o ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
+	touch ${DIR}/assemblies/${RUNOUT}.ORP.diamond.done
 
-${DIR}/assemblies/working/${RUNOUT}.unique.ORP.txt:${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
+${DIR}/assemblies/working/${RUNOUT}.unique.ORP.txt:${DIR}/assemblies/${RUNOUT}.ORP.diamond.done
 	awk '{print $$2}' ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/working/${RUNOUT}.unique.ORP.txt
 	rm ${DIR}/assemblies/${RUNOUT}.ORP.fasta.clstr
 
@@ -395,8 +396,8 @@ ${DIR}/reports/transrate_${RUNOUT}/assemblies.csv:${DIR}/assemblies/${RUNOUT}.OR
 {DIR}/reports/${RUNOUT}.strandeval.done:${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	bwa index -p ${RUNOUT} ${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	bwa mem -t $(CPU) ${RUNOUT} \
-	<(seqtk sample -s 23894 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq 200000) \
-	<(seqtk sample -s 23894 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq 200000) \
+	<(seqtk sample -s 23894 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq 400000) \
+	<(seqtk sample -s 23894 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq 400000) \
 	| samtools view -@10 -Sb - \
 	| samtools sort -T ${RUNOUT} -O bam -@10 -o "${RUNOUT}".sorted.bam -
 	samtools flagstat "${RUNOUT}".sorted.bam > ${DIR}/assemblies/${RUNOUT}.flagstat
