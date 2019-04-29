@@ -400,6 +400,7 @@ ${DIR}/reports/${RUNOUT}.transrate.done:${DIR}/assemblies/${RUNOUT}.ORP.fasta ${
 	<(seqtk sample -s 23894 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq 200000) \
 	| samtools view -@10 -Sb - \
 	| samtools sort -T ${RUNOUT} -O bam -@10 -o "${RUNOUT}".sorted.bam -
+	samtools flagstat "${RUNOUT}".sorted.bam > ${DIR}/assemblies/${RUNOUT}.flagstat
 	perl -I $$(dirname $$(readlink -f $$(which Trinity)))/PerlLib ${MAKEDIR}/scripts/examine_strand.pl "${RUNOUT}".sorted.bam ${RUNOUT}
 	hist  -p '#' -c red <(cat ${RUNOUT}.dat | awk '{print $$5}' | sed  1d)
 	rm -f "${RUNOUT}".sorted.bam
@@ -435,5 +436,7 @@ ${DIR}/reports/qualreport.${RUNOUT}:
 	cat ${DIR}/assemblies/diamond/${RUNOUT}.unique.sp75.txt | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	printf "*****  UNIQUE GENES TRANSABYSS ~~~~~>   " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	cat ${DIR}/assemblies/diamond/${RUNOUT}.unique.transabyss.txt | tee -a ${DIR}/reports/qualreport.${RUNOUT}
+	printf "*****  READS MAPPED AS PROPER PAIRS ~~~~~>           " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
+	cat ${DIR}/assemblies/${RUNOUT}.flagstat | grep "properly paired" | awk '{print $$6}' | sed 's_(__' | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 
 	printf " \n\n"
