@@ -89,7 +89,7 @@ make_list7:${DIR}/assemblies/diamond/${RUNOUT}.list7
 cdhit:${DIR}/assemblies/${RUNOUT}.ORP.fasta
 orp_diamond:${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
 orp_uniq:${DIR}/assemblies/working/${RUNOUT}.unique.ORP.done
-salmon_index:${DIR}/quants/salmon_orthomerged_${RUNOUT}/${RUNOUT}.ortho.idx
+salmon_index:${DIR}/quants/${RUNOUT}.ortho.idx
 
 .DELETE_ON_ERROR:
 .PHONY:report check clean
@@ -363,12 +363,11 @@ ${DIR}/assemblies/working/${RUNOUT}.unique.ORP.done:${DIR}/assemblies/${RUNOUT}.
 	awk '{print $$2}' ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/working/${RUNOUT}.unique.ORP.txt
 	touch ${DIR}/assemblies/working/${RUNOUT}.unique.ORP.done
 
-${DIR}/quants/salmon_orthomerged_${RUNOUT}/${RUNOUT}.ortho.idx:${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta
-	salmon index --no-version-check -t ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta  -i ${DIR}/quants/salmon_orthomerged_${RUNOUT}/${RUNOUT}.ortho.idx --type quasi -k 31
+${DIR}/quants/${RUNOUT}.ortho.idx:${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta
+	salmon index --no-version-check -t ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta  -i ${DIR}/quants/${RUNOUT}.ortho.idx --type quasi -k 31
 
 ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
-	salmon quant --no-version-check --validateMappings -p $(CPU) -i ${DIR}/quants/salmon_orthomerged_${RUNOUT}/${RUNOUT}.ortho.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/salmon_orthomerged_${RUNOUT}
-	rm -fr ${RUNOUT}.ortho.idx
+	salmon quant --no-version-check --validateMappings -p $(CPU) -i ${DIR}/quants/${RUNOUT}.ortho.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/salmon_orthomerged_${RUNOUT}
 
 ${DIR}/assemblies/${RUNOUT}.filter.done ${DIR}/assemblies/${RUNOUT}.ORP.fasta:${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf
 ifdef TPM_FILT
