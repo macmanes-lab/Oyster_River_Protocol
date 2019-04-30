@@ -421,7 +421,7 @@ clean:
 	${DIR}/assemblies/diamond/${RUNOUT}.newbies.fasta ${DIR}/reports/busco.done ${DIR}/reports/transrate.done ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf \
 	${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq ${DIR}/reports/run_${RUNOUT}.orthomerged/ ${DIR}/reports/transrate_${RUNOUT}/
 
-${DIR}/reports/qualreport.${RUNOUT}:${DIR}/assemblies/working/${RUNOUT}.unique.ORP.done ${DIR}/assemblies/${RUNOUT}.ORP.fasta
+${DIR}/reports/qualreport.${RUNOUT}.done ${DIR}/reports/qualreport.${RUNOUT}:${DIR}/assemblies/working/${RUNOUT}.unique.ORP.done ${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	printf "\n\n*****  QUALITY REPORT FOR: ${RUNOUT} using the ORP version ${VERSION} ****"
 	printf "\n*****  THE ASSEMBLY CAN BE FOUND HERE: ${DIR}/assemblies/${RUNOUT}.ORP.fasta **** \n\n"
 	printf "*****  BUSCO SCORE ~~~~~>                 " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
@@ -442,5 +442,4 @@ ${DIR}/reports/qualreport.${RUNOUT}:${DIR}/assemblies/working/${RUNOUT}.unique.O
 	cat ${DIR}/assemblies/diamond/${RUNOUT}.unique.transabyss.txt | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	printf "*****  READS MAPPED AS PROPER PAIRS ~~~~~>      " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	cat ${DIR}/assemblies/${RUNOUT}.flagstat | grep "properly paired" | awk '{print $$6}' | sed 's_(__' | tee -a ${DIR}/reports/qualreport.${RUNOUT}
-
 	printf " \n\n"
