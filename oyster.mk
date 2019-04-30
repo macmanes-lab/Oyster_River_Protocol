@@ -372,7 +372,7 @@ ${DIR}/quants/${RUNOUT}.ortho.idx:${DIR}/assemblies/${RUNOUT}.ORP.intermediate.f
 ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf:${DIR}/quants/${RUNOUT}.ortho.idx ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
 	salmon quant --no-version-check --validateMappings -p $(CPU) -i ${DIR}/quants/${RUNOUT}.ortho.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/salmon_orthomerged_${RUNOUT}
 
-${DIR}/assemblies/${RUNOUT}.filter.done ${DIR}/assemblies/${RUNOUT}.ORP.fasta:${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf
+${DIR}/assemblies/${RUNOUT}.filter.done ${DIR}/assemblies/${RUNOUT}.ORP.fasta:${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
 ifdef TPM_FILT
 	cat ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf| awk '$$4 > $(TPM_FILT)' | cut -f1 | sed 1d > ${DIR}/assemblies/working/${RUNOUT}.HIGHEXP.txt
 	cat ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf| awk '$$4 < $(TPM_FILT)' | cut -f1 | sed 1d > ${DIR}/assemblies/working/${RUNOUT}.LOWEXP.txt
