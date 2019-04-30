@@ -426,11 +426,11 @@ ${DIR}/reports/qualreport.${RUNOUT}.done ${DIR}/reports/qualreport.${RUNOUT}:${D
 	printf "\n*****  THE ASSEMBLY CAN BE FOUND HERE: ${DIR}/assemblies/${RUNOUT}.ORP.fasta **** \n\n"
 	printf "*****  BUSCO SCORE ~~~~~~~~~~~~~~~~~~~~~~>" | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	cat $$(find reports/run_${RUNOUT}.ORP -name 'short*') | sed -n 8p  | tee -a ${DIR}/reports/qualreport.${RUNOUT}
-	printf "*****  TRANSRATE SCORE ~~~~~~~~~~~~~~~~~~>       " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
+	printf "*****  TRANSRATE SCORE ~~~~~~~~~~~~~~~~~~>      " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	cat $$(find reports/transrate_${RUNOUT} -name assemblies.csv) | awk -F , '{print $$37}' | sed -n 2p | tee -a ${DIR}/reports/qualreport.${RUNOUT}
-	printf "*****  TRANSRATE OPTIMAL SCORE ~~~~~~~~~~>       " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
+	printf "*****  TRANSRATE OPTIMAL SCORE ~~~~~~~~~~>      " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	cat $$(find reports/transrate_${RUNOUT} -name assemblies.csv) | awk -F , '{print $$38}' | sed -n 2p | tee -a ${DIR}/reports/qualreport.${RUNOUT}
-	printf "*****  UNIQUE GENES ORP ~~~~~~~~~~~~~~~~~>       " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
+	printf "*****  UNIQUE GENES ORP ~~~~~~~~~~~~~~~~~>      " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	cat ${DIR}/assemblies/working/${RUNOUT}.unique.ORP.txt | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	printf "*****  UNIQUE GENES TRINITY ~~~~~~~~~~~~~>      " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	cat ${DIR}/assemblies/diamond/${RUNOUT}.unique.trinity.txt | tee -a ${DIR}/reports/qualreport.${RUNOUT}
