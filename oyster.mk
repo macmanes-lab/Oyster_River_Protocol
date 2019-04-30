@@ -74,7 +74,7 @@ orthofuse:merge orthotransrate orthofusing
 report:busco transrate reportgen
 busco:${DIR}/reports/${RUNOUT}.busco.done
 transrate:${DIR}/reports/transrate_${RUNOUT}/assemblies.csv
-reportgen:${DIR}/reports/qualreport.${RUNOUT}
+reportgen:${DIR}/reports/qualreport.${RUNOUT}.done
 clean:
 setup:${DIR}/assemblies/working ${DIR}/reads ${DIR}/rcorr ${DIR}/assemblies/diamond ${DIR}/assemblies ${DIR}/reports ${DIR}/orthofuse ${DIR}/quants ${DIR}/assemblies/working
 strandeval:${DIR}/reports/${RUNOUT}.strandeval.done
