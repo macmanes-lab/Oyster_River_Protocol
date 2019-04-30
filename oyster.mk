@@ -77,7 +77,7 @@ transrate:${DIR}/reports/transrate_${RUNOUT}/assemblies.csv
 reportgen:${DIR}/reports/qualreport.${RUNOUT}
 clean:
 setup:${DIR}/assemblies/working ${DIR}/reads ${DIR}/rcorr ${DIR}/assemblies/diamond ${DIR}/assemblies ${DIR}/reports ${DIR}/orthofuse ${DIR}/quants ${DIR}/assemblies/working
-strandeval:{DIR}/reports/${RUNOUT}.strandeval.done
+strandeval:${DIR}/reports/${RUNOUT}.strandeval.done
 filter:${DIR}/assemblies/${RUNOUT}.filter.done
 makelist:${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.list
 makegroups:${DIR}/orthofuse/${RUNOUT}/groups.done
@@ -93,7 +93,7 @@ orp_uniq:${DIR}/assemblies/working/${RUNOUT}.unique.ORP.done
 salmon_index:${DIR}/quants/${RUNOUT}.ortho.idx
 
 .DELETE_ON_ERROR:
-.PHONY:report check clean
+.PHONY:reportgen check clean
 
 ${DIR}/assemblies/working ${DIR}/reads ${DIR}/rcorr ${DIR}/assemblies/diamond ${DIR}/assemblies ${DIR}/reports ${DIR}/orthofuse ${DIR}/quants:
 	@mkdir -p ${DIR}/reads
@@ -397,7 +397,7 @@ ${DIR}/reports/transrate_${RUNOUT}/assemblies.csv:${DIR}/assemblies/${RUNOUT}.OR
 	${MAKEDIR}/software/orp-transrate/transrate -o ${DIR}/reports/transrate_${RUNOUT} -a ${DIR}/assemblies/${RUNOUT}.ORP.fasta --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -t $(CPU)
 	find ${DIR}/reports/transrate_${RUNOUT} -name "*bam" -delete
 
-{DIR}/reports/${RUNOUT}.strandeval.done:${DIR}/assemblies/${RUNOUT}.ORP.fasta
+${DIR}/reports/${RUNOUT}.strandeval.done:${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	bwa index -p ${RUNOUT} ${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	bwa mem -t $(CPU) ${RUNOUT} \
 	<(seqtk sample -s 23894 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq 400000) \
@@ -421,7 +421,7 @@ clean:
 	${DIR}/assemblies/diamond/${RUNOUT}.newbies.fasta ${DIR}/reports/busco.done ${DIR}/reports/transrate.done ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf \
 	${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq ${DIR}/reports/run_${RUNOUT}.orthomerged/ ${DIR}/reports/transrate_${RUNOUT}/
 
-${DIR}/reports/qualreport.${RUNOUT}:${DIR}/assemblies/working/${RUNOUT}.unique.ORP.done
+${DIR}/reports/qualreport.${RUNOUT}:${DIR}/assemblies/working/${RUNOUT}.unique.ORP.done ${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	printf "\n\n*****  QUALITY REPORT FOR: ${RUNOUT} using the ORP version ${VERSION} ****"
 	printf "\n*****  THE ASSEMBLY CAN BE FOUND HERE: ${DIR}/assemblies/${RUNOUT}.ORP.fasta **** \n\n"
 	printf "*****  BUSCO SCORE ~~~~~>                 " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
