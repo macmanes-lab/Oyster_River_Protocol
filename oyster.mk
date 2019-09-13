@@ -320,10 +320,10 @@ ${DIR}/assemblies/diamond/${RUNOUT}.orthomerged.diamond.txt ${DIR}/assemblies/di
 	diamond blastx -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta -d ${MAKEDIR}/software/diamond/swissprot  -o ${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt
 
 ${DIR}/assemblies/diamond/${RUNOUT}.unique.trinity.txt ${DIR}/assemblies/diamond/${RUNOUT}.unique.sp75.txt ${DIR}/assemblies/diamond/${RUNOUT}.unique.sp55.txt ${DIR}/assemblies/diamond/${RUNOUT}.unique.transabyss.txt:${DIR}/assemblies/diamond/${RUNOUT}.orthomerged.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.transabyss.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.spades55.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.spades55.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt
-	awk '{print $$2}' ${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/${RUNOUT}.unique.trinity.txt
-	awk '{print $$2}' ${DIR}/assemblies/diamond/${RUNOUT}.spades75.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/${RUNOUT}.unique.sp75.txt
-	awk '{print $$2}' ${DIR}/assemblies/diamond/${RUNOUT}.spades55.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/${RUNOUT}.unique.sp55.txt
-	awk '{print $$2}' ${DIR}/assemblies/diamond/${RUNOUT}.transabyss.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/${RUNOUT}.unique.transabyss.txt
+	awk '{print $$2}' ${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f1 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/${RUNOUT}.unique.trinity.txt
+	awk '{print $$2}' ${DIR}/assemblies/diamond/${RUNOUT}.spades75.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f1 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/${RUNOUT}.unique.sp75.txt
+	awk '{print $$2}' ${DIR}/assemblies/diamond/${RUNOUT}.spades55.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f1 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/${RUNOUT}.unique.sp55.txt
+	awk '{print $$2}' ${DIR}/assemblies/diamond/${RUNOUT}.transabyss.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f1 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/${RUNOUT}.unique.transabyss.txt
 
 #list1 is unique geneIDs in orthomerged
 #list2 is unique  geneIDs in other assemblies
@@ -363,7 +363,7 @@ ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt:${DIR}/assemblies/${RUNOUT}.ORP.inte
 	touch ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
 
 ${DIR}/assemblies/working/${RUNOUT}.unique.ORP.done:${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
-	awk '{print $$2}' ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f2 | sort | uniq | wc -l > ${DIR}/assemblies/working/${RUNOUT}.unique.ORP.txt
+	awk '{print $$2}' ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f1 | sort | uniq | wc -l > ${DIR}/assemblies/working/${RUNOUT}.unique.ORP.txt
 	touch ${DIR}/assemblies/working/${RUNOUT}.unique.ORP.done
 
 ${DIR}/quants/${RUNOUT}.ortho.idx:${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta
