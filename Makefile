@@ -14,7 +14,7 @@ orthopath := $(shell ls ${DIR}/software/OrthoFinder/orthofinder/orthofuser.py 2>
 orthufuserversion = $(shell orthofuser.py --help | grep "OrthoFinder version" | awk '{print $$3}')
 transrate := $(shell ls ${DIR}/software/orp-transrate/transrate 2>/dev/null)
 transabysspath := $(shell which ${DIR}/software/transabyss/transabyss 2>/dev/null)
-transabyssversion = $(shell source ${DIR}/software/anaconda/install/bin/activate orp 2>/dev/null; transabyss --version 2>/dev/null; source deactivate 2> /dev/null)
+transabyssversion = $(shell conda ${DIR}/software/anaconda/install/bin/activate orp 2>/dev/null; transabyss --version 2>/dev/null; conda deactivate 2> /dev/null)
 diamond_data := $(shell ls ${DIR}/software/diamond/uniprot_sprot.fasta 2>/dev/null)
 busco_data := $(shell ls ${DIR}/busco_dbs/eukaryota_odb10 2>/dev/null)
 conda := $(shell ${DIR}/software/anaconda/install/bin/conda info 2>/dev/null)
@@ -41,11 +41,11 @@ orp:py37_env.yml conda setup
 ifdef orp
 else
 	( \
-				source ${DIR}/software/anaconda/install/bin/activate; \
+				conda ${DIR}/software/anaconda/install/bin/activate; \
 				${DIR}/software/anaconda/install/bin/conda update -y -n base conda; \
 				echo ". ${DIR}/software/anaconda/install/etc/profile.d/conda.sh" >> ~/.bashrc; \
 				source ~/.bashrc; \
-				source ${DIR}/software/anaconda/install/bin/deactivate; \
+				conda ${DIR}/software/anaconda/install/bin/deactivate; \
 	 )
 	 ( \
 				${DIR}/software/anaconda/install/bin/conda env create -f py37_env.yml python=3.6; \

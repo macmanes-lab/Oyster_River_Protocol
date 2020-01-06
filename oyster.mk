@@ -20,7 +20,7 @@ RCORR := ${shell which rcorrector}
 RCORRDIR := $(dir $(firstword $(RCORR)))
 READ1=
 READ2=
-BUSCO := ${shell which run_BUSCO.py}
+BUSCO := ${shell which busco}
 BUSCODIR := $(dir $(firstword $(BUSCO)))
 RUNOUT=USER_RUN
 LINEAGE=
@@ -35,7 +35,7 @@ trinitypath := $(shell which Trinity 2>/dev/null)
 spadespath := $(shell which rnaspades.py 2>/dev/null)
 salmonpath := $(shell which salmon 2>/dev/null)
 mclpath := $(shell which mcl 2>/dev/null)
-buscopath := $(shell which run_BUSCO.py 2>/dev/null)
+buscopath := $(shell which busco 2>/dev/null)
 seqtkpath := $(shell which seqtk 2>/dev/null)
 transratepath := $(shell which transrate 2>/dev/null)
 transabyss := $(shell which transabyss 2>/dev/null)
@@ -389,7 +389,7 @@ endif
 
 ${DIR}/reports/${RUNOUT}.busco.done:${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	export BUSCO_CONFIG_FILE=${MAKEDIR}/software/config.ini
-	python $$(which run_BUSCO.py) -i ${DIR}/assemblies/${RUNOUT}.ORP.fasta -m transcriptome --cpu ${BUSCO_THREADS} -o ${RUNOUT}.ORP
+	python $$(which busco) -i ${DIR}/assemblies/${RUNOUT}.ORP.fasta -m transcriptome --cpu ${BUSCO_THREADS} -o ${RUNOUT}.ORP
 	mv run_${RUNOUT}* ${DIR}/reports/
 	touch ${DIR}/reports/${RUNOUT}.busco.done
 

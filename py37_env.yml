@@ -44,7 +44,7 @@ dependencies:
   - blast=2.7.1
   - hmmer=3.2.1
   - samtools=1.10
-  - tbb=2019.4
+  - tbb
   - gettext=0.19.8.1
   - jpeg=9c
   - pango=1.40.14
