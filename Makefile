@@ -48,9 +48,7 @@ else
 				source ${DIR}/software/anaconda/install/bin/deactivate; \
 	 )
 	 ( \
-				${DIR}/software/anaconda/install/bin/conda install -y pycryptosat; \
-				${DIR}/software/anaconda/install/bin/conda config --set sat_solver pycryptosat; \
-				${DIR}/software/anaconda/install/bin/conda env create -f py37_env.yml python=3.7; \
+				${DIR}/software/anaconda/install/bin/conda env create -f py37_env.yml python=3.6; \
   )
 	@echo PATH=\$$PATH:${DIR}/software/anaconda/install/bin > pathfile;
 endif
