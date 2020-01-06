@@ -16,7 +16,7 @@ transrate := $(shell ls ${DIR}/software/orp-transrate/transrate 2>/dev/null)
 transabysspath := $(shell which ${DIR}/software/transabyss/transabyss 2>/dev/null)
 transabyssversion = $(shell source ${DIR}/software/anaconda/install/bin/activate orp 2>/dev/null; transabyss --version 2>/dev/null; source deactivate 2> /dev/null)
 diamond_data := $(shell ls ${DIR}/software/diamond/uniprot_sprot.fasta 2>/dev/null)
-busco_data := $(shell ls ${DIR}/busco_dbs/eukaryota_odb9 2>/dev/null)
+busco_data := $(shell ls ${DIR}/busco_dbs/eukaryota_odb10 2>/dev/null)
 conda := $(shell ${DIR}/software/anaconda/install/bin/conda info 2>/dev/null)
 orp := $(shell ${DIR}/software/anaconda/install/bin/conda info --envs | grep orp 2>/dev/null)
 VERSION := ${shell cat  ${MAKEDIR}version.txt}
@@ -33,8 +33,8 @@ setup:
 conda:setup
 ifdef conda
 else
-	cd ${DIR}/software/anaconda && curl -LO https://repo.anaconda.com/archive/Anaconda3-2018.12-Linux-x86_64.sh
-	cd ${DIR}/software/anaconda && bash Anaconda3-2018.12-Linux-x86_64.sh -b -p install/
+	cd ${DIR}/software/anaconda && curl -LO https://repo.anaconda.com/archive/Anaconda3-2019.10-Linux-x86_64.sh
+	cd ${DIR}/software/anaconda && bash Anaconda3-2019.10-Linux-x86_64.sh -b -p install/
 endif
 
 orp:py37_env.yml conda setup
@@ -82,7 +82,7 @@ busco_data:conda
 ifdef busco_data
 else
 	mkdir ${DIR}/busco_dbs && cd ${DIR}/busco_dbs
-	cd ${DIR}/busco_dbs && wget http://busco.ezlab.org/v2/datasets/eukaryota_odb9.tar.gz && tar -zxf eukaryota_odb9.tar.gz
+	cd ${DIR}/busco_dbs && wget https://busco-data.ezlab.org/v4/data/lineages/eukaryota_odb10.2019-11-20.tar.gz && tar -zxf eukaryota_odb10.2019-11-20.tar.gz
 endif
 
 transrate:
@@ -94,7 +94,7 @@ endif
 
 orthofuser:
 ifdef orthopath
-ifeq ($(orthufuserversion),2.2.6)
+ifeq ($(orthufuserversion),2.3.8)
 	@echo "orthofuser right version is already installed"
 else
 	@echo "version ${orthufuserversion}"
