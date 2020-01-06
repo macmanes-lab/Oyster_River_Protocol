@@ -35,6 +35,8 @@ ifdef conda
 else
 	cd ${DIR}/software/anaconda && curl -LO https://repo.anaconda.com/archive/Anaconda3-2019.10-Linux-x86_64.sh
 	cd ${DIR}/software/anaconda && bash Anaconda3-2019.10-Linux-x86_64.sh -b -p install/
+	echo ". ${DIR}/software/anaconda/install/etc/profile.d/conda.sh" >> ~/.bashrc;
+	source ~/.bashrc;
 endif
 
 orp:py37_env.yml conda setup
