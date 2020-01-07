@@ -1,14 +1,15 @@
 #!/usr/bin/python
-from Bio import SeqIO
+
 import sys
-import os
+from Bio import SeqIO
+
 
 #usage: python long.seq.py in.fasta out.fasta 200
- 
-input_seq_iterator = SeqIO.parse(open(sys.argv[1], "rU"), "fasta")
-short_seq_iterator = (record for record in input_seq_iterator \
+
+INPUT_SEQ_ITERATOR = SeqIO.parse(sys.argv[1], "fasta")
+SHORT_SEQ_ITERATOR = (record for record in INPUT_SEQ_ITERATOR \
                       if len(record.seq) > int(sys.argv[3]))
- 
-output_handle = open(sys.argv[2], "w")
-SeqIO.write(short_seq_iterator, output_handle, "fasta")
-output_handle.close()
+
+OUTPUT_HANDLE = open(sys.argv[2], "w")
+SeqIO.write(SHORT_SEQ_ITERATOR, OUTPUT_HANDLE, "fasta")
+OUTPUT_HANDLE.close()
