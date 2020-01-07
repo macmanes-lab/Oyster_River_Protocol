@@ -49,7 +49,7 @@ else
 				conda deactivate; \
 	 )
 	 ( \
-				conda env create -f py37_env.yml python=3.6; \
+				conda env create -f py37_env.yml python=3.6 -p ${DIR}/software/anaconda/install/ ; \
   )
 	@echo PATH=\$$PATH:${DIR}/software/anaconda/install/bin > pathfile;
 endif
