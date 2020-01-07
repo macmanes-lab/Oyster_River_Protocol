@@ -17,7 +17,7 @@ transabysspath := $(shell which ${DIR}/software/transabyss/transabyss 2>/dev/nul
 transabyssversion = $(shell conda ${DIR}/software/anaconda/install/bin/activate orp 2>/dev/null; transabyss --version 2>/dev/null; conda deactivate 2> /dev/null)
 diamond_data := $(shell ls ${DIR}/software/diamond/uniprot_sprot.fasta 2>/dev/null)
 busco_data := $(shell ls ${DIR}/busco_dbs/eukaryota_odb10 2>/dev/null)
-conda := $(shell ${DIR}/software/anaconda/install/bin/conda info 2>/dev/null)
+conda := $(shell conda info 2>/dev/null)
 orp := $(shell ${DIR}/software/anaconda/install/bin/conda info --envs | grep orp 2>/dev/null)
 VERSION := ${shell cat  ${MAKEDIR}version.txt}
 
