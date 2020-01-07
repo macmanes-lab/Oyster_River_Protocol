@@ -62,7 +62,6 @@ else
 	cd ${DIR}/software/transabyss && git pull
 endif
 else
-	pip2 install python-igraph scipy numpy
 	cd ${DIR}/software/ && git clone https://github.com/bcgsc/transabyss.git
 	@echo PATH=\$$PATH:${DIR}/software/transabyss >> pathfile
 endif
@@ -101,7 +100,7 @@ endif
 else
 	@echo "orthofuser is not installed and needs to be installed"
 	cd ${DIR}/software && git clone https://github.com/macmanes-lab/OrthoFinder.git
-	@echo PATH=\$$PATH:${DIR}/software/OrthoFinder/orthofinder >> pathfile
+	@echo PATH=\$$PATH:${DIR}/software/OrthoFinder/ >> pathfile
 endif
 
 postscript: setup orp diamond_data busco_data orthofuser conda transrate

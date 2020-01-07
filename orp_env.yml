@@ -17,8 +17,10 @@ dependencies:
   - cd-hit=4.6.8
   - bwa=0.7.17
   - mcl
+  - pip=19.3.1
   - pip:
     - biopython
+    - scipy
     - cvxopt
     - cython
     - bashplotlib
