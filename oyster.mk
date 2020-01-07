@@ -377,7 +377,7 @@ else
 endif
 
 ${DIR}/reports/${RUNOUT}.busco.done:${DIR}/assemblies/${RUNOUT}.ORP.fasta
-	python $$(which busco) --offline --lineage ${DIR}/busco_dbs/eukaryota_odb10 -i ${DIR}/assemblies/${RUNOUT}.ORP.fasta -m transcriptome --cpu ${BUSCO_THREADS} -o ${RUNOUT}.ORP --config ${MAKEDIR}/software/config.ini
+	python $$(which busco) --offline --lineage ${DIR}/../busco_dbs/eukaryota_odb10 -i ${DIR}/assemblies/${RUNOUT}.ORP.fasta -m transcriptome --cpu ${BUSCO_THREADS} -o run_${RUNOUT}.ORP --config ${MAKEDIR}/software/config.ini
 	mv run_${RUNOUT}* ${DIR}/reports/
 	touch ${DIR}/reports/${RUNOUT}.busco.done
 
@@ -413,7 +413,7 @@ ${DIR}/reports/qualreport.${RUNOUT}.done ${DIR}/reports/qualreport.${RUNOUT}:${D
 	printf "\n\n*****  QUALITY REPORT FOR: ${RUNOUT} using the ORP version ${VERSION} ****"
 	printf "\n*****  THE ASSEMBLY CAN BE FOUND HERE: ${DIR}/assemblies/${RUNOUT}.ORP.fasta **** \n\n"
 	printf "*****  BUSCO SCORE ~~~~~~~~~~~~~~~~~~~~~~>" | tee -a ${DIR}/reports/qualreport.${RUNOUT}
-	cat $$(find reports/run_${RUNOUT}.ORP -name 'short*') | sed -n 8p  | tee -a ${DIR}/reports/qualreport.${RUNOUT}
+	cat $$(find reports/run_${RUNOUT}.ORP -name 'short*') | sed -n 9p  | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	printf "*****  TRANSRATE SCORE ~~~~~~~~~~~~~~~~~~>      " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	cat $$(find reports/transrate_${RUNOUT} -name assemblies.csv) | awk -F , '{print $$37}' | sed -n 2p | tee -a ${DIR}/reports/qualreport.${RUNOUT}
 	printf "*****  TRANSRATE OPTIMAL SCORE ~~~~~~~~~~>      " | tee -a ${DIR}/reports/qualreport.${RUNOUT}
