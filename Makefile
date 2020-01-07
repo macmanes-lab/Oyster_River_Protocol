@@ -43,6 +43,7 @@ orp:py37_env.yml conda setup
 ifdef orp
 else
 	( \
+				source ${DIR}/software/anaconda/install/etc/profile.d/conda.sh; \
 				conda activate; \
 				conda update -y -n base conda; \
 				conda deactivate; \
