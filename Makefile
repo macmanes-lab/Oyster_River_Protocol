@@ -90,7 +90,7 @@ endif
 
 orthofuser:
 ifdef orthopath
-ifeq ($(orthufuserversion),2.3.8)
+ifeq ($(orthufuserversion),2.3.9)
 	@echo "orthofuser right version is already installed"
 else
 	@echo "version ${orthufuserversion}"
