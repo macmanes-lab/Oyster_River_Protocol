@@ -17,12 +17,10 @@ dependencies:
   - diamond=0.9.29
   - cd-hit=4.6.8
   - bwa=0.7.17
+  - mcl
   - pip:
     - biopython
     - cvxopt
     - cython
-    - numpy==1.15.4
-    - pandas
-    - pip
-    - scipy==1.2.1
     - bashplotlib
+    - python-igraph
