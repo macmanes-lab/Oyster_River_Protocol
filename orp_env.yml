@@ -1,4 +1,4 @@
-name:orp
+name: orp
 channels:
   - bioconda
   - conda-forge

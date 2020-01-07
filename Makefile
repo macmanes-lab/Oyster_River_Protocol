@@ -39,17 +39,15 @@ else
 	source ~/.bashrc;
 endif
 
-orp:py37_env.yml conda setup
+orp:orp_env.yml conda setup
 ifdef orp
 else
 	( \
 				source ${DIR}/software/anaconda/install/etc/profile.d/conda.sh; \
 				conda activate; \
 				conda update -y -n base conda; \
+				conda env create -f ${DIR}/orp_env.yml ; \
 				conda deactivate; \
-	 )
-	 ( \
-				conda env create -f ${DIR}/py37_env.yml python=3.6 -p ${DIR}/software/anaconda/install/orp/ ; \
   )
 	@echo PATH=\$$PATH:${DIR}/software/anaconda/install/bin > pathfile;
 endif
