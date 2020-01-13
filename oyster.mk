@@ -23,7 +23,7 @@ READ2=
 BUSCO := ${shell which busco}
 BUSCODIR := $(dir $(firstword $(BUSCO)))
 RUNOUT=USER_RUN
-LINEAGE=
+LINEAGE=eukaryota_odb10
 BUSCODB :=
 START=1
 STRAND :=
@@ -377,7 +377,7 @@ else
 endif
 
 ${DIR}/reports/${RUNOUT}.busco.done:${DIR}/assemblies/${RUNOUT}.ORP.fasta
-	python $$(which busco) --offline --lineage ${MAKEDIR}/busco_dbs/eukaryota_odb10 -i ${DIR}/assemblies/${RUNOUT}.ORP.fasta -m transcriptome --cpu ${BUSCO_THREADS} -o run_${RUNOUT}.ORP --config ${MAKEDIR}/software/config.ini
+	python $$(which busco) --offline --lineage ${MAKEDIR}/busco_dbs/${LINEAGE} -i ${DIR}/assemblies/${RUNOUT}.ORP.fasta -m transcriptome --cpu ${BUSCO_THREADS} -o run_${RUNOUT}.ORP --config ${MAKEDIR}/software/config.ini
 	mv run_${RUNOUT}* ${DIR}/reports/
 	touch ${DIR}/reports/${RUNOUT}.busco.done
 

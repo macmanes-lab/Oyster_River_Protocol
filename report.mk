@@ -81,9 +81,8 @@ welcome:
 
 
 ${DIR}/reports/${RUNOUT}.busco.done:${ASSEMBLY}
-	export BUSCO_CONFIG_FILE=${MAKEDIR}/software/config.ini
-	python $$(which run_BUSCO.py) -i ${ASSEMBLY} -m transcriptome --cpu $(CPU) -o ${RUNOUT} --lineage_path ${BUSCODBDIR}/${LINEAGE}
-	mv run_${RUNOUT} ${DIR}/reports/
+	python $$(which busco) --offline --lineage ${MAKEDIR}/busco_dbs/${LINEAGE} -i ${ASSEMBLY} -m transcriptome --cpu ${BUSCO_THREADS} -o run_${RUNOUT} --config ${MAKEDIR}/software/config.ini
+	mv run_${RUNOUT}* ${DIR}/reports/
 	touch ${DIR}/reports/${RUNOUT}.busco.done
 
 ${DIR}/reports/${RUNOUT}.transrate.done:${ASSEMBLY}
