@@ -355,7 +355,7 @@ ${DIR}/assemblies/working/${RUNOUT}.unique.ORP.done:${DIR}/assemblies/${RUNOUT}.
 	touch ${DIR}/assemblies/working/${RUNOUT}.unique.ORP.done
 
 ${DIR}/quants/${RUNOUT}.ortho.idx:${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta
-	salmon index --no-version-check -t ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta -i ${DIR}/quants/${RUNOUT}.ortho.idx --type quasi -k 31
+	salmon index --no-version-check -t ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta -i ${DIR}/quants/${RUNOUT}.ortho.idx -k 31
 
 ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf:${DIR}/quants/${RUNOUT}.ortho.idx ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
 	salmon quant --no-version-check --validateMappings -p $(CPU) -i ${DIR}/quants/${RUNOUT}.ortho.idx --seqBias --gcBias -l a -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/salmon_orthomerged_${RUNOUT}
