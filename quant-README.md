@@ -1,6 +1,6 @@
 # General usage for quant.mk
 
-This make file is meant to be used to trim adaptors, error correct reads, and pseudo-map to a reference transcriptome (for example one produced by the Oyster River Protocol...) for an individul sample. The user specifies some sample information, then the make file runs through to quantification of that sample. 
+This make file is meant to be used to  pseudo-map to a reference transcriptome (for example one produced by the Oyster River Protocol...) for an individul sample. This script does not trim adaptors or clean reads, as we have found that this does not improve performance and massively increases mapping time for each sample. The user specifies some sample information, then the make file runs through to quantification of that sample. 
 
 # Usage:
 First, the user needs to activate the relevant conda environment using `source activate orp_v2`
