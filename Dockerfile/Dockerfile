@@ -22,13 +22,13 @@ RUN apt update \
     && apt -y upgrade \
     && apt install -y --reinstall language-pack-en \
     && locale-gen en_US.UTF-8
-RUN apt update && apt install -y build-essential git python python-pip libxml2-dev libz-dev curl wget sudo nano
+RUN apt update && apt install -y build-essential git python3 python3-pip libxml2-dev libz-dev curl wget sudo nano
 
 
 #########
 ### Python modules
 #########
-RUN pip install --upgrade pip
+RUN pip3 install --upgrade pip
 
 #########
 ### Create user orp
