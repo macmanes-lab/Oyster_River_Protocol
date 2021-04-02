@@ -1,5 +1,10 @@
 ### CHANGELOG
 
+ORP Version 2.3.2 <- 2.3.1
+
+- update docker base image to Ubuntu 20.04
+- update software version for Trinity, SPAdes, ABySS, RCORRECTOR
+
 ORP Version 2.3.0 <- 2.2.8
 
 - remove Python 2.x dependencies!
