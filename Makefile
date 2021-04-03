@@ -84,7 +84,7 @@ else
 endif
 else
 	cd ${DIR}/software/ && curl -LO https://github.com/trinityrnaseq/trinityrnaseq/releases/download/v2.12.0/trinityrnaseq-v2.12.0.FULL.tar.gz
-	tar -zxf trinityrnaseq-v2.12.0.FULL.tar.gz
+	cd ${DIR}/software/ && tar -zxf trinityrnaseq-v2.12.0.FULL.tar.gz
 	cd trinityrnaseq-v2.12.0
 	make
 	@echo export TRINITY_HOME=${DIR}/software/trinityrnaseq-v2.12.0/ >> pathfile
@@ -98,7 +98,7 @@ else
 endif
 else
 	cd ${DIR}/software/ && curl -LO curl -LO https://cab.spbu.ru/files/release3.15.2/SPAdes-3.15.2-Linux.tar.gz
-	tar -zxf SPAdes-3.15.2-Linux.tar.gz
+	cd ${DIR}/software/ && tar -zxf SPAdes-3.15.2-Linux.tar.gz
 	cd SPAdes-3.15.2-Linux
 	@echo PATH=\$$PATH:${DIR}/software/SPAdes-3.15.2-Linux/bin/ >> pathfile
 endif
