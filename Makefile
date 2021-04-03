@@ -15,13 +15,17 @@ orthufuserversion = $(shell orthofuser.py --help | grep "OrthoFinder version" | 
 transrate := $(shell ls ${DIR}/software/orp-transrate/transrate 2>/dev/null)
 transabysspath := $(shell which ${DIR}/software/transabyss/transabyss 2>/dev/null)
 transabyssversion = $(shell conda ${DIR}/software/anaconda/install/bin/activate orp 2>/dev/null; transabyss --version 2>/dev/null; conda deactivate 2> /dev/null)
+trinitypath := $(shell which ${DIR}/software/trinityrnaseq-v2.12.0/Trinity 2>/dev/null)
+trinityversion = $(shell ${DIR}/software/trinityrnaseq-v2.12.0/Trinity --version | awk '{print $$3}' | head -1 | awk -F 'v' '{print $$2}')
+spadespath := $(shell which ${DIR}/software/SPAdes-3.15.2-Linux/bin/spades.py 2>/dev/null)
+spadesversion = $(shell ${DIR}/software/SPAdes-3.15.2-Linux/bin/spades.py --version | awk -F 'v' '{print $$2}')
 diamond_data := $(shell ls ${DIR}/software/diamond/uniprot_sprot.fasta 2>/dev/null)
 busco_data := $(shell ls ${DIR}/busco_dbs/eukaryota_odb10 2>/dev/null)
 conda := $(shell conda info 2>/dev/null)
 orp := $(shell ${DIR}/software/anaconda/install/bin/conda info --envs | grep orp 2>/dev/null)
 VERSION := ${shell cat  ${MAKEDIR}version.txt}
 
-all: setup conda orp orthofuser transrate transabyss diamond_data busco_data postscript
+all: setup conda orp orthofuser transrate transabyss trinity spades diamond_data busco_data postscript
 
 .DELETE_ON_ERROR:
 
@@ -46,7 +50,9 @@ else
 				source ${DIR}/software/anaconda/install/etc/profile.d/conda.sh; \
 				conda activate; \
 				conda update -y -n base conda; \
-				conda env create -f ${DIR}/orp_env.yml ; \
+				conda install pycryptosat; \
+				conda config --set sat_solver pycryptosat; \
+				conda env create -f ${DIR}/orp_env.yml python=3.8; \
 				conda deactivate; \
   )
 	@echo PATH=\$$PATH:${DIR}/software/anaconda/install/bin > pathfile;
@@ -64,6 +70,37 @@ endif
 else
 	cd ${DIR}/software/ && git clone https://github.com/bcgsc/transabyss.git
 	@echo PATH=\$$PATH:${DIR}/software/transabyss >> pathfile
+endif
+
+
+trinity:
+ifdef trinitypath
+ifeq ($(trinityversion),2.12.0)
+	@echo "trinity is already installed"
+else
+	@echo "version ${trinityversion}"
+	@echo "trinity is installed, but not the right version"
+	cd ${DIR}/software/trinityrnaseq-v2.12.0 && git pull
+endif
+else
+	cd ${DIR}/software/ && curl -LO https://github.com/trinityrnaseq/trinityrnaseq/releases/download/v2.12.0/trinityrnaseq-v2.12.0.FULL.tar.gz
+	tar -zxf trinityrnaseq-v2.12.0.FULL.tar.gz
+	cd trinityrnaseq-v2.12.0
+	make
+	@echo export TRINITY_HOME=${DIR}/software/trinityrnaseq-v2.12.0/ >> pathfile
+endif
+
+spades:
+ifdef spadespath
+ifeq ($(spadesversion),3.15.2)
+	@echo "spades is already installed"
+else
+endif
+else
+	cd ${DIR}/software/ && curl -LO curl -LO https://cab.spbu.ru/files/release3.15.2/SPAdes-3.15.2-Linux.tar.gz
+	tar -zxf SPAdes-3.15.2-Linux.tar.gz
+	cd SPAdes-3.15.2-Linux
+	@echo PATH=\$$PATH:${DIR}/software/SPAdes-3.15.2-Linux/bin/ >> pathfile
 endif
 
 diamond_data:conda

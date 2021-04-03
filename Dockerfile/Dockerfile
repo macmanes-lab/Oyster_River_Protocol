@@ -8,7 +8,7 @@ RUN	mkdir build
 WORKDIR /build
 
 #########
-### Setup the envirenment
+### Setup the environment
 #########
 ENV DEBIAN_FRONTEND noninteractive
 ENV LC_ALL en_US.UTF-8
@@ -22,7 +22,7 @@ RUN apt update \
     && apt -y upgrade \
     && apt install -y --reinstall language-pack-en \
     && locale-gen en_US.UTF-8
-RUN apt update && apt install -y build-essential git python3 python3-pip libxml2-dev libz-dev curl wget sudo nano
+RUN apt update && apt install -y build-essential git python3 python3-pip autoconf libxml2-dev libz-dev curl wget sudo nano
 
 
 #########
@@ -56,6 +56,8 @@ RUN sed -i  "s_ubuntu_orp_g" /home/orp/Oyster_River_Protocol/software/config.ini
 #########
 RUN echo 'PATH=$PATH:/home/orp/Oyster_River_Protocol/software/anaconda/install/bin' >> /home/orp/.profile
 RUN echo 'PATH=$PATH:/home/orp/Oyster_River_Protocol/software/OrthoFinder/orthofinder' >> /home/orp/.profile
+RUN echo 'export TRINITY_HOME=/home/orp/Oyster_River_Protocol/software/trinityrnaseq-v2.12.0/ >> /home/orp/.profile
+RUN echo 'PATH=$PATH:/home/orp/Oyster_River_Protocol/software/SPAdes-3.15.2-Linux/bin/' >> /home/orp/.profile
 RUN echo 'PATH=$PATH:/home/orp/Oyster_River_Protocol/software/orp-transrate' >> /home/orp/.profile
 RUN echo 'PATH=$PATH:/home/orp/Oyster_River_Protocol/software/transabyss' >> /home/orp/.profile
 RUN /bin/bash -c "source /home/orp/.profile"
