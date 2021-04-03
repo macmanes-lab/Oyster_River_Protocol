@@ -5,7 +5,6 @@ channels:
   - defaults
   - r
 dependencies:
-  - cmake=3.19.7
   - abyss=2.0.1
   - bowtie2=2.4.2
   - salmon=1.4.0
