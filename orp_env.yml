@@ -5,6 +5,9 @@ channels:
   - defaults
   - r
 dependencies:
+  - jellyfish=2.2.10
+  - samtools=1.12
+  - trimmomatic=0.39
   - abyss=2.0.1
   - bowtie2=2.4.2
   - salmon=1.4.0
