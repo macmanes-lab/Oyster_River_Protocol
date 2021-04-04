@@ -74,6 +74,9 @@ RUN rm -rf /build
 ### Setup init workspace
 #########
 WORKDIR $HOME
+USER root
+RUN chown -R orp:orp /home/orp/
+RUN chmod 755 /home/orp/
 USER orp
 RUN /bin/bash -c "source /home/orp/.profile"
 RUN /bin/bash -c "source /home/orp/Oyster_River_Protocol/software/anaconda/install/etc/profile.d/conda.sh"
