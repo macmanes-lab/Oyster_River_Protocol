@@ -96,7 +96,7 @@ ifeq ($(spadesversion),3.15.2)
 else
 endif
 else
-	cd ${DIR}/software/ && curl -LO curl -LO https://cab.spbu.ru/files/release3.15.2/SPAdes-3.15.2-Linux.tar.gz
+	cd ${DIR}/software/ && curl -LO https://cab.spbu.ru/files/release3.15.2/SPAdes-3.15.2-Linux.tar.gz
 	cd ${DIR}/software/ && tar -zxf SPAdes-3.15.2-Linux.tar.gz
 	@echo PATH=\$$PATH:${DIR}/software/SPAdes-3.15.2-Linux/bin/ >> pathfile
 endif
