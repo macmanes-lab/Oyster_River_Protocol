@@ -76,4 +76,4 @@ RUN rm -rf /build
 WORKDIR $HOME
 USER orp
 RUN /bin/bash -c "source /home/orp/.profile"
-#RUN /bin/bash -c "conda activate orp"
+RUN /bin/bash -c "source /home/orp/Oyster_River_Protocol/software/anaconda/install/etc/profile.d/conda.sh"

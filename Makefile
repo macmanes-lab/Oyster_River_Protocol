@@ -51,9 +51,8 @@ else
 				source ${DIR}/software/anaconda/install/etc/profile.d/conda.sh; \
 				conda activate; \
 				conda update -y -n base conda; \
-				conda install -y pycryptosat; \
-				conda config --set sat_solver pycryptosat; \
-				conda env create -f ${DIR}/orp_env.yml python=3.8; \
+				conda install mamba -n base -c conda-forge; \
+				mamba env create -f ${DIR}/orp_env.yml python=3.8; \
 				conda deactivate; \
   )
 	@echo PATH=\$$PATH:${DIR}/software/anaconda/install/bin >> pathfile;
