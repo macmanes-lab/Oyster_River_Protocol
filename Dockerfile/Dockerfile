@@ -56,7 +56,7 @@ RUN sed -i  "s_ubuntu_orp_g" /home/orp/Oyster_River_Protocol/software/config.ini
 #########
 RUN echo 'PATH=$PATH:/home/orp/Oyster_River_Protocol/software/anaconda/install/bin' >> /home/orp/.profile
 RUN echo 'PATH=$PATH:/home/orp/Oyster_River_Protocol/software/OrthoFinder/orthofinder' >> /home/orp/.profile
-RUN echo 'export TRINITY_HOME=/home/orp/Oyster_River_Protocol/software/trinityrnaseq-v2.12.0/ >> /home/orp/.profile
+RUN echo 'export TRINITY_HOME=/home/orp/Oyster_River_Protocol/software/trinityrnaseq-v2.12.0/' >> /home/orp/.profile
 RUN echo 'PATH=$PATH:/home/orp/Oyster_River_Protocol/software/SPAdes-3.15.2-Linux/bin/' >> /home/orp/.profile
 RUN echo 'PATH=$PATH:/home/orp/Oyster_River_Protocol/software/orp-transrate' >> /home/orp/.profile
 RUN echo 'PATH=$PATH:/home/orp/Oyster_River_Protocol/software/transabyss' >> /home/orp/.profile
