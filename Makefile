@@ -113,7 +113,7 @@ busco_data:conda
 ifdef busco_data
 else
 	mkdir ${DIR}/busco_dbs && cd ${DIR}/busco_dbs
-	cd ${DIR}/busco_dbs && wget https://busco-data.ezlab.org/v4/data/lineages/eukaryota_odb10.2019-11-20.tar.gz && tar -zxf eukaryota_odb10.2019-11-20.tar.gz
+	cd ${DIR}/busco_dbs && wget https://busco-data.ezlab.org/v5/data/lineages/eukaryota_odb10.2020-09-10.tar.gz && tar -zxf eukaryota_odb10.2020-09-10.tar.gz
 endif
 
 transrate:
