@@ -39,7 +39,8 @@ ifdef conda
 else
 	cd ${DIR}/software/anaconda && curl -LO https://repo.anaconda.com/archive/Anaconda3-2020.11-Linux-x86_64.sh
 	cd ${DIR}/software/anaconda && bash Anaconda3-2020.11-Linux-x86_64.sh -b -p install/
-	echo ". ${DIR}/software/anaconda/install/etc/profile.d/conda.sh" >> ~/.bashrc;
+	@echo ". ${DIR}/software/anaconda/install/etc/profile.d/conda.sh" >> ~/.bashrc;
+	@echo ". ${DIR}/software/anaconda/install/etc/profile.d/conda.sh" > pathfile;
 	source ~/.bashrc;
 endif
 
@@ -55,7 +56,7 @@ else
 				conda env create -f ${DIR}/orp_env.yml python=3.8; \
 				conda deactivate; \
   )
-	@echo PATH=\$$PATH:${DIR}/software/anaconda/install/bin > pathfile;
+	@echo PATH=\$$PATH:${DIR}/software/anaconda/install/bin >> pathfile;
 endif
 
 transabyss:
