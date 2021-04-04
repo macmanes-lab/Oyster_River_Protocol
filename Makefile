@@ -125,7 +125,7 @@ endif
 
 orthofuser:
 ifdef orthopath
-ifeq ($(orthufuserversion),2.3.9)
+ifeq ($(orthufuserversion),2.5.2)
 	@echo "orthofuser right version is already installed"
 else
 	@echo "version ${orthufuserversion}"
@@ -134,7 +134,8 @@ else
 endif
 else
 	@echo "orthofuser is not installed and needs to be installed"
-	cd ${DIR}/software && git clone https://github.com/macmanes-lab/OrthoFinder.git
+	cd ${DIR}/software && curl -LO https://github.com/davidemms/OrthoFinder/releases/download/2.5.2/OrthoFinder.tar.gz
+	cd ${DIR}/software/ && tar -zxf OrthoFinder.tar.gz
 	@echo PATH=\$$PATH:${DIR}/software/OrthoFinder/ >> pathfile
 endif
 
