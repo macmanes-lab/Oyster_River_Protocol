@@ -61,7 +61,13 @@ RUN echo 'PATH=$PATH:/home/orp/Oyster_River_Protocol/software/SPAdes-3.15.2-Linu
 RUN echo 'PATH=$PATH:/home/orp/Oyster_River_Protocol/software/orp-transrate' >> /home/orp/.profile
 RUN echo 'PATH=$PATH:/home/orp/Oyster_River_Protocol/software/transabyss' >> /home/orp/.profile
 RUN /bin/bash -c "source /home/orp/.profile"
-ENV PATH="/home/orp/Oyster_River_Protocol/software/transabyss:/home/orp/Oyster_River_Protocol/software/orp-transrate:/home/orp/Oyster_River_Protocol/software/OrthoFinder/orthofinder:/home/orp/Oyster_River_Protocol/software/anaconda/install/bin:${PATH}"
+ENV PATH="/home/orp/Oyster_River_Protocol/software/transabyss:\
+          /home/orp/Oyster_River_Protocol/software/anaconda/install/bin:\
+          /home/orp/Oyster_River_Protocol/software/trinityrnaseq-v2.12.0/:\
+          /home/orp/Oyster_River_Protocol/software/orp-transrate:\
+          /home/orp/Oyster_River_Protocol/software/SPAdes-3.15.2-Linux/bin/:\
+          /home/orp/Oyster_River_Protocol/software/OrthoFinder/orthofinder:\
+          /home/orp/Oyster_River_Protocol/software/anaconda/install/bin:${PATH}"
 
 #########
 ### Clean up
@@ -75,4 +81,5 @@ RUN rm -rf /build
 #########
 WORKDIR $HOME
 USER orp
-RUN /bin/bash -c "source activate orp"
+RUN /bin/bash -c "source /home/orp/.profile"
+RUN /bin/bash -c "conda activate orp"

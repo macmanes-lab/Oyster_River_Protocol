@@ -146,6 +146,7 @@ postscript: setup orp diamond_data busco_data orthofuser conda transrate
 		cat pathfile;\
 		cat pathfile >> ~/.profile;\
 		cat pathfile >> ~/.bash_profile;\
+		cat pathfile >> ~/.bash_profile;\
 		export PATH=$$PATH:$$(cat pathfile);\
 		printf "\n\n\n";\
 		printf "\n*** type ``source ~/.profile`` to complete the install ***\n\n";\
