@@ -53,6 +53,7 @@ else
 				conda update -y -n base conda; \
 				conda install mamba -n base -c conda-forge; \
 				mamba env create -f ${DIR}/orp_env.yml python=3.8; \
+				mamba clean -ya; \
 				conda deactivate; \
   )
 	@echo PATH=\$$PATH:${DIR}/software/anaconda/install/bin >> pathfile;
