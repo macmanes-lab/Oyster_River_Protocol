@@ -365,9 +365,11 @@ ${DIR}/assemblies/${RUNOUT}.filter.done ${DIR}/assemblies/${RUNOUT}.ORP.fasta:${
 ifndef TPM_FILT
 	cp ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta ${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	touch ${DIR}/assemblies/${RUNOUT}.filter.done
+	printf "\n\n\n\n PART: ifndef TPM_FILT\n\n\n\n"
 endif
 ifdef TPM_FILT
 	cat ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf | awk '$$4 < $(TPM_FILT)' | cut -f1 > ${DIR}/assemblies/working/${RUNOUT}.LOWEXP.txt
+	printf "\n\n\n\n PART: ifdef TPM_FILT\n\n\n\n"
 ifeq ($(shell test -s $(LOWEXPFILE) && echo -n yes),yes)
 		cat ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf| awk '$$4 > $(TPM_FILT)' | cut -f1 | sed 1d > ${DIR}/assemblies/working/${RUNOUT}.HIGHEXP.txt
 		cp ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta ${DIR}/assemblies/working/${RUNOUT}.ORP_BEFORE_TPM_FILT.fasta
@@ -377,9 +379,11 @@ ifeq ($(shell test -s $(LOWEXPFILE) && echo -n yes),yes)
 		python ${MAKEDIR}/scripts/filter.py ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta ${DIR}/assemblies/working/${RUNOUT}.donotremove.list > ${DIR}/assemblies/working/${RUNOUT}.saveme.fasta
 		cat ${DIR}/assemblies/working/${RUNOUT}.saveme.fasta ${DIR}/assemblies/working/${RUNOUT}.ORP.HIGHEXP.fasta > ${DIR}/assemblies/${RUNOUT}.ORP.fasta
 		touch ${DIR}/assemblies/${RUNOUT}.filter.done
+		printf "\n\n\n\n PART: ifeq \n\n\n\n"
 else
 		cp ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta ${DIR}/assemblies/${RUNOUT}.ORP.fasta
 		touch ${DIR}/assemblies/${RUNOUT}.filter.done
+		printf "\n\n\n\n PART: ifeq else \n\n\n\n"
 endif
 endif
 

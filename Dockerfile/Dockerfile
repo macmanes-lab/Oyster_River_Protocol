@@ -22,7 +22,7 @@ RUN apt update \
     && apt -y upgrade \
     && apt install -y --reinstall language-pack-en \
     && locale-gen en_US.UTF-8 \
-    && apt update && apt install -y build-essential git python3 autoconf libbz2-dev liblzma-dev libxml2-dev libz-dev curl wget sudo nano \
+    && apt update && apt install -y build-essential git cmake python3 autoconf libbz2-dev liblzma-dev libxml2-dev libz-dev curl wget sudo nano \
     && apt -y autoremove
 
 
