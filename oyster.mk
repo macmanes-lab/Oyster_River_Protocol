@@ -370,7 +370,7 @@ ifdef TPM_FILT
 	printf "\n\n\n\n PART: TPM_FILT MAKE LOW AND HIGH\n\n\n\n"
 endif
 
-${DIR}/assemblies/${RUNOUT}.ORP.fasta:${DIR}/assemblies/${RUNOUT}.filter.done ${DIR}/assemblies/working/${RUNOUT}.LOWEXP.txt ${DIR}/assemblies/working/${RUNOUT}.HIGHEXP.txt ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf ${DIR}/assemblies/working/${RUNOUT}.blasted ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
+${DIR}/assemblies/${RUNOUT}.ORP.fasta:${DIR}/assemblies/${RUNOUT}.filter.done ${DIR}/assemblies/working/${RUNOUT}.LOWEXP.txt ${DIR}/assemblies/working/${RUNOUT}.HIGHEXP.txt ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
 ifeq ($(shell test -s ${DIR}/assemblies/working/${RUNOUT}.LOWEXP.txt && echo yes),yes)
 		cp ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta ${DIR}/assemblies/working/${RUNOUT}.ORP_BEFORE_TPM_FILT.fasta
 		python ${MAKEDIR}/scripts/filter.py ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta ${DIR}/assemblies/working/${RUNOUT}.HIGHEXP.txt > ${DIR}/assemblies/working/${RUNOUT}.ORP.HIGHEXP.fasta
