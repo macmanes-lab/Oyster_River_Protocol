@@ -49,7 +49,7 @@ LOWEXPFILE=${DIR}/assemblies/working/${RUNOUT}.LOWEXP.txt
 help:
 main: setup check welcome readcheck run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_transabyss run_filtershort run_orthofuser merge makelist \
 	makegroups orthotransrate makeorthout make_goodlist orthofusing diamond diamond_uniq make_list1 make_list2 make_list3 make_list5 make_list6 make_list7 posthack cdhit orp_diamond orp_uniq salmon_index salmon filter \
-	busco transrate strandeval report
+	secondfilter busco transrate strandeval report
 preprocess:setup check welcome readcheck run_trimmomatic run_rcorrector
 update_merge:setup check welcome readcheck run_filtershort run_orthofuser merge makelist makegroups orthotransrate makeorthout make_goodlist orthofusing diamond diamond_uniq \
 	make_list1 make_list2 make_list3 make_list5 make_list6 make_list7 posthack cdhit orp_diamond orp_uniq salmon_index salmon filter busco transrate strandeval report
@@ -80,6 +80,7 @@ clean:
 setup:${DIR}/assemblies/working ${DIR}/reads ${DIR}/rcorr ${DIR}/assemblies/diamond ${DIR}/assemblies ${DIR}/reports ${DIR}/orthofuse ${DIR}/quants ${DIR}/assemblies/working
 strandeval:${DIR}/reports/${RUNOUT}.strandeval.done
 filter:${DIR}/assemblies/${RUNOUT}.filter.done
+secondfilter:${DIR}/assemblies/${RUNOUT}.ORP.fasta
 makelist:${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.list
 makegroups:${DIR}/orthofuse/${RUNOUT}/groups.done
 make_list1:${DIR}/assemblies/diamond/${RUNOUT}.list1
@@ -88,7 +89,7 @@ make_list3:${DIR}/assemblies/diamond/${RUNOUT}.list3
 make_list5:${DIR}/assemblies/diamond/${RUNOUT}.list5
 make_list6:${DIR}/assemblies/diamond/${RUNOUT}.list6
 make_list7:${DIR}/assemblies/diamond/${RUNOUT}.list7
-cdhit:${DIR}/assemblies/${RUNOUT}.ORP.fasta
+cdhit:${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta
 orp_diamond:${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
 orp_uniq:${DIR}/assemblies/working/${RUNOUT}.unique.ORP.done
 salmon_index:${DIR}/quants/${RUNOUT}.ortho.idx
@@ -361,29 +362,26 @@ ${DIR}/quants/${RUNOUT}.ortho.idx:${DIR}/assemblies/${RUNOUT}.ORP.intermediate.f
 ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf:${DIR}/quants/${RUNOUT}.ortho.idx ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
 	salmon quant --no-version-check --validateMappings -p $(CPU) -i ${DIR}/quants/${RUNOUT}.ortho.idx --seqBias --gcBias --libType A -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/salmon_orthomerged_${RUNOUT}
 
-${DIR}/assemblies/${RUNOUT}.filter.done ${DIR}/assemblies/${RUNOUT}.ORP.fasta:${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
-ifndef TPM_FILT
-	cp ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta ${DIR}/assemblies/${RUNOUT}.ORP.fasta
-	touch ${DIR}/assemblies/${RUNOUT}.filter.done
-	printf "\n\n\n\n PART: ifndef TPM_FILT\n\n\n\n"
-endif
+${DIR}/assemblies/${RUNOUT}.filter.done:${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
 ifdef TPM_FILT
-		cat ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf | awk '$$4 < $(TPM_FILT)' | cut -f1 > ${DIR}/assemblies/working/${RUNOUT}.LOWEXP.txt
-		printf "\n\n\n\n PART: ifdef TPM_FILT\n\n\n\n"
-ifeq ($(shell test -s $${DIR}/assemblies/working/$${RUNOUT}.LOWEXP.txt && echo -n yes),yes)
-		cat ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf| awk '$$4 > $(TPM_FILT)' | cut -f1 | sed 1d > ${DIR}/assemblies/working/${RUNOUT}.HIGHEXP.txt
+	cat ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf| awk '$$4 > $(TPM_FILT)' | cut -f1 | sed 1d > ${DIR}/assemblies/working/${RUNOUT}.HIGHEXP.txt
+	cat ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf | awk '$$4 < $(TPM_FILT)' | cut -f1 > ${DIR}/assemblies/working/${RUNOUT}.LOWEXP.txt
+	touch ${DIR}/assemblies/${RUNOUT}.filter.done
+	printf "\n\n\n\n PART: TPM_FILT MAKE LOW AND HIGH\n\n\n\n"
+endif
+
+${DIR}/assemblies/${RUNOUT}.ORP.fasta:${DIR}/assemblies/${RUNOUT}.filter.done ${DIR}/assemblies/working/${RUNOUT}.saveme.fasta ${DIR}/assemblies/working/${RUNOUT}.LOWEXP.txt ${DIR}/assemblies/working/${RUNOUT}.HIGHEXP.txt ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf ${DIR}/assemblies/working/${RUNOUT}.blasted ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
+ifeq ($(shell test -s ${DIR}/assemblies/working/${RUNOUT}.LOWEXP.txt && echo yes),yes)
 		cp ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta ${DIR}/assemblies/working/${RUNOUT}.ORP_BEFORE_TPM_FILT.fasta
 		python ${MAKEDIR}/scripts/filter.py ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta ${DIR}/assemblies/working/${RUNOUT}.HIGHEXP.txt > ${DIR}/assemblies/working/${RUNOUT}.ORP.HIGHEXP.fasta
 		grep -Fwf ${DIR}/assemblies/working/${RUNOUT}.LOWEXP.txt ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt >> ${DIR}/assemblies/working/${RUNOUT}.blasted
 		awk '{print $$1}' ${DIR}/assemblies/working/${RUNOUT}.blasted | sort | uniq | tee -a ${DIR}/assemblies/working/${RUNOUT}.donotremove.list
 		python ${MAKEDIR}/scripts/filter.py ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta ${DIR}/assemblies/working/${RUNOUT}.donotremove.list > ${DIR}/assemblies/working/${RUNOUT}.saveme.fasta
 		cat ${DIR}/assemblies/working/${RUNOUT}.saveme.fasta ${DIR}/assemblies/working/${RUNOUT}.ORP.HIGHEXP.fasta > ${DIR}/assemblies/${RUNOUT}.ORP.fasta
-		touch ${DIR}/assemblies/${RUNOUT}.filter.done
-		printf "\n\n\n\n PART: ifeq \n\n\n\n"
+		printf "\n\n\n\n PART: FILTER LOW STUFF \n\n\n\n"
 else
 		cp ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta ${DIR}/assemblies/${RUNOUT}.ORP.fasta
-		touch ${DIR}/assemblies/${RUNOUT}.filter.done
-		printf "\n\n\n\n PART: ifeq else \n\n\n\n"
+		printf "\n\n\n\n PART: THERE IS NO LOW STUFF \n\n\n\n"
 endif
 endif
 
