@@ -2,8 +2,10 @@
 
 ORP Version 2.3.2 <- 2.3.1
 
-- update docker base image to Ubuntu 20.04
-- update software version for Trinity, SPAdes, ABySS, RCORRECTOR
+- update docker base image to Ubuntu 20.04 and new docker image
+- update software version for Orthofinder 2,5,2, BUSCO 5.1.2, Trinity 2.12, SPAdes 3.15.2, diamond 2.0.8, RCORRECTOR 1.04
+- handle a corner case there TPM filter does not remove any transcripts, which in previous versions caused a crash.
+-  change to use mamba during install
 
 ORP Version 2.3.0 <- 2.2.8
 
