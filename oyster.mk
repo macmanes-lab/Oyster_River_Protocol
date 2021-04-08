@@ -303,6 +303,7 @@ ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/good.${
 	python ${MAKEDIR}/scripts/filter.py ${DIR}/orthofuse/${RUNOUT}/merged.fasta ${DIR}/orthofuse/${RUNOUT}/good.${RUNOUT}.list > ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 
 ${DIR}/assemblies/diamond/${RUNOUT}.orthomerged.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.transabyss.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.spades75.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.spades55.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta ${DIR}/assemblies/${RUNOUT}.transabyss.fasta ${DIR}/assemblies/${RUNOUT}.spades75.fasta ${DIR}/assemblies/${RUNOUT}.spades55.fasta ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
+	printf "\n\n\n\n Starting diamond \n\n\n\n";\
 	diamond blastx --quiet -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -d ${MAKEDIR}/software/diamond/swissprot -o ${DIR}/assemblies/diamond/${RUNOUT}.orthomerged.diamond.txt
 	diamond blastx --quiet -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.transabyss.fasta -d ${MAKEDIR}/software/diamond/swissprot -o ${DIR}/assemblies/diamond/${RUNOUT}.transabyss.diamond.txt
 	diamond blastx --quiet -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.spades75.fasta -d ${MAKEDIR}/software/diamond/swissprot  -o ${DIR}/assemblies/diamond/${RUNOUT}.spades75.diamond.txt
@@ -349,7 +350,7 @@ ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta:${DIR}/assemblies/working/${R
 	cd-hit-est -M 5000 -T $(CPU) -c .98 -i ${DIR}/assemblies/working/${RUNOUT}.orthomerged.fasta -o ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta
 
 ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt:${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta
-	diamond blastx -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta -d ${MAKEDIR}/software/diamond/swissprot  -o ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
+	diamond blastx --quiet -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta -d ${MAKEDIR}/software/diamond/swissprot  -o ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
 	touch ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
 
 ${DIR}/assemblies/working/${RUNOUT}.unique.ORP.done:${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
@@ -368,6 +369,8 @@ ifdef TPM_FILT
 	cat ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf | awk '$$4 < $(TPM_FILT)' | cut -f1 > ${DIR}/assemblies/working/${RUNOUT}.LOWEXP.txt
 	touch ${DIR}/assemblies/${RUNOUT}.filter.done
 	printf "\n\n\n\n PART: TPM_FILT MAKE LOW AND HIGH\n\n\n\n"
+else
+	touch ${DIR}/assemblies/${RUNOUT}.filter.done
 endif
 
 ${DIR}/assemblies/${RUNOUT}.ORP.fasta:${DIR}/assemblies/${RUNOUT}.filter.done ${DIR}/assemblies/working/${RUNOUT}.LOWEXP.txt ${DIR}/assemblies/working/${RUNOUT}.HIGHEXP.txt ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
