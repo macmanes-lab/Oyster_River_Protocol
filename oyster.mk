@@ -259,17 +259,17 @@ endif
 
 ${DIR}/assemblies/${RUNOUT}.transabyss.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
 ifeq ($(STRAND),RF)
-		source activate orp_spades;\
+		source activate orp_transabyss;\
 		transabyss --SS --threads $(CPU) --outdir ${DIR}/assemblies/${RUNOUT}.transabyss --kmer $(TRANSABYSS_KMER) --length 250 --name ${RUNOUT}.transabyss.fasta --pe ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
 		awk '{print $$1}' ${DIR}/assemblies/${RUNOUT}.transabyss/${RUNOUT}.transabyss.fasta-final.fa >  ${DIR}/assemblies/${RUNOUT}.transabyss.fasta
 		rm -fr ${DIR}/assemblies/${RUNOUT}.transabyss/ ${DIR}/assemblies/${RUNOUT}.transabyss/${RUNOUT}.transabyss.fasta-final.fa
 else ifeq ($(STRAND),FR)
-		source activate orp_spades;\
+		source activate orp_transabyss;\
 		transabyss --SS --threads $(CPU) --outdir ${DIR}/assemblies/${RUNOUT}.transabyss --kmer $(TRANSABYSS_KMER) --length 250 --name ${RUNOUT}.transabyss.fasta --pe ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
 		awk '{print $$1}' ${DIR}/assemblies/${RUNOUT}.transabyss/${RUNOUT}.transabyss.fasta-final.fa >  ${DIR}/assemblies/${RUNOUT}.transabyss.fasta
 		rm -fr ${DIR}/assemblies/${RUNOUT}.transabyss/ ${DIR}/assemblies/${RUNOUT}.transabyss/${RUNOUT}.transabyss.fasta-final.fa
 else
-		source activate orp_spades;\
+		source activate orp_transabyss;\
 		transabyss --threads $(CPU) --outdir ${DIR}/assemblies/${RUNOUT}.transabyss --kmer $(TRANSABYSS_KMER) --length 250 --name ${RUNOUT}.transabyss.fasta --pe ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
 		awk '{print $$1}' ${DIR}/assemblies/${RUNOUT}.transabyss/${RUNOUT}.transabyss.fasta-final.fa >  ${DIR}/assemblies/${RUNOUT}.transabyss.fasta
 		rm -fr ${DIR}/assemblies/${RUNOUT}.transabyss/ ${DIR}/assemblies/${RUNOUT}.transabyss/${RUNOUT}.transabyss.fasta-final.fa
