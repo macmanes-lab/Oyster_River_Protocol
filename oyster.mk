@@ -4,7 +4,7 @@ SHELL=/bin/bash -o pipefail
 
 #USAGE:
 #
-#	oyster.mk main READ1= READ2= MEM=110 CPU=24 RUNOUT=runname STRAND=RF
+#	oyster.mk READ1= READ2= MEM=110 CPU=24 RUNOUT=runname STRAND=RF
 #
 
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
@@ -47,7 +47,7 @@ LOWEXPFILE=${DIR}/assemblies/working/${RUNOUT}.LOWEXP.txt
 .DEFAULT_GOAL := main
 
 help:
-main: setup check welcome readcheck run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_transabyss run_filtershort run_orthofuser merge makelist \
+main: setup welcome readcheck run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_transabyss run_filtershort run_orthofuser merge makelist \
 	makegroups orthotransrate makeorthout make_goodlist orthofusing diamond diamond_uniq make_list1 make_list2 make_list3 make_list5 make_list6 make_list7 posthack cdhit orp_diamond orp_uniq salmon_index salmon filter \
 	secondfilter busco transrate strandeval report
 preprocess:setup check welcome readcheck run_trimmomatic run_rcorrector
