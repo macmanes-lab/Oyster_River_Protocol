@@ -421,7 +421,7 @@ ${DIR}/reports/transrate_${RUNOUT}/assemblies.csv:${DIR}/assemblies/${RUNOUT}.OR
 	find ${DIR}/reports/transrate_${RUNOUT} -name "*bam" -delete
 
 ${DIR}/reports/${RUNOUT}.strandeval.done:${DIR}/assemblies/${RUNOUT}.ORP.fasta
-	source activate orp;\
+	source activate orp_trinity;\
 	bwa index -p ${RUNOUT} ${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	bwa mem -t $(CPU) ${RUNOUT} \
 	<(seqtk sample -s 23894 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq 400000) \
