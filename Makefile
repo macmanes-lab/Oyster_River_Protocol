@@ -60,6 +60,7 @@ else
 				mamba create -yc bioconda --name orp_transabyss transabyss=2.0.1; \
 				mamba create -yc bioconda --name orp_rcorrector rcorrector=1.0.4; \
 				mamba create -yc bioconda --name orp_trimmomatic trimmomatic=0.39; \
+				mamba create -yc bioconda --name orp_salmon salmon=1.4.0; \
 				mamba create -yc bioconda --name orp_cdhit cd-hit=4.6.8; \
 				mamba create -yc bioconda --name orp_diamond diamond=2.0.8; \
 				mamba env create -f ${DIR}/orp_env.yml python=3.8; \

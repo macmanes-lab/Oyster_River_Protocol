@@ -29,16 +29,16 @@ START=1
 STRAND :=
 TPM_FILT = 0
 FASTADIR=
-rcorrpath := $(shell conda activate orp_rcorrector; which rcorrector 2>/dev/null)
-trimmomaticpath := $(shell conda activate orp_trimmomatic; which trimmomatic 2>/dev/null)
-trinitypath := $(shell conda activate orp_trinity; which Trinity 2>/dev/null)
-spadespath := $(shell conda activate orp_spades; which rnaspades.py 2>/dev/null)
-salmonpath := $(shell which salmon 2>/dev/null)
-mclpath := $(shell which mcl 2>/dev/null)
-buscopath := $(shell conda activate orp_busco; which busco 2>/dev/null)
-seqtkpath := $(shell which seqtk 2>/dev/null)
-transratepath := $(shell which transrate 2>/dev/null)
-transabyss := $(shell conda activate orp_transabyss; which transabyss 2>/dev/null)
+rcorrpath := $(bash conda activate orp_rcorrector; which rcorrector 2>/dev/null)
+trimmomaticpath := $(bash conda activate orp_trimmomatic; which trimmomatic 2>/dev/null)
+trinitypath := $(bash conda activate orp_trinity; which Trinity 2>/dev/null)
+spadespath := $(bash conda activate orp_spades; which rnaspades.py 2>/dev/null)
+salmonpath := $(conda activate orp_salmon; which salmon 2>/dev/null)
+mclpath := $(bash which mcl 2>/dev/null)
+buscopath := $(bash conda activate orp_busco; which busco 2>/dev/null)
+seqtkpath := $(bash which seqtk 2>/dev/null)
+transratepath := $(bash which transrate 2>/dev/null)
+transabyss := $(bash conda activate orp_transabyss; which transabyss 2>/dev/null)
 BUSCO_CONFIG_FILE := ${MAKEDIR}/software/config.ini
 export BUSCO_CONFIG_FILE
 VERSION := ${shell cat  ${MAKEDIR}version.txt}
@@ -377,11 +377,11 @@ ${DIR}/assemblies/working/${RUNOUT}.unique.ORP.done:${DIR}/assemblies/${RUNOUT}.
 	touch ${DIR}/assemblies/working/${RUNOUT}.unique.ORP.done
 
 ${DIR}/quants/${RUNOUT}.ortho.idx:${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta
-	conda activate orp
+	conda activate orp_salmon
 	salmon index --no-version-check -t ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta -i ${DIR}/quants/${RUNOUT}.ortho.idx -k 31 --threads $(CPU)
 
 ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf:${DIR}/quants/${RUNOUT}.ortho.idx ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
-	conda activate orp
+	conda activate orp_salmon
 	salmon quant --no-version-check --validateMappings -p $(CPU) -i ${DIR}/quants/${RUNOUT}.ortho.idx --seqBias --gcBias --libType A -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq -o ${DIR}/quants/salmon_orthomerged_${RUNOUT}
 
 ${DIR}/assemblies/${RUNOUT}.filter.done:${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
