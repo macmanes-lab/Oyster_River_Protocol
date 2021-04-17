@@ -55,7 +55,7 @@ else
 				conda config --add channels bioconda; \
 				conda install mamba -n base -c conda-forge; \
 				mamba create -yc bioconda --name orp_spades spades=3.15.2; \
-				mamba create -yc bioconda --name orp_trinity trinity=2.9.1; \
+				mamba create -yc bioconda --name orp_trinity trinity=2.9.1 bwa=0.7.17 bashplotlib seqtk=1.3; \
 				mamba create -yc bioconda --name orp_busco busco=5.1.2; \
 				mamba create -yc bioconda --name orp_transabyss transabyss=2.0.1; \
 				mamba create -yc bioconda --name orp_rcorrector rcorrector=1.0.4; \

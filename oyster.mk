@@ -33,7 +33,7 @@ rcorrpath := $(conda activate orp_rcorrector; which rcorrector 2>/dev/null)
 trimmomaticpath := $(conda activate orp_trimmomatic; which trimmomatic 2>/dev/null)
 trinitypath := $(conda activate orp_trinity; which Trinity 2>/dev/null)
 spadespath := $(conda activate orp_spades; which rnaspades.py 2>/dev/null)
-salmonpath := $(conda activate orp_salmon; which salmon 2>/dev/null)
+salmonpath := $(source activate orp_salmon; which salmon 2>/dev/null)
 mclpath := $(bash which mcl 2>/dev/null)
 buscopath := $(conda activate orp_busco; which busco 2>/dev/null)
 seqtkpath := $(bash which seqtk 2>/dev/null)
@@ -47,7 +47,7 @@ LOWEXPFILE=${DIR}/assemblies/working/${RUNOUT}.LOWEXP.txt
 .DEFAULT_GOAL := main
 
 help:
-main: setup welcome readcheck run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_transabyss run_filtershort run_orthofuser merge makelist \
+main: setup check welcome readcheck run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_transabyss run_filtershort run_orthofuser merge makelist \
 	makegroups orthotransrate makeorthout make_goodlist orthofusing diamond diamond_uniq make_list1 make_list2 make_list3 make_list5 make_list6 make_list7 posthack cdhit orp_diamond orp_uniq salmon_index salmon filter \
 	secondfilter busco transrate strandeval report
 preprocess:setup check welcome readcheck run_trimmomatic run_rcorrector
