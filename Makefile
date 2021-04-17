@@ -52,6 +52,14 @@ else
 				conda activate; \
 				conda update -y -n base conda; \
 				conda install mamba -n base -c conda-forge; \
+				mamba create -yc bioconda --name orp_spades spades=3.15.2; \
+				mamba create -yc bioconda --name orp_trinity trinity=2.9.1; \
+				mamba create -yc bioconda --name orp_busco busco=5.1.2; \
+				mamba create -yc bioconda --name orp_transabyss transabyss=2.0.1; \
+				mamba create -yc bioconda --name orp_rcorrector rcorrector=1.0.4; \
+				mamba create -yc bioconda --name orp_trimmomatic trimmomatic=0.39; \
+				mamba create -yc bioconda --name orp_cdhit cd-hit=4.6.8; \
+				mamba create -yc bioconda --name orp_diamond diamond=2.0.8; \
 				mamba env create -f ${DIR}/orp_env.yml python=3.8; \
 				mamba clean -ya; \
 				conda deactivate; \
@@ -59,48 +67,6 @@ else
 	@echo PATH=\$$PATH:${DIR}/software/anaconda/install/bin >> pathfile;
 endif
 
-transabyss:
-ifdef transabysspath
-ifeq ($(transabyssversion),2.0.1)
-	@echo "TransABySS is already installed"
-else
-	@echo "version ${transabyssversion}"
-	@echo "TransABySS is installed, but not the right version"
-	cd ${DIR}/software/transabyss && git pull
-endif
-else
-	cd ${DIR}/software/ && git clone https://github.com/bcgsc/transabyss.git
-	@echo PATH=\$$PATH:${DIR}/software/transabyss >> pathfile
-endif
-
-
-trinity:
-ifdef trinitypath
-ifeq ($(trinityversion),2.12.0)
-	@echo "trinity is already installed"
-else
-	@echo "version ${trinityversion}"
-	@echo "trinity is installed, but not the right version"
-	cd ${DIR}/software/trinityrnaseq-v2.12.0 && git pull
-endif
-else
-	cd ${DIR}/software/ && curl -LO https://github.com/trinityrnaseq/trinityrnaseq/releases/download/v2.12.0/trinityrnaseq-v2.12.0.FULL.tar.gz
-	cd ${DIR}/software/ && tar -zxf trinityrnaseq-v2.12.0.FULL.tar.gz
-	cd ${DIR}/software/trinityrnaseq-v2.12.0 && make
-	@echo export TRINITY_HOME=${DIR}/software/trinityrnaseq-v2.12.0/ >> pathfile
-endif
-
-spades:
-ifdef spadespath
-ifeq ($(spadesversion),3.15.2)
-	@echo "spades is already installed"
-else
-endif
-else
-	cd ${DIR}/software/ && curl -LO https://cab.spbu.ru/files/release3.15.2/SPAdes-3.15.2-Linux.tar.gz
-	cd ${DIR}/software/ && tar -zxf SPAdes-3.15.2-Linux.tar.gz
-	@echo PATH=\$$PATH:${DIR}/software/SPAdes-3.15.2-Linux/bin/ >> pathfile
-endif
 
 diamond_data:conda
 ifdef diamond_data

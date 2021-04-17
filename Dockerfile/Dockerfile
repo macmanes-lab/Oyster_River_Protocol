@@ -50,12 +50,9 @@ RUN git clone https://github.com/macmanes-lab/Oyster_River_Protocol.git && cd Oy
 #########
 RUN echo 'PATH=$PATH:/home/orp/Oyster_River_Protocol/software/anaconda/install/bin' >> /home/orp/.profile \
     && echo 'PATH=$PATH:/home/orp/Oyster_River_Protocol/software/OrthoFinder/orthofinder' >> /home/orp/.profile \
-    && echo 'export TRINITY_HOME=/home/orp/Oyster_River_Protocol/software/trinityrnaseq-v2.12.0/' >> /home/orp/.profile \
-    && echo 'PATH=$PATH:/home/orp/Oyster_River_Protocol/software/SPAdes-3.15.2-Linux/bin/' >> /home/orp/.profile \
     && echo 'PATH=$PATH:/home/orp/Oyster_River_Protocol/software/orp-transrate' >> /home/orp/.profile \
-    && echo 'PATH=$PATH:/home/orp/Oyster_River_Protocol/software/transabyss' >> /home/orp/.profile \
     && /bin/bash -c "source /home/orp/.profile"
-ENV PATH="/home/orp/Oyster_River_Protocol/software/transabyss:/home/orp/Oyster_River_Protocol/software/anaconda/install/bin:/home/orp/Oyster_River_Protocol/software/trinityrnaseq-v2.12.0/:/home/orp/Oyster_River_Protocol/software/orp-transrate:/home/orp/Oyster_River_Protocol/software/SPAdes-3.15.2-Linux/bin/:/home/orp/Oyster_River_Protocol/software/OrthoFinder/orthofinder:/home/orp/Oyster_River_Protocol/software/anaconda/install/bin:${PATH}"
+ENV PATH="/home/orp/Oyster_River_Protocol/software/transabyss:/home/orp/Oyster_River_Protocol/software/anaconda/install/bin:/home/orp/Oyster_River_Protocol/software/orp-transrate:/home/orp/Oyster_River_Protocol/software/OrthoFinder/orthofinder:/home/orp/Oyster_River_Protocol/software/anaconda/install/bin:${PATH}"
 
 #########
 ### Clean up
