@@ -51,6 +51,8 @@ else
 				source ${DIR}/software/anaconda/install/etc/profile.d/conda.sh; \
 				conda activate; \
 				conda update -y -n base conda; \
+				conda config --add channels conda-forge; \
+				conda config --add channels bioconda; \
 				conda install mamba -n base -c conda-forge; \
 				mamba create -yc bioconda --name orp_spades spades=3.15.2; \
 				mamba create -yc bioconda --name orp_trinity trinity=2.9.1; \
