@@ -5,6 +5,7 @@ channels:
   - defaults
   - r
 dependencies:
+  - parallel
   - biopython
   - samtools=1.12
   - seqtk=1.3

@@ -201,7 +201,7 @@ ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq:${READ
 
 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq:${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq
 	source activate orp_rcorrector;\
-	perl ${RCORRDIR}/run_rcorrector.pl -t $(CPU) -k 31 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq -od ${DIR}/rcorr
+	run_rcorrector.pl -t $(CPU) -k 31 -1 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq -2 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq -od ${DIR}/rcorr
 
 ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq
 ifeq ($(STRAND),RF)
@@ -295,6 +295,7 @@ ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.list:${DIR}/orthofuse/${RUNOUT}/orthofuser.
 	echo $$(eval echo "{1..$$END}") | tr ' ' '\n' > ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.list
 
 ${DIR}/orthofuse/${RUNOUT}/groups.done:${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.list
+	source activate orp;\
 	export ORTHOINPUT=$$(find ${DIR}/orthofuse/${RUNOUT}/working/ -name Orthogroups.txt 2> /dev/null) && \
 	cat ${DIR}/orthofuse/${RUNOUT}/${RUNOUT}.list | parallel  -j $(CPU) -k "sed -n ''{}'p' $$ORTHOINPUT | tr ' ' '\n' | sed '1d' > ${DIR}/orthofuse/${RUNOUT}/{1}.groups"
 	touch ${DIR}/orthofuse/${RUNOUT}/groups.done
@@ -306,6 +307,7 @@ ${DIR}/orthofuse/${RUNOUT}/merged/assemblies.csv:${DIR}/orthofuse/${RUNOUT}/merg
 
 ${DIR}/orthofuse/${RUNOUT}/orthout.done:${DIR}/orthofuse/${RUNOUT}/groups.done
 	echo All the text files are made, start GREP
+	source activate orp;\
 	find ${DIR}/orthofuse/${RUNOUT}/ -maxdepth 1 -name '*groups' 2> /dev/null | parallel -j $(CPU) "grep -Fwf {} $$(find ${DIR}/orthofuse/${RUNOUT}/ -name contigs.csv 2> /dev/null) > {1}.orthout 2> /dev/null"
 	echo About to delete all the text files
 	find ${DIR}/orthofuse/${RUNOUT}/ -maxdepth 1 -name '*groups' -delete
@@ -313,6 +315,7 @@ ${DIR}/orthofuse/${RUNOUT}/orthout.done:${DIR}/orthofuse/${RUNOUT}/groups.done
 
 ${DIR}/orthofuse/${RUNOUT}/good.${RUNOUT}.list:${DIR}/orthofuse/${RUNOUT}/orthout.done
 	echo Search output files
+	source activate orp;\
 	find ${DIR}/orthofuse/${RUNOUT}/ -name '*orthout' 2> /dev/null | parallel -j $(CPU) "awk -F, -v max=0 '{if(\$$9>max){want=\$$1; max=\$$9}}END{print want}'" >> ${DIR}/orthofuse/${RUNOUT}/good.${RUNOUT}.list
 	find ${DIR}/orthofuse/${RUNOUT}/ -name '*orthout' -delete
 
@@ -343,15 +346,18 @@ ${DIR}/assemblies/diamond/${RUNOUT}.unique.trinity.txt ${DIR}/assemblies/diamond
 #list7 is stuff that is in 5 but not 6
 
 ${DIR}/assemblies/diamond/${RUNOUT}.list1:${DIR}/assemblies/diamond/${RUNOUT}.orthomerged.diamond.txt
+	source activate orp;\
 	cut -f2 ${DIR}/assemblies/diamond/${RUNOUT}.orthomerged.diamond.txt | cut -d "|" -f3 | cut -d "_" -f1 | sort --parallel=20 |uniq > ${DIR}/assemblies/diamond/${RUNOUT}.list1
 
 ${DIR}/assemblies/diamond/${RUNOUT}.list2:${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.spades75.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.spades55.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.transabyss.diamond.txt
+	source activate orp;\
 	cut -f2 ${DIR}/assemblies/diamond/${RUNOUT}.{transabyss,spades75,spades55,trinity}.diamond.txt | cut -d "|" -f3 | cut -d "_" -f1 | sort --parallel=20 | uniq > ${DIR}/assemblies/diamond/${RUNOUT}.list2
 
 ${DIR}/assemblies/diamond/${RUNOUT}.list3:${DIR}/assemblies/diamond/${RUNOUT}.list1 ${DIR}/assemblies/diamond/${RUNOUT}.list2
 	grep -xFvwf ${DIR}/assemblies/diamond/${RUNOUT}.list1 ${DIR}/assemblies/diamond/${RUNOUT}.list2 > ${DIR}/assemblies/diamond/${RUNOUT}.list3
 
 ${DIR}/assemblies/diamond/${RUNOUT}.list5:${DIR}/assemblies/diamond/${RUNOUT}.list3 ${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.spades75.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.spades55.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.transabyss.diamond.txt
+	source activate orp;\
 	for item in $$(cat ${DIR}/assemblies/diamond/${RUNOUT}.list3); do grep -F $$item ${DIR}/assemblies/diamond/${RUNOUT}.{transabyss,spades75,spades55,trinity}.diamond.txt | head -1 | cut -f1; done | cut -d ":" -f2 | sort --parallel=10 | uniq >> ${DIR}/assemblies/diamond/${RUNOUT}.list5
 
 ${DIR}/assemblies/diamond/${RUNOUT}.list6:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
