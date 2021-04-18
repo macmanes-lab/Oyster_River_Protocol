@@ -25,7 +25,7 @@ conda := $(shell conda info 2>/dev/null)
 orp := $(shell ${DIR}/software/anaconda/install/bin/conda info --envs | grep orp 2>/dev/null)
 VERSION := ${shell cat  ${MAKEDIR}version.txt}
 
-all: setup conda orp orthofuser transrate transabyss trinity spades diamond_data busco_data postscript
+all: setup conda orp orthofuser transrate diamond_data busco_data postscript
 
 .DELETE_ON_ERROR:
 
