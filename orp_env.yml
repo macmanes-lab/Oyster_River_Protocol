@@ -5,6 +5,8 @@ channels:
   - defaults
   - r
 dependencies:
+  - sra-tools
+  - blast
   - parallel
   - biopython
   - samtools=1.12
