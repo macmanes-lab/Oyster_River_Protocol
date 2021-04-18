@@ -76,8 +76,7 @@ diamond_data:conda
 ifdef diamond_data
 		@echo "diamond_data is already installed"
 else
-		source ${DIR}/software/anaconda/install/etc/profile.d/conda.sh && source activate orp_diamond;\
-		cd ${DIR}/software/diamond && curl -LO ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz && gzip -d uniprot_sprot.fasta.gz && diamond makedb --in uniprot_sprot.fasta -d swissprot
+		cd ${DIR}/software/diamond && curl -LO ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz && gzip -d uniprot_sprot.fasta.gz && ${DIR}/software/anaconda/install/envs/orp_diamond/bin/diamond makedb --in uniprot_sprot.fasta -d swissprot
 endif
 
 busco_data:conda
