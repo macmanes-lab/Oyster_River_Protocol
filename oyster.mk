@@ -320,15 +320,16 @@ ${DIR}/orthofuse/${RUNOUT}/good.${RUNOUT}.list:${DIR}/orthofuse/${RUNOUT}/orthou
 	find ${DIR}/orthofuse/${RUNOUT}/ -name '*orthout' -delete
 
 ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/good.${RUNOUT}.list ${DIR}/orthofuse/${RUNOUT}/merged.fasta
+	source activate orp;\
 	python ${MAKEDIR}/scripts/filter.py ${DIR}/orthofuse/${RUNOUT}/merged.fasta ${DIR}/orthofuse/${RUNOUT}/good.${RUNOUT}.list > ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 
 ${DIR}/assemblies/diamond/${RUNOUT}.orthomerged.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.transabyss.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.spades75.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.spades55.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta ${DIR}/assemblies/${RUNOUT}.transabyss.fasta ${DIR}/assemblies/${RUNOUT}.spades75.fasta ${DIR}/assemblies/${RUNOUT}.spades55.fasta ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
 	source activate orp_diamond;\
 	printf "\n\n\n\n Starting diamond \n\n\n\n";\
-	diamond blastx --quiet -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -d ${MAKEDIR}/software/diamond/swissprot -o ${DIR}/assemblies/diamond/${RUNOUT}.orthomerged.diamond.txt
-	diamond blastx --quiet -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.transabyss.fasta -d ${MAKEDIR}/software/diamond/swissprot -o ${DIR}/assemblies/diamond/${RUNOUT}.transabyss.diamond.txt
-	diamond blastx --quiet -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.spades75.fasta -d ${MAKEDIR}/software/diamond/swissprot  -o ${DIR}/assemblies/diamond/${RUNOUT}.spades75.diamond.txt
-	diamond blastx --quiet -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.spades55.fasta -d ${MAKEDIR}/software/diamond/swissprot -o ${DIR}/assemblies/diamond/${RUNOUT}.spades55.diamond.txt
+	diamond blastx --quiet -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta -d ${MAKEDIR}/software/diamond/swissprot -o ${DIR}/assemblies/diamond/${RUNOUT}.orthomerged.diamond.txt;\
+	diamond blastx --quiet -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.transabyss.fasta -d ${MAKEDIR}/software/diamond/swissprot -o ${DIR}/assemblies/diamond/${RUNOUT}.transabyss.diamond.txt;\
+	diamond blastx --quiet -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.spades75.fasta -d ${MAKEDIR}/software/diamond/swissprot  -o ${DIR}/assemblies/diamond/${RUNOUT}.spades75.diamond.txt;\
+	diamond blastx --quiet -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.spades55.fasta -d ${MAKEDIR}/software/diamond/swissprot -o ${DIR}/assemblies/diamond/${RUNOUT}.spades55.diamond.txt;\
 	diamond blastx --quiet -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta -d ${MAKEDIR}/software/diamond/swissprot  -o ${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt
 
 ${DIR}/assemblies/diamond/${RUNOUT}.unique.trinity.txt ${DIR}/assemblies/diamond/${RUNOUT}.unique.sp75.txt ${DIR}/assemblies/diamond/${RUNOUT}.unique.sp55.txt ${DIR}/assemblies/diamond/${RUNOUT}.unique.transabyss.txt:${DIR}/assemblies/diamond/${RUNOUT}.orthomerged.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.transabyss.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.spades55.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.spades55.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt
@@ -367,11 +368,12 @@ ${DIR}/assemblies/diamond/${RUNOUT}.list7:${DIR}/assemblies/diamond/${RUNOUT}.li
 	grep -xFvwf ${DIR}/assemblies/diamond/${RUNOUT}.list6 ${DIR}/assemblies/diamond/${RUNOUT}.list5 > ${DIR}/assemblies/diamond/${RUNOUT}.list7
 
 ${DIR}/assemblies/diamond/${RUNOUT}.newbies.fasta ${DIR}/assemblies/working/${RUNOUT}.orthomerged.fasta:${DIR}/assemblies/diamond/${RUNOUT}.list7
+	source activate orp;\
 	python ${MAKEDIR}/scripts/filter.py <(cat ${DIR}/assemblies/${RUNOUT}.{spades55,spades75,transabyss,trinity.Trinity}.fasta) ${DIR}/assemblies/diamond/${RUNOUT}.list7 >> ${DIR}/assemblies/diamond/${RUNOUT}.newbies.fasta
 	cat ${DIR}/assemblies/diamond/${RUNOUT}.newbies.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta > ${DIR}/assemblies/working/${RUNOUT}.orthomerged.fasta
 
 ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta:${DIR}/assemblies/working/${RUNOUT}.orthomerged.fasta
-	source activate orp_cdhit
+	source activate orp_cdhit;\
 	cd-hit-est -M 5000 -T $(CPU) -c .98 -i ${DIR}/assemblies/working/${RUNOUT}.orthomerged.fasta -o ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta
 
 ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt:${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta
@@ -404,6 +406,7 @@ endif
 ${DIR}/assemblies/${RUNOUT}.ORP.fasta:${DIR}/assemblies/${RUNOUT}.filter.done ${DIR}/assemblies/working/${RUNOUT}.LOWEXP.txt ${DIR}/assemblies/working/${RUNOUT}.HIGHEXP.txt ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta ${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt
 	if [[ "$$(test -s ${DIR}/assemblies/working/${RUNOUT}.LOWEXP.txt && echo "yes")" == "yes" ]];\
 	then\
+			source activate orp;\
 			cp ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta ${DIR}/assemblies/working/${RUNOUT}.ORP_BEFORE_TPM_FILT.fasta;\
 			python ${MAKEDIR}/scripts/filter.py ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta ${DIR}/assemblies/working/${RUNOUT}.HIGHEXP.txt > ${DIR}/assemblies/working/${RUNOUT}.ORP.HIGHEXP.fasta;\
 			grep -Fwf ${DIR}/assemblies/working/${RUNOUT}.LOWEXP.txt ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt >> ${DIR}/assemblies/working/${RUNOUT}.blasted;\
