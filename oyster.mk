@@ -28,26 +28,17 @@ BUSCODB :=
 START=1
 STRAND :=
 TPM_FILT = 0
-FASTADIR=
-rcorrpath := $(conda activate orp_rcorrector; which rcorrector 2>/dev/null)
-trimmomaticpath := $(conda activate orp_trimmomatic; which trimmomatic 2>/dev/null)
-trinitypath := $(conda activate orp_trinity; which Trinity 2>/dev/null)
-spadespath := $(conda activate orp_spades; which rnaspades.py 2>/dev/null)
-salmonpath := $(source activate orp_salmon; which salmon 2>/dev/null)
-mclpath := $(bash which mcl 2>/dev/null)
-buscopath := $(conda activate orp_busco; which busco 2>/dev/null)
-seqtkpath := $(bash which seqtk 2>/dev/null)
-transratepath := $(bash which transrate 2>/dev/null)
-transabyss := $(conda activate orp_transabyss; which transabyss 2>/dev/null)
 BUSCO_CONFIG_FILE := ${MAKEDIR}/software/config.ini
 export BUSCO_CONFIG_FILE
 VERSION := ${shell cat  ${MAKEDIR}version.txt}
 LOWEXPFILE=${DIR}/assemblies/working/${RUNOUT}.LOWEXP.txt
+RED:=$(shell tput setaf 1)
+reset:=$(shell tput sgr0)
 
 .DEFAULT_GOAL := main
 
 help:
-main: setup welcome readcheck run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_transabyss run_filtershort run_orthofuser merge makelist \
+main: setup check welcome readcheck run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_transabyss run_filtershort run_orthofuser merge makelist \
 	makegroups orthotransrate makeorthout make_goodlist orthofusing diamond diamond_uniq make_list1 make_list2 make_list3 make_list5 make_list6 make_list7 posthack cdhit orp_diamond orp_uniq salmon_index salmon filter \
 	secondfilter busco transrate strandeval report
 preprocess:setup check welcome readcheck run_trimmomatic run_rcorrector
@@ -108,57 +99,76 @@ ${DIR}/assemblies/working ${DIR}/reads ${DIR}/rcorr ${DIR}/assemblies/diamond ${
 	@mkdir -p ${DIR}/assemblies/working
 
 check:
-ifdef salmonpath
+ifeq ($(shell basename $$(source activate orp_salmon; which salmon)),salmon)
+$(info $RED"SALMON installed"$NC)
 else
-	$(error "\n\n*** SALMON is not installed, must fix ***")
+$(error "*** SALMON is not installed, must fix ***")
 endif
-ifdef transratepath
+
+ifeq ($(shell basename $$(source activate orp; which transrate)),transrate)
 else
-	$(error "\n\n*** TRANSRATE is not installed, must fix ***")
+$(info "TRANSRATE installed")
+$(error "*** TRANSRATE is not installed, must fix ***")
 endif
-ifdef seqtkpath
+
+ifeq ($(shell basename $$(source activate orp; which seqtk)),seqtk)
 else
-	$(error "\n\n*** SEQTK is not installed, must fix ***")
+$(info "SEQTK installed")
+$(error "*** SEQTK is not installed, must fix ***")
 endif
-ifdef buscopath
+
+ifeq ($(shell basename $$(source activate orp_busco; which busco)),busco)
+$(info "BUSCO installed")
 else
-	$(error "\n\n*** BUSCO is not installed, must fix ***")
+$(error "*** BUSCO is not installed, must fix ***")
 endif
-ifdef mclpath
+
+ifeq ($(shell basename $$(source activate orp; which mcl)),mcl)
 else
-	$(error "\n\n*** MCL is not installed, must fix ***")
+$(info "MCL installed")
+$(error "*** MCL is not installed, must fix ***")
 endif
-ifdef spadespath
+
+ifeq ($(shell basename $$(source activate orp_spades; which rnaspades.py)),rnaspades.py)
+$(info "SPADES installed")
 else
-	$(error "\n\n*** SPADES is not installed, must fix ***")
+$(error "*** SPADES is not installed, must fix ***")
 endif
-ifdef trinitypath
+
+ifeq ($(shell basename $$(source activate orp_trinity; which Trinity)),Trinity)
+$(info "TRINITY installed")
 else
-	$(error "\n\n*** TRINITY is not installed, must fix ***")
+$(error "*** TRINITY is not installed, must fix ***")
 endif
-ifdef trimmomaticpath
+
+ifeq ($(shell basename $$(source activate orp_trimmomatic; which trimmomatic)),trimmomatic)
+$(info "TRIMMOMATIC installed")
 else
-	$(error  "\n\n Maybe TRIMMOMATIC is not installed, or maybe you are working on Bridges")
+$(error "*** TRIMMOMATIC is not installed, must fix ***")
 endif
-ifdef transabyss
+
+ifeq ($(shell basename $$(source activate orp_transabyss; which transabyss)),transabyss)
+$(info "TRANSABYSS installed")
 else
-	$(error "\n\n *** transabyss is not installed, must fix ***")
+$(error "*** TRANSABYSS is not installed, must fix ***")
 endif
-ifdef rcorrpath
+
+ifeq ($(shell basename $$(source activate orp_rcorrector; which run_rcorrector.pl)),run_rcorrector.pl)
+$(info "RCORRECTOR installed")
 else
-	$(error "\n\n *** RCORRECTOR is not installed, must fix ***")
+$(error "*** RCORRECTOR is not installed, must fix ***")
 endif
 
 help:
-	printf "\n\n*****  Welcome to the Oyster River Prptocol ***** \n"
+	printf $(RED)"\n\n*****  Welcome to the Oyster River Prptocol ***** \n"
 	printf "*****  This is version ${VERSION} *****\n\n"
 	printf "Usage:\n\n"
-	printf "/path/to/Oyster_River/Protocol/oyster.mk main CPU=24 \\n"
+	printf "/path/to/Oyster_River/Protocol/oyster.mk CPU=24 \\n"
 	printf "MEM=128 \\n"
 	printf "STRAND=RF \\n"
 	printf "READ1=1.subsamp_1.cor.fq \\n"
 	printf "READ2=1.subsamp_2.cor.fq \\n"
-	printf "RUNOUT=test\n\n"
+	printf "RUNOUT=test\n\n"$(reset)
 
 readcheck:
 	if [ -e ${READ1} ]; then printf ""; else printf "\n\n\n\n ERROR: YOUR READ1 FILE DOES NOT EXIST AT THE LOCATION YOU SPECIFIED\n\n\n\n "; $$(shell exit); fi;
@@ -186,9 +196,9 @@ else
 endif
 
 welcome:
-	printf "\n\n*****  Welcome to the Oyster River ***** \n"
+	printf $(RED)"\n\n*****  Welcome to the Oyster River ***** \n"
 	printf "*****  This is version ${VERSION} ***** \n\n "
-	printf " \n\n"
+	printf " \n\n"$(reset)
 
 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq:${READ1} ${READ2}
 	@if [ $$(hostname | cut -d. -f3-5) == 'bridges.psc.edu' ];\
