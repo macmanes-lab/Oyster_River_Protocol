@@ -100,67 +100,67 @@ ${DIR}/assemblies/working ${DIR}/reads ${DIR}/rcorr ${DIR}/assemblies/diamond ${
 
 check:
 ifeq ($(shell basename $$(source activate orp_salmon; which salmon)),salmon)
-$(info "SALMON installed")
+$(info SALMON installed)
 else
-$(error "*** SALMON is not installed, must fix ***")
+$(error *** SALMON is not installed, must fix ***)
 endif
 
 ifeq ($(shell basename $$(source activate orp; which transrate)),transrate)
 else
-$(info "TRANSRATE installed")
-$(error "*** TRANSRATE is not installed, must fix ***")
+$(info TRANSRATE installed)
+$(error *** TRANSRATE is not installed, must fix ***)
 endif
 
 ifeq ($(shell basename $$(source activate orp; which seqtk)),seqtk)
 else
-$(info "SEQTK installed")
-$(error "*** SEQTK is not installed, must fix ***")
+$(info SEQTK installed)
+$(error *** SEQTK is not installed, must fix ***)
 endif
 
 ifeq ($(shell basename $$(source activate orp_busco; which busco)),busco)
-$(info "BUSCO installed")
+$(info BUSCO installed)
 else
-$(error "*** BUSCO is not installed, must fix ***")
+$(error *** BUSCO is not installed, must fix ***)
 endif
 
 ifeq ($(shell basename $$(source activate orp; which mcl)),mcl)
 else
-$(info "MCL installed")
-$(error "*** MCL is not installed, must fix ***")
+$(info MCL installed)
+$(error *** MCL is not installed, must fix ***)
 endif
 
 ifeq ($(shell basename $$(source activate orp_spades; which rnaspades.py)),rnaspades.py)
-$(info "SPADES installed")
+$(info SPADES installed)
 else
-$(error "*** SPADES is not installed, must fix ***")
+$(error *** SPADES is not installed, must fix ***)
 endif
 
 ifeq ($(shell basename $$(source activate orp_trinity; which Trinity)),Trinity)
-$(info "TRINITY installed")
+$(info TRINITY installed)
 else
-$(error "*** TRINITY is not installed, must fix ***")
+$(error *** TRINITY is not installed, must fix ***)
 endif
 
 ifeq ($(shell basename $$(source activate orp_trimmomatic; which trimmomatic)),trimmomatic)
-$(info "TRIMMOMATIC installed")
+$(info TRIMMOMATIC installed)
 else
-$(error "*** TRIMMOMATIC is not installed, must fix ***")
+$(error *** TRIMMOMATIC is not installed, must fix ***)
 endif
 
 ifeq ($(shell basename $$(source activate orp_transabyss; which transabyss)),transabyss)
-$(info "TRANSABYSS installed")
+$(info TRANSABYSS installed)
 else
-$(error "*** TRANSABYSS is not installed, must fix ***")
+$(error *** TRANSABYSS is not installed, must fix ***)
 endif
 
 ifeq ($(shell basename $$(source activate orp_rcorrector; which run_rcorrector.pl)),run_rcorrector.pl)
-$(info "RCORRECTOR installed")
+$(info RCORRECTOR installed)
 else
-$(error "*** RCORRECTOR is not installed, must fix ***")
+$(error *** RCORRECTOR is not installed, must fix ***)
 endif
 
 help:
-	printf $(RED)"\n\n*****  Welcome to the Oyster River Prptocol ***** \n"
+	printf "$(RED)\n\n*****  Welcome to the Oyster River Prptocol ***** \n"
 	printf "*****  This is version ${VERSION} *****\n\n"
 	printf "Usage:\n\n"
 	printf "/path/to/Oyster_River/Protocol/oyster.mk CPU=24 \\n"
@@ -168,7 +168,7 @@ help:
 	printf "STRAND=RF \\n"
 	printf "READ1=1.subsamp_1.cor.fq \\n"
 	printf "READ2=1.subsamp_2.cor.fq \\n"
-	printf "RUNOUT=test\n\n"$(reset)
+	printf "RUNOUT=test\n\n$(reset)"
 
 readcheck:
 	if [ -e ${READ1} ]; then printf ""; else printf "\n\n\n\n ERROR: YOUR READ1 FILE DOES NOT EXIST AT THE LOCATION YOU SPECIFIED\n\n\n\n "; $$(shell exit); fi;
@@ -196,7 +196,7 @@ else
 endif
 
 welcome:
-	printf $(RED)"\n\n*****  Welcome to the Oyster River ***** \n"
+	printf "$(RED)\n\n*****  Welcome to the Oyster River ***** \n"
 	printf "*****  This is version ${VERSION} *****$(reset)\n\n"
 	printf " \n\n"
 
