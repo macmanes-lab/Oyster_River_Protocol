@@ -100,7 +100,7 @@ ${DIR}/assemblies/working ${DIR}/reads ${DIR}/rcorr ${DIR}/assemblies/diamond ${
 
 check:
 ifeq ($(shell basename $$(source activate orp_salmon; which salmon)),salmon)
-$(info $RED"SALMON installed"$NC)
+$(info "SALMON installed")
 else
 $(error "*** SALMON is not installed, must fix ***")
 endif
@@ -197,8 +197,8 @@ endif
 
 welcome:
 	printf $(RED)"\n\n*****  Welcome to the Oyster River ***** \n"
-	printf "*****  This is version ${VERSION} ***** \n\n "
-	printf " \n\n"$(reset)
+	printf "*****  This is version ${VERSION} *****$(reset)\n\n"
+	printf " \n\n"
 
 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq:${READ1} ${READ2}
 	@if [ $$(hostname | cut -d. -f3-5) == 'bridges.psc.edu' ];\
