@@ -27,18 +27,19 @@ BUSCO_CONFIG_FILE := ${MAKEDIR}/software/config.ini
 export BUSCO_CONFIG_FILE
 VERSION := ${shell cat  ${MAKEDIR}version.txt}
 LOWEXPFILE=${DIR}/assemblies/working/${RUNOUT}.LOWEXP.txt
+TIMING_LOG := ${DIR}/reports/${RUNOUT}.timing.log
 RED:=$(shell tput setaf 1)
 reset:=$(shell tput sgr0)
 
 .DEFAULT_GOAL := main
 
 help:
-main: setup check welcome readcheck run_trimmomatic run_rcorrector run_trinity run_spades75 run_spades55 run_transabyss run_filtershort run_orthofuser merge makelist \
-	makegroups orthotransrate makeorthout make_goodlist orthofusing diamond diamond_uniq make_list1 make_list2 make_list3 make_list5 make_list6 make_list7 posthack cdhit orp_diamond orp_uniq salmon_index salmon filter \
-	secondfilter busco transrate strandeval report
+main: setup timing_init check welcome readcheck timed-run_trimmomatic timed-run_rcorrector timed-run_trinity timed-run_spades75 timed-run_spades55 timed-run_transabyss timed-run_filtershort timed-run_orthofuser merge makelist \
+	makegroups timed-orthotransrate timed-makeorthout make_goodlist timed-orthofusing timed-diamond diamond_uniq make_list1 make_list2 make_list3 timed-make_list5 make_list6 make_list7 timed-posthack timed-cdhit timed-orp_diamond orp_uniq timed-salmon_index timed-salmon filter \
+	timed-secondfilter timed-busco timed-transrate timed-strandeval report timing_report
 preprocess:setup check welcome readcheck run_trimmomatic run_rcorrector
-update_merge:setup check welcome readcheck run_filtershort run_orthofuser merge makelist makegroups orthotransrate makeorthout make_goodlist orthofusing diamond diamond_uniq \
-	make_list1 make_list2 make_list3 make_list5 make_list6 make_list7 posthack cdhit orp_diamond orp_uniq salmon_index salmon filter busco transrate strandeval report
+update_merge:setup timing_init check welcome readcheck timed-run_filtershort timed-run_orthofuser merge makelist makegroups timed-orthotransrate timed-makeorthout make_goodlist timed-orthofusing timed-diamond diamond_uniq \
+	make_list1 make_list2 make_list3 timed-make_list5 make_list6 make_list7 timed-posthack timed-cdhit timed-orp_diamond orp_uniq timed-salmon_index timed-salmon filter timed-secondfilter timed-busco timed-transrate timed-strandeval report timing_report
 run_trimmomatic:${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq
 run_rcorrector:${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
 run_trinity:${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta
@@ -81,7 +82,7 @@ orp_uniq:${DIR}/assemblies/working/${RUNOUT}.unique.ORP.done
 salmon_index:${DIR}/quants/${RUNOUT}.ortho.idx
 
 .DELETE_ON_ERROR:
-.PHONY:reportgen check clean
+.PHONY:reportgen check clean timing_init timing_report
 
 ${DIR}/assemblies/working ${DIR}/reads ${DIR}/rcorr ${DIR}/assemblies/diamond ${DIR}/assemblies ${DIR}/reports ${DIR}/orthofuse ${DIR}/quants:
 	@mkdir -p ${DIR}/reads
@@ -92,6 +93,23 @@ ${DIR}/assemblies/working ${DIR}/reads ${DIR}/rcorr ${DIR}/assemblies/diamond ${
 	@mkdir -p ${DIR}/quants
 	@mkdir -p ${DIR}/assemblies/diamond
 	@mkdir -p ${DIR}/assemblies/working
+
+timing_init:
+	@mkdir -p ${DIR}/reports
+	@: > ${TIMING_LOG}
+
+timed-%:
+	@start=$$(date +%s); \
+	$(MAKE) --no-print-directory -f $(firstword $(MAKEFILE_LIST)) $*; \
+	status=$$?; \
+	end=$$(date +%s); \
+	printf "%s\t%d\n" "$*" "$$((end - start))" >> ${TIMING_LOG}; \
+	exit $$status
+
+timing_report:
+	@printf "\n\n*****  STEP TIMING for ${RUNOUT} ***** \n\n"
+	@awk -F'\t' '{h=int($$2/3600); m=int(($$2%3600)/60); s=$$2%60; printf "%-16s %02d:%02d:%02d\n", $$1, h, m, s; total+=$$2} END{h=int(total/3600); m=int((total%3600)/60); s=total%60; printf "%-16s %02d:%02d:%02d\n", "TOTAL", h, m, s}' ${TIMING_LOG}
+	@printf "\nFull timing log saved to: ${TIMING_LOG}\n\n"
 
 check:
 ifeq ($(shell basename $$(conda run -n orp_salmon which salmon 2>/dev/null)),salmon)
