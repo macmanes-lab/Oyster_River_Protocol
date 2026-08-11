@@ -341,7 +341,7 @@ ${DIR}/assemblies/diamond/${RUNOUT}.list7:${DIR}/assemblies/diamond/${RUNOUT}.li
 	grep -xFvwf ${DIR}/assemblies/diamond/${RUNOUT}.list6 ${DIR}/assemblies/diamond/${RUNOUT}.list5 > ${DIR}/assemblies/diamond/${RUNOUT}.list7
 
 ${DIR}/assemblies/diamond/${RUNOUT}.newbies.fasta ${DIR}/assemblies/working/${RUNOUT}.orthomerged.fasta:${DIR}/assemblies/diamond/${RUNOUT}.list7
-	conda run --no-capture-output -n orp python ${MAKEDIR}/scripts/filter.py <(cat ${DIR}/assemblies/${RUNOUT}.{spades55,spades75,transabyss,trinity.Trinity}.fasta) ${DIR}/assemblies/diamond/${RUNOUT}.list7 >> ${DIR}/assemblies/diamond/${RUNOUT}.newbies.fasta
+	conda run --no-capture-output -n orp bash -c "python ${MAKEDIR}/scripts/filter.py <(cat ${DIR}/assemblies/${RUNOUT}.{spades55,spades75,transabyss,trinity.Trinity}.fasta) ${DIR}/assemblies/diamond/${RUNOUT}.list7" >> ${DIR}/assemblies/diamond/${RUNOUT}.newbies.fasta
 	cat ${DIR}/assemblies/diamond/${RUNOUT}.newbies.fasta ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta > ${DIR}/assemblies/working/${RUNOUT}.orthomerged.fasta
 
 ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta:${DIR}/assemblies/working/${RUNOUT}.orthomerged.fasta
@@ -397,14 +397,12 @@ ${DIR}/reports/transrate_${RUNOUT}/assemblies.csv:${DIR}/assemblies/${RUNOUT}.OR
 
 ${DIR}/reports/${RUNOUT}.strandeval.done:${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	conda run --no-capture-output -n orp_trinity bwa index -p ${RUNOUT} ${DIR}/assemblies/${RUNOUT}.ORP.fasta;\
-	conda run --no-capture-output -n orp_trinity bwa mem -t $(CPU) ${RUNOUT} \
-	<(conda run --no-capture-output -n orp_trinity seqtk sample -s 23894 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq 400000) \
-	<(conda run --no-capture-output -n orp_trinity seqtk sample -s 23894 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq 400000) \
+	conda run --no-capture-output -n orp_trinity bash -c "bwa mem -t $(CPU) ${RUNOUT} <(seqtk sample -s 23894 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq 400000) <(seqtk sample -s 23894 ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq 400000)" \
 	| conda run --no-capture-output -n orp_sam samtools view -@10 -Sb - \
 	| conda run --no-capture-output -n orp_sam samtools sort -T ${RUNOUT} -O bam -@10 -o "${RUNOUT}".sorted.bam -;\
 	conda run --no-capture-output -n orp_sam samtools flagstat "${RUNOUT}".sorted.bam > ${DIR}/assemblies/${RUNOUT}.flagstat;\
 	perl -I $$(dirname $$(readlink -f $$(conda run -n orp_trinity which Trinity)))/PerlLib ${MAKEDIR}/scripts/examine_strand.pl "${RUNOUT}".sorted.bam ${RUNOUT};\
-	conda run --no-capture-output -n orp_trinity hist  -p '#' -c red <(cat ${RUNOUT}.dat | awk '{print $$5}' | sed  1d);\
+	conda run --no-capture-output -n orp_trinity bash -c "hist -p '#' -c red <(cat ${RUNOUT}.dat | awk '{print \$$5}' | sed 1d)";\
 	rm -f "${RUNOUT}".sorted.bam
 	rm -fr ${RUNOUT}.{bwt,pac,ann,amb,sa,dat}
 	touch ${DIR}/reports/${RUNOUT}.strandeval.done
