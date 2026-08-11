@@ -2,8 +2,6 @@ name: orp
 channels:
   - bioconda
   - conda-forge
-  - defaults
-  - r
 dependencies:
   - sra-tools
   - blast
