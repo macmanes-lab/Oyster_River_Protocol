@@ -20,7 +20,7 @@ trinityversion = $(shell ${DIR}/software/trinityrnaseq-v2.12.0/Trinity --version
 spadespath := $(shell which ${DIR}/software/SPAdes-3.15.2-Linux/bin/spades.py 2>/dev/null)
 spadesversion = $(shell ${DIR}/software/SPAdes-3.15.2-Linux/bin/spades.py --version | awk -F 'v' '{print $$2}')
 diamond_data := $(shell ls ${DIR}/software/diamond/uniprot_sprot.fasta 2>/dev/null)
-busco_data := $(shell ls ${DIR}/busco_dbs/eukaryota_odb10 2>/dev/null)
+busco_data := $(shell find ${DIR}/busco_dbs -iname "eukaryota_odb12*" -type d 2>/dev/null)
 conda := $(shell conda info 2>/dev/null)
 orp := $(shell ${DIR}/software/anaconda/install/bin/conda info --envs | grep orp 2>/dev/null)
 VERSION := ${shell cat  ${MAKEDIR}version.txt}
@@ -54,17 +54,17 @@ else
 				conda config --add channels conda-forge; \
 				conda config --add channels bioconda; \
 				conda install mamba -n base -yc conda-forge; \
-				mamba create -yc bioconda --name orp_spades spades=3.15.2; \
-				mamba create -yc bioconda --name orp_trinity trinity=2.9.1 bwa=0.7.17 bashplotlib seqtk=1.3; \
-				mamba create -yc bioconda --name orp_busco busco=5.1.2; \
+				mamba create -yc bioconda --name orp_spades spades=4.3.0; \
+				mamba create -yc bioconda --name orp_trinity trinity=2.15.2 bwa=0.7.19 bashplotlib seqtk=1.5; \
+				mamba create -yc bioconda --name orp_busco busco=6.1.0; \
 				mamba create -yc bioconda --name orp_transabyss transabyss=2.0.1; \
-				mamba create -yc bioconda --name orp_rcorrector rcorrector=1.0.4; \
-				mamba create -yc bioconda --name orp_trimmomatic trimmomatic=0.39; \
-				mamba create -yc bioconda --name orp_sam samtools=1.12 bwa=0.7.17 seqtk=1.3; \
-				mamba create -yc bioconda --name orp_salmon salmon=1.4.0; \
-				mamba create -yc bioconda --name orp_cdhit cd-hit=4.6.8; \
-				mamba create -yc bioconda --name orp_diamond diamond=2.0.8; \
-				mamba env create -f ${DIR}/orp_env.yml python=3.8; \
+				mamba create -yc bioconda --name orp_rcorrector rcorrector=1.0.7; \
+				mamba create -yc bioconda --name orp_trimmomatic trimmomatic=0.41; \
+				mamba create -yc bioconda --name orp_sam samtools=1.24 bwa=0.7.19 seqtk=1.5; \
+				mamba create -yc bioconda --name orp_salmon salmon=2.5.1; \
+				mamba create -yc bioconda --name orp_cdhit cd-hit=4.8.1; \
+				mamba create -yc bioconda --name orp_diamond diamond=2.2.5; \
+				mamba env create -f ${DIR}/orp_env.yml python=3.14; \
 				mamba clean -ya; \
 				conda deactivate; \
   )
@@ -81,9 +81,10 @@ endif
 
 busco_data:conda
 ifdef busco_data
+		@echo "busco_data is already installed"
 else
-	mkdir ${DIR}/busco_dbs && cd ${DIR}/busco_dbs
-	cd ${DIR}/busco_dbs && wget https://busco-data.ezlab.org/v5/data/lineages/eukaryota_odb10.2020-09-10.tar.gz && tar -zxf eukaryota_odb10.2020-09-10.tar.gz
+		mkdir -p ${DIR}/busco_dbs
+		${DIR}/software/anaconda/install/envs/orp_busco/bin/busco --download eukaryota_odb12.2 --download_path ${DIR}/busco_dbs
 endif
 
 transrate:

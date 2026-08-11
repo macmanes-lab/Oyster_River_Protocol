@@ -9,10 +9,10 @@ dependencies:
   - blast
   - parallel
   - biopython
-  - samtools=1.12
-  - seqtk=1.3
-  - mcl=14.137
-  - pip=21.0.1
+  - samtools=1.24
+  - seqtk=1.5
+  - mcl=22.282
+  - pip=26.2.1
   - pip:
     - biopython
     - scipy

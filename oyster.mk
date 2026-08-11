@@ -23,7 +23,7 @@ READ2=
 BUSCO := ${shell which busco}
 BUSCODIR := $(dir $(firstword $(BUSCO)))
 RUNOUT=USER_RUN
-LINEAGE=eukaryota_odb10
+LINEAGE=eukaryota_odb12.2
 BUSCODB :=
 START=1
 STRAND :=
@@ -55,7 +55,7 @@ run_filtershort:${DIR}/orthofuse/${RUNOUT}/working/${RUNOUT}.spades55.fasta.shor
 run_orthofuser:${DIR}/orthofuse/${RUNOUT}/orthofuser.done
 merge:${DIR}/orthofuse/${RUNOUT}/merged.fasta
 orthotransrate:${DIR}/orthofuse/${RUNOUT}/merged/assemblies.csv
-makeorthout:${DIR}/orthofuse/${RUNOUT}/orthout.done
+makeorthout:${DIR}/orthofuse/${RUNOUT}/good.${RUNOUT}.list
 make_goodlist:${DIR}/orthofuse/${RUNOUT}/good.${RUNOUT}.list
 orthofusing:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 salmon:${DIR}/quants/salmon_orthomerged_${RUNOUT}/quant.sf
@@ -171,8 +171,8 @@ help:
 	printf "RUNOUT=test\n\n$(reset)"
 
 readcheck:
-	if [ -e ${READ1} ]; then printf ""; else printf "\n\n\n\n ERROR: YOUR READ1 FILE DOES NOT EXIST AT THE LOCATION YOU SPECIFIED\n\n\n\n "; $$(shell exit); fi;
-	if [ -e ${READ2} ]; then printf ""; else printf "\n\n\n\n ERROR: YOUR READ2 FILE DOES NOT EXIST AT THE LOCATION YOU SPECIFIED\n\n\n\n "; $$(shell exit); fi;
+	if [ -e ${READ1} ]; then printf ""; else printf "\n\n\n\n ERROR: YOUR READ1 FILE DOES NOT EXIST AT THE LOCATION YOU SPECIFIED\n\n\n\n "; exit 1; fi;
+	if [ -e ${READ2} ]; then printf ""; else printf "\n\n\n\n ERROR: YOUR READ2 FILE DOES NOT EXIST AT THE LOCATION YOU SPECIFIED\n\n\n\n "; exit 1; fi;
 ifeq ($(shell file ${READ1} | awk '{print $$2}'),gzip)
 	if [ $$(gzip -cd $${READ1} | head -n 400 | awk '{if(NR%4==2) {count++; bases += length} } END{print int(bases/count)}') -gt $(SPADES2_KMER) ] && [ $$(gzip -cd $${READ2} | head -n 400 | awk '{if(NR%4==2) {count++; bases += length} } END{print int(bases/count)}') -gt $(SPADES2_KMER) ];\
 	then\
@@ -181,7 +181,7 @@ ifeq ($(shell file ${READ1} | awk '{print $$2}'),gzip)
 		printf "\n\n\n\n IT LOOKS LIKE YOUR READS ARE NOT AT LEAST $(SPADES2_KMER) BP LONG,\n ";\
 		printf "PLEASE EDIT YOUR COMMAND USING THE "SPADES2_KMER=INT" FLAGS,\n";\
 		printf " SETTING THE ASSEMBLY KMER LENGTH TO AN ODD NUMBER LESS THAN YOUR READ LENGTH \n\n\n\n";\
-		$$(shell exit);\
+		exit 1;\
 	fi
 else
 	if [ $$(head -n400 $${READ1} | awk '{if(NR%4==2) {count++; bases += length} } END{print int(bases/count)}') -gt $(SPADES2_KMER) ] && [ $$(head -n400 $${READ2} | awk '{if(NR%4==2) {count++; bases += length} } END{print int(bases/count)}') -gt $(SPADES2_KMER) ];\
@@ -191,7 +191,7 @@ else
 		printf "\n\n\n\n IT LOOKS LIKE YOUR READS ARE NOT AT LEAST $(SPADES2_KMER) BP LONG,\n ";\
 		printf "PLEASE EDIT YOUR COMMAND USING THE "SPADES2_KMER=INT" FLAGS,\n";\
 		printf " SETTING THE ASSEMBLY KMER LENGTH LESS THAN YOUR READ LENGTH \n\n\n\n";\
-		$$(shell exit);\
+		exit 1;\
 	fi
 endif
 
@@ -315,19 +315,11 @@ ${DIR}/orthofuse/${RUNOUT}/merged/assemblies.csv:${DIR}/orthofuse/${RUNOUT}/merg
 	${MAKEDIR}/software/orp-transrate/transrate -o ${DIR}/orthofuse/${RUNOUT}/merged -t $(CPU) -a ${DIR}/orthofuse/${RUNOUT}/merged.fasta --left ${DIR}/rcorr/${RUNOUT}.TRIM_1P.cor.fq --right ${DIR}/rcorr/${RUNOUT}.TRIM_2P.cor.fq
 	find ${DIR}/orthofuse/${RUNOUT}/merged -name "*bam" -delete
 
-${DIR}/orthofuse/${RUNOUT}/orthout.done:${DIR}/orthofuse/${RUNOUT}/groups.done
-	echo All the text files are made, start GREP
+${DIR}/orthofuse/${RUNOUT}/good.${RUNOUT}.list:${DIR}/orthofuse/${RUNOUT}/groups.done ${DIR}/orthofuse/${RUNOUT}/merged/assemblies.csv
+	echo Picking the best contig per orthogroup
 	source activate orp;\
-	find ${DIR}/orthofuse/${RUNOUT}/ -maxdepth 1 -name '*groups' 2> /dev/null | parallel -j $(CPU) "grep -Fwf {} $$(find ${DIR}/orthofuse/${RUNOUT}/ -name contigs.csv 2> /dev/null) > {1}.orthout 2> /dev/null"
-	echo About to delete all the text files
+	python ${MAKEDIR}/scripts/pick_best_contigs.py $$(find ${DIR}/orthofuse/${RUNOUT}/ -name contigs.csv 2> /dev/null) ${DIR}/orthofuse/${RUNOUT} ${DIR}/orthofuse/${RUNOUT}/good.${RUNOUT}.list
 	find ${DIR}/orthofuse/${RUNOUT}/ -maxdepth 1 -name '*groups' -delete
-	touch ${DIR}/orthofuse/${RUNOUT}/orthout.done
-
-${DIR}/orthofuse/${RUNOUT}/good.${RUNOUT}.list:${DIR}/orthofuse/${RUNOUT}/orthout.done
-	echo Search output files
-	source activate orp;\
-	find ${DIR}/orthofuse/${RUNOUT}/ -name '*orthout' 2> /dev/null | parallel -j $(CPU) "awk -F, -v max=0 '{if(\$$9>max){want=\$$1; max=\$$9}}END{print want}'" >> ${DIR}/orthofuse/${RUNOUT}/good.${RUNOUT}.list
-	find ${DIR}/orthofuse/${RUNOUT}/ -name '*orthout' -delete
 
 ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta:${DIR}/orthofuse/${RUNOUT}/good.${RUNOUT}.list ${DIR}/orthofuse/${RUNOUT}/merged.fasta
 	source activate orp;\
@@ -342,7 +334,7 @@ ${DIR}/assemblies/diamond/${RUNOUT}.orthomerged.diamond.txt ${DIR}/assemblies/di
 	diamond blastx --quiet -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.spades55.fasta -d ${MAKEDIR}/software/diamond/swissprot -o ${DIR}/assemblies/diamond/${RUNOUT}.spades55.diamond.txt;\
 	diamond blastx --quiet -p $(CPU) -e 1e-8 --top 0.1 -q ${DIR}/assemblies/${RUNOUT}.trinity.Trinity.fasta -d ${MAKEDIR}/software/diamond/swissprot  -o ${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt
 
-${DIR}/assemblies/diamond/${RUNOUT}.unique.trinity.txt ${DIR}/assemblies/diamond/${RUNOUT}.unique.sp75.txt ${DIR}/assemblies/diamond/${RUNOUT}.unique.sp55.txt ${DIR}/assemblies/diamond/${RUNOUT}.unique.transabyss.txt:${DIR}/assemblies/diamond/${RUNOUT}.orthomerged.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.transabyss.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.spades55.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.spades55.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt
+${DIR}/assemblies/diamond/${RUNOUT}.unique.trinity.txt ${DIR}/assemblies/diamond/${RUNOUT}.unique.sp75.txt ${DIR}/assemblies/diamond/${RUNOUT}.unique.sp55.txt ${DIR}/assemblies/diamond/${RUNOUT}.unique.transabyss.txt:${DIR}/assemblies/diamond/${RUNOUT}.orthomerged.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.transabyss.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.spades55.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.spades75.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt
 	awk '{print $$2}' ${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f1 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/${RUNOUT}.unique.trinity.txt
 	awk '{print $$2}' ${DIR}/assemblies/diamond/${RUNOUT}.spades75.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f1 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/${RUNOUT}.unique.sp75.txt
 	awk '{print $$2}' ${DIR}/assemblies/diamond/${RUNOUT}.spades55.diamond.txt | awk -F "|" '{print $$3}' | cut -d _ -f1 | sort | uniq | wc -l > ${DIR}/assemblies/diamond/${RUNOUT}.unique.sp55.txt
@@ -369,7 +361,7 @@ ${DIR}/assemblies/diamond/${RUNOUT}.list3:${DIR}/assemblies/diamond/${RUNOUT}.li
 
 ${DIR}/assemblies/diamond/${RUNOUT}.list5:${DIR}/assemblies/diamond/${RUNOUT}.list3 ${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.spades75.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.spades55.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.transabyss.diamond.txt
 	source activate orp;\
-	for item in $$(cat ${DIR}/assemblies/diamond/${RUNOUT}.list3); do grep -F $$item ${DIR}/assemblies/diamond/${RUNOUT}.{transabyss,spades75,spades55,trinity}.diamond.txt | head -1 | cut -f1; done | cut -d ":" -f2 | sort --parallel=10 | uniq >> ${DIR}/assemblies/diamond/${RUNOUT}.list5
+	python ${MAKEDIR}/scripts/build_list5.py ${DIR}/assemblies/diamond/${RUNOUT}.list3 ${DIR}/assemblies/diamond/${RUNOUT}.list5 ${DIR}/assemblies/diamond/${RUNOUT}.transabyss.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.spades75.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.spades55.diamond.txt ${DIR}/assemblies/diamond/${RUNOUT}.trinity.diamond.txt
 
 ${DIR}/assemblies/diamond/${RUNOUT}.list6:${DIR}/assemblies/${RUNOUT}.orthomerged.fasta
 	grep -F ">" ${DIR}/assemblies/${RUNOUT}.orthomerged.fasta | sed 's_>__' > ${DIR}/assemblies/diamond/${RUNOUT}.list6
@@ -384,7 +376,7 @@ ${DIR}/assemblies/diamond/${RUNOUT}.newbies.fasta ${DIR}/assemblies/working/${RU
 
 ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta:${DIR}/assemblies/working/${RUNOUT}.orthomerged.fasta
 	source activate orp_cdhit;\
-	cd-hit-est -M 5000 -T $(CPU) -c .98 -i ${DIR}/assemblies/working/${RUNOUT}.orthomerged.fasta -o ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta
+	cd-hit-est -M $$(($(MEM)*1000)) -T $(CPU) -c .98 -i ${DIR}/assemblies/working/${RUNOUT}.orthomerged.fasta -o ${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta
 
 ${DIR}/assemblies/${RUNOUT}.ORP.diamond.txt:${DIR}/assemblies/${RUNOUT}.ORP.intermediate.fasta
 	source activate orp_diamond;\
@@ -431,7 +423,7 @@ ${DIR}/assemblies/${RUNOUT}.ORP.fasta:${DIR}/assemblies/${RUNOUT}.filter.done ${
 
 ${DIR}/reports/${RUNOUT}.busco.done:${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	source activate orp_busco;\
-	python $$(which busco) --offline --lineage ${MAKEDIR}/busco_dbs/${LINEAGE} -i ${DIR}/assemblies/${RUNOUT}.ORP.fasta -m transcriptome --cpu ${BUSCO_THREADS} -o run_${RUNOUT}.ORP --config ${MAKEDIR}/software/config.ini
+	python $$(which busco) --offline --lineage ${LINEAGE} --download_path ${MAKEDIR}/busco_dbs -i ${DIR}/assemblies/${RUNOUT}.ORP.fasta -m transcriptome --cpu ${BUSCO_THREADS} -o run_${RUNOUT}.ORP --config ${MAKEDIR}/software/config.ini
 	mv run_${RUNOUT}* ${DIR}/reports/
 	touch ${DIR}/reports/${RUNOUT}.busco.done
 
