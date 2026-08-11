@@ -420,8 +420,9 @@ ${DIR}/reports/${RUNOUT}.strandeval.done:${DIR}/assemblies/${RUNOUT}.ORP.fasta
 	| conda run --no-capture-output -n orp_sam samtools sort -T ${RUNOUT} -O bam -@10 -o "${RUNOUT}".sorted.bam -;\
 	conda run --no-capture-output -n orp_sam samtools flagstat "${RUNOUT}".sorted.bam > ${DIR}/assemblies/${RUNOUT}.flagstat;\
 	perl -I $$(dirname $$(readlink -f $$(conda run -n orp_trinity which Trinity)))/PerlLib ${MAKEDIR}/scripts/examine_strand.pl "${RUNOUT}".sorted.bam ${RUNOUT};\
-	conda run --no-capture-output -n orp_trinity bash -c "hist -p '#' -c red <(cat ${RUNOUT}.dat | awk '{print \$$5}' | sed 1d)";\
-	rm -f "${RUNOUT}".sorted.bam
+	cat ${RUNOUT}.dat | awk '{print $$5}' | sed 1d > ${RUNOUT}.hist_input.txt;\
+	conda run --no-capture-output -n orp_trinity hist -p '#' -c red ${RUNOUT}.hist_input.txt;\
+	rm -f ${RUNOUT}.hist_input.txt "${RUNOUT}".sorted.bam
 	rm -fr ${RUNOUT}.{bwt,pac,ann,amb,sa,dat}
 	touch ${DIR}/reports/${RUNOUT}.strandeval.done
 	printf "\n\n*****  See the following link for interpretation ***** \n"
