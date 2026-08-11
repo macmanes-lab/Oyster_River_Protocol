@@ -105,7 +105,7 @@ else
 $(error *** SALMON is not installed, must fix ***)
 endif
 
-ifeq ($(shell basename $$(conda run -n orp which transrate 2>/dev/null)),transrate)
+ifeq ($(shell test -x ${MAKEDIR}/software/orp-transrate/transrate && echo transrate),transrate)
 else
 $(info TRANSRATE installed)
 $(error *** TRANSRATE is not installed, must fix ***)
