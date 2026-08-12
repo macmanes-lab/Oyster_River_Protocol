@@ -10,6 +10,17 @@ ORP Version 2.4.0 <- 2.3.3
 - fix cd-hit-est's memory cap being hardcoded to 5000MB regardless of the run's requested MEM budget
 - replace the list3->list5 diamond reconciliation step's shell loop (one grep per gene against the full diamond output) with a single hash-based Python pass, scripts/build_list5.py
 - replace the per-orthogroup best-contig selection (one grep of contigs.csv per orthogroup via orthout.done) with a single hash-based Python pass, scripts/pick_best_contigs.py, retiring the orthout.done intermediate
+- replace `source activate` with `conda run` throughout oyster.mk
+- isolate all orp_* conda env creation from the user's/system's default conda channels
+- pin a compatible salmon inside orp_trinity, since an unpinned resolve was picking a salmon 2.x whose Rust rewrite dropped flags Trinity's internal isoform filtering still calls with
+- fix the TRANSRATE check to test the bundled binary directly instead of a stale proxy check
+- fix process substitution breaking under conda run in oyster.mk
+- remove dead RCORR/RCORRDIR/BUSCO/BUSCODIR/BUSCODB and TRINITY_KMER variables left over from earlier refactors
+- blank out hardcoded /home/ubuntu paths in software/config.ini
+- add per-step timing to oyster.mk, logged to a file and printed as a summary at the end of the run
+- fix strandeval's `hist` histogram call: it was reading unfiltered raw data instead of the filtered numeric column, and separately losing its `-p '#'` argument when re-executed through conda run's internal shell
+- fix the software-installed banner (SALMON/BUSCO/SPADES/etc.) printing between every timed step instead of once at the start, caused by per-step timing re-parsing the whole makefile
+- fix the BUSCO score in qualreport picking up a line from BUSCO's JSON summary instead of its text summary, after newer BUSCO started writing both a .txt and .json short_summary per run
 
 ORP Version 2.3.2 <- 2.3.1
 
