@@ -106,8 +106,11 @@ timed-%:
 	exit $$status
 
 timing_report:
-	@printf "\n\n*****  STEP TIMING for ${RUNOUT} ***** \n\n"
-	@awk -F'\t' '{h=int($$2/3600); m=int(($$2%3600)/60); s=$$2%60; printf "%-16s %02d:%02d:%02d\n", $$1, h, m, s; total+=$$2} END{h=int(total/3600); m=int((total%3600)/60); s=total%60; printf "%-16s %02d:%02d:%02d\n", "TOTAL", h, m, s}' ${TIMING_LOG}
+	@{ \
+	printf "\n\n*****  STEP TIMING for ${RUNOUT} ***** \n\n"; \
+	awk -F'\t' '{h=int($$2/3600); m=int(($$2%3600)/60); s=$$2%60; printf "%-16s %02d:%02d:%02d\n", $$1, h, m, s; total+=$$2} END{h=int(total/3600); m=int((total%3600)/60); s=total%60; printf "%-16s %02d:%02d:%02d\n", "TOTAL", h, m, s}' ${TIMING_LOG}; \
+	} | tee ${TIMING_LOG}.new; \
+	mv ${TIMING_LOG}.new ${TIMING_LOG}
 	@printf "\nFull timing log saved to: ${TIMING_LOG}\n\n"
 
 check:
