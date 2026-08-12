@@ -112,6 +112,7 @@ timing_report:
 	@printf "\nFull timing log saved to: ${TIMING_LOG}\n\n"
 
 check:
+ifeq ($(MAKELEVEL),0)
 ifeq ($(shell basename $$(conda run -n orp_salmon which salmon 2>/dev/null)),salmon)
 $(info SALMON installed)
 else
@@ -170,6 +171,7 @@ ifeq ($(shell basename $$(conda run -n orp_rcorrector which run_rcorrector.pl 2>
 $(info RCORRECTOR installed)
 else
 $(error *** RCORRECTOR is not installed, must fix ***)
+endif
 endif
 
 help:
