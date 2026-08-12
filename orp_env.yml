@@ -12,7 +12,6 @@ dependencies:
   - mcl=22.282
   - pip=26.2.1
   - pip:
-    - biopython
     - scipy
     - numpy
     - bashplotlib

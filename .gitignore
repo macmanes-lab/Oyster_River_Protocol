@@ -1,0 +1,11 @@
+.DS_Store
+pathfile
+shared/
+busco_dbs/
+software/anaconda/
+software/OrthoFinder/
+software/orp-transrate/
+software/diamond/*.fasta
+software/diamond/*.dmnd
+__pycache__/
+*.pyc
