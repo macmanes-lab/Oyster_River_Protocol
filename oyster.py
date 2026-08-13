@@ -31,6 +31,41 @@ RESET = "\033[0m"
 
 SHORT_ASSEMBLY_NAMES = ("spades55.fasta", "spades75.fasta", "transabyss.fasta", "trinity.Trinity.fasta")
 
+# Reference profile (seconds, from a representative run) used only to decide
+# submission order within a concurrent group -- run the historically slow
+# steps first so they aren't left waiting behind quick ones. Each dataset is
+# normally assembled only once, so this is a fixed relative ranking rather
+# than something learned per-run; edit these if a different pattern turns
+# out to hold across your datasets. Names with no entry sort after every
+# hinted step, in the order they were given.
+STEP_TIME_HINTS = {
+    "run_trimmomatic": 1,
+    "run_rcorrector": 1,
+    "run_spades75": 2,
+    "run_spades55": 1,
+    "run_transabyss": 8,
+    "run_trinity": 77,
+    "run_filtershort": 3,
+    "orthotransrate": 6,
+    "merge_branch": 6,
+    "run_orthofuser": 7,
+    "orthofuser_branch": 7,
+    "diamond_orthomerged": 12,
+    "diamond_transabyss": 12,
+    "diamond_spades55": 12,
+    "diamond_spades75": 12,
+    "diamond_trinity": 12,
+    "salmon_index": 1,
+    "salmon": 0,
+    "salmon_branch": 2,
+    "orp_diamond": 12,
+    "orp_diamond_branch": 12,
+    "secondfilter": 1,
+    "transrate": 5,
+    "strandeval": 8,
+    "busco": 123,
+}
+
 
 def awk_first_field(src: Path, dst: Path) -> None:
     with open(src) as inf, open(dst, "w") as outf:
@@ -122,7 +157,6 @@ class Pipeline:
         self.timing_log = self.reports_dir / f"{self.runout}.timing.log"
         self.run_cmd = "oyster.py " + " ".join(sys.argv[1:])
         self.steps = []
-        self.historical_timings = {}
         self._timing_lock = threading.Lock()
 
     # -- process helpers -------------------------------------------------
@@ -185,10 +219,11 @@ class Pipeline:
 
         # Longest-processing-time-first: submit the slowest known jobs first so
         # they start immediately instead of waiting behind quick ones, using
-        # durations observed in this run directory's previous timing log (if
-        # any). Jobs with no history keep their given relative order, after
-        # every job with known history.
-        pending.sort(key=lambda item: self.historical_timings.get(item[0], -1), reverse=True)
+        # a fixed reference profile (STEP_TIME_HINTS) rather than this run's
+        # own history -- each dataset is normally only ever assembled once,
+        # so there's no prior run of *this* data to learn from. Jobs with no
+        # hint keep their given relative order, after every hinted job.
+        pending.sort(key=lambda item: STEP_TIME_HINTS.get(item[0], -1), reverse=True)
 
         workers = min(max_workers, len(pending), max(1, self.cpu))
         job_cpu = max(1, self.cpu // workers)
@@ -215,21 +250,6 @@ class Pipeline:
             self.orthofuse_dir, self.quants_dir, self.diamond_dir, self.assemblies_working,
         ):
             d.mkdir(parents=True, exist_ok=True)
-
-    def load_historical_timings(self):
-        if not self.timing_log.exists():
-            return {}
-        timings = {}
-        with open(self.timing_log) as f:
-            for line in f:
-                if "\t" not in line:
-                    continue
-                name, secs = line.rstrip("\n").split("\t")
-                try:
-                    timings[name] = int(secs)
-                except ValueError:
-                    pass
-        return timings
 
     def timing_init(self):
         self.reports_dir.mkdir(parents=True, exist_ok=True)
@@ -786,8 +806,11 @@ class Pipeline:
                 if len(cols) >= 5:
                     out.write(cols[4] + "\n")
 
-        self.run(["conda", "run", "--no-capture-output", "-n", "orp_trinity", "bash", "-c",
-                  f"hist -p '#' -c red {hist_input}"])
+        hist_result = subprocess.run(
+            ["conda", "run", "--no-capture-output", "-n", "orp_trinity", "bash", "-c",
+             f"hist -p '#' -c red {hist_input}"],
+            check=True, cwd=self.dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True,
+        )
 
         if hist_input.exists():
             hist_input.unlink()
@@ -800,8 +823,15 @@ class Pipeline:
                 p.unlink()
 
         (self.reports_dir / f"{self.runout}.strandeval.done").touch()
-        print("\n\n*****  See the following link for interpretation ***** ")
-        print("*****  https://oyster-river-protocol.readthedocs.io/en/latest/strandexamine.html ***** \n")
+        histogram_text = hist_result.stdout.rstrip("\n")
+        summary = (
+            "\n*****  STRAND EXAMINATION HISTOGRAM ***** \n"
+            f"{histogram_text}\n"
+            "\n*****  See the following link for interpretation ***** \n"
+            "*****  https://oyster-river-protocol.readthedocs.io/en/latest/strandexamine.html ***** \n"
+        )
+        print(summary)
+        (self.reports_dir / f"{self.runout}.strandeval_summary.txt").write_text(summary)
 
     def reportgen(self):
         runout = self.runout
@@ -851,6 +881,12 @@ class Pipeline:
         emit("*****  READS MAPPED AS PROPER PAIRS ~~~~~>     ", proper_pairs)
         print(" \n")
 
+        strandeval_summary_path = self.reports_dir / f"{runout}.strandeval_summary.txt"
+        if strandeval_summary_path.exists():
+            strandeval_summary = strandeval_summary_path.read_text()
+            print(strandeval_summary)
+            lines.append(strandeval_summary.rstrip("\n"))
+
         qualreport_path = self.reports_dir / f"qualreport.{runout}"
         qualreport_path.write_text("\n".join(lines) + "\n")
         (self.reports_dir / f"qualreport.{runout}.done").touch()
@@ -881,7 +917,6 @@ class Pipeline:
 
     def main(self):
         self.setup()
-        self.historical_timings = self.load_historical_timings()
         self.timing_init()
         self.check()
         self.welcome()
@@ -1012,11 +1047,14 @@ class Pipeline:
             [filter_done, low_txt, high_txt, orp_intermediate, quant_sf, orp_diamond_txt],
             self.secondfilter,
         )
-        # busco, transrate, and strandeval are all independent given ORP.fasta;
-        # reportgen (below) needs all three done first.
+        # BUSCO dwarfs transrate/strandeval (minutes vs. seconds); splitting its
+        # CPUs to overlap with them would slow it down far more than the
+        # overlap could ever save, so it gets the full --cpu/--busco-threads
+        # budget to itself. transrate and strandeval are independent of each
+        # other and cheap, so they still run as a small concurrent pair.
+        self.step("busco", [busco_done], [orp_fasta], self.busco)
         self.run_parallel(
             [
-                ("busco", [busco_done], [orp_fasta], self.busco),
                 ("transrate", [transrate_csv], [orp_fasta, c1, c2], self.transrate),
                 ("strandeval", [strandeval_done], [orp_fasta], self.strandeval),
             ],
