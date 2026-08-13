@@ -173,7 +173,8 @@ class Pipeline:
     def which_in_env(self, env, binary):
         try:
             result = subprocess.run(
-                ["conda", "run", "-n", env, "which", binary], capture_output=True, text=True
+                ["conda", "run", "-n", env, "which", binary],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True,
             )
         except FileNotFoundError:
             return None
@@ -665,7 +666,7 @@ class Pipeline:
     def trinity_perllib_dir(self):
         result = subprocess.run(
             ["conda", "run", "-n", "orp_trinity", "which", "Trinity"],
-            capture_output=True, text=True, check=True,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, check=True,
         )
         trinity_path = Path(result.stdout.strip()).resolve()
         return trinity_path.parent / "PerlLib"
@@ -711,8 +712,11 @@ class Pipeline:
         self.run(["conda", "run", "--no-capture-output", "-n", "orp_trinity", "bash", "-c",
                   f"hist -p '#' -c red {hist_input}"])
 
-        hist_input.unlink(missing_ok=True)
-        (self.dir / f"{self.runout}.sorted.bam").unlink(missing_ok=True)
+        if hist_input.exists():
+            hist_input.unlink()
+        sorted_bam = self.dir / f"{self.runout}.sorted.bam"
+        if sorted_bam.exists():
+            sorted_bam.unlink()
         for ext in ("bwt", "pac", "ann", "amb", "sa", "dat"):
             p = self.dir / f"{self.runout}.{ext}"
             if p.exists():
