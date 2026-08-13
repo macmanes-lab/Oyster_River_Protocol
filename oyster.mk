@@ -39,6 +39,9 @@ endif
 
 .DEFAULT_GOAL := main
 
+RUN_GOAL := $(if $(MAKECMDGOALS),$(MAKECMDGOALS),$(.DEFAULT_GOAL))
+RUN_CMD := oyster.mk $(RUN_GOAL) $(MAKEOVERRIDES)
+
 help:
 main: setup timing_init check welcome readcheck timed-run_trimmomatic timed-run_rcorrector timed-run_trinity timed-run_spades75 timed-run_spades55 timed-run_transabyss timed-run_filtershort timed-run_orthofuser merge makelist \
 	makegroups timed-orthotransrate timed-makeorthout make_goodlist timed-orthofusing timed-diamond diamond_uniq make_list1 make_list2 make_list3 timed-make_list5 make_list6 make_list7 timed-posthack timed-cdhit timed-orp_diamond orp_uniq timed-salmon_index timed-salmon filter \
@@ -102,7 +105,7 @@ ${DIR}/assemblies/working ${DIR}/reads ${DIR}/rcorr ${DIR}/assemblies/diamond ${
 
 timing_init:
 	@mkdir -p ${DIR}/reports
-	@: > ${TIMING_LOG}
+	@printf "Command: %s\n\n" "$(RUN_CMD)" > ${TIMING_LOG}
 
 timed-%:
 	@start=$$(date +%s); \
@@ -114,8 +117,9 @@ timed-%:
 
 timing_report:
 	@{ \
+	head -n1 ${TIMING_LOG}; \
 	printf "\n\n*****  STEP TIMING for ${RUNOUT} ***** \n\n"; \
-	awk -F'\t' '{h=int($$2/3600); m=int(($$2%3600)/60); s=$$2%60; printf "%-16s %02d:%02d:%02d\n", $$1, h, m, s; total+=$$2} END{h=int(total/3600); m=int((total%3600)/60); s=total%60; printf "%-16s %02d:%02d:%02d\n", "TOTAL", h, m, s}' ${TIMING_LOG}; \
+	awk -F'\t' 'NF==2{h=int($$2/3600); m=int(($$2%3600)/60); s=$$2%60; printf "%-16s %02d:%02d:%02d\n", $$1, h, m, s; total+=$$2} END{h=int(total/3600); m=int((total%3600)/60); s=total%60; printf "%-16s %02d:%02d:%02d\n", "TOTAL", h, m, s}' ${TIMING_LOG}; \
 	} | tee ${TIMING_LOG}.new; \
 	mv ${TIMING_LOG}.new ${TIMING_LOG}
 	@printf "\nFull timing log saved to: ${TIMING_LOG}\n\n"
@@ -220,9 +224,14 @@ else
 endif
 
 welcome:
-	printf "$(RED)\n\n*****  Welcome to the Oyster River ***** \n"
-	printf "*****  This is version ${VERSION} *****$(reset)\n\n"
-	printf " \n\n"
+	printf "$(RED)\n"
+	printf "    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+	printf "                    _.-~~~~~-._\n"
+	printf "                 .-~   o   o   ~-.\n"
+	printf "                (   .-'~~~~~'-.   )        OYSTER RIVER PROTOCOL\n"
+	printf "                 '-.___________.-'         version ${VERSION}\n"
+	printf "                     '-.___.-'\n"
+	printf "    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~$(reset)\n\n"
 
 ${DIR}/rcorr/${RUNOUT}.TRIM_1P.fastq ${DIR}/rcorr/${RUNOUT}.TRIM_2P.fastq:${READ1} ${READ2}
 	@if [ "$$(hostname | cut -d. -f3-5)" = 'bridges.psc.edu' ];\
