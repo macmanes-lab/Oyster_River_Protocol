@@ -102,7 +102,7 @@ class Pipeline:
         self.strand = args.strand
         self.normalize_reads = args.normalize_reads
         self.tpm_filt = args.tpm_filt
-        self.parallel_assemblers = max(1, args.parallel_assemblers)
+        self.max_parallel = max(1, args.max_parallel)
 
         self.version = (self.makedir / "version.txt").read_text().strip()
         self.busco_config = self.makedir / "software" / "config.ini"
@@ -920,7 +920,7 @@ class Pipeline:
                 ("run_spades55", [sp55], [c1, c2], self.run_spades55),
                 ("run_transabyss", [ta], [c1, c2], self.run_transabyss),
             ],
-            max_workers=self.parallel_assemblers,
+            max_workers=self.max_parallel,
         )
         self.step("run_filtershort", short_fastas, [ta, sp75, sp55, trinity_fa], self.run_filtershort)
 
@@ -941,7 +941,7 @@ class Pipeline:
                 ("orthofuser_branch", [groups_done], short_fastas, orthofuser_branch),
                 ("merge_branch", [merged_csv], short_fastas, merge_branch),
             ],
-            max_workers=2,
+            max_workers=self.max_parallel,
         )
         self.step("makeorthout", [good_list], [groups_done, merged_csv], self.makeorthout)
         self.step("orthofusing", [orthomerged_fasta], [good_list, merged_fasta], self.orthofusing)
@@ -953,7 +953,7 @@ class Pipeline:
                 (f"diamond_{name}", [out], [query], partial(self.run_diamond_one, query, out))
                 for name, (query, out) in zip(diamond_names, self.diamond_jobs())
             ],
-            max_workers=2,
+            max_workers=self.max_parallel,
         )
         self.step("diamond_uniq", uniq_outs, diamond_outs, self.diamond_uniq, timed=False)
         self.step("make_list1", [list1], [diamond_orthomerged], self.make_list1, timed=False)
@@ -980,7 +980,7 @@ class Pipeline:
                 ("orp_diamond_branch", [unique_orp_done], [orp_intermediate], orp_diamond_branch),
                 ("salmon_branch", [quant_sf], [orp_intermediate], salmon_branch),
             ],
-            max_workers=2,
+            max_workers=self.max_parallel,
         )
         self.step("filter", [filter_done], [orp_intermediate, quant_sf, orp_diamond_txt], self.filter_tpm, timed=False)
         self.step(
@@ -996,7 +996,7 @@ class Pipeline:
                 ("transrate", [transrate_csv], [orp_fasta, c1, c2], self.transrate),
                 ("strandeval", [strandeval_done], [orp_fasta], self.strandeval),
             ],
-            max_workers=2,
+            max_workers=self.max_parallel,
         )
         self.step("reportgen", [qualreport_done], [unique_orp_done, orp_fasta], self.reportgen, timed=False)
 
@@ -1021,9 +1021,11 @@ def parse_args():
     p.add_argument("--spades2-kmer", type=int, default=75, help="rnaSPAdes k-mer for spades75 (default: 75)")
     p.add_argument("--transabyss-kmer", type=int, default=32, help="Trans-ABySS k-mer (default: 32)")
     p.add_argument(
-        "--parallel-assemblers", type=int, default=2,
-        help="max concurrent assemblers (Trinity/rnaSPAdes55/rnaSPAdes75/Trans-ABySS), "
-             "splitting --cpu/--mem across them; 1 disables concurrency (default: 2)",
+        "--max-parallel", type=int, default=2,
+        help="max concurrent jobs within each independent stage (assemblers, "
+             "diamond searches, orthofuse/salmon branches, busco/transrate/strandeval), "
+             "splitting --cpu/--mem across however many run at once; 1 disables "
+             "concurrency entirely (default: 2)",
     )
     p.add_argument("--dir", default=None, help="working directory (default: current directory)")
     return p.parse_args()
