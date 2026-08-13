@@ -19,6 +19,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import threading
 import time
 import concurrent.futures
 from pathlib import Path
@@ -119,6 +120,7 @@ class Pipeline:
         self.timing_log = self.reports_dir / f"{self.runout}.timing.log"
         self.run_cmd = "oyster.py " + " ".join(sys.argv[1:])
         self.steps = []
+        self._timing_lock = threading.Lock()
 
     # -- process helpers -------------------------------------------------
 
@@ -153,9 +155,47 @@ class Pipeline:
         func()
         elapsed = int(time.time() - start)
         if timed:
+            self._record_timing(name, elapsed)
+
+    def _record_timing(self, name, elapsed):
+        with self._timing_lock:
             self.steps.append((name, elapsed))
             with open(self.timing_log, "a") as f:
                 f.write(f"{name}\t{elapsed}\n")
+
+    def run_parallel(self, jobs, max_workers=2):
+        """Run independent (name, outputs, inputs, func) jobs concurrently.
+
+        Each pending job's func is called as func(cpu=<split>, mem=<split>),
+        where self.cpu/self.mem are divided across however many jobs actually
+        run at once (capped at max_workers). Already up-to-date jobs are
+        skipped and don't count toward the split.
+        """
+        pending = []
+        for name, outputs, inputs, func in jobs:
+            if self.needs_run(outputs, inputs):
+                pending.append((name, func))
+            else:
+                print(f"[{name}] up to date, skipping")
+        if not pending:
+            return
+
+        workers = min(max_workers, len(pending), max(1, self.cpu))
+        job_cpu = max(1, self.cpu // workers)
+        job_mem = max(1, self.mem // workers)
+        if workers > 1:
+            print(f"\n=== running {len(pending)} step(s), {workers} at a time (cpu={job_cpu}, mem={job_mem}G each) ===")
+
+        def run_one(name, func):
+            print(f"\n=== {name} (cpu={job_cpu}, mem={job_mem}G) ===")
+            start = time.time()
+            func(cpu=job_cpu, mem=job_mem)
+            self._record_timing(name, int(time.time() - start))
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
+            futures = [ex.submit(run_one, name, func) for name, func in pending]
+            for future in concurrent.futures.as_completed(futures):
+                future.result()
 
     # -- setup / preflight -------------------------------------------------
 
@@ -276,7 +316,9 @@ class Pipeline:
 
     # -- assemblers ----------------------------------------------------------
 
-    def run_trinity(self):
+    def run_trinity(self, cpu=None, mem=None):
+        cpu = self.cpu if cpu is None else cpu
+        mem = self.mem if mem is None else mem
         out = self.assemblies_dir / f"{self.runout}.trinity.Trinity.fasta"
         cmd = ["Trinity"]
         if self.strand == "RF":
@@ -289,9 +331,9 @@ class Pipeline:
         cmd += [
             "--seqType", "fq",
             "--output", str(self.assemblies_dir / f"{self.runout}.trinity"),
-            "--max_memory", f"{self.mem}G",
+            "--max_memory", f"{mem}G",
             "--left", str(self.cor1()), "--right", str(self.cor2()),
-            "--CPU", str(self.cpu), "--inchworm_cpu", "10", "--full_cleanup",
+            "--CPU", str(cpu), "--inchworm_cpu", "10", "--full_cleanup",
         ]
         self.conda_run("orp_trinity", *cmd)
         tmp = out.with_suffix(".fa")
@@ -300,7 +342,9 @@ class Pipeline:
         for f in self.assemblies_dir.glob("*gene_trans_map"):
             f.unlink()
 
-    def run_spades(self, kmer, outname, workdir_suffix):
+    def run_spades(self, kmer, outname, workdir_suffix, cpu=None, mem=None):
+        cpu = self.cpu if cpu is None else cpu
+        mem = self.mem if mem is None else mem
         out = self.assemblies_dir / f"{self.runout}.{outname}.fasta"
         workdir = self.assemblies_dir / f"{self.runout}.spades_k{workdir_suffix}"
         cmd = ["rnaspades.py"]
@@ -310,27 +354,28 @@ class Pipeline:
             cmd.append("--ss-fr")
         cmd += [
             "--only-assembler", "-o", str(workdir),
-            "--threads", str(self.cpu), "--memory", str(self.mem), "-k", str(kmer),
+            "--threads", str(cpu), "--memory", str(mem), "-k", str(kmer),
             "-1", str(self.cor1()), "-2", str(self.cor2()),
         ]
         self.conda_run("orp_spades", *cmd)
         shutil.move(str(workdir / "transcripts.fasta"), str(out))
         shutil.rmtree(workdir, ignore_errors=True)
 
-    def run_spades55(self):
-        self.run_spades(self.spades1_kmer, "spades55", "55")
+    def run_spades55(self, cpu=None, mem=None):
+        self.run_spades(self.spades1_kmer, "spades55", "55", cpu=cpu, mem=mem)
 
-    def run_spades75(self):
-        self.run_spades(self.spades2_kmer, "spades75", "75")
+    def run_spades75(self, cpu=None, mem=None):
+        self.run_spades(self.spades2_kmer, "spades75", "75", cpu=cpu, mem=mem)
 
-    def run_transabyss(self):
+    def run_transabyss(self, cpu=None, mem=None):
+        cpu = self.cpu if cpu is None else cpu
         out = self.assemblies_dir / f"{self.runout}.transabyss.fasta"
         workdir = self.assemblies_dir / f"{self.runout}.transabyss"
         cmd = ["transabyss"]
         if self.strand in ("RF", "FR"):
             cmd.append("--SS")
         cmd += [
-            "--threads", str(self.cpu), "--outdir", str(workdir),
+            "--threads", str(cpu), "--outdir", str(workdir),
             "--kmer", str(self.transabyss_kmer), "--length", "250",
             "--name", f"{self.runout}.transabyss.fasta",
             "--pe", str(self.cor1()), str(self.cor2()),
@@ -859,10 +904,15 @@ class Pipeline:
 
         self.step("run_trimmomatic", [t1, t2], [self.read1, self.read2], self.run_trimmomatic)
         self.step("run_rcorrector", [c1, c2], [t1, t2], self.run_rcorrector)
-        self.step("run_trinity", [trinity_fa], [c1], self.run_trinity)
-        self.step("run_spades75", [sp75], [c1, c2], self.run_spades75)
-        self.step("run_spades55", [sp55], [c1, c2], self.run_spades55)
-        self.step("run_transabyss", [ta], [c1, c2], self.run_transabyss)
+        self.run_parallel(
+            [
+                ("run_trinity", [trinity_fa], [c1], self.run_trinity),
+                ("run_spades75", [sp75], [c1, c2], self.run_spades75),
+                ("run_spades55", [sp55], [c1, c2], self.run_spades55),
+                ("run_transabyss", [ta], [c1, c2], self.run_transabyss),
+            ],
+            max_workers=2,
+        )
         self.step("run_filtershort", short_fastas, [ta, sp75, sp55, trinity_fa], self.run_filtershort)
         self.step("run_orthofuser", [orthofuser_done], short_fastas, self.run_orthofuser)
         self.step("merge", [merged_fasta], short_fastas, self.merge, timed=False)
