@@ -32,38 +32,25 @@ RESET = "\033[0m"
 SHORT_ASSEMBLY_NAMES = ("spades55.fasta", "spades75.fasta", "transabyss.fasta", "trinity.Trinity.fasta")
 
 # Reference profile (seconds, from a representative run) used only to decide
-# submission order within a concurrent group -- run the historically slow
-# steps first so they aren't left waiting behind quick ones. Each dataset is
-# normally assembled only once, so this is a fixed relative ranking rather
-# than something learned per-run; edit these if a different pattern turns
-# out to hold across your datasets. Names with no entry sort after every
-# hinted step, in the order they were given.
+# submission order within the concurrent groups that remain (assemblers;
+# orthofuser vs. merge/orthotransrate; transrate vs. strandeval) -- run the
+# historically slow step first so it isn't left waiting behind a quick one.
+# Each dataset is normally assembled only once, so this is a fixed relative
+# ranking rather than something learned per-run. Steps that no longer run
+# concurrently with anything (diamond, orp_diamond, salmon, busco) have no
+# entry since ordering doesn't apply to them; names with no entry sort after
+# every hinted step, in the order they were given.
 STEP_TIME_HINTS = {
-    "run_trimmomatic": 1,
-    "run_rcorrector": 1,
     "run_spades75": 2,
     "run_spades55": 1,
     "run_transabyss": 8,
     "run_trinity": 77,
-    "run_filtershort": 3,
     "orthotransrate": 6,
     "merge_branch": 6,
     "run_orthofuser": 7,
     "orthofuser_branch": 7,
-    "diamond_orthomerged": 12,
-    "diamond_transabyss": 12,
-    "diamond_spades55": 12,
-    "diamond_spades75": 12,
-    "diamond_trinity": 12,
-    "salmon_index": 1,
-    "salmon": 0,
-    "salmon_branch": 2,
-    "orp_diamond": 12,
-    "orp_diamond_branch": 12,
-    "secondfilter": 1,
     "transrate": 5,
     "strandeval": 8,
-    "busco": 123,
 }
 
 
@@ -891,21 +878,23 @@ class Pipeline:
         qualreport_path.write_text("\n".join(lines) + "\n")
         (self.reports_dir / f"qualreport.{runout}.done").touch()
 
-    def timing_report(self):
+    def timing_report(self, wall_clock_seconds):
         with open(self.timing_log) as f:
             all_lines = f.readlines()
         header = all_lines[0].rstrip("\n") if all_lines else ""
         body = [l for l in all_lines if "\t" in l]
 
         out_lines = [header, "", f"*****  STEP TIMING for {self.runout} ***** ", ""]
-        total = 0
         for line in body:
             name, secs = line.rstrip("\n").split("\t")
             secs = int(secs)
             h, m, s = secs // 3600, (secs % 3600) // 60, secs % 60
             out_lines.append(f"{name:<16} {h:02d}:{m:02d}:{s:02d}")
-            total += secs
-        h, m, s = total // 3600, (total % 3600) // 60, total % 60
+        # TOTAL is real wall-clock elapsed time, not a sum of the lines above:
+        # concurrent jobs overlap (their durations shouldn't add), and a
+        # branch's own entry already includes the sub-steps it calls, so
+        # summing every line double-counts and overstates the true runtime.
+        h, m, s = wall_clock_seconds // 3600, (wall_clock_seconds % 3600) // 60, wall_clock_seconds % 60
         out_lines.append(f"{'TOTAL':<16} {h:02d}:{m:02d}:{s:02d}")
 
         text = "\n".join(out_lines) + "\n"
@@ -916,6 +905,7 @@ class Pipeline:
     # -- orchestration -------------------------------------------------------
 
     def main(self):
+        pipeline_start = time.time()
         self.setup()
         self.timing_init()
         self.check()
@@ -1005,15 +995,14 @@ class Pipeline:
         self.step("makeorthout", [good_list], [groups_done, merged_csv], self.makeorthout)
         self.step("orthofusing", [orthomerged_fasta], [good_list, merged_fasta], self.orthofusing)
 
+        # diamond blastx is CPU-bound and scales well with threads, so running
+        # the 5 searches concurrently on split CPU nets ~zero benefit over
+        # running them one at a time with the full budget each -- keep them
+        # sequential, just individually named/timed for visibility.
         print("\n\n\n\n Starting diamond \n\n\n\n")
         diamond_names = ("orthomerged", "transabyss", "spades75", "spades55", "trinity")
-        self.run_parallel(
-            [
-                (f"diamond_{name}", [out], [query], partial(self.run_diamond_one, query, out))
-                for name, (query, out) in zip(diamond_names, self.diamond_jobs())
-            ],
-            max_workers=self.max_parallel,
-        )
+        for name, (query, out) in zip(diamond_names, self.diamond_jobs()):
+            self.step(f"diamond_{name}", [out], [query], partial(self.run_diamond_one, query, out))
         self.step("diamond_uniq", uniq_outs, diamond_outs, self.diamond_uniq, timed=False)
         self.step("make_list1", [list1], [diamond_orthomerged], self.make_list1, timed=False)
         self.step("make_list2", [list2], [diamond_trinity, diamond_sp75, diamond_sp55, diamond_ta], self.make_list2, timed=False)
@@ -1024,23 +1013,14 @@ class Pipeline:
         self.step("posthack", [newbies, working_orthomerged], [list7], self.posthack)
         self.step("cdhit", [orp_intermediate], [working_orthomerged], self.cdhit)
 
-        def orp_diamond_branch(cpu=None, mem=None):
-            self.step("orp_diamond", [orp_diamond_txt], [orp_intermediate], partial(self.orp_diamond, cpu=cpu))
-            self.step("orp_uniq", [unique_orp_done], [orp_diamond_txt], self.orp_uniq, timed=False)
-
-        def salmon_branch(cpu=None, mem=None):
-            self.step("salmon_index", [ortho_idx], [orp_intermediate], partial(self.salmon_index, cpu=cpu))
-            self.step("salmon", [quant_sf], [ortho_idx, c1, c2], partial(self.salmon, cpu=cpu))
-
-        # orp_diamond and salmon indexing/quantification are independent
-        # chains that both only need orp_intermediate; they join at filter.
-        self.run_parallel(
-            [
-                ("orp_diamond_branch", [unique_orp_done], [orp_intermediate], orp_diamond_branch),
-                ("salmon_branch", [quant_sf], [orp_intermediate], salmon_branch),
-            ],
-            max_workers=self.max_parallel,
-        )
+        # orp_diamond is the same CPU-bound diamond blastx as above, paired
+        # here with salmon_branch which is tiny (~2s); halving orp_diamond's
+        # CPU to overlap with it costs more than the overlap saves, so both
+        # run sequentially at full CPU instead.
+        self.step("orp_diamond", [orp_diamond_txt], [orp_intermediate], self.orp_diamond)
+        self.step("orp_uniq", [unique_orp_done], [orp_diamond_txt], self.orp_uniq, timed=False)
+        self.step("salmon_index", [ortho_idx], [orp_intermediate], self.salmon_index)
+        self.step("salmon", [quant_sf], [ortho_idx, c1, c2], self.salmon)
         self.step("filter", [filter_done], [orp_intermediate, quant_sf, orp_diamond_txt], self.filter_tpm, timed=False)
         self.step(
             "secondfilter", [orp_fasta],
@@ -1062,7 +1042,7 @@ class Pipeline:
         )
         self.step("reportgen", [qualreport_done], [unique_orp_done, orp_fasta], self.reportgen, timed=False)
 
-        self.timing_report()
+        self.timing_report(int(time.time() - pipeline_start))
 
 
 def parse_args():
@@ -1084,10 +1064,12 @@ def parse_args():
     p.add_argument("--transabyss-kmer", type=int, default=32, help="Trans-ABySS k-mer (default: 32)")
     p.add_argument(
         "--max-parallel", type=int, default=2,
-        help="max concurrent jobs within each independent stage (assemblers, "
-             "diamond searches, orthofuse/salmon branches, busco/transrate/strandeval), "
-             "splitting --cpu/--mem across however many run at once; 1 disables "
-             "concurrency entirely (default: 2)",
+        help="max concurrent jobs within each independent stage that benefits from "
+             "it (the 4 assemblers; orthofuser vs. merge/orthotransrate; transrate "
+             "vs. strandeval), splitting --cpu/--mem across however many run at "
+             "once; CPU-bound stages that don't benefit (diamond, orp_diamond, "
+             "salmon, busco) always run sequentially at full --cpu regardless of "
+             "this flag; 1 disables concurrency entirely (default: 2)",
     )
     p.add_argument("--dir", default=None, help="working directory (default: current directory)")
     return p.parse_args()
