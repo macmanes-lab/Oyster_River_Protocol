@@ -22,6 +22,7 @@ import sys
 import threading
 import time
 import concurrent.futures
+from functools import partial
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -398,10 +399,11 @@ class Pipeline:
             outp = self.orthofuse_working / f"{fasta.name}.short.fasta"
             self.conda_run("orp", "python", self.makedir / "scripts" / "long.seq.py", fasta, outp, "200")
 
-    def run_orthofuser(self):
+    def run_orthofuser(self, cpu=None, mem=None):
+        cpu = self.cpu if cpu is None else cpu
         self.conda_run(
             "orp", self.makedir / "software" / "OrthoFinder" / "orthofinder",
-            "-d", "-I", "12", "-f", self.orthofuse_working, "-og", "-t", self.cpu, "-a", self.cpu,
+            "-d", "-I", "12", "-f", self.orthofuse_working, "-og", "-t", cpu, "-a", cpu,
         )
         (self.orthofuse_dir / "orthofuser.done").touch()
 
@@ -443,11 +445,12 @@ class Pipeline:
             list(ex.map(write_group, range(1, len(lines) + 1)))
         (self.orthofuse_dir / "groups.done").touch()
 
-    def orthotransrate(self):
+    def orthotransrate(self, cpu=None, mem=None):
+        cpu = self.cpu if cpu is None else cpu
         outdir = self.orthofuse_dir / "merged"
         self.conda_run(
             "orp", self.makedir / "software" / "orp-transrate" / "transrate",
-            "-o", outdir, "-t", self.cpu, "-a", self.orthofuse_dir / "merged.fasta",
+            "-o", outdir, "-t", cpu, "-a", self.orthofuse_dir / "merged.fasta",
             "--left", self.cor1(), "--right", self.cor2(),
         )
         for f in outdir.rglob("*.bam"):
@@ -487,13 +490,12 @@ class Pipeline:
             (self.assemblies_dir / f"{self.runout}.trinity.Trinity.fasta", self.diamond_dir / f"{self.runout}.trinity.diamond.txt"),
         ]
 
-    def diamond(self):
-        print("\n\n\n\n Starting diamond \n\n\n\n")
-        for query, out in self.diamond_jobs():
-            self.conda_run(
-                "orp_diamond", "diamond", "blastx", "--quiet", "-p", self.cpu,
-                "-e", "1e-8", "--top", "0.1", "-q", query, "-d", self.diamond_db, "-o", out,
-            )
+    def run_diamond_one(self, query, out, cpu=None, mem=None):
+        cpu = self.cpu if cpu is None else cpu
+        self.conda_run(
+            "orp_diamond", "diamond", "blastx", "--quiet", "-p", cpu,
+            "-e", "1e-8", "--top", "0.1", "-q", query, "-d", self.diamond_db, "-o", out,
+        )
 
     def diamond_uniq(self):
         mapping = {
@@ -579,11 +581,12 @@ class Pipeline:
             "-c", ".98", "-i", src, "-o", out,
         )
 
-    def orp_diamond(self):
+    def orp_diamond(self, cpu=None, mem=None):
+        cpu = self.cpu if cpu is None else cpu
         src = self.assemblies_dir / f"{self.runout}.ORP.intermediate.fasta"
         out = self.assemblies_dir / f"{self.runout}.ORP.diamond.txt"
         self.conda_run(
-            "orp_diamond", "diamond", "blastx", "--quiet", "-p", self.cpu,
+            "orp_diamond", "diamond", "blastx", "--quiet", "-p", cpu,
             "-e", "1e-8", "--top", "0.1", "-q", src, "-d", self.diamond_db, "-o", out,
         )
         out.touch()
@@ -594,20 +597,22 @@ class Pipeline:
         (self.assemblies_working / f"{self.runout}.unique.ORP.txt").write_text(f"{count}\n")
         (self.assemblies_working / f"{self.runout}.unique.ORP.done").touch()
 
-    def salmon_index(self):
+    def salmon_index(self, cpu=None, mem=None):
+        cpu = self.cpu if cpu is None else cpu
         src = self.assemblies_dir / f"{self.runout}.ORP.intermediate.fasta"
         idx = self.quants_dir / f"{self.runout}.ortho.idx"
         self.conda_run(
             "orp_salmon", "salmon", "index", "--no-version-check", "-t", src,
-            "-i", idx, "-k", "31", "--threads", self.cpu,
+            "-i", idx, "-k", "31", "--threads", cpu,
         )
 
-    def salmon(self):
+    def salmon(self, cpu=None, mem=None):
+        cpu = self.cpu if cpu is None else cpu
         idx = self.quants_dir / f"{self.runout}.ortho.idx"
         outdir = self.quants_dir / f"salmon_orthomerged_{self.runout}"
         self.conda_run(
             "orp_salmon", "salmon", "quant", "--no-version-check", "--validateMappings",
-            "-p", self.cpu, "-i", idx, "--seqBias", "--gcBias", "--libType", "A",
+            "-p", cpu, "-i", idx, "--seqBias", "--gcBias", "--libType", "A",
             "-1", self.cor1(), "-2", self.cor2(), "-o", outdir,
         )
 
@@ -686,25 +691,27 @@ class Pipeline:
 
     # -- QC / reporting ----------------------------------------------------
 
-    def busco(self):
+    def busco(self, cpu=None, mem=None):
+        cpu = self.busco_threads if cpu is None else cpu
         orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
         self.conda_run(
             "orp_busco", "busco", "--offline", "--lineage", self.lineage,
             "--download_path", self.makedir / "busco_dbs",
-            "-i", orp_fasta, "-m", "transcriptome", "--cpu", self.busco_threads,
+            "-i", orp_fasta, "-m", "transcriptome", "--cpu", cpu,
             "-o", f"run_{self.runout}.ORP", "--config", self.busco_config,
         )
         for p in self.dir.glob(f"run_{self.runout}*"):
             shutil.move(str(p), str(self.reports_dir / p.name))
         (self.reports_dir / f"{self.runout}.busco.done").touch()
 
-    def transrate(self):
+    def transrate(self, cpu=None, mem=None):
+        cpu = self.cpu if cpu is None else cpu
         orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
         outdir = self.reports_dir / f"transrate_{self.runout}"
         self.conda_run(
             "orp", self.makedir / "software" / "orp-transrate" / "transrate",
             "-o", outdir, "-a", orp_fasta,
-            "--left", self.cor1(), "--right", self.cor2(), "-t", self.cpu,
+            "--left", self.cor1(), "--right", self.cor2(), "-t", cpu,
         )
         for f in outdir.rglob("*.bam"):
             f.unlink()
@@ -717,14 +724,15 @@ class Pipeline:
         trinity_path = Path(result.stdout.strip()).resolve()
         return trinity_path.parent / "PerlLib"
 
-    def strandeval(self):
+    def strandeval(self, cpu=None, mem=None):
+        cpu = self.cpu if cpu is None else cpu
         orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
         r1, r2 = self.cor1(), self.cor2()
         self.conda_run("orp_trinity", "bwa", "index", "-p", self.runout, orp_fasta)
 
         pipeline_script = (
             f'conda run --no-capture-output -n orp_trinity bash -c '
-            f'"bwa mem -t {self.cpu} {self.runout} '
+            f'"bwa mem -t {cpu} {self.runout} '
             f'<(seqtk sample -s 23894 {r1} 400000) <(seqtk sample -s 23894 {r2} 400000)" '
             f"| conda run --no-capture-output -n orp_sam samtools view -@10 -Sb - "
             f"| conda run --no-capture-output -n orp_sam samtools sort -T {self.runout} -O bam -@10 "
@@ -915,14 +923,38 @@ class Pipeline:
             max_workers=self.parallel_assemblers,
         )
         self.step("run_filtershort", short_fastas, [ta, sp75, sp55, trinity_fa], self.run_filtershort)
-        self.step("run_orthofuser", [orthofuser_done], short_fastas, self.run_orthofuser)
-        self.step("merge", [merged_fasta], short_fastas, self.merge, timed=False)
-        self.step("makelist", [list_file], [orthofuser_done], self.makelist, timed=False)
-        self.step("makegroups", [groups_done], [list_file], self.makegroups, timed=False)
-        self.step("orthotransrate", [merged_csv], [merged_fasta, c1, c2], self.orthotransrate)
+
+        def orthofuser_branch(cpu=None, mem=None):
+            self.step("run_orthofuser", [orthofuser_done], short_fastas, partial(self.run_orthofuser, cpu=cpu))
+            self.step("makelist", [list_file], [orthofuser_done], self.makelist, timed=False)
+            self.step("makegroups", [groups_done], [list_file], self.makegroups, timed=False)
+
+        def merge_branch(cpu=None, mem=None):
+            self.step("merge", [merged_fasta], short_fastas, self.merge, timed=False)
+            self.step("orthotransrate", [merged_csv], [merged_fasta, c1, c2], partial(self.orthotransrate, cpu=cpu))
+
+        # run_orthofuser->makelist->makegroups and merge->orthotransrate are
+        # independent chains that both only need short_fastas; they join at
+        # makeorthout below.
+        self.run_parallel(
+            [
+                ("orthofuser_branch", [groups_done], short_fastas, orthofuser_branch),
+                ("merge_branch", [merged_csv], short_fastas, merge_branch),
+            ],
+            max_workers=2,
+        )
         self.step("makeorthout", [good_list], [groups_done, merged_csv], self.makeorthout)
         self.step("orthofusing", [orthomerged_fasta], [good_list, merged_fasta], self.orthofusing)
-        self.step("diamond", diamond_outs, [orthomerged_fasta, ta, sp75, sp55, trinity_fa], self.diamond)
+
+        print("\n\n\n\n Starting diamond \n\n\n\n")
+        diamond_names = ("orthomerged", "transabyss", "spades75", "spades55", "trinity")
+        self.run_parallel(
+            [
+                (f"diamond_{name}", [out], [query], partial(self.run_diamond_one, query, out))
+                for name, (query, out) in zip(diamond_names, self.diamond_jobs())
+            ],
+            max_workers=2,
+        )
         self.step("diamond_uniq", uniq_outs, diamond_outs, self.diamond_uniq, timed=False)
         self.step("make_list1", [list1], [diamond_orthomerged], self.make_list1, timed=False)
         self.step("make_list2", [list2], [diamond_trinity, diamond_sp75, diamond_sp55, diamond_ta], self.make_list2, timed=False)
@@ -932,19 +964,40 @@ class Pipeline:
         self.step("make_list7", [list7], [list6, list5], self.make_list7, timed=False)
         self.step("posthack", [newbies, working_orthomerged], [list7], self.posthack)
         self.step("cdhit", [orp_intermediate], [working_orthomerged], self.cdhit)
-        self.step("orp_diamond", [orp_diamond_txt], [orp_intermediate], self.orp_diamond)
-        self.step("orp_uniq", [unique_orp_done], [orp_diamond_txt], self.orp_uniq, timed=False)
-        self.step("salmon_index", [ortho_idx], [orp_intermediate], self.salmon_index)
-        self.step("salmon", [quant_sf], [ortho_idx, c1, c2], self.salmon)
+
+        def orp_diamond_branch(cpu=None, mem=None):
+            self.step("orp_diamond", [orp_diamond_txt], [orp_intermediate], partial(self.orp_diamond, cpu=cpu))
+            self.step("orp_uniq", [unique_orp_done], [orp_diamond_txt], self.orp_uniq, timed=False)
+
+        def salmon_branch(cpu=None, mem=None):
+            self.step("salmon_index", [ortho_idx], [orp_intermediate], partial(self.salmon_index, cpu=cpu))
+            self.step("salmon", [quant_sf], [ortho_idx, c1, c2], partial(self.salmon, cpu=cpu))
+
+        # orp_diamond and salmon indexing/quantification are independent
+        # chains that both only need orp_intermediate; they join at filter.
+        self.run_parallel(
+            [
+                ("orp_diamond_branch", [unique_orp_done], [orp_intermediate], orp_diamond_branch),
+                ("salmon_branch", [quant_sf], [orp_intermediate], salmon_branch),
+            ],
+            max_workers=2,
+        )
         self.step("filter", [filter_done], [orp_intermediate, quant_sf, orp_diamond_txt], self.filter_tpm, timed=False)
         self.step(
             "secondfilter", [orp_fasta],
             [filter_done, low_txt, high_txt, orp_intermediate, quant_sf, orp_diamond_txt],
             self.secondfilter,
         )
-        self.step("busco", [busco_done], [orp_fasta], self.busco)
-        self.step("transrate", [transrate_csv], [orp_fasta, c1, c2], self.transrate)
-        self.step("strandeval", [strandeval_done], [orp_fasta], self.strandeval)
+        # busco, transrate, and strandeval are all independent given ORP.fasta;
+        # reportgen (below) needs all three done first.
+        self.run_parallel(
+            [
+                ("busco", [busco_done], [orp_fasta], self.busco),
+                ("transrate", [transrate_csv], [orp_fasta, c1, c2], self.transrate),
+                ("strandeval", [strandeval_done], [orp_fasta], self.strandeval),
+            ],
+            max_workers=2,
+        )
         self.step("reportgen", [qualreport_done], [unique_orp_done, orp_fasta], self.reportgen, timed=False)
 
         self.timing_report()
