@@ -122,6 +122,7 @@ class Pipeline:
         self.timing_log = self.reports_dir / f"{self.runout}.timing.log"
         self.run_cmd = "oyster.py " + " ".join(sys.argv[1:])
         self.steps = []
+        self.historical_timings = {}
         self._timing_lock = threading.Lock()
 
     # -- process helpers -------------------------------------------------
@@ -182,6 +183,13 @@ class Pipeline:
         if not pending:
             return
 
+        # Longest-processing-time-first: submit the slowest known jobs first so
+        # they start immediately instead of waiting behind quick ones, using
+        # durations observed in this run directory's previous timing log (if
+        # any). Jobs with no history keep their given relative order, after
+        # every job with known history.
+        pending.sort(key=lambda item: self.historical_timings.get(item[0], -1), reverse=True)
+
         workers = min(max_workers, len(pending), max(1, self.cpu))
         job_cpu = max(1, self.cpu // workers)
         job_mem = max(1, self.mem // workers)
@@ -207,6 +215,21 @@ class Pipeline:
             self.orthofuse_dir, self.quants_dir, self.diamond_dir, self.assemblies_working,
         ):
             d.mkdir(parents=True, exist_ok=True)
+
+    def load_historical_timings(self):
+        if not self.timing_log.exists():
+            return {}
+        timings = {}
+        with open(self.timing_log) as f:
+            for line in f:
+                if "\t" not in line:
+                    continue
+                name, secs = line.rstrip("\n").split("\t")
+                try:
+                    timings[name] = int(secs)
+                except ValueError:
+                    pass
+        return timings
 
     def timing_init(self):
         self.reports_dir.mkdir(parents=True, exist_ok=True)
@@ -858,6 +881,7 @@ class Pipeline:
 
     def main(self):
         self.setup()
+        self.historical_timings = self.load_historical_timings()
         self.timing_init()
         self.check()
         self.welcome()
