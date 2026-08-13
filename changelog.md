@@ -21,6 +21,7 @@ ORP Version 2.4.0 <- 2.3.3
 - fix strandeval's `hist` histogram call: it was reading unfiltered raw data instead of the filtered numeric column, and separately losing its `-p '#'` argument when re-executed through conda run's internal shell
 - fix the software-installed banner (SALMON/BUSCO/SPADES/etc.) printing between every timed step instead of once at the start, caused by per-step timing re-parsing the whole makefile
 - fix the BUSCO score in qualreport picking up a line from BUSCO's JSON summary instead of its text summary, after newer BUSCO started writing both a .txt and .json short_summary per run
+- add NORMALIZE_READS option to oyster.mk, exposing Trinity's `--no_normalize_reads` flag on the command line (defaults to FALSE, preserving prior behavior)
 
 ORP Version 2.3.2 <- 2.3.1
 
