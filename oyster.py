@@ -101,6 +101,7 @@ class Pipeline:
         self.strand = args.strand
         self.normalize_reads = args.normalize_reads
         self.tpm_filt = args.tpm_filt
+        self.parallel_assemblers = max(1, args.parallel_assemblers)
 
         self.version = (self.makedir / "version.txt").read_text().strip()
         self.busco_config = self.makedir / "software" / "config.ini"
@@ -911,7 +912,7 @@ class Pipeline:
                 ("run_spades55", [sp55], [c1, c2], self.run_spades55),
                 ("run_transabyss", [ta], [c1, c2], self.run_transabyss),
             ],
-            max_workers=2,
+            max_workers=self.parallel_assemblers,
         )
         self.step("run_filtershort", short_fastas, [ta, sp75, sp55, trinity_fa], self.run_filtershort)
         self.step("run_orthofuser", [orthofuser_done], short_fastas, self.run_orthofuser)
@@ -966,6 +967,11 @@ def parse_args():
     p.add_argument("--spades1-kmer", type=int, default=55, help="rnaSPAdes k-mer for spades55 (default: 55)")
     p.add_argument("--spades2-kmer", type=int, default=75, help="rnaSPAdes k-mer for spades75 (default: 75)")
     p.add_argument("--transabyss-kmer", type=int, default=32, help="Trans-ABySS k-mer (default: 32)")
+    p.add_argument(
+        "--parallel-assemblers", type=int, default=2,
+        help="max concurrent assemblers (Trinity/rnaSPAdes55/rnaSPAdes75/Trans-ABySS), "
+             "splitting --cpu/--mem across them; 1 disables concurrency (default: 2)",
+    )
     p.add_argument("--dir", default=None, help="working directory (default: current directory)")
     return p.parse_args()
 
