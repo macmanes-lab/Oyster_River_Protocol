@@ -1,0 +1,931 @@
+#!/usr/bin/env python3
+"""Python port of oyster.mk - the Oyster River Protocol assembly pipeline.
+
+Usage:
+    oyster.py --read1 R1.fq.gz --read2 R2.fq.gz --mem 110 --cpu 24 \\
+              --runout myrun --strand RF
+
+Runs the full pipeline end to end. Steps whose output files already exist
+and are newer than their inputs are skipped, so a failed/interrupted run
+can be re-invoked to resume where it left off.
+"""
+
+import argparse
+import csv
+import gzip
+import os
+import re
+import shutil
+import socket
+import subprocess
+import sys
+import time
+import concurrent.futures
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+RED = "\033[31m"
+RESET = "\033[0m"
+
+SHORT_ASSEMBLY_NAMES = ("spades55.fasta", "spades75.fasta", "transabyss.fasta", "trinity.Trinity.fasta")
+
+
+def awk_first_field(src: Path, dst: Path) -> None:
+    with open(src) as inf, open(dst, "w") as outf:
+        for line in inf:
+            fields = line.split()
+            outf.write((fields[0] if fields else "") + "\n")
+
+
+def extract_gene_ids(diamond_txt: Path) -> set:
+    ids = set()
+    with open(diamond_txt) as f:
+        for line in f:
+            cols = line.rstrip("\n").split("\t")
+            if len(cols) < 2:
+                continue
+            parts = cols[1].split("|")
+            if len(parts) < 3:
+                continue
+            ids.add(parts[2].split("_")[0])
+    return ids
+
+
+def parse_unique_count(diamond_txt: Path) -> int:
+    return len(extract_gene_ids(diamond_txt))
+
+
+def write_sorted(path: Path, ids) -> None:
+    with open(path, "w") as f:
+        for i in sorted(ids):
+            f.write(i + "\n")
+
+
+def is_gzip(path: Path) -> bool:
+    with open(path, "rb") as fh:
+        return fh.read(2) == b"\x1f\x8b"
+
+
+def average_read_length(path: Path, n_records: int = 100) -> int:
+    opener = gzip.open if is_gzip(path) else open
+    lengths = []
+    with opener(path, "rt") as fh:
+        for i, line in enumerate(fh):
+            if i >= n_records * 4:
+                break
+            if i % 4 == 1:
+                lengths.append(len(line.strip()))
+    return sum(lengths) // len(lengths) if lengths else 0
+
+
+def hostname_suffix() -> str:
+    parts = socket.gethostname().split(".")
+    return ".".join(parts[2:5])
+
+
+class Pipeline:
+    def __init__(self, args):
+        self.dir = Path(args.dir).resolve() if args.dir else Path.cwd()
+        self.makedir = HERE
+        self.cpu = args.cpu
+        self.busco_threads = args.busco_threads or self.cpu
+        self.mem = args.mem
+        self.spades1_kmer = args.spades1_kmer
+        self.spades2_kmer = args.spades2_kmer
+        self.transabyss_kmer = args.transabyss_kmer
+        self.read1 = Path(args.read1)
+        self.read2 = Path(args.read2)
+        self.runout = args.runout
+        self.lineage = args.lineage
+        self.strand = args.strand
+        self.normalize_reads = args.normalize_reads
+        self.tpm_filt = args.tpm_filt
+
+        self.version = (self.makedir / "version.txt").read_text().strip()
+        self.busco_config = self.makedir / "software" / "config.ini"
+        os.environ["BUSCO_CONFIG_FILE"] = str(self.busco_config)
+        self.diamond_db = self.makedir / "software" / "diamond" / "swissprot"
+
+        self.reads_dir = self.dir / "reads"
+        self.rcorr_dir = self.dir / "rcorr"
+        self.assemblies_dir = self.dir / "assemblies"
+        self.assemblies_working = self.assemblies_dir / "working"
+        self.diamond_dir = self.assemblies_dir / "diamond"
+        self.reports_dir = self.dir / "reports"
+        self.orthofuse_dir = self.dir / "orthofuse" / self.runout
+        self.orthofuse_working = self.orthofuse_dir / "working"
+        self.quants_dir = self.dir / "quants"
+
+        self.timing_log = self.reports_dir / f"{self.runout}.timing.log"
+        self.run_cmd = "oyster.py " + " ".join(sys.argv[1:])
+        self.steps = []
+
+    # -- process helpers -------------------------------------------------
+
+    def run(self, cmd, cwd=None, **kwargs):
+        print("+", " ".join(str(c) for c in cmd))
+        subprocess.run(cmd, check=True, cwd=str(cwd or self.dir), **kwargs)
+
+    def conda_run(self, env, *cmd, **kwargs):
+        self.run(["conda", "run", "--no-capture-output", "-n", env, *[str(c) for c in cmd]], **kwargs)
+
+    # -- resumability ------------------------------------------------------
+
+    def needs_run(self, outputs, inputs) -> bool:
+        if not outputs:
+            return True
+        outputs = [Path(o) for o in outputs]
+        if not all(o.exists() for o in outputs):
+            return True
+        existing_inputs = [Path(i) for i in inputs if i and Path(i).exists()]
+        if not existing_inputs:
+            return False
+        newest_input = max(i.stat().st_mtime for i in existing_inputs)
+        oldest_output = min(o.stat().st_mtime for o in outputs)
+        return newest_input > oldest_output
+
+    def step(self, name, outputs, inputs, func, timed=True):
+        if not self.needs_run(outputs, inputs):
+            print(f"[{name}] up to date, skipping")
+            return
+        print(f"\n=== {name} ===")
+        start = time.time()
+        func()
+        elapsed = int(time.time() - start)
+        if timed:
+            self.steps.append((name, elapsed))
+            with open(self.timing_log, "a") as f:
+                f.write(f"{name}\t{elapsed}\n")
+
+    # -- setup / preflight -------------------------------------------------
+
+    def setup(self):
+        for d in (
+            self.reads_dir, self.assemblies_dir, self.rcorr_dir, self.reports_dir,
+            self.orthofuse_dir, self.quants_dir, self.diamond_dir, self.assemblies_working,
+        ):
+            d.mkdir(parents=True, exist_ok=True)
+
+    def timing_init(self):
+        self.reports_dir.mkdir(parents=True, exist_ok=True)
+        self.timing_log.write_text(f"Command: {self.run_cmd}\n\n")
+
+    def which_in_env(self, env, binary):
+        try:
+            result = subprocess.run(
+                ["conda", "run", "-n", env, "which", binary], capture_output=True, text=True
+            )
+        except FileNotFoundError:
+            return None
+        path = result.stdout.strip()
+        if result.returncode == 0 and path and os.path.basename(path) == binary:
+            return path
+        return None
+
+    def check(self):
+        if self.which_in_env("orp_salmon", "salmon"):
+            print("SALMON installed")
+        else:
+            sys.exit("*** SALMON is not installed, must fix ***")
+
+        transrate_bin = self.makedir / "software" / "orp-transrate" / "transrate"
+        if os.access(transrate_bin, os.X_OK):
+            print("TRANSRATE installed")
+        else:
+            sys.exit("*** TRANSRATE is not installed, must fix ***")
+
+        for env, binary, label in (
+            ("orp", "seqtk", "SEQTK"),
+            ("orp_busco", "busco", "BUSCO"),
+            ("orp", "mcl", "MCL"),
+            ("orp_spades", "rnaspades.py", "SPADES"),
+            ("orp_trinity", "Trinity", "TRINITY"),
+            ("orp_trimmomatic", "trimmomatic", "TRIMMOMATIC"),
+            ("orp_transabyss", "transabyss", "TRANSABYSS"),
+            ("orp_rcorrector", "run_rcorrector.pl", "RCORRECTOR"),
+        ):
+            if self.which_in_env(env, binary):
+                print(f"{label} installed")
+            else:
+                sys.exit(f"*** {label} is not installed, must fix ***")
+
+    def welcome(self):
+        print(RED)
+        print("    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+        print("                    _.-~~~~~-._")
+        print("                 .-~   o   o   ~-.")
+        print("                (   .-'~~~~~'-.   )        OYSTER RIVER PROTOCOL")
+        print(f"                 '-.___________.-'         version {self.version}")
+        print("                     '-.___.-'")
+        print("    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + RESET + "\n")
+
+    def readcheck(self):
+        if not self.read1.exists():
+            sys.exit("\n\n\n\n ERROR: YOUR READ1 FILE DOES NOT EXIST AT THE LOCATION YOU SPECIFIED\n\n\n\n ")
+        if not self.read2.exists():
+            sys.exit("\n\n\n\n ERROR: YOUR READ2 FILE DOES NOT EXIST AT THE LOCATION YOU SPECIFIED\n\n\n\n ")
+        len1 = average_read_length(self.read1)
+        len2 = average_read_length(self.read2)
+        if not (len1 > self.spades2_kmer and len2 > self.spades2_kmer):
+            sys.exit(
+                f"\n\n\n\n IT LOOKS LIKE YOUR READS ARE NOT AT LEAST {self.spades2_kmer} BP LONG,\n "
+                'PLEASE EDIT YOUR COMMAND USING THE "SPADES2_KMER=INT" FLAGS,\n'
+                " SETTING THE ASSEMBLY KMER LENGTH TO AN ODD NUMBER LESS THAN YOUR READ LENGTH \n\n\n\n"
+            )
+
+    # -- trimming / correction ----------------------------------------------
+
+    def trim1(self):
+        return self.rcorr_dir / f"{self.runout}.TRIM_1P.fastq"
+
+    def trim2(self):
+        return self.rcorr_dir / f"{self.runout}.TRIM_2P.fastq"
+
+    def cor1(self):
+        return self.rcorr_dir / f"{self.runout}.TRIM_1P.cor.fq"
+
+    def cor2(self):
+        return self.rcorr_dir / f"{self.runout}.TRIM_2P.cor.fq"
+
+    def run_trimmomatic(self):
+        baseout = self.rcorr_dir / f"{self.runout}.TRIM.fastq"
+        clip = self.makedir / "barcodes" / "barcodes.fa"
+        pe_args = [
+            "PE", "-threads", str(self.cpu), "-baseout", str(baseout),
+            str(self.read1), str(self.read2),
+            "LEADING:3", "TRAILING:3",
+            f"ILLUMINACLIP:{clip}:2:30:10:8:TRUE", "MINLEN:25",
+        ]
+        if hostname_suffix() == "bridges.psc.edu":
+            trimmomatic_home = os.environ.get("TRIMMOMATIC_HOME", "")
+            jar = f"{trimmomatic_home}/trimmomatic-0.36.jar"
+            self.run(["java", f"-Xmx{self.mem}G", "-jar", jar, *pe_args])
+        else:
+            env = dict(os.environ, _JAVA_OPTIONS=f"-Xmx{self.mem}G")
+            self.run(
+                ["conda", "run", "--no-capture-output", "-n", "orp_trimmomatic", "trimmomatic", *pe_args],
+                env=env,
+            )
+
+    def run_rcorrector(self):
+        self.conda_run(
+            "orp_rcorrector", "run_rcorrector.pl", "-t", self.cpu, "-k", "31",
+            "-1", self.trim1(), "-2", self.trim2(), "-od", self.rcorr_dir,
+        )
+
+    # -- assemblers ----------------------------------------------------------
+
+    def run_trinity(self):
+        out = self.assemblies_dir / f"{self.runout}.trinity.Trinity.fasta"
+        cmd = ["Trinity"]
+        if self.strand == "RF":
+            cmd += ["--SS_lib_type", "RF"]
+        elif self.strand == "FR":
+            cmd += ["--SS_lib_type", "FR"]
+        cmd += ["--no_version_check", "--bypass_java_version_check"]
+        if not self.normalize_reads:
+            cmd.append("--no_normalize_reads")
+        cmd += [
+            "--seqType", "fq",
+            "--output", str(self.assemblies_dir / f"{self.runout}.trinity"),
+            "--max_memory", f"{self.mem}G",
+            "--left", str(self.cor1()), "--right", str(self.cor2()),
+            "--CPU", str(self.cpu), "--inchworm_cpu", "10", "--full_cleanup",
+        ]
+        self.conda_run("orp_trinity", *cmd)
+        tmp = out.with_suffix(".fa")
+        awk_first_field(out, tmp)
+        tmp.replace(out)
+        for f in self.assemblies_dir.glob("*gene_trans_map"):
+            f.unlink()
+
+    def run_spades(self, kmer, outname, workdir_suffix):
+        out = self.assemblies_dir / f"{self.runout}.{outname}.fasta"
+        workdir = self.assemblies_dir / f"{self.runout}.spades_k{workdir_suffix}"
+        cmd = ["rnaspades.py"]
+        if self.strand == "RF":
+            cmd.append("--ss-rf")
+        elif self.strand == "FR":
+            cmd.append("--ss-fr")
+        cmd += [
+            "--only-assembler", "-o", str(workdir),
+            "--threads", str(self.cpu), "--memory", str(self.mem), "-k", str(kmer),
+            "-1", str(self.cor1()), "-2", str(self.cor2()),
+        ]
+        self.conda_run("orp_spades", *cmd)
+        shutil.move(str(workdir / "transcripts.fasta"), str(out))
+        shutil.rmtree(workdir, ignore_errors=True)
+
+    def run_spades55(self):
+        self.run_spades(self.spades1_kmer, "spades55", "55")
+
+    def run_spades75(self):
+        self.run_spades(self.spades2_kmer, "spades75", "75")
+
+    def run_transabyss(self):
+        out = self.assemblies_dir / f"{self.runout}.transabyss.fasta"
+        workdir = self.assemblies_dir / f"{self.runout}.transabyss"
+        cmd = ["transabyss"]
+        if self.strand in ("RF", "FR"):
+            cmd.append("--SS")
+        cmd += [
+            "--threads", str(self.cpu), "--outdir", str(workdir),
+            "--kmer", str(self.transabyss_kmer), "--length", "250",
+            "--name", f"{self.runout}.transabyss.fasta",
+            "--pe", str(self.cor1()), str(self.cor2()),
+        ]
+        self.conda_run("orp_transabyss", *cmd)
+        final = workdir / f"{self.runout}.transabyss.fasta-final.fa"
+        awk_first_field(final, out)
+        shutil.rmtree(workdir, ignore_errors=True)
+
+    # -- orthofuse merge -------------------------------------------------------
+
+    def short_fasta_paths(self):
+        return [self.orthofuse_working / f"{self.runout}.{n}.short.fasta" for n in SHORT_ASSEMBLY_NAMES]
+
+    def run_filtershort(self):
+        self.orthofuse_working.mkdir(parents=True, exist_ok=True)
+        for n in ("transabyss.fasta", "spades75.fasta", "spades55.fasta", "trinity.Trinity.fasta"):
+            fasta = self.assemblies_dir / f"{self.runout}.{n}"
+            outp = self.orthofuse_working / f"{fasta.name}.short.fasta"
+            self.conda_run("orp", "python", self.makedir / "scripts" / "long.seq.py", fasta, outp, "200")
+
+    def run_orthofuser(self):
+        self.conda_run(
+            "orp", self.makedir / "software" / "OrthoFinder" / "orthofinder",
+            "-d", "-I", "12", "-f", self.orthofuse_working, "-og", "-t", self.cpu, "-a", self.cpu,
+        )
+        (self.orthofuse_dir / "orthofuser.done").touch()
+
+    def merge(self):
+        out = self.orthofuse_dir / "merged.fasta"
+        with open(out, "wb") as outf:
+            for p in self.short_fasta_paths():
+                with open(p, "rb") as inf:
+                    shutil.copyfileobj(inf, outf)
+
+    def find_orthogroups_txt(self):
+        match = next(self.orthofuse_working.rglob("Orthogroups.txt"), None)
+        if match is None:
+            sys.exit("Orthogroups.txt not found under orthofuse working directory")
+        return match
+
+    def makelist(self):
+        orthogroups = self.find_orthogroups_txt()
+        with open(orthogroups) as f:
+            n = sum(1 for _ in f)
+        out = self.orthofuse_dir / f"{self.runout}.list"
+        with open(out, "w") as f:
+            for i in range(1, n + 1):
+                f.write(f"{i}\n")
+
+    def makegroups(self):
+        orthogroups = self.find_orthogroups_txt()
+        with open(orthogroups) as f:
+            lines = f.readlines()
+
+        def write_group(i):
+            tokens = lines[i - 1].split()
+            group_file = self.orthofuse_dir / f"{i}.groups"
+            with open(group_file, "w") as f:
+                for tok in tokens[1:]:
+                    f.write(tok + "\n")
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.cpu) as ex:
+            list(ex.map(write_group, range(1, len(lines) + 1)))
+        (self.orthofuse_dir / "groups.done").touch()
+
+    def orthotransrate(self):
+        outdir = self.orthofuse_dir / "merged"
+        self.conda_run(
+            "orp", self.makedir / "software" / "orp-transrate" / "transrate",
+            "-o", outdir, "-t", self.cpu, "-a", self.orthofuse_dir / "merged.fasta",
+            "--left", self.cor1(), "--right", self.cor2(),
+        )
+        for f in outdir.rglob("*.bam"):
+            f.unlink()
+
+    def makeorthout(self):
+        print("Picking the best contig per orthogroup")
+        contigs_csv = next(self.orthofuse_dir.rglob("contigs.csv"), None)
+        if contigs_csv is None:
+            sys.exit("contigs.csv not found under orthofuse directory")
+        good_list = self.orthofuse_dir / f"good.{self.runout}.list"
+        self.conda_run(
+            "orp", "python", self.makedir / "scripts" / "pick_best_contigs.py",
+            contigs_csv, self.orthofuse_dir, good_list,
+        )
+        for f in self.orthofuse_dir.glob("*groups"):
+            f.unlink()
+
+    def orthofusing(self):
+        good_list = self.orthofuse_dir / f"good.{self.runout}.list"
+        out = self.assemblies_dir / f"{self.runout}.orthomerged.fasta"
+        with open(out, "w") as outf:
+            subprocess.run(
+                ["conda", "run", "--no-capture-output", "-n", "orp", "python",
+                 str(self.makedir / "scripts" / "filter.py"), str(self.orthofuse_dir / "merged.fasta"), str(good_list)],
+                check=True, stdout=outf, cwd=self.dir,
+            )
+
+    # -- diamond passes ----------------------------------------------------
+
+    def diamond_jobs(self):
+        return [
+            (self.assemblies_dir / f"{self.runout}.orthomerged.fasta", self.diamond_dir / f"{self.runout}.orthomerged.diamond.txt"),
+            (self.assemblies_dir / f"{self.runout}.transabyss.fasta", self.diamond_dir / f"{self.runout}.transabyss.diamond.txt"),
+            (self.assemblies_dir / f"{self.runout}.spades75.fasta", self.diamond_dir / f"{self.runout}.spades75.diamond.txt"),
+            (self.assemblies_dir / f"{self.runout}.spades55.fasta", self.diamond_dir / f"{self.runout}.spades55.diamond.txt"),
+            (self.assemblies_dir / f"{self.runout}.trinity.Trinity.fasta", self.diamond_dir / f"{self.runout}.trinity.diamond.txt"),
+        ]
+
+    def diamond(self):
+        print("\n\n\n\n Starting diamond \n\n\n\n")
+        for query, out in self.diamond_jobs():
+            self.conda_run(
+                "orp_diamond", "diamond", "blastx", "--quiet", "-p", self.cpu,
+                "-e", "1e-8", "--top", "0.1", "-q", query, "-d", self.diamond_db, "-o", out,
+            )
+
+    def diamond_uniq(self):
+        mapping = {
+            "trinity": self.diamond_dir / f"{self.runout}.trinity.diamond.txt",
+            "sp75": self.diamond_dir / f"{self.runout}.spades75.diamond.txt",
+            "sp55": self.diamond_dir / f"{self.runout}.spades55.diamond.txt",
+            "transabyss": self.diamond_dir / f"{self.runout}.transabyss.diamond.txt",
+        }
+        for label, path in mapping.items():
+            count = parse_unique_count(path)
+            (self.diamond_dir / f"{self.runout}.unique.{label}.txt").write_text(f"{count}\n")
+
+    def make_list1(self):
+        ids = extract_gene_ids(self.diamond_dir / f"{self.runout}.orthomerged.diamond.txt")
+        write_sorted(self.diamond_dir / f"{self.runout}.list1", ids)
+
+    def make_list2(self):
+        ids = set()
+        for name in ("transabyss", "spades75", "spades55", "trinity"):
+            ids |= extract_gene_ids(self.diamond_dir / f"{self.runout}.{name}.diamond.txt")
+        write_sorted(self.diamond_dir / f"{self.runout}.list2", ids)
+
+    def make_list3(self):
+        list1 = set(line.rstrip("\n") for line in open(self.diamond_dir / f"{self.runout}.list1"))
+        list2_path = self.diamond_dir / f"{self.runout}.list2"
+        out = self.diamond_dir / f"{self.runout}.list3"
+        with open(list2_path) as f, open(out, "w") as o:
+            for line in f:
+                if line.rstrip("\n") not in list1:
+                    o.write(line)
+
+    def make_list5(self):
+        self.conda_run(
+            "orp", "python", self.makedir / "scripts" / "build_list5.py",
+            self.diamond_dir / f"{self.runout}.list3", self.diamond_dir / f"{self.runout}.list5",
+            self.diamond_dir / f"{self.runout}.transabyss.diamond.txt",
+            self.diamond_dir / f"{self.runout}.spades75.diamond.txt",
+            self.diamond_dir / f"{self.runout}.spades55.diamond.txt",
+            self.diamond_dir / f"{self.runout}.trinity.diamond.txt",
+        )
+
+    def make_list6(self):
+        fasta = self.assemblies_dir / f"{self.runout}.orthomerged.fasta"
+        out = self.diamond_dir / f"{self.runout}.list6"
+        with open(fasta) as f, open(out, "w") as o:
+            for line in f:
+                if line.startswith(">"):
+                    o.write(line[1:])
+
+    def make_list7(self):
+        list6 = set(line.rstrip("\n") for line in open(self.diamond_dir / f"{self.runout}.list6"))
+        list5_path = self.diamond_dir / f"{self.runout}.list5"
+        out = self.diamond_dir / f"{self.runout}.list7"
+        with open(list5_path) as f, open(out, "w") as o:
+            for line in f:
+                if line.rstrip("\n") not in list6:
+                    o.write(line)
+
+    def posthack(self):
+        fastas = " ".join(
+            str(self.assemblies_dir / f"{self.runout}.{n}")
+            for n in ("spades55.fasta", "spades75.fasta", "transabyss.fasta", "trinity.Trinity.fasta")
+        )
+        list7 = self.diamond_dir / f"{self.runout}.list7"
+        newbies = self.diamond_dir / f"{self.runout}.newbies.fasta"
+        orthomerged = self.assemblies_dir / f"{self.runout}.orthomerged.fasta"
+        working_out = self.assemblies_working / f"{self.runout}.orthomerged.fasta"
+        filter_py = self.makedir / "scripts" / "filter.py"
+        script = f"python {filter_py} <(cat {fastas}) {list7} >> {newbies}"
+        self.run(["conda", "run", "--no-capture-output", "-n", "orp", "bash", "-c", script])
+        with open(working_out, "wb") as outf:
+            for p in (newbies, orthomerged):
+                with open(p, "rb") as inf:
+                    shutil.copyfileobj(inf, outf)
+
+    # -- dedup / quantify -----------------------------------------------------
+
+    def cdhit(self):
+        src = self.assemblies_working / f"{self.runout}.orthomerged.fasta"
+        out = self.assemblies_dir / f"{self.runout}.ORP.intermediate.fasta"
+        self.conda_run(
+            "orp_cdhit", "cd-hit-est", "-M", self.mem * 1000, "-T", self.cpu,
+            "-c", ".98", "-i", src, "-o", out,
+        )
+
+    def orp_diamond(self):
+        src = self.assemblies_dir / f"{self.runout}.ORP.intermediate.fasta"
+        out = self.assemblies_dir / f"{self.runout}.ORP.diamond.txt"
+        self.conda_run(
+            "orp_diamond", "diamond", "blastx", "--quiet", "-p", self.cpu,
+            "-e", "1e-8", "--top", "0.1", "-q", src, "-d", self.diamond_db, "-o", out,
+        )
+        out.touch()
+
+    def orp_uniq(self):
+        diamond_txt = self.assemblies_dir / f"{self.runout}.ORP.diamond.txt"
+        count = parse_unique_count(diamond_txt)
+        (self.assemblies_working / f"{self.runout}.unique.ORP.txt").write_text(f"{count}\n")
+        (self.assemblies_working / f"{self.runout}.unique.ORP.done").touch()
+
+    def salmon_index(self):
+        src = self.assemblies_dir / f"{self.runout}.ORP.intermediate.fasta"
+        idx = self.quants_dir / f"{self.runout}.ortho.idx"
+        self.conda_run(
+            "orp_salmon", "salmon", "index", "--no-version-check", "-t", src,
+            "-i", idx, "-k", "31", "--threads", self.cpu,
+        )
+
+    def salmon(self):
+        idx = self.quants_dir / f"{self.runout}.ortho.idx"
+        outdir = self.quants_dir / f"salmon_orthomerged_{self.runout}"
+        self.conda_run(
+            "orp_salmon", "salmon", "quant", "--no-version-check", "--validateMappings",
+            "-p", self.cpu, "-i", idx, "--seqBias", "--gcBias", "--libType", "A",
+            "-1", self.cor1(), "-2", self.cor2(), "-o", outdir,
+        )
+
+    def filter_tpm(self):
+        quant = self.quants_dir / f"salmon_orthomerged_{self.runout}" / "quant.sf"
+        high = self.assemblies_working / f"{self.runout}.HIGHEXP.txt"
+        low = self.assemblies_working / f"{self.runout}.LOWEXP.txt"
+        with open(quant) as f, open(high, "w") as hf, open(low, "w") as lf:
+            next(f, None)
+            for line in f:
+                cols = line.rstrip("\n").split("\t")
+                if len(cols) < 4:
+                    continue
+                try:
+                    tpm = float(cols[3])
+                except ValueError:
+                    continue
+                if tpm > self.tpm_filt:
+                    hf.write(cols[0] + "\n")
+                elif tpm < self.tpm_filt:
+                    lf.write(cols[0] + "\n")
+        (self.assemblies_dir / f"{self.runout}.filter.done").touch()
+        print("\n\n\n\n PART: TPM_FILT MAKE LOW AND HIGH\n\n\n\n")
+
+    def secondfilter(self):
+        intermediate = self.assemblies_dir / f"{self.runout}.ORP.intermediate.fasta"
+        orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
+        low = self.assemblies_working / f"{self.runout}.LOWEXP.txt"
+        high = self.assemblies_working / f"{self.runout}.HIGHEXP.txt"
+        diamond_txt = self.assemblies_dir / f"{self.runout}.ORP.diamond.txt"
+        filter_py = self.makedir / "scripts" / "filter.py"
+
+        if low.exists() and low.stat().st_size > 0:
+            before = self.assemblies_working / f"{self.runout}.ORP_BEFORE_TPM_FILT.fasta"
+            shutil.copy(intermediate, before)
+
+            highexp_fasta = self.assemblies_working / f"{self.runout}.ORP.HIGHEXP.fasta"
+            with open(highexp_fasta, "w") as outf:
+                subprocess.run(
+                    ["conda", "run", "--no-capture-output", "-n", "orp", "python",
+                     str(filter_py), str(intermediate), str(high)],
+                    check=True, stdout=outf, cwd=self.dir,
+                )
+
+            low_ids = set(line.strip() for line in open(low) if line.strip())
+            blasted = self.assemblies_working / f"{self.runout}.blasted"
+            donotremove = self.assemblies_working / f"{self.runout}.donotremove.list"
+            do_not_remove_ids = set()
+            with open(diamond_txt) as f, open(blasted, "a") as bf:
+                for line in f:
+                    cols = line.rstrip("\n").split("\t")
+                    if cols and cols[0] in low_ids:
+                        bf.write(line)
+                        do_not_remove_ids.add(cols[0])
+            with open(donotremove, "a") as df:
+                for i in sorted(do_not_remove_ids):
+                    print(i)
+                    df.write(i + "\n")
+
+            saveme = self.assemblies_working / f"{self.runout}.saveme.fasta"
+            with open(saveme, "w") as outf:
+                subprocess.run(
+                    ["conda", "run", "--no-capture-output", "-n", "orp", "python",
+                     str(filter_py), str(intermediate), str(donotremove)],
+                    check=True, stdout=outf, cwd=self.dir,
+                )
+
+            with open(orp_fasta, "wb") as outf:
+                for p in (saveme, highexp_fasta):
+                    with open(p, "rb") as inf:
+                        shutil.copyfileobj(inf, outf)
+            print("\n\n\n\n PART: FILTER LOW STUFF \n\n\n\n")
+        else:
+            shutil.copy(intermediate, orp_fasta)
+            print("\n\n\n\n PART: THERE IS NO LOW STUFF \n\n\n\n")
+
+    # -- QC / reporting ----------------------------------------------------
+
+    def busco(self):
+        orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
+        self.conda_run(
+            "orp_busco", "busco", "--offline", "--lineage", self.lineage,
+            "--download_path", self.makedir / "busco_dbs",
+            "-i", orp_fasta, "-m", "transcriptome", "--cpu", self.busco_threads,
+            "-o", f"run_{self.runout}.ORP", "--config", self.busco_config,
+        )
+        for p in self.dir.glob(f"run_{self.runout}*"):
+            shutil.move(str(p), str(self.reports_dir / p.name))
+        (self.reports_dir / f"{self.runout}.busco.done").touch()
+
+    def transrate(self):
+        orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
+        outdir = self.reports_dir / f"transrate_{self.runout}"
+        self.conda_run(
+            "orp", self.makedir / "software" / "orp-transrate" / "transrate",
+            "-o", outdir, "-a", orp_fasta,
+            "--left", self.cor1(), "--right", self.cor2(), "-t", self.cpu,
+        )
+        for f in outdir.rglob("*.bam"):
+            f.unlink()
+
+    def trinity_perllib_dir(self):
+        result = subprocess.run(
+            ["conda", "run", "-n", "orp_trinity", "which", "Trinity"],
+            capture_output=True, text=True, check=True,
+        )
+        trinity_path = Path(result.stdout.strip()).resolve()
+        return trinity_path.parent / "PerlLib"
+
+    def strandeval(self):
+        orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
+        r1, r2 = self.cor1(), self.cor2()
+        self.conda_run("orp_trinity", "bwa", "index", "-p", self.runout, orp_fasta)
+
+        pipeline_script = (
+            f'conda run --no-capture-output -n orp_trinity bash -c '
+            f'"bwa mem -t {self.cpu} {self.runout} '
+            f'<(seqtk sample -s 23894 {r1} 400000) <(seqtk sample -s 23894 {r2} 400000)" '
+            f"| conda run --no-capture-output -n orp_sam samtools view -@10 -Sb - "
+            f"| conda run --no-capture-output -n orp_sam samtools sort -T {self.runout} -O bam -@10 "
+            f"-o {self.runout}.sorted.bam -"
+        )
+        self.run(["bash", "-o", "pipefail", "-c", pipeline_script])
+
+        flagstat_out = self.assemblies_dir / f"{self.runout}.flagstat"
+        with open(flagstat_out, "w") as outf:
+            subprocess.run(
+                ["conda", "run", "--no-capture-output", "-n", "orp_sam", "samtools", "flagstat",
+                 f"{self.runout}.sorted.bam"],
+                check=True, stdout=outf, cwd=self.dir,
+            )
+
+        perllib = self.trinity_perllib_dir()
+        self.run(
+            ["perl", "-I", str(perllib), str(self.makedir / "scripts" / "examine_strand.pl"),
+             f"{self.runout}.sorted.bam", self.runout]
+        )
+
+        dat_file = self.dir / f"{self.runout}.dat"
+        hist_input = self.dir / f"{self.runout}.hist_input.txt"
+        with open(dat_file) as f, open(hist_input, "w") as out:
+            next(f, None)
+            for line in f:
+                cols = line.rstrip("\n").split()
+                if len(cols) >= 5:
+                    out.write(cols[4] + "\n")
+
+        self.run(["conda", "run", "--no-capture-output", "-n", "orp_trinity", "bash", "-c",
+                  f"hist -p '#' -c red {hist_input}"])
+
+        hist_input.unlink(missing_ok=True)
+        (self.dir / f"{self.runout}.sorted.bam").unlink(missing_ok=True)
+        for ext in ("bwt", "pac", "ann", "amb", "sa", "dat"):
+            p = self.dir / f"{self.runout}.{ext}"
+            if p.exists():
+                p.unlink()
+
+        (self.reports_dir / f"{self.runout}.strandeval.done").touch()
+        print("\n\n*****  See the following link for interpretation ***** ")
+        print("*****  https://oyster-river-protocol.readthedocs.io/en/latest/strandexamine.html ***** \n")
+
+    def reportgen(self):
+        runout = self.runout
+        lines = []
+
+        def emit(label, value):
+            text = f"{label}      {value}"
+            print(text)
+            lines.append(text)
+
+        print(f"\n\n*****  QUALITY REPORT FOR: {runout} using the ORP version {self.version} ****")
+        orp_fasta = self.assemblies_dir / f"{runout}.ORP.fasta"
+        print(f"\n*****  THE ASSEMBLY CAN BE FOUND HERE: {orp_fasta} **** \n")
+
+        busco_line = ""
+        busco_dir = self.reports_dir / f"run_{runout}.ORP"
+        for p in busco_dir.rglob("short*.txt"):
+            for line in open(p):
+                if re.match(r"^\s*C:[0-9]", line):
+                    busco_line = line.strip()
+        emit("*****  BUSCO SCORE ~~~~~~~~~~~~~~~~~~~~~~>", busco_line)
+
+        csv_path = next((self.reports_dir / f"transrate_{runout}").rglob("assemblies.csv"), None)
+        rows = list(csv.reader(open(csv_path))) if csv_path else []
+        transrate_score = rows[1][36] if len(rows) > 1 and len(rows[1]) > 36 else ""
+        transrate_optimal = rows[1][37] if len(rows) > 1 and len(rows[1]) > 37 else ""
+        emit("*****  TRANSRATE SCORE ~~~~~~~~~~~~~~~~~~>     ", transrate_score)
+        emit("*****  TRANSRATE OPTIMAL SCORE ~~~~~~~~~~>     ", transrate_optimal)
+
+        def read_count(path):
+            return path.read_text().strip() if path.exists() else ""
+
+        emit("*****  UNIQUE GENES ORP ~~~~~~~~~~~~~~~~~>     ", read_count(self.assemblies_working / f"{runout}.unique.ORP.txt"))
+        emit("*****  UNIQUE GENES TRINITY ~~~~~~~~~~~~~>     ", read_count(self.diamond_dir / f"{runout}.unique.trinity.txt"))
+        emit("*****  UNIQUE GENES SPADES55 ~~~~~~~~~~~~>     ", read_count(self.diamond_dir / f"{runout}.unique.sp55.txt"))
+        emit("*****  UNIQUE GENES SPADES75 ~~~~~~~~~~~~>     ", read_count(self.diamond_dir / f"{runout}.unique.sp75.txt"))
+        emit("*****  UNIQUE GENES TRANSABYSS ~~~~~~~~~~>     ", read_count(self.diamond_dir / f"{runout}.unique.transabyss.txt"))
+
+        proper_pairs = ""
+        flagstat = self.assemblies_dir / f"{runout}.flagstat"
+        if flagstat.exists():
+            for line in open(flagstat):
+                if "properly paired" in line:
+                    fields = line.split()
+                    if len(fields) > 5:
+                        proper_pairs = fields[5].lstrip("(")
+        emit("*****  READS MAPPED AS PROPER PAIRS ~~~~~>     ", proper_pairs)
+        print(" \n")
+
+        qualreport_path = self.reports_dir / f"qualreport.{runout}"
+        qualreport_path.write_text("\n".join(lines) + "\n")
+        (self.reports_dir / f"qualreport.{runout}.done").touch()
+
+    def timing_report(self):
+        with open(self.timing_log) as f:
+            all_lines = f.readlines()
+        header = all_lines[0].rstrip("\n") if all_lines else ""
+        body = [l for l in all_lines if "\t" in l]
+
+        out_lines = [header, "", f"*****  STEP TIMING for {self.runout} ***** ", ""]
+        total = 0
+        for line in body:
+            name, secs = line.rstrip("\n").split("\t")
+            secs = int(secs)
+            h, m, s = secs // 3600, (secs % 3600) // 60, secs % 60
+            out_lines.append(f"{name:<16} {h:02d}:{m:02d}:{s:02d}")
+            total += secs
+        h, m, s = total // 3600, (total % 3600) // 60, total % 60
+        out_lines.append(f"{'TOTAL':<16} {h:02d}:{m:02d}:{s:02d}")
+
+        text = "\n".join(out_lines) + "\n"
+        print(text)
+        self.timing_log.write_text(text)
+        print(f"\nFull timing log saved to: {self.timing_log}\n")
+
+    # -- orchestration -------------------------------------------------------
+
+    def main(self):
+        self.setup()
+        self.timing_init()
+        self.check()
+        self.welcome()
+        self.readcheck()
+
+        t1, t2 = self.trim1(), self.trim2()
+        c1, c2 = self.cor1(), self.cor2()
+        trinity_fa = self.assemblies_dir / f"{self.runout}.trinity.Trinity.fasta"
+        sp75 = self.assemblies_dir / f"{self.runout}.spades75.fasta"
+        sp55 = self.assemblies_dir / f"{self.runout}.spades55.fasta"
+        ta = self.assemblies_dir / f"{self.runout}.transabyss.fasta"
+        short_fastas = self.short_fasta_paths()
+        orthofuser_done = self.orthofuse_dir / "orthofuser.done"
+        merged_fasta = self.orthofuse_dir / "merged.fasta"
+        list_file = self.orthofuse_dir / f"{self.runout}.list"
+        groups_done = self.orthofuse_dir / "groups.done"
+        merged_csv = self.orthofuse_dir / "merged" / "assemblies.csv"
+        good_list = self.orthofuse_dir / f"good.{self.runout}.list"
+        orthomerged_fasta = self.assemblies_dir / f"{self.runout}.orthomerged.fasta"
+        diamond_outs = [o for _, o in self.diamond_jobs()]
+        diamond_orthomerged = self.diamond_dir / f"{self.runout}.orthomerged.diamond.txt"
+        diamond_ta = self.diamond_dir / f"{self.runout}.transabyss.diamond.txt"
+        diamond_sp75 = self.diamond_dir / f"{self.runout}.spades75.diamond.txt"
+        diamond_sp55 = self.diamond_dir / f"{self.runout}.spades55.diamond.txt"
+        diamond_trinity = self.diamond_dir / f"{self.runout}.trinity.diamond.txt"
+        uniq_outs = [
+            self.diamond_dir / f"{self.runout}.unique.trinity.txt",
+            self.diamond_dir / f"{self.runout}.unique.sp75.txt",
+            self.diamond_dir / f"{self.runout}.unique.sp55.txt",
+            self.diamond_dir / f"{self.runout}.unique.transabyss.txt",
+        ]
+        list1 = self.diamond_dir / f"{self.runout}.list1"
+        list2 = self.diamond_dir / f"{self.runout}.list2"
+        list3 = self.diamond_dir / f"{self.runout}.list3"
+        list5 = self.diamond_dir / f"{self.runout}.list5"
+        list6 = self.diamond_dir / f"{self.runout}.list6"
+        list7 = self.diamond_dir / f"{self.runout}.list7"
+        newbies = self.diamond_dir / f"{self.runout}.newbies.fasta"
+        working_orthomerged = self.assemblies_working / f"{self.runout}.orthomerged.fasta"
+        orp_intermediate = self.assemblies_dir / f"{self.runout}.ORP.intermediate.fasta"
+        orp_diamond_txt = self.assemblies_dir / f"{self.runout}.ORP.diamond.txt"
+        unique_orp_done = self.assemblies_working / f"{self.runout}.unique.ORP.done"
+        ortho_idx = self.quants_dir / f"{self.runout}.ortho.idx"
+        quant_sf = self.quants_dir / f"salmon_orthomerged_{self.runout}" / "quant.sf"
+        filter_done = self.assemblies_dir / f"{self.runout}.filter.done"
+        low_txt = self.assemblies_working / f"{self.runout}.LOWEXP.txt"
+        high_txt = self.assemblies_working / f"{self.runout}.HIGHEXP.txt"
+        orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
+        busco_done = self.reports_dir / f"{self.runout}.busco.done"
+        transrate_csv = self.reports_dir / f"transrate_{self.runout}" / "assemblies.csv"
+        strandeval_done = self.reports_dir / f"{self.runout}.strandeval.done"
+        qualreport_done = self.reports_dir / f"qualreport.{self.runout}.done"
+
+        self.step("run_trimmomatic", [t1, t2], [self.read1, self.read2], self.run_trimmomatic)
+        self.step("run_rcorrector", [c1, c2], [t1, t2], self.run_rcorrector)
+        self.step("run_trinity", [trinity_fa], [c1], self.run_trinity)
+        self.step("run_spades75", [sp75], [c1, c2], self.run_spades75)
+        self.step("run_spades55", [sp55], [c1, c2], self.run_spades55)
+        self.step("run_transabyss", [ta], [c1, c2], self.run_transabyss)
+        self.step("run_filtershort", short_fastas, [ta, sp75, sp55, trinity_fa], self.run_filtershort)
+        self.step("run_orthofuser", [orthofuser_done], short_fastas, self.run_orthofuser)
+        self.step("merge", [merged_fasta], short_fastas, self.merge, timed=False)
+        self.step("makelist", [list_file], [orthofuser_done], self.makelist, timed=False)
+        self.step("makegroups", [groups_done], [list_file], self.makegroups, timed=False)
+        self.step("orthotransrate", [merged_csv], [merged_fasta, c1, c2], self.orthotransrate)
+        self.step("makeorthout", [good_list], [groups_done, merged_csv], self.makeorthout)
+        self.step("orthofusing", [orthomerged_fasta], [good_list, merged_fasta], self.orthofusing)
+        self.step("diamond", diamond_outs, [orthomerged_fasta, ta, sp75, sp55, trinity_fa], self.diamond)
+        self.step("diamond_uniq", uniq_outs, diamond_outs, self.diamond_uniq, timed=False)
+        self.step("make_list1", [list1], [diamond_orthomerged], self.make_list1, timed=False)
+        self.step("make_list2", [list2], [diamond_trinity, diamond_sp75, diamond_sp55, diamond_ta], self.make_list2, timed=False)
+        self.step("make_list3", [list3], [list1, list2], self.make_list3, timed=False)
+        self.step("make_list5", [list5], [list3, diamond_ta, diamond_sp75, diamond_sp55, diamond_trinity], self.make_list5)
+        self.step("make_list6", [list6], [orthomerged_fasta], self.make_list6, timed=False)
+        self.step("make_list7", [list7], [list6, list5], self.make_list7, timed=False)
+        self.step("posthack", [newbies, working_orthomerged], [list7], self.posthack)
+        self.step("cdhit", [orp_intermediate], [working_orthomerged], self.cdhit)
+        self.step("orp_diamond", [orp_diamond_txt], [orp_intermediate], self.orp_diamond)
+        self.step("orp_uniq", [unique_orp_done], [orp_diamond_txt], self.orp_uniq, timed=False)
+        self.step("salmon_index", [ortho_idx], [orp_intermediate], self.salmon_index)
+        self.step("salmon", [quant_sf], [ortho_idx, c1, c2], self.salmon)
+        self.step("filter", [filter_done], [orp_intermediate, quant_sf, orp_diamond_txt], self.filter_tpm, timed=False)
+        self.step(
+            "secondfilter", [orp_fasta],
+            [filter_done, low_txt, high_txt, orp_intermediate, quant_sf, orp_diamond_txt],
+            self.secondfilter,
+        )
+        self.step("busco", [busco_done], [orp_fasta], self.busco)
+        self.step("transrate", [transrate_csv], [orp_fasta, c1, c2], self.transrate)
+        self.step("strandeval", [strandeval_done], [orp_fasta], self.strandeval)
+        self.step("reportgen", [qualreport_done], [unique_orp_done, orp_fasta], self.reportgen, timed=False)
+
+        self.timing_report()
+
+
+def parse_args():
+    p = argparse.ArgumentParser(description="Python port of oyster.mk - the Oyster River Protocol pipeline.")
+    version = (HERE / "version.txt").read_text().strip()
+    p.add_argument("--version", action="version", version=f"Oyster River Protocol {version}")
+    p.add_argument("--read1", required=True, help="path to R1 fastq(.gz)")
+    p.add_argument("--read2", required=True, help="path to R2 fastq(.gz)")
+    p.add_argument("--mem", type=int, default=110, help="memory in GB (default: 110)")
+    p.add_argument("--cpu", type=int, default=16, help="CPU threads (default: 16)")
+    p.add_argument("--busco-threads", type=int, default=None, help="BUSCO threads (default: same as --cpu)")
+    p.add_argument("--runout", default="USER_RUN", help="run name prefix (default: USER_RUN)")
+    p.add_argument("--strand", choices=["RF", "FR", ""], default="", help="strand-specificity (default: unstranded)")
+    p.add_argument("--lineage", default="eukaryota_odb12.2", help="BUSCO lineage (default: eukaryota_odb12.2)")
+    p.add_argument("--normalize-reads", action="store_true", help="let Trinity normalize reads (default: off, i.e. --no_normalize_reads)")
+    p.add_argument("--tpm-filt", type=float, default=0, help="TPM filter threshold (default: 0)")
+    p.add_argument("--spades1-kmer", type=int, default=55, help="rnaSPAdes k-mer for spades55 (default: 55)")
+    p.add_argument("--spades2-kmer", type=int, default=75, help="rnaSPAdes k-mer for spades75 (default: 75)")
+    p.add_argument("--transabyss-kmer", type=int, default=32, help="Trans-ABySS k-mer (default: 32)")
+    p.add_argument("--dir", default=None, help="working directory (default: current directory)")
+    return p.parse_args()
+
+
+def main():
+    args = parse_args()
+    pipeline = Pipeline(args)
+    try:
+        pipeline.main()
+    except subprocess.CalledProcessError as e:
+        sys.exit(f"\n*** step failed: {' '.join(str(c) for c in e.cmd)} (exit {e.returncode}) ***")
+    except FileNotFoundError as e:
+        sys.exit(f"\n*** required command not found: {e.filename} ***")
+
+
+if __name__ == "__main__":
+    main()
