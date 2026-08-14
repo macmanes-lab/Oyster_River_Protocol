@@ -49,10 +49,10 @@ else
 				conda config --add channels bioconda; \
 				conda install mamba -n base -yc conda-forge; \
 				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_spades spades=4.3.0 python=3.14; \
-				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_trinity trinity=2.15.2 bwa=0.7.19 bashplotlib seqtk=1.5 salmon=1.10.3 python=3.14; \
-				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_busco busco=6.1.0 python=3.14; \
-				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_transabyss transabyss=2.0.1 python=3.14; \
-				mamba env create -f ${DIR}/orp_env.yml python=3.14; \
+				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_trinity trinity=2.15.2 bwa=0.7.19 bashplotlib seqtk=1.5 salmon=1.10.3; \
+				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_busco busco=6.1.0; \
+				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_transabyss transabyss=2.0.1; \
+				mamba env create -f ${DIR}/orp_env.yml; \
 				mamba clean -ya; \
 				conda deactivate; \
   )
