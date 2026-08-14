@@ -6,8 +6,8 @@ These directions cover installing ORP 3.0+ (the `oyster.py` pipeline) on Linux. 
 
 - Linux (the installer's Anaconda bootstrap is Linux x86_64 specific)
 - `git`, `curl`, `bash`, and a system `python3` already available
-- Internet access on the install machine — it pulls down Anaconda, OrthoFinder, the UniProt/Swiss-Prot diamond database, and the BUSCO lineage database
-- Several GB of free disk space (Swiss-Prot + Anaconda + 5 conda environments + BUSCO database adds up)
+- Internet access on the install machine — it pulls down Anaconda, the UniProt/Swiss-Prot diamond database, and the BUSCO lineage database
+- Several GB of free disk space (Swiss-Prot + Anaconda + 6 conda environments + BUSCO database adds up)
 
 ## Option A: one-command install
 
@@ -17,7 +17,7 @@ cd Oyster_River_Protocol
 make
 ```
 
-`make` chains through everything: creates the conda environments, downloads OrthoFinder and orp-transrate, builds the diamond search database, downloads the BUSCO lineage database, and appends any needed PATH entries to `~/.profile`/`~/.bash_profile`. Each step checks whether it's already done and skips itself if so, so re-running `make` after a partial or failed install picks up where it left off rather than starting over.
+`make` chains through everything: creates the conda environments (including OrthoFinder's), unpacks orp-transrate, builds the diamond search database, downloads the BUSCO lineage database, and appends any needed PATH entries to `~/.profile`/`~/.bash_profile`. Each step checks whether it's already done and skips itself if so, so re-running `make` after a partial or failed install picks up where it left off rather than starting over.
 
 When it finishes, run:
 
@@ -37,15 +37,18 @@ conda config --add channels bioconda
 conda install mamba -n base -yc conda-forge
 ```
 
-**2. Create the 4 isolated tool environments**
+**2. Create the 5 isolated tool environments**
 
 Only `orp_spades` pins `python=3.14` — that env has a confirmed bug (see [Known gotchas](#known-gotchas)) that requires forcing a modern Python. The others resolve whatever compatible Python their own recipe naturally wants; forcing 3.14 there bought no benefit (each env's Python is invisible outside that env) and broke `orp_transabyss`'s solve in practice.
+
+`orp_orthofinder` is kept isolated rather than folded into the shared `orp` env because OrthoFinder 3.x requires `diamond <2.2`, which conflicts with `orp`'s own `diamond=2.2.5` (used for the Swiss-Prot search, a separate purpose from OrthoFinder's internal one).
 
 ```bash
 mamba create -y -c bioconda -c conda-forge --override-channels --name orp_spades spades=4.3.0 python=3.14
 mamba create -y -c bioconda -c conda-forge --override-channels --name orp_trinity trinity=2.15.2 bwa=0.7.19 bashplotlib seqtk=1.5 salmon=1.10.3
 mamba create -y -c bioconda -c conda-forge --override-channels --name orp_busco busco=6.1.0
 mamba create -y -c bioconda -c conda-forge --override-channels --name orp_transabyss transabyss=2.0.1
+mamba create -y -c bioconda -c conda-forge --override-channels --name orp_orthofinder orthofinder=3.1.5
 ```
 
 **3. Create the consolidated `orp` environment**
@@ -56,14 +59,9 @@ Everything else — rcorrector, trimmomatic, cd-hit, diamond, salmon (the pipeli
 mamba env create -f orp_env.yml
 ```
 
-**4. OrthoFinder** (not conda-installed)
+**4. OrthoFinder**
 
-```bash
-cd software
-curl -LO https://github.com/davidemms/OrthoFinder/releases/download/2.5.2/OrthoFinder.tar.gz
-tar -zxf OrthoFinder.tar.gz
-cd ..
-```
+Already created in step 2 above (`orp_orthofinder`) — nothing further needed here.
 
 **5. orp-transrate** (already bundled in the repo — just unpack it)
 
@@ -91,10 +89,10 @@ mkdir -p busco_dbs
 conda run -n orp_busco busco --download eukaryota_odb12.2 --download_path busco_dbs
 ```
 
-**8. Add OrthoFinder and orp-transrate to your PATH**
+**8. Add orp-transrate to your PATH**
 
 ```bash
-echo "export PATH=\$PATH:$(pwd)/software/OrthoFinder:$(pwd)/software/orp-transrate" >> ~/.profile
+echo "export PATH=\$PATH:$(pwd)/software/orp-transrate" >> ~/.profile
 source ~/.profile
 ```
 

@@ -1,5 +1,11 @@
 ### CHANGELOG
 
+Unreleased
+
+- upgrade OrthoFinder 2.5.2 -> 3.1.5 and move it off the hand-rolled curl/tar/PATH install into its own isolated conda env, `orp_orthofinder` (bioconda now packages OrthoFinder 3.x directly). The `-d -I 12 -f ... -og -t -a` invocation in `run_orthofuser()` is unchanged -- v3.1.5's argument parser still accepts all of those flags and `-og` still stops the run right after MCL orthogroup clustering and writes `Orthogroups.txt` in the same place, which is all ORP ever uses OrthoFinder for. Kept isolated rather than folded into the shared `orp` env because OrthoFinder 3.x requires `diamond <2.2`, which conflicts with `orp`'s own `diamond=2.2.5`
+- add `orp_orthofinder`/`orthofinder` to `check()`'s preflight tool verification, which never covered OrthoFinder before since it used to be a bare downloaded binary rather than a conda env
+- remove the `orthofuser.py`-based version-check in the Makefile (`orthopath`/`orthufuserversion`, and the `orthofuser` target's curl/tar logic): dead code left over from ORP's pre-2021 install process, when a MacManes-lab-patched fork of OrthoFinder named `orthofuser.py` supplied nucleotide-input support that upstream OrthoFinder didn't have yet. That patch was retired in 2021 once upstream OrthoFinder added its own `-d` DNA-input flag, but the Makefile's check for it (a path that stopped existing at that point) was never cleaned up until now
+
 ORP Version 3.0.0 <- 2.4.0
 
 - replace oyster.mk (GNU Make) with oyster.py (Python 3.6+), the new primary pipeline entrypoint; every 2.4.0 fix and behavior below (software versions, BUSCO OrthoDB v12.2, NORMALIZE_READS, TPM/cd-hit/diamond-prerequisite fixes, etc.) carries forward unchanged except where noted here

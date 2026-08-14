@@ -276,6 +276,7 @@ class Pipeline:
             ("orp", "trimmomatic", "TRIMMOMATIC"),
             ("orp_transabyss", "transabyss", "TRANSABYSS"),
             ("orp", "run_rcorrector.pl", "RCORRECTOR"),
+            ("orp_orthofinder", "orthofinder", "ORTHOFINDER"),
         ):
             if self.which_in_env(env, binary):
                 print(f"{label} installed")
@@ -432,7 +433,7 @@ class Pipeline:
     def run_orthofuser(self, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
         self.conda_run(
-            "orp", self.makedir / "software" / "OrthoFinder" / "orthofinder",
+            "orp_orthofinder", "orthofinder",
             "-d", "-I", "12", "-f", self.orthofuse_working, "-og", "-t", cpu, "-a", cpu,
         )
         (self.orthofuse_dir / "orthofuser.done").touch()

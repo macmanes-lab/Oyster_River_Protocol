@@ -10,8 +10,6 @@ SHELL=/bin/bash -o pipefail
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
 CONDAROOT = ${DIR}/software/anaconda/install/
-orthopath := $(shell ls ${DIR}/software/OrthoFinder/orthofinder/orthofuser.py 2>/dev/null)
-orthufuserversion = $(shell orthofuser.py --help | grep "OrthoFinder version" | awk '{print $$3}')
 transrate := $(shell ls ${DIR}/software/orp-transrate/transrate 2>/dev/null)
 diamond_data := $(shell ls ${DIR}/software/diamond/uniprot_sprot.fasta 2>/dev/null)
 busco_data := $(shell find ${DIR}/busco_dbs -iname "eukaryota_odb12*" -type d 2>/dev/null)
@@ -19,7 +17,7 @@ conda := $(shell conda info 2>/dev/null)
 orp := $(shell ${DIR}/software/anaconda/install/bin/conda info --envs | grep orp 2>/dev/null)
 VERSION := ${shell cat  ${MAKEDIR}version.txt}
 
-all: setup conda orp orthofuser transrate diamond_data busco_data postscript
+all: setup conda orp transrate diamond_data busco_data postscript
 
 .DELETE_ON_ERROR:
 
@@ -52,6 +50,7 @@ else
 				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_trinity trinity=2.15.2 bwa=0.7.19 bashplotlib seqtk=1.5 salmon=1.10.3; \
 				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_busco busco=6.1.0; \
 				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_transabyss transabyss=2.0.1; \
+				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_orthofinder orthofinder=3.1.5; \
 				mamba env create -f ${DIR}/orp_env.yml; \
 				mamba clean -ya; \
 				conda deactivate; \
@@ -82,23 +81,7 @@ else
 	@echo PATH=\$$PATH:${DIR}/software/orp-transrate >> pathfile
 endif
 
-orthofuser:
-ifdef orthopath
-ifeq ($(orthufuserversion),2.5.2)
-	@echo "orthofuser right version is already installed"
-else
-	@echo "version ${orthufuserversion}"
-	@echo "orthofuser is installed, but not the right version"
-	cd ${DIR}/software/OrthoFinder/ && git pull
-endif
-else
-	@echo "orthofuser is not installed and needs to be installed"
-	cd ${DIR}/software && curl -LO https://github.com/davidemms/OrthoFinder/releases/download/2.5.2/OrthoFinder.tar.gz
-	cd ${DIR}/software/ && tar -zxf OrthoFinder.tar.gz
-	@echo PATH=\$$PATH:${DIR}/software/OrthoFinder/ >> pathfile
-endif
-
-postscript: setup orp diamond_data busco_data orthofuser conda transrate
+postscript: setup orp diamond_data busco_data conda transrate
 	@if [ -f pathfile ]; then\
 		printf "\n\n*** The following location(s), if any print, need to be added to your PATH ***";\
 		printf "\n*** They will be automatically to your ~/.profile or ~/.bash_profile ***\n\n";\
@@ -114,7 +97,6 @@ postscript: setup orp diamond_data busco_data orthofuser conda transrate
 clean:
 	${DIR}/software/anaconda/install/bin/conda remove -y --name orp --all
 	rm -fr ${DIR}/software/anaconda/install
-	rm -fr ${DIR}/software/OrthoFinder/
 	rm -fr ${DIR}/software/orp-transrate
 	rm -fr ${DIR}/software/transabyss
 	rm -fr ${DIR}/software/anaconda/
