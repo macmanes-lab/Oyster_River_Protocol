@@ -256,7 +256,7 @@ class Pipeline:
         return None
 
     def check(self):
-        if self.which_in_env("orp_salmon", "salmon"):
+        if self.which_in_env("orp", "salmon"):
             print("SALMON installed")
         else:
             sys.exit("*** SALMON is not installed, must fix ***")
@@ -273,9 +273,9 @@ class Pipeline:
             ("orp", "mcl", "MCL"),
             ("orp_spades", "rnaspades.py", "SPADES"),
             ("orp_trinity", "Trinity", "TRINITY"),
-            ("orp_trimmomatic", "trimmomatic", "TRIMMOMATIC"),
+            ("orp", "trimmomatic", "TRIMMOMATIC"),
             ("orp_transabyss", "transabyss", "TRANSABYSS"),
-            ("orp_rcorrector", "run_rcorrector.pl", "RCORRECTOR"),
+            ("orp", "run_rcorrector.pl", "RCORRECTOR"),
         ):
             if self.which_in_env(env, binary):
                 print(f"{label} installed")
@@ -336,13 +336,13 @@ class Pipeline:
         else:
             env = dict(os.environ, _JAVA_OPTIONS=f"-Xmx{self.mem}G")
             self.run(
-                ["conda", "run", "--no-capture-output", "-n", "orp_trimmomatic", "trimmomatic", *pe_args],
+                ["conda", "run", "--no-capture-output", "-n", "orp", "trimmomatic", *pe_args],
                 env=env,
             )
 
     def run_rcorrector(self):
         self.conda_run(
-            "orp_rcorrector", "run_rcorrector.pl", "-t", self.cpu, "-k", "31",
+            "orp", "run_rcorrector.pl", "-t", self.cpu, "-k", "31",
             "-1", self.trim1(), "-2", self.trim2(), "-od", self.rcorr_dir,
         )
 
@@ -523,7 +523,7 @@ class Pipeline:
     def run_diamond_one(self, query, out, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
         self.conda_run(
-            "orp_diamond", "diamond", "blastx", "--quiet", "-p", cpu,
+            "orp", "diamond", "blastx", "--quiet", "-p", cpu,
             "-e", "1e-8", "--top", "0.1", "-q", query, "-d", self.diamond_db, "-o", out,
         )
 
@@ -607,7 +607,7 @@ class Pipeline:
         src = self.assemblies_working / f"{self.runout}.orthomerged.fasta"
         out = self.assemblies_dir / f"{self.runout}.ORP.intermediate.fasta"
         self.conda_run(
-            "orp_cdhit", "cd-hit-est", "-M", self.mem * 1000, "-T", self.cpu,
+            "orp", "cd-hit-est", "-M", self.mem * 1000, "-T", self.cpu,
             "-c", ".98", "-i", src, "-o", out,
         )
 
@@ -616,7 +616,7 @@ class Pipeline:
         src = self.assemblies_dir / f"{self.runout}.ORP.intermediate.fasta"
         out = self.assemblies_dir / f"{self.runout}.ORP.diamond.txt"
         self.conda_run(
-            "orp_diamond", "diamond", "blastx", "--quiet", "-p", cpu,
+            "orp", "diamond", "blastx", "--quiet", "-p", cpu,
             "-e", "1e-8", "--top", "0.1", "-q", src, "-d", self.diamond_db, "-o", out,
         )
         out.touch()
@@ -632,7 +632,7 @@ class Pipeline:
         src = self.assemblies_dir / f"{self.runout}.ORP.intermediate.fasta"
         idx = self.quants_dir / f"{self.runout}.ortho.idx"
         self.conda_run(
-            "orp_salmon", "salmon", "index", "--no-version-check", "-t", src,
+            "orp", "salmon", "index", "--no-version-check", "-t", src,
             "-i", idx, "-k", "31", "--threads", cpu,
         )
 
@@ -641,7 +641,7 @@ class Pipeline:
         idx = self.quants_dir / f"{self.runout}.ortho.idx"
         outdir = self.quants_dir / f"salmon_orthomerged_{self.runout}"
         self.conda_run(
-            "orp_salmon", "salmon", "quant", "--no-version-check", "--validateMappings",
+            "orp", "salmon", "quant", "--no-version-check", "--validateMappings",
             "-p", cpu, "-i", idx, "--seqBias", "--gcBias", "--libType", "A",
             "-1", self.cor1(), "-2", self.cor2(), "-o", outdir,
         )
@@ -764,8 +764,8 @@ class Pipeline:
             f'conda run --no-capture-output -n orp_trinity bash -c '
             f'"bwa mem -t {cpu} {self.runout} '
             f'<(seqtk sample -s 23894 {r1} 400000) <(seqtk sample -s 23894 {r2} 400000)" '
-            f"| conda run --no-capture-output -n orp_sam samtools view -@10 -Sb - "
-            f"| conda run --no-capture-output -n orp_sam samtools sort -T {self.runout} -O bam -@10 "
+            f"| conda run --no-capture-output -n orp samtools view -@10 -Sb - "
+            f"| conda run --no-capture-output -n orp samtools sort -T {self.runout} -O bam -@10 "
             f"-o {self.runout}.sorted.bam -"
         )
         self.run(["bash", "-o", "pipefail", "-c", pipeline_script])
@@ -773,7 +773,7 @@ class Pipeline:
         flagstat_out = self.assemblies_dir / f"{self.runout}.flagstat"
         with open(flagstat_out, "w") as outf:
             subprocess.run(
-                ["conda", "run", "--no-capture-output", "-n", "orp_sam", "samtools", "flagstat",
+                ["conda", "run", "--no-capture-output", "-n", "orp", "samtools", "flagstat",
                  f"{self.runout}.sorted.bam"],
                 check=True, stdout=outf, cwd=self.dir,
             )

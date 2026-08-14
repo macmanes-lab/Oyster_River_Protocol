@@ -52,12 +52,6 @@ else
 				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_trinity trinity=2.15.2 bwa=0.7.19 bashplotlib seqtk=1.5 salmon=1.10.3 python=3.14; \
 				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_busco busco=6.1.0 python=3.14; \
 				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_transabyss transabyss=2.0.1 python=3.14; \
-				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_rcorrector rcorrector=1.0.7 python=3.14; \
-				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_trimmomatic trimmomatic=0.41 python=3.14; \
-				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_sam samtools=1.24 bwa=0.7.19 seqtk=1.5 python=3.14; \
-				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_salmon salmon=2.5.1 python=3.14; \
-				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_cdhit cd-hit=4.8.1 python=3.14; \
-				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_diamond diamond=2.2.5 python=3.14; \
 				mamba env create -f ${DIR}/orp_env.yml python=3.14; \
 				mamba clean -ya; \
 				conda deactivate; \
@@ -70,7 +64,7 @@ diamond_data:conda
 ifdef diamond_data
 		@echo "diamond_data is already installed"
 else
-		cd ${DIR}/software/diamond && curl -LO ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz && gzip -d uniprot_sprot.fasta.gz && ${DIR}/software/anaconda/install/envs/orp_diamond/bin/diamond makedb --in uniprot_sprot.fasta -d swissprot
+		cd ${DIR}/software/diamond && curl -LO ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz && gzip -d uniprot_sprot.fasta.gz && ${DIR}/software/anaconda/install/envs/orp/bin/diamond makedb --in uniprot_sprot.fasta -d swissprot
 endif
 
 busco_data:conda

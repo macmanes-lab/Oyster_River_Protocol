@@ -2,7 +2,7 @@
 
 ORP Version 3.0.0 <- 2.4.0
 
-- replace oyster.mk (GNU Make) with oyster.py (Python 3.6+), the new primary pipeline entrypoint; every 2.4.0 fix and behavior below (software versions, BUSCO OrthoDB v12.2, conda env isolation, NORMALIZE_READS, TPM/cd-hit/diamond-prerequisite fixes, etc.) carries forward unchanged
+- replace oyster.mk (GNU Make) with oyster.py (Python 3.6+), the new primary pipeline entrypoint; every 2.4.0 fix and behavior below (software versions, BUSCO OrthoDB v12.2, NORMALIZE_READS, TPM/cd-hit/diamond-prerequisite fixes, etc.) carries forward unchanged except where noted here
 - add file-mtime-based resumability: a step whose output already exists and is newer than its inputs is skipped, so a failed/interrupted run can be re-invoked without recomputing finished work
 - run independent stages concurrently, capped by the new `--max-parallel` flag (default 2, splitting `--cpu`/`--mem` across however many run at once): the 4 assemblers (Trinity/rnaSPAdes55/rnaSPAdes75/Trans-ABySS); the orthofuser vs. merge/orthotransrate branches; transrate vs. strandeval
 - deliberately keep diamond, orp_diamond, salmon, and BUSCO sequential at full `--cpu` -- these are CPU-bound tools where splitting cores to enable overlap measured out to no net benefit (diamond) or a real regression (BUSCO, whose ~2 minutes dwarfs the ~13s of transrate+strandeval it would otherwise share cores with)
@@ -10,7 +10,8 @@ ORP Version 3.0.0 <- 2.4.0
 - fix per-step timing: TOTAL is now real wall-clock time measured across the whole run, not a naive sum of the lines above it -- the previous approach double-counted composite/branch steps and summed concurrent jobs' durations as if they ran sequentially, overstating the true runtime
 - capture strandeval's strand-examination histogram and reprint it at the end alongside the BUSCO/transrate/unique-gene quality metrics (and save it into the persisted qualreport), instead of it only appearing mid-run where concurrent output could bury it
 - add `--version` and full `argparse`-based `--help`
-- pin `python=3.14` for every `orp_*` conda environment created by the top-level Makefile, not just the base `orp` env -- fixes SPAdes reporting "Python version 3.6.8 is not supported," a known SPAdes bug (ablab/spades#1319) where it detects a stray system Python instead of its own env's interpreter
+- pin `python=3.14` for every remaining conda environment created by the top-level Makefile, not just the base `orp` env -- fixes SPAdes reporting "Python version 3.6.8 is not supported," a known SPAdes bug (ablab/spades#1319) where it detects a stray system Python instead of its own env's interpreter
+- consolidate installed conda environments from 11 down to 5 (`orp`, `orp_spades`, `orp_trinity`, `orp_busco`, `orp_transabyss`) to make install faster and less failure-prone: `orp_rcorrector`, `orp_trimmomatic`, `orp_cdhit`, `orp_diamond`, and `orp_salmon` are folded into the base `orp` env, and `orp_sam` is removed entirely (its samtools was a version-for-version duplicate of `orp`'s, and its bwa/seqtk were never actually used from that env -- every bwa/seqtk call already ran inside `orp_trinity`). `orp_spades`/`orp_trinity`/`orp_busco`/`orp_transabyss` are left fully isolated since each has its own complex or fragile dependency tree -- `orp_trinity` in particular pins an old `salmon=1.10.3` for Trinity's internal isoform filtering, which must never resolve against the pipeline's own modern `salmon=2.5.1` now living in `orp`
 
 ORP Version 2.4.0 <- 2.3.3
 

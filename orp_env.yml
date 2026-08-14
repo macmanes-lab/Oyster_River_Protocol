@@ -10,6 +10,11 @@ dependencies:
   - samtools=1.24
   - seqtk=1.5
   - mcl=22.282
+  - rcorrector=1.0.7
+  - trimmomatic=0.41
+  - cd-hit=4.8.1
+  - diamond=2.2.5
+  - salmon=2.5.1
   - pip=26.2.1
   - pip:
     - scipy
