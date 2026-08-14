@@ -1,5 +1,17 @@
 ### CHANGELOG
 
+ORP Version 3.0.0 <- 2.4.0
+
+- replace oyster.mk (GNU Make) with oyster.py (Python 3.6+), the new primary pipeline entrypoint; every 2.4.0 fix and behavior below (software versions, BUSCO OrthoDB v12.2, conda env isolation, NORMALIZE_READS, TPM/cd-hit/diamond-prerequisite fixes, etc.) carries forward unchanged
+- add file-mtime-based resumability: a step whose output already exists and is newer than its inputs is skipped, so a failed/interrupted run can be re-invoked without recomputing finished work
+- run independent stages concurrently, capped by the new `--max-parallel` flag (default 2, splitting `--cpu`/`--mem` across however many run at once): the 4 assemblers (Trinity/rnaSPAdes55/rnaSPAdes75/Trans-ABySS); the orthofuser vs. merge/orthotransrate branches; transrate vs. strandeval
+- deliberately keep diamond, orp_diamond, salmon, and BUSCO sequential at full `--cpu` -- these are CPU-bound tools where splitting cores to enable overlap measured out to no net benefit (diamond) or a real regression (BUSCO, whose ~2 minutes dwarfs the ~13s of transrate+strandeval it would otherwise share cores with)
+- order jobs within a concurrent group by a fixed longest-first reference profile (`STEP_TIME_HINTS`) rather than adapting per-run, since a given dataset is normally only assembled once
+- fix per-step timing: TOTAL is now real wall-clock time measured across the whole run, not a naive sum of the lines above it -- the previous approach double-counted composite/branch steps and summed concurrent jobs' durations as if they ran sequentially, overstating the true runtime
+- capture strandeval's strand-examination histogram and reprint it at the end alongside the BUSCO/transrate/unique-gene quality metrics (and save it into the persisted qualreport), instead of it only appearing mid-run where concurrent output could bury it
+- add `--version` and full `argparse`-based `--help`
+- pin `python=3.14` for every `orp_*` conda environment created by the top-level Makefile, not just the base `orp` env -- fixes SPAdes reporting "Python version 3.6.8 is not supported," a known SPAdes bug (ablab/spades#1319) where it detects a stray system Python instead of its own env's interpreter
+
 ORP Version 2.4.0 <- 2.3.3
 
 - update software versions: Trinity 2.15.2, SPAdes 4.3.0, BUSCO 6.1.0, DIAMOND 2.2.5, salmon 2.5.1, samtools 1.24, bwa 0.7.19, rcorrector 1.0.7, cd-hit 4.8.1, trimmomatic 0.41, seqtk 1.5, mcl 22.282
