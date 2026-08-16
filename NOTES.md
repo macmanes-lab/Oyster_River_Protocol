@@ -4,6 +4,13 @@ Cross-machine scratchpad so a session on either machine can pick up where
 the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 
+## 2026-08-16 (3)
+
+- Updated README.md ("Parallel task management" section) and changelog.md
+  (Unreleased) to describe the two-lane assembler split and the
+  STEP_TIME_HINTS fix from the entry below -- both docs still described the
+  old even `--max-parallel` split across all 4 assemblers.
+
 ## 2026-08-16 (2)
 
 - Diagnosed why half the cores sit idle for ~36 hours during the assembler
