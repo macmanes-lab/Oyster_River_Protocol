@@ -4,6 +4,14 @@ Cross-machine scratchpad so a session on either machine can pick up where
 the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 
+## 2026-08-16 (4)
+
+- Real-run validation of the two-lane assembler split (commit 246804a) is
+  in progress, same dataset as before (SRR1789336). Time to beat: the old
+  even-split TOTAL of 38:28:11. Not yet known whether it finished or what
+  the new TOTAL/per-step timing looks like -- check with the user or look
+  for an updated timing report / NOTES entry before assuming either way.
+
 ## 2026-08-16 (3)
 
 - Updated README.md ("Parallel task management" section) and changelog.md
