@@ -32,26 +32,30 @@ RESET = "\033[0m"
 SHORT_ASSEMBLY_NAMES = ("spades55.fasta", "spades75.fasta", "transabyss.fasta", "trinity.Trinity.fasta")
 
 # Reference profile (minutes, from a representative run at --max-parallel 2)
-# used only to decide submission order within the concurrent groups that
-# remain (assemblers; orthofuser_branch vs. merge_branch; transrate vs.
-# strandeval) -- run the historically slow step first so it isn't left
-# waiting behind a quick one. Each dataset is normally assembled only once,
-# so this is a fixed relative ranking rather than something learned per-run.
-# Only names actually passed to run_parallel() are looked up here (see the
-# three run_parallel() calls in main()); steps that no longer run
-# concurrently with anything (diamond, orp_diamond, salmon, busco) have no
-# entry since ordering doesn't apply to them, and names with no entry sort
-# after every hinted step, in the order they were given.
+# used only to decide submission order within the two remaining
+# run_parallel() concurrent groups (orthofuser_branch vs. merge_branch;
+# transrate vs. strandeval) -- run the historically slow step first so it
+# isn't left waiting behind a quick one. The assemblers no longer go
+# through run_parallel (see TRINITY_LANE_SHARE and the assembly lanes in
+# main()), so they have no entries here. Each dataset is normally assembled
+# only once, so this is a fixed relative ranking rather than something
+# learned per-run. Names with no entry sort after every hinted step, in the
+# order they were given.
 STEP_TIME_HINTS = {
-    "run_spades75": 8,
-    "run_spades55": 9,
-    "run_transabyss": 287,
-    "run_trinity": 2232,
     "merge_branch": 27,
     "orthofuser_branch": 6,
     "transrate": 16,
     "strandeval": 2,
 }
+
+# Trinity is the dominant cost by orders of magnitude (hours vs. minutes for
+# the other three assemblers) and its thread count is fixed at launch --
+# there's no way to hand it more CPU once it starts -- so it gets a
+# dedicated lane with the bulk of the machine for the entire run. The
+# second lane (the three short assemblers plus their diamond searches, none
+# of which depend on Trinity) only needs enough to finish in a fraction of
+# Trinity's runtime, so it gets the remainder.
+TRINITY_LANE_SHARE = 0.8
 
 
 def awk_first_field(src: Path, dst: Path) -> None:
@@ -963,15 +967,41 @@ class Pipeline:
 
         self.step("run_trimmomatic", [t1, t2], [self.read1, self.read2], self.run_trimmomatic)
         self.step("run_rcorrector", [c1, c2], [t1, t2], self.run_rcorrector)
-        self.run_parallel(
-            [
-                ("run_trinity", [trinity_fa], [c1], self.run_trinity),
-                ("run_spades75", [sp75], [c1, c2], self.run_spades75),
-                ("run_spades55", [sp55], [c1, c2], self.run_spades55),
-                ("run_transabyss", [ta], [c1, c2], self.run_transabyss),
-            ],
-            max_workers=self.max_parallel,
-        )
+
+        # Two resource lanes rather than an even run_parallel() split across
+        # all four assemblers -- see TRINITY_LANE_SHARE above for why.
+        lane2_cpu = max(1, round(self.cpu * (1 - TRINITY_LANE_SHARE)))
+        lane2_mem = max(1, round(self.mem * (1 - TRINITY_LANE_SHARE)))
+        trinity_cpu = max(1, self.cpu - lane2_cpu)
+        trinity_mem = max(1, self.mem - lane2_mem)
+
+        def trinity_lane():
+            self.step(
+                "run_trinity", [trinity_fa], [c1],
+                partial(self.run_trinity, cpu=trinity_cpu, mem=trinity_mem),
+            )
+
+        def short_assembler_lane():
+            # Slowest of the three first; diamond_{transabyss,spades75,
+            # spades55} depend only on their own assembly (not on Trinity or
+            # the orthofuser merge below), so each fires as soon as its
+            # assembly is done instead of waiting for the merge stage.
+            for step_name, outputs, inputs, assemble, diamond_name, diamond_out in (
+                ("run_transabyss", [ta], [c1, c2], self.run_transabyss, "transabyss", diamond_ta),
+                ("run_spades55", [sp55], [c1, c2], self.run_spades55, "spades55", diamond_sp55),
+                ("run_spades75", [sp75], [c1, c2], self.run_spades75, "spades75", diamond_sp75),
+            ):
+                self.step(step_name, outputs, inputs, partial(assemble, cpu=lane2_cpu, mem=lane2_mem))
+                query = outputs[0]
+                self.step(
+                    f"diamond_{diamond_name}", [diamond_out], [query],
+                    partial(self.run_diamond_one, query, diamond_out, cpu=lane2_cpu),
+                )
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
+            for f in concurrent.futures.as_completed([ex.submit(trinity_lane), ex.submit(short_assembler_lane)]):
+                f.result()
+
         self.step("run_filtershort", short_fastas, [ta, sp75, sp55, trinity_fa], self.run_filtershort)
 
         def orthofuser_branch(cpu=None, mem=None):
@@ -996,14 +1026,19 @@ class Pipeline:
         self.step("makeorthout", [good_list], [groups_done, merged_csv], self.makeorthout)
         self.step("orthofusing", [orthomerged_fasta], [good_list, merged_fasta], self.orthofusing)
 
-        # diamond blastx is CPU-bound and scales well with threads, so running
-        # the 5 searches concurrently on split CPU nets ~zero benefit over
-        # running them one at a time with the full budget each -- keep them
-        # sequential, just individually named/timed for visibility.
+        # diamond_transabyss/spades75/spades55 already ran in the short
+        # assembler lane above. Only these two remain: orthomerged depends
+        # on the merge stage just above, and trinity depends on the trinity
+        # lane -- both are only just now guaranteed to be ready.
         print("\n\n\n\n Starting diamond \n\n\n\n")
-        diamond_names = ("orthomerged", "transabyss", "spades75", "spades55", "trinity")
-        for name, (query, out) in zip(diamond_names, self.diamond_jobs()):
-            self.step(f"diamond_{name}", [out], [query], partial(self.run_diamond_one, query, out))
+        self.step(
+            "diamond_orthomerged", [diamond_orthomerged], [orthomerged_fasta],
+            partial(self.run_diamond_one, orthomerged_fasta, diamond_orthomerged),
+        )
+        self.step(
+            "diamond_trinity", [diamond_trinity], [trinity_fa],
+            partial(self.run_diamond_one, trinity_fa, diamond_trinity),
+        )
         self.step("diamond_uniq", uniq_outs, diamond_outs, self.diamond_uniq, timed=False)
         self.step("make_list1", [list1], [diamond_orthomerged], self.make_list1, timed=False)
         self.step("make_list2", [list2], [diamond_trinity, diamond_sp75, diamond_sp55, diamond_ta], self.make_list2, timed=False)
@@ -1066,11 +1101,13 @@ def parse_args():
     p.add_argument(
         "--max-parallel", type=int, default=2,
         help="max concurrent jobs within each independent stage that benefits from "
-             "it (the 4 assemblers; orthofuser vs. merge/orthotransrate; transrate "
-             "vs. strandeval), splitting --cpu/--mem across however many run at "
-             "once; CPU-bound stages that don't benefit (diamond, orp_diamond, "
-             "salmon, busco) always run sequentially at full --cpu regardless of "
-             "this flag; 1 disables concurrency entirely (default: 2)",
+             "it (orthofuser vs. merge/orthotransrate; transrate vs. strandeval), "
+             "splitting --cpu/--mem across however many run at once; the 4 "
+             "assemblers instead run as two fixed resource lanes (see "
+             "TRINITY_LANE_SHARE), unaffected by this flag; other CPU-bound stages "
+             "that don't benefit (diamond, orp_diamond, salmon, busco) always run "
+             "sequentially at full --cpu; 1 disables concurrency for the remaining "
+             "stages entirely (default: 2)",
     )
     p.add_argument("--dir", default=None, help="working directory (default: current directory)")
     return p.parse_args()

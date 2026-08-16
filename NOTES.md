@@ -4,6 +4,45 @@ Cross-machine scratchpad so a session on either machine can pick up where
 the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 
+## 2026-08-16 (2)
+
+- Diagnosed why half the cores sit idle for ~36 hours during the assembler
+  stage: `run_parallel()` split `--cpu`/`--mem` evenly across whichever jobs
+  were pending *at group start*, and that split was fixed for a job's whole
+  lifetime -- once TransAByss/SPAdes55/SPAdes75 finish (~62 min in), Trinity
+  runs alone at half-CPU for the rest of its ~37h, since its thread count is
+  fixed at launch (no way to hand it more CPU once it starts).
+- Replaced the assembler `run_parallel()` call in [oyster.py](oyster.py)
+  `main()` with two fixed resource "lanes" run concurrently via
+  `ThreadPoolExecutor(max_workers=2)`:
+  - **Trinity lane**: gets `TRINITY_LANE_SHARE` (0.8) of `--cpu`/`--mem` for
+    the whole run.
+  - **Short-assembler lane**: gets the remainder, runs TransAByss ->
+    SPAdes55 -> SPAdes75 (slowest first), and fires each assembly's diamond
+    search (`diamond_transabyss`/`diamond_spades75`/`diamond_spades55`)
+    immediately after it finishes, rather than waiting for the full
+    orthofuser/merge stage that follows (those diamond jobs only ever
+    needed their own assembly fasta, not Trinity or the merge -- confirmed
+    by tracing `diamond_jobs()` deps). Only `diamond_orthomerged` and
+    `diamond_trinity` remain in the post-merge diamond block, since those
+    two genuinely depend on the merge stage / Trinity.
+  - `STEP_TIME_HINTS` no longer has assembler entries (dead now that
+    assemblers don't go through `run_parallel()`); `--max-parallel` help
+    text updated to say it no longer covers the assemblers.
+- `TRINITY_LANE_SHARE = 0.8` is a flat constant, not a CLI flag -- decided
+  against a flag for now since we don't have data yet on whether 80/20 is
+  actually the right ratio.
+- Not yet done: no real-run validation of this change (no cluster access
+  from this session). Next real run should confirm: (a) `--max-parallel`
+  still governs the orthofuser/merge and transrate/strandeval lanes
+  correctly, (b) Trinity's wall time actually drops with ~80% instead of
+  50% of the cores (there's no guarantee -- Trinity's Butterfly stage has
+  diminishing returns past some thread count), and (c) memory headroom is
+  fine with `TRINITY_LANE_SHARE=0.8` on real (larger) data, not just the
+  sample dataset.
+- Local-only so far, not yet pushed to `origin/python_convert` -- ask
+  before pushing (see previous entry below).
+
 ## 2026-08-16
 
 - Fixed `STEP_TIME_HINTS` in [oyster.py](oyster.py) (~line 43). These hints
