@@ -4,6 +4,42 @@ Cross-machine scratchpad so a session on either machine can pick up where
 the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 
+## 2026-08-16 (5)
+
+- Investigating small quality-metric differences between ORP 2.4.0
+  (oyster.mk) and 3.0.0 (oyster.py) on SRR1789336:
+  ```
+                          2.4.0                 3.0.0 (pre-lane-fix baseline)
+  BUSCO                   C:88.8% M:3.2%        C:88.0% M:4.8%
+  TRANSRATE               0.51558               0.51827
+  TRANSRATE OPTIMAL       0.52685               0.53225
+  UNIQUE GENES ORP        13810                 13772
+  UNIQUE GENES TRINITY    13265                 13231
+  UNIQUE GENES SPADES55   13493                 13493   (identical)
+  UNIQUE GENES SPADES75   12809                 12809   (identical)
+  UNIQUE GENES TRANSABYSS 12632                 12632   (identical)
+  READS MAPPED PROPER     95.82%                96.06%
+  ```
+  SPAdes55/75 and Trans-ABySS are byte-identical between versions, which
+  proves the trimmed/corrected reads feeding all four assemblers were
+  identical and rules out an rcorrector/Trimmomatic difference. Only
+  Trinity differs, and everything else that differs (ORP/BUSCO/transrate/
+  mapping rate) is downstream of Trinity's output via the merge stage.
+  Confirmed via `git log -p -- Makefile` that `orp_trinity`'s env
+  (`trinity=2.15.2`, `bwa=0.7.19`, `seqtk=1.5`, `salmon=1.10.3`) hasn't
+  changed across this whole window, and oyster.py's `run_trinity()` passes
+  the same flags as oyster.mk's TRINITY rule -- except `--CPU`. oyster.mk
+  ran Trinity sequentially at the full `--cpu`; the 3.0.0 run above predates
+  tonight's two-lane fix (246804a) and gave Trinity only half `--cpu` via
+  the old even `run_parallel()` split. Leading theory: Trinity's Chrysalis/
+  Butterfly stages aren't perfectly reproducible across different thread
+  counts (known Trinity behavior), so the `--CPU` difference alone plausibly
+  explains a ~0.3% divergence with no actual bug involved.
+  **To confirm**: compare tonight's in-progress validation run (Trinity now
+  at ~80% `--cpu`, see entry below) against these two baselines -- if its
+  Trinity/BUSCO/etc. numbers land closer to the 2.4.0 column than the 3.0.0
+  column above, that's strong confirmation. Not yet checked.
+
 ## 2026-08-16 (4)
 
 - Real-run validation of the two-lane assembler split (commit 246804a) is
