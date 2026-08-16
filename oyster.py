@@ -31,26 +31,26 @@ RESET = "\033[0m"
 
 SHORT_ASSEMBLY_NAMES = ("spades55.fasta", "spades75.fasta", "transabyss.fasta", "trinity.Trinity.fasta")
 
-# Reference profile (seconds, from a representative run) used only to decide
-# submission order within the concurrent groups that remain (assemblers;
-# orthofuser vs. merge/orthotransrate; transrate vs. strandeval) -- run the
-# historically slow step first so it isn't left waiting behind a quick one.
-# Each dataset is normally assembled only once, so this is a fixed relative
-# ranking rather than something learned per-run. Steps that no longer run
+# Reference profile (minutes, from a representative run at --max-parallel 2)
+# used only to decide submission order within the concurrent groups that
+# remain (assemblers; orthofuser_branch vs. merge_branch; transrate vs.
+# strandeval) -- run the historically slow step first so it isn't left
+# waiting behind a quick one. Each dataset is normally assembled only once,
+# so this is a fixed relative ranking rather than something learned per-run.
+# Only names actually passed to run_parallel() are looked up here (see the
+# three run_parallel() calls in main()); steps that no longer run
 # concurrently with anything (diamond, orp_diamond, salmon, busco) have no
-# entry since ordering doesn't apply to them; names with no entry sort after
-# every hinted step, in the order they were given.
+# entry since ordering doesn't apply to them, and names with no entry sort
+# after every hinted step, in the order they were given.
 STEP_TIME_HINTS = {
-    "run_spades75": 2,
-    "run_spades55": 1,
-    "run_transabyss": 8,
-    "run_trinity": 77,
-    "orthotransrate": 6,
-    "merge_branch": 6,
-    "run_orthofuser": 7,
-    "orthofuser_branch": 7,
-    "transrate": 5,
-    "strandeval": 8,
+    "run_spades75": 8,
+    "run_spades55": 9,
+    "run_transabyss": 287,
+    "run_trinity": 2232,
+    "merge_branch": 27,
+    "orthofuser_branch": 6,
+    "transrate": 16,
+    "strandeval": 2,
 }
 
 
