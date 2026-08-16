@@ -4,6 +4,19 @@ Cross-machine scratchpad so a session on either machine can pick up where
 the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 
+## 2026-08-16 (6)
+
+- User suspects read normalization (Trinity's `--no_normalize_reads` /
+  `--normalize-reads`) explains the 2.4.0-vs-3.0.0 Trinity diff in entry
+  below, and is going to test it themselves. Checked the code first: both
+  `oyster.mk` (`NORMALIZE_READS := FALSE` by default) and `oyster.py`
+  (`--normalize-reads` is `action="store_true"`, default off) resolve to
+  the same `--no_normalize_reads` flag by default, so this isn't a
+  default-value mismatch between the two pipelines -- it would only apply
+  if the two specific runs being compared used different actual flags/
+  commands, which hasn't been confirmed either way. Waiting on the user's
+  test result; don't assume this is or isn't the cause yet.
+
 ## 2026-08-16 (5)
 
 - Investigating small quality-metric differences between ORP 2.4.0
