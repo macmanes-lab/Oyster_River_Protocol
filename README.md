@@ -30,15 +30,16 @@ python3 oyster.py --read1 R1.fq.gz --read2 R2.fq.gz --mem 110 --cpu 24 --runout 
 
 ### Parallel task management
 
-By default (`--max-parallel 2`), oyster.py runs up to 2 jobs at once within each stage of the pipeline that benefits from it, splitting `--cpu`/`--mem` across however many jobs are running concurrently:
+The 4 assemblers (Trinity, rnaSPAdes55, rnaSPAdes75, Trans-ABySS) run as two fixed resource lanes rather than an even split. Trinity's runtime dwarfs the other three by orders of magnitude and its thread count is fixed once it launches, so it gets its own lane with 80% of `--cpu`/`--mem` (`TRINITY_LANE_SHARE`) for the entire run. The remaining 20% runs a second lane: rnaSPAdes55, rnaSPAdes75, and Trans-ABySS one after another (slowest first), each immediately followed by its own diamond search rather than waiting for the orthofuser/merge stage below, since that search only ever needed its own assembly. This split is fixed and not affected by `--max-parallel`.
 
-- the 4 assemblers (Trinity, rnaSPAdes55, rnaSPAdes75, Trans-ABySS)
+By default (`--max-parallel 2`), oyster.py runs up to 2 jobs at once within the other stages of the pipeline that benefit from it, splitting `--cpu`/`--mem` across however many jobs are running concurrently:
+
 - the orthofuser branch vs. the merge/orthotransrate branch
 - transrate vs. strandeval
 
 CPU-bound stages that don't benefit from splitting cores — diamond, orp_diamond, salmon, and BUSCO — always run sequentially at the full `--cpu` count regardless of this flag.
 
-Set `--max-parallel 1` to disable concurrency entirely and run every step one at a time (useful when debugging, or on a machine where you'd rather not split cores). Raise it above 2 to run more jobs at once within a stage, at the cost of each job getting a smaller slice of `--cpu`/`--mem`.
+Set `--max-parallel 1` to disable concurrency for those stages and run them one at a time (useful when debugging, or on a machine where you'd rather not split cores). Raise it above 2 to run more jobs at once within a stage, at the cost of each job getting a smaller slice of `--cpu`/`--mem`.
 
 ### All flags
 
