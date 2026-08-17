@@ -4,6 +4,36 @@ Cross-machine scratchpad so a session on either machine can pick up where
 the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 
+## 2026-08-17 (3)
+
+- User asked whether `oyster.py` lost any functionality vs. `oyster.mk` at
+  tag `2.3.3`. Went target-by-target/method-by-method (both files read in
+  full, plus `scripts/` diffed against `2.3.3`). Every pipeline rule from
+  2.3.3 has a corresponding, functionally-equivalent method in `oyster.py`
+  -- the many differences found are all changes already documented in
+  `changelog.md` under 2.4.0/3.0.0 (env consolidation, BUSCO ODB v12.2,
+  `build_list5.py`/`pick_best_contigs.py` replacing shell loops, per-step
+  timing, concurrency, etc.), not accidental regressions. Variables in
+  2.3.3 that `oyster.py` doesn't carry (`TRINITY_KMER`, `BUSCODB`, `START`,
+  `LOWEXPFILE`, `RCORR`/`RCORRDIR`, `BUSCO`/`BUSCODIR`) were already dead/
+  unused in 2.3.3 itself.
+- Two genuine gaps found, both worth a decision rather than silently
+  carrying forward:
+  - **`clean:` target has no equivalent.** 2.3.3's `clean` (still present
+    in the current `oyster.mk`, line ~452) deletes a `RUNOUT`'s
+    intermediate files so a rerun starts fresh. `oyster.py` has no
+    `--clean`/equivalent; its resumability (skip steps whose outputs are
+    newer than their inputs) is a different mechanism aimed at resuming
+    after failure, not deliberately discarding a run's outputs.
+  - **`preprocess`/`update_merge` partial-pipeline targets have no
+    equivalent.** 2.3.3 let you run just trimming+correction
+    (`preprocess`) or resume from the merge stage onward
+    (`update_merge`) as separate `make` invocations. `oyster.py`'s
+    `main()` always runs the full pipeline top to bottom -- resumability
+    covers the `update_merge` use case implicitly (already-done early
+    steps get skipped), but there's no way to ask it to stop after
+    preprocessing only.
+
 ## 2026-08-17 (2)
 
 - User hit `rnaspades.py` failing with SPAdes's known "Python version 3.6.8
