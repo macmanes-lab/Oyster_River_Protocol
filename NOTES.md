@@ -3,23 +3,7 @@
 Cross-machine scratchpad so a session on either machine can pick up where
 the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
-
-## 2026-08-17 (5)
-
-- Checked CLAUDE.md/NOTES.md/changelog.md for anything needing merging before
-  the user deletes CLAUDE.md. Found one real gap: commit d2ef2ca (step
-  retry/cleanup + lane-failure logging, see entry (2) below) had shipped in
-  `oyster.py` but never got a changelog bullet -- added it to the `ORP
-  Version 3.0.0 <- 2.4.0` section. Everything else in this file that
-  documents a shipped change was already reflected in changelog.md; the rest
-  is open investigation (SPAdes python-3.6.8 bug, OrthoFinder-3.1.5
-  regression theory, the clean/preprocess/update_merge gap two entries up)
-  with no changelog entry yet because none of it is resolved.
-- Per the user's request, removed CLAUDE.md itself. It had no content beyond
-  the instruction to read this file first and add a dated entry before
-  wrapping up a session -- that instruction is now gone, so a future session
-  (this machine or the other one) won't automatically know to check or
-  update this file. If picking this repo back up cold, check here anyway.
+	
 
 ## 2026-08-17 (4)
 
