@@ -57,6 +57,15 @@ STEP_TIME_HINTS = {
 # Trinity's runtime, so it gets the remainder.
 TRINITY_LANE_SHARE = 0.8
 
+# A step that fails on a cluster is often transient (node preemption,
+# filesystem hiccup, scheduler blip) rather than a real bug, so retry before
+# giving up -- previously any single failed subprocess call killed the whole
+# run immediately, discarding hours of unrelated concurrent work in the
+# other lane. This does not help steps that fail deterministically (e.g. a
+# missing dependency), which will just fail the same way on every attempt.
+STEP_RETRIES = 2
+STEP_RETRY_DELAY = 60
+
 
 def awk_first_field(src: Path, dst: Path) -> None:
     with open(src) as inf, open(dst, "w") as outf:
@@ -152,9 +161,32 @@ class Pipeline:
 
     # -- process helpers -------------------------------------------------
 
-    def run(self, cmd, cwd=None, **kwargs):
-        print("+", " ".join(str(c) for c in cmd))
-        subprocess.run(cmd, check=True, cwd=str(cwd or self.dir), **kwargs)
+    def run(self, cmd, cwd=None, retries=STEP_RETRIES, retry_delay=STEP_RETRY_DELAY,
+            retry_cleanup=None, **kwargs):
+        """retry_cleanup: path or iterable of paths to rmtree before each retry --
+        for tools (SPAdes, TransAByss) that refuse to reuse a non-empty output
+        dir rather than resuming, so a bare retry would just fail differently
+        instead of actually re-attempting the work. Not needed for tools like
+        Trinity that resume from their own checkpoints in-place.
+        """
+        printable = " ".join(str(c) for c in cmd)
+        for attempt in range(retries + 1):
+            print("+", printable)
+            try:
+                subprocess.run(cmd, check=True, cwd=str(cwd or self.dir), **kwargs)
+                return
+            except subprocess.CalledProcessError as e:
+                if attempt == retries:
+                    raise
+                print(
+                    f"*** step failed (exit {e.returncode}), retrying in {retry_delay}s "
+                    f"[attempt {attempt + 2}/{retries + 1}] ***"
+                )
+                if retry_cleanup is not None:
+                    paths = [retry_cleanup] if isinstance(retry_cleanup, (str, Path)) else retry_cleanup
+                    for path in paths:
+                        shutil.rmtree(path, ignore_errors=True)
+                time.sleep(retry_delay)
 
     def conda_run(self, env, *cmd, **kwargs):
         self.run(["conda", "run", "--no-capture-output", "-n", env, *[str(c) for c in cmd]], **kwargs)
@@ -372,7 +404,12 @@ class Pipeline:
             "--left", str(self.cor1()), "--right", str(self.cor2()),
             "--CPU", str(cpu), "--inchworm_cpu", "10", "--full_cleanup",
         ]
-        self.conda_run("orp_trinity", *cmd)
+        # No retries: Trinity's runtime dwarfs every other step (~37h vs.
+        # minutes), so blindly retrying a deterministic failure could triple
+        # the wall time before finally giving up. It also resumes from its
+        # own checkpoints in-place, so a manual re-run of oyster.py after a
+        # transient failure loses little anyway.
+        self.conda_run("orp_trinity", *cmd, retries=0)
         tmp = out.with_suffix(".fa")
         awk_first_field(out, tmp)
         tmp.replace(out)
@@ -394,7 +431,7 @@ class Pipeline:
             "--threads", str(cpu), "--memory", str(mem), "-k", str(kmer),
             "-1", str(self.cor1()), "-2", str(self.cor2()),
         ]
-        self.conda_run("orp_spades", *cmd)
+        self.conda_run("orp_spades", *cmd, retry_cleanup=workdir)
         shutil.move(str(workdir / "transcripts.fasta"), str(out))
         shutil.rmtree(workdir, ignore_errors=True)
 
@@ -417,7 +454,7 @@ class Pipeline:
             "--name", f"{self.runout}.transabyss.fasta",
             "--pe", str(self.cor1()), str(self.cor2()),
         ]
-        self.conda_run("orp_transabyss", *cmd)
+        self.conda_run("orp_transabyss", *cmd, retry_cleanup=workdir)
         final = workdir / f"{self.runout}.transabyss.fasta-final.fa"
         awk_first_field(final, out)
         shutil.rmtree(workdir, ignore_errors=True)
@@ -975,28 +1012,48 @@ class Pipeline:
         trinity_cpu = max(1, self.cpu - lane2_cpu)
         trinity_mem = max(1, self.mem - lane2_mem)
 
-        def trinity_lane():
-            self.step(
-                "run_trinity", [trinity_fa], [c1],
-                partial(self.run_trinity, cpu=trinity_cpu, mem=trinity_mem),
+        def _lane_failed(lane_name, e):
+            # ThreadPoolExecutor.__exit__ (below) calls shutdown(wait=True) even
+            # while an exception unwinds, so the *other* lane's still-running
+            # future keeps blocking the run's exit -- Trinity in particular can
+            # still be tens of hours out. Log the failure the moment it happens
+            # rather than leaving it silent until the other lane finally finishes.
+            print(
+                f"\n*** [{lane_name}] lane failed ({e}) -- other lane keeps running; "
+                "this run will still abort once it finishes ***",
+                flush=True,
             )
+
+        def trinity_lane():
+            try:
+                self.step(
+                    "run_trinity", [trinity_fa], [c1],
+                    partial(self.run_trinity, cpu=trinity_cpu, mem=trinity_mem),
+                )
+            except Exception as e:
+                _lane_failed("run_trinity", e)
+                raise
 
         def short_assembler_lane():
             # Slowest of the three first; diamond_{transabyss,spades75,
             # spades55} depend only on their own assembly (not on Trinity or
             # the orthofuser merge below), so each fires as soon as its
             # assembly is done instead of waiting for the merge stage.
-            for step_name, outputs, inputs, assemble, diamond_name, diamond_out in (
-                ("run_transabyss", [ta], [c1, c2], self.run_transabyss, "transabyss", diamond_ta),
-                ("run_spades55", [sp55], [c1, c2], self.run_spades55, "spades55", diamond_sp55),
-                ("run_spades75", [sp75], [c1, c2], self.run_spades75, "spades75", diamond_sp75),
-            ):
-                self.step(step_name, outputs, inputs, partial(assemble, cpu=lane2_cpu, mem=lane2_mem))
-                query = outputs[0]
-                self.step(
-                    f"diamond_{diamond_name}", [diamond_out], [query],
-                    partial(self.run_diamond_one, query, diamond_out, cpu=lane2_cpu),
-                )
+            try:
+                for step_name, outputs, inputs, assemble, diamond_name, diamond_out in (
+                    ("run_transabyss", [ta], [c1, c2], self.run_transabyss, "transabyss", diamond_ta),
+                    ("run_spades55", [sp55], [c1, c2], self.run_spades55, "spades55", diamond_sp55),
+                    ("run_spades75", [sp75], [c1, c2], self.run_spades75, "spades75", diamond_sp75),
+                ):
+                    self.step(step_name, outputs, inputs, partial(assemble, cpu=lane2_cpu, mem=lane2_mem))
+                    query = outputs[0]
+                    self.step(
+                        f"diamond_{diamond_name}", [diamond_out], [query],
+                        partial(self.run_diamond_one, query, diamond_out, cpu=lane2_cpu),
+                    )
+            except Exception as e:
+                _lane_failed("short-assembler", e)
+                raise
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
             for f in concurrent.futures.as_completed([ex.submit(trinity_lane), ex.submit(short_assembler_lane)]):

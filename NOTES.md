@@ -4,6 +4,99 @@ Cross-machine scratchpad so a session on either machine can pick up where
 the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 
+## 2026-08-17 (2)
+
+- User hit `rnaspades.py` failing with SPAdes's known "Python version 3.6.8
+  is not supported!" bug (ablab/spades#1319) under the 80/20 lane split.
+  Traced it rather than assuming the lane split caused it:
+  - Concurrency between Trinity and the short-assembler lane (which is
+    where SPAdes runs) predates the lane split -- assemblers have run
+    concurrently since [2e7ee5b](oyster.py) (2026-08-13), a full day before
+    the existing `python=3.14` fix for this exact bug landed in
+    `orp_spades` ([b05da12](Makefile), 2026-08-14). So the lane-ratio
+    change on 2026-08-16 isn't a new variable for this failure mode.
+  - `conda run -n orp_spades python --version` -> 3.14.6 (pin is in place).
+  - User's hypothesis that TransAByss's env was leaking into SPAdes (they
+    run sequentially in the same short lane) doesn't hold up:
+    `conda run -n orp_transabyss python --version` -> 2.7.15, which matches
+    neither the reported bad version (3.6.8) nor `orp_spades`'s own
+    (3.14.6). 3.6.8 is the cluster's system default Python, so SPAdes is
+    finding *that* somehow, not confused by a neighboring conda env.
+  - `conda run --no-capture-output -n orp_spades rnaspades.py --version`
+    succeeds cleanly (reports 4.3.0, no complaint) -- but this likely just
+    short-circuits before whatever internal check does the real
+    python-version validation, so it doesn't prove the real-run path is
+    clean. The user confirmed the real failure happens right at the start
+    of an actual run, consistent with that being the first point the real
+    validation path executes, not evidence of a mid-run env corruption.
+  - **Not yet confirmed / still open.** Never got the actual traceback or
+    SPAdes log (`spades.log`/`params.txt` in the run's `.spades_k*`
+    working dir) from a real failed run -- that's the one thing that would
+    show definitively which file/binary does the bad python lookup, and
+    whether it's a fixable `PATH`-order issue or (per other reports on
+    ablab/spades#1319) a python path baked into a compiled SPAdes
+    component at bioconda build time, which wouldn't be fixable from this
+    repo at all.
+
+- Added general step-retry + failure-visibility handling in
+  [oyster.py](oyster.py), prompted by the above (a step failing used to
+  kill the whole run immediately, and even now, one lane failing stays
+  silent until the other lane -- often Trinity, tens of hours out --
+  finishes):
+  - `run()` ([oyster.py:164](oyster.py#L164)) now retries a failed
+    subprocess up to `STEP_RETRIES` (2) times with `STEP_RETRY_DELAY`
+    (60s) between attempts before propagating, for transient cluster
+    failures (node preemption, filesystem hiccups). Does nothing for
+    deterministic failures like the SPAdes bug above -- those just fail
+    the same way 3 times.
+  - Added `retry_cleanup=` (path or paths to `rmtree` before each retry),
+    wired into `run_spades()` and `run_transabyss()` -- both fail outright
+    on a non-empty `-o`/`--outdir` from a prior attempt rather than
+    resuming, so a bare retry would hit a different, unrelated error
+    instead of actually re-attempting the assembly. Trinity is exempt from
+    cleanup (and now from retries entirely, next bullet) since it resumes
+    from its own checkpoints in-place.
+  - `run_trinity()` now passes `retries=0` -- the blanket default would
+    otherwise let a deterministically-failing ~37h Trinity step retry
+    twice more (up to ~111h) before finally giving up.
+  - `trinity_lane()`/`short_assembler_lane()` in `main()` now log
+    immediately (`*** [lane] lane failed ... ***`) the moment either
+    raises, since `ThreadPoolExecutor`'s context manager still blocks on
+    `shutdown(wait=True)` for the other lane before the exception actually
+    propagates and the run exits -- previously a short-lane failure gave
+    no signal at all until Trinity separately finished.
+  - Not yet real-run validated (no cluster access from this session).
+
+## 2026-08-17
+
+- New timing run from the user (weekend, home machine), SRR1789336,
+  `--max-parallel 1 --normalize-reads`, TOTAL 43:39:49 vs the 38:28:11
+  `--max-parallel 2` (no `--normalize-reads`) baseline in the entry below.
+  Trinity/TransAByss/merge/transrate/busco all ~flat between the two runs;
+  the entire regression is `run_orthofuser`: 5:15 -> 30:57 (~6x). Ruled out
+  parallelism as the cause -- checked `run_parallel()`
+  ([oyster.py:194](oyster.py#L194)): a solo job under `--max-parallel 1`
+  gets the *full* `--cpu`/`--mem` (`workers=1`), not less, so orthofuser
+  actually had *more* CPU this run (40 vs ~20 under mp=2) and was still 6x
+  slower.
+  User then mentioned they also upgraded OrthoFinder locally sometime
+  between the two runs. Confirmed via `git show a7e5d62` (2026-08-14) that
+  this repo's `orp_orthofinder` env was bumped 2.5.2 -> 3.1.5 in that
+  window (changelog.md:7). The `-d -I 12 -f ... -og -t -a` CLI invocation
+  in `run_orthofuser()` ([oyster.py:437](oyster.py#L437)) is unchanged
+  across that bump, but a major-version algorithm change is a much more
+  plausible cause of a 6x wall-time jump that *doesn't* respond to more
+  CPU than either `--normalize-reads` or `--max-parallel` are. Leading
+  theory now: the OrthoFinder 3.1.5 upgrade, not the other two flags,
+  explains the orthofuser regression.
+  **Not yet confirmed.** Three variables differ between these two runs
+  (`--max-parallel`, `--normalize-reads`, OrthoFinder version) with no
+  isolated comparison. To actually confirm, need a run holding OrthoFinder
+  version and `--normalize-reads` fixed while only varying one thing at a
+  time -- or at minimum, checking OrthoFinder's own log/timing output from
+  the two runs (2.5.2 vs 3.1.5 report their internal stage timing
+  differently and might show directly where the time went).
+
 ## 2026-08-16 (6)
 
 - User suspects read normalization (Trinity's `--no_normalize_reads` /
