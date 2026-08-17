@@ -4,8 +4,6 @@
 
 Official Repository of the Oyster River Protocol for Transcriptome Assembly
 
-Please see http://oyster-river-protocol.readthedocs.io/en/latest/ and https://hackmd.io/s/SJhOQvkVm# for instructions about how to run and install. 
-
 ## Installation
 
 See [INSTALL.md](INSTALL.md) for step-by-step install directions, covering both the one-command `make` installer and the manual, step-by-step alternative.
