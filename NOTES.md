@@ -4,6 +4,25 @@ Cross-machine scratchpad so a session on either machine can pick up where
 the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 
+## 2026-08-17 (4)
+
+- Pre-3.0.0-release cleanup, per user request:
+  - Folded changelog's "Unreleased" section (two-lane split, `STEP_TIME_HINTS`
+    fix, OrthoFinder 3.1.5, `orp_orthofinder` preflight check, dead
+    `orthofuser.py` Makefile cruft removal) into the `ORP Version 3.0.0 <-
+    2.4.0` section -- `version.txt` already said 3.0.0, so these were the
+    actual 3.0.0 changes, not a future release.
+  - Removed `scripts/for_loop.sh`, `scripts/numbers.sh`, `scripts/tpm.sh` --
+    unreferenced anywhere (pipeline, docs, changelog) and predate the
+    current pipeline entirely (`orp.mk`, a `shannon` assembler, `SAMP=`,
+    `eukaryota_odb9` -- none of which exist anymore).
+  - Removed `oyster.mk` -- fully superseded by `oyster.py` per changelog,
+    not referenced by README/INSTALL.
+  - Did NOT touch: the still-open SPAdes python-3.6.8 investigation (see
+    entry below), or the `clean`/`preprocess`/`update_merge` functionality
+    gap noted in the oyster.py-vs-2.3.3 comparison two entries up -- both
+    are still open decisions, not yet acted on.
+
 ## 2026-08-17 (3)
 
 - User asked whether `oyster.py` lost any functionality vs. `oyster.mk` at
