@@ -856,9 +856,10 @@ class Pipeline:
             )
 
         perllib = self.trinity_perllib_dir()
-        self.run(
-            ["perl", "-I", str(perllib), str(self.makedir / "scripts" / "examine_strand.pl"),
-             f"{self.runout}.sorted.bam", self.runout]
+        self.conda_run(
+            "orp_trinity", "perl", "-I", str(perllib),
+            str(self.makedir / "scripts" / "examine_strand.pl"),
+            f"{self.runout}.sorted.bam", self.runout,
         )
 
         dat_file = self.dir / f"{self.runout}.dat"

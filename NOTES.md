@@ -5,6 +5,35 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-08-18 (2)
+
+- Real cluster run hit `strandeval()` failing with `Can't exec "samtools":
+  No such file or directory` from `SAM_reader.pm` (part of
+  `examine_strand.pl`, called via Trinity's own PerlLib). Root cause: that
+  one call ran bare `perl` (`self.run(["perl", ...])`) instead of going
+  through `conda_run()`/`conda run -n <env>` like literally every other
+  subprocess in [oyster.py](oyster.py) -- confirmed by grepping every
+  `self.run(` call in the file; this was the only one not wrapped (or
+  wrapped only internally, like the `bash -c` bwa|samtools pipe a few
+  lines above it). It inherited the bare process `PATH`, which per entry
+  (5) on 2026-08-17 no longer has any conda env active (the `conda
+  activate orp` line was deliberately dropped from the SLURM script, on
+  the assumption every subprocess call already wrapped itself -- this one
+  slipped through that audit).
+  - Fix: `self.conda_run("orp_trinity", "perl", "-I", perllib, ...)`,
+    matching the `bwa index` call right above it in the same function.
+    Picked `orp_trinity` over `orp` (which also has samtools) because the
+    `-I perllib` path is Trinity's own PerlLib, pulled from `orp_trinity`'s
+    install (`trinity_perllib_dir()`) -- running it under a different env's
+    perl risks a version/XS mismatch for no reason, and Trinity's own
+    conda package almost certainly already depends on samtools internally
+    (Trinity uses it in its own pipeline).
+  - Not yet confirmed on a real run that `orp_trinity` actually has
+    samtools available -- inferred from Trinity needing it internally, not
+    observed. If this is wrong, the fallback is `orp` instead (confirmed
+    to have both perl and samtools, since `run_rcorrector.pl` already runs
+    successfully under `orp`).
+
 ## 2026-08-18 (1)
 
 - Real-run evidence that the 80/20 lane split (entry (2) below, 2026-08-16)
