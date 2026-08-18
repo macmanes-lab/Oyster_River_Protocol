@@ -1,6 +1,6 @@
 ### CHANGELOG
 
-Unreleased
+ORP Version 3.1.0 <- 3.0.0 (pending release)
 
 - split `run_trinity()` into `run_trinity_phase1()`/`run_trinity_phase2()` using Trinity's documented [multi-stage execution support](https://github.com/trinityrnaseq/trinityrnaseq/wiki/Running-Trinity#running-trinity-in-multiple-sequential-stages) (`--no_distributed_trinity_exec`, then a plain re-run that resumes from Phase 1's checkpoints), and drop `TRINITY_LANE_SHARE` from 80% to 50%: real-run timing showed the short-assembler lane finishing in ~15h while Trinity's Phase 2 (the actual per-gene-component assembly -- by far its dominant cost) was only ~12% complete, meaning the fixed-for-the-whole-run 80/20 split left ~20% of the machine idle for likely days once the short lane finished. Now Phase 1 (Inchworm + Chrysalis prep, largely insensitive to its CPU share) splits 50/50 with the short-assembler lane as before, but Phase 2 runs afterward alone at the full `--cpu`/`--mem` budget once both lanes are done
 - fix `strandeval()`'s `examine_strand.pl` call running bare `perl` instead of going through `conda run -n orp_trinity` like every other subprocess call in the file -- it inherited whatever `PATH` the oyster.py process itself had, and `examine_strand.pl`'s `SAM_reader.pm` shells out to `samtools`, which isn't on `PATH` at all once nothing is conda-activated (see the SLURM-script fix a couple of entries back in NOTES.md). Surfaced as `Can't exec "samtools": No such file or directory` on a real cluster run

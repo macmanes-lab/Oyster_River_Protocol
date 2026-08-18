@@ -67,9 +67,10 @@ stale.
   the short lane through its own work faster without meaningfully slowing
   Trinity's prep. Once both lanes join, Phase 2 runs alone at the full
   `--cpu`/`--mem` budget instead of staying capped at a fixed share.
-  Updated [changelog.md](changelog.md) (new `Unreleased` section -- the
-  `3.0.0` tag is already published at an earlier commit, so the tagged
-  section itself wasn't touched) and
+  Updated [changelog.md](changelog.md) (new `ORP Version 3.1.0 <- 3.0.0
+  (pending release)` section, later renamed from an initial `Unreleased`
+  heading at the user's request -- the `3.0.0` tag is already published at
+  an earlier commit, so the tagged section itself wasn't touched) and
   [README.md](README.md)'s "Parallel task management" section to match.
 - Not yet done: no real-run validation (no cluster access from this
   session). Next real run should confirm: (a) `recursive_trinity.cmds.ok`
