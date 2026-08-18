@@ -1,5 +1,9 @@
 ### CHANGELOG
 
+Unreleased
+
+- split `run_trinity()` into `run_trinity_phase1()`/`run_trinity_phase2()` using Trinity's documented [multi-stage execution support](https://github.com/trinityrnaseq/trinityrnaseq/wiki/Running-Trinity#running-trinity-in-multiple-sequential-stages) (`--no_distributed_trinity_exec`, then a plain re-run that resumes from Phase 1's checkpoints), and drop `TRINITY_LANE_SHARE` from 80% to 50%: real-run timing showed the short-assembler lane finishing in ~15h while Trinity's Phase 2 (the actual per-gene-component assembly -- by far its dominant cost) was only ~12% complete, meaning the fixed-for-the-whole-run 80/20 split left ~20% of the machine idle for likely days once the short lane finished. Now Phase 1 (Inchworm + Chrysalis prep, largely insensitive to its CPU share) splits 50/50 with the short-assembler lane as before, but Phase 2 runs afterward alone at the full `--cpu`/`--mem` budget once both lanes are done
+
 ORP Version 3.0.0 <- 2.4.0
 
 - replace oyster.mk (GNU Make) with oyster.py (Python 3.6+), the new primary pipeline entrypoint; every 2.4.0 fix and behavior below (software versions, BUSCO OrthoDB v12.2, NORMALIZE_READS, TPM/cd-hit/diamond-prerequisite fixes, etc.) carries forward unchanged except where noted here

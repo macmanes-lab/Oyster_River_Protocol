@@ -5,6 +5,88 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-08-18 (1)
+
+- Real-run evidence that the 80/20 lane split (entry (2) below, 2026-08-16)
+  still leaves a lot of the machine idle even though it fixed the original
+  "Trinity runs alone at half `--cpu`" bug: on the user's current dataset,
+  the short-assembler lane (20% of `--cpu`) finished in ~15h, and at that
+  point Trinity's Butterfly/Phase-2 stage was only ~12% complete. Linear
+  extrapolation from that (`15h / 0.12 ≈ 125h` total) puts the idle window
+  at ~110h, not the ~20h a naive read of the old ~37h `SRR1789336`-based
+  benchmark (entry (4)/(3), 2026-08-16) would suggest -- that benchmark was
+  from a much smaller dataset and never applied here.
+- Root cause: Trinity's own architecture is two phases -- Phase 1
+  (Inchworm + Chrysalis: builds the whole-transcriptome graph, partitions
+  reads per gene component) then Phase 2 (thousands of small, independent,
+  single-threaded per-component assembly jobs dispatched via ParaFly).
+  Phase 2 is the dominant cost by a wide margin and scales close to
+  linearly with core count, but the old `TRINITY_LANE_SHARE=0.8` capped it
+  at 80% of `--cpu` for the *entire* run, including the long stretch after
+  the short lane was done and its 20% was sitting unused.
+- Fix, using Trinity's documented [multi-stage execution
+  support](https://github.com/trinityrnaseq/trinityrnaseq/wiki/Running-Trinity#running-trinity-in-multiple-sequential-stages)
+  (confirmed against the actual `Trinity-v2.15.2` source, not just the
+  wiki): split `run_trinity()` in [oyster.py](oyster.py) into
+  `run_trinity_phase1()` (`--no_distributed_trinity_exec`, stops right
+  after Phase 1) and `run_trinity_phase2()` (same command, no flag --
+  Trinity resumes from Phase 1's on-disk checkpoints straight into Phase 2,
+  per the docs). `main()`'s lane split now only covers Phase 1, at a new
+  `TRINITY_LANE_SHARE=0.5` (was 0.8) -- Phase 1 is largely insensitive to
+  its CPU share (Inchworm is hard-capped at `--inchworm_cpu` regardless,
+  Chrysalis's clustering is brief next to Phase 2), so a 50/50 split gets
+  the short lane through its own work faster without meaningfully slowing
+  Trinity's prep. Once both lanes join, Phase 2 runs alone at the full
+  `--cpu`/`--mem` budget instead of staying capped at a fixed share.
+  Updated [changelog.md](changelog.md) (new `Unreleased` section -- the
+  `3.0.0` tag is already published at an earlier commit, so the tagged
+  section itself wasn't touched) and
+  [README.md](README.md)'s "Parallel task management" section to match.
+- Not yet done: no real-run validation (no cluster access from this
+  session). Next real run should confirm: (a) `recursive_trinity.cmds.ok`
+  is actually the right checkpoint file to gate the phase1->phase2
+  transition on (confirmed from reading the Trinity source, not observed
+  in an actual output dir), (b) Phase 1 really is short/CPU-insensitive
+  enough that 50/50 doesn't meaningfully slow it down, (c) Phase 2 at
+  100% `--cpu` doesn't blow past `--mem` now that it's not sharing with the
+  short lane.
+
+## 2026-08-17 (5)
+
+- **SPAdes python-3.6.8 bug (see (2) below) -- root cause found, fix
+  confirmed.** Not a lane-split or `oyster.py` issue at all: the user's
+  SLURM submission script did
+  `source ~/.bashrc; module purge; module load anaconda/colsa; conda
+  activate orp` before launching `oyster.py`. `conda activate orp`, run
+  *after* `module load anaconda/colsa` has already altered `PATH`, was
+  the thing breaking python resolution -- confirmed by reproducing it
+  standalone (`conda activate orp_spades` then running `rnaspades.py`
+  directly fails; `conda run -n orp_spades rnaspades.py` from an
+  unactivated shell doesn't).
+  - Audited every subprocess call in `oyster.py` (all ~20, including the
+    ones not going through the `conda_run()` helper -- lines 283, 548,
+    726, 749, 792, 817, 838, plus the `bwa | samtools` pipe in
+    `strandeval()`): every single one already explicitly wraps its
+    command in `conda run -n <env> ...` itself. Nothing in `oyster.py`
+    ever assumes an env is pre-activated, so dropping `conda activate
+    orp` from the job script costs nothing functionally.
+  - Fix: remove the `conda activate orp` line from the SLURM script;
+    keep `module purge`/`module load anaconda/colsa` as-is. Confirmed
+    working: with the module loaded but no `conda activate`, `conda run
+    -n orp_spades python --version` correctly reports 3.14.6 (the pin).
+  - Residual risk noted but not yet hit: `conda_run()` invokes bare
+    `"conda"` via `subprocess.run()` (no shell), so it does a raw `PATH`
+    lookup for the `conda` *executable*, not the bash *function*
+    `.bashrc`'s `conda.sh` defines -- `module load anaconda/colsa` could
+    in principle still shadow ORP's own private conda independent of the
+    `activate` line. Not observed in practice here (`orp_spades`
+    resolved correctly), but if this bug resurfaces on a differently
+    configured node, check `which conda` and `conda run -n orp_spades
+    python --version` first.
+  - This closes the "still open" status from entry (2) below -- no code
+    change needed in this repo, purely a job-script fix on the user's
+    end.
+
 ## 2026-08-17 (4)
 
 - Pre-3.0.0-release cleanup, per user request:

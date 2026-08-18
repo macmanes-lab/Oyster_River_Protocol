@@ -48,14 +48,21 @@ STEP_TIME_HINTS = {
     "strandeval": 2,
 }
 
-# Trinity is the dominant cost by orders of magnitude (hours vs. minutes for
-# the other three assemblers) and its thread count is fixed at launch --
-# there's no way to hand it more CPU once it starts -- so it gets a
-# dedicated lane with the bulk of the machine for the entire run. The
-# second lane (the three short assemblers plus their diamond searches, none
-# of which depend on Trinity) only needs enough to finish in a fraction of
-# Trinity's runtime, so it gets the remainder.
-TRINITY_LANE_SHARE = 0.8
+# Trinity's own wall time is overwhelmingly Phase 2 (thousands of small,
+# independent per-gene-component assembly jobs dispatched via ParaFly --
+# see run_trinity_phase2), which can only start once Phase 1 (Inchworm +
+# Chrysalis prep, see run_trinity_phase1) has finished building the
+# whole-transcriptome graph and partitioning reads. TRINITY_LANE_SHARE only
+# governs that comparatively short Phase 1 window, split evenly with the
+# short-assembler lane below -- Phase 1 is largely insensitive to its CPU
+# share (Inchworm is hard-capped at --inchworm_cpu regardless of --CPU, and
+# Chrysalis's clustering step is brief next to Phase 2). Phase 2 itself
+# always claims the full --cpu/--mem budget once the short lane is done,
+# rather than being capped at a fixed share for the rest of the run (see
+# main()) -- real-run timing showed the short lane finishing in ~15h while
+# Trinity's Phase 2 was only ~12% complete, i.e. days of the 20% share
+# sitting idle under a fixed-for-the-whole-run split.
+TRINITY_LANE_SHARE = 0.5
 
 # A step that fails on a cluster is often transient (node preemption,
 # filesystem hiccup, scheduler blip) rather than a real bug, so retry before
@@ -385,10 +392,10 @@ class Pipeline:
 
     # -- assemblers ----------------------------------------------------------
 
-    def run_trinity(self, cpu=None, mem=None):
-        cpu = self.cpu if cpu is None else cpu
-        mem = self.mem if mem is None else mem
-        out = self.assemblies_dir / f"{self.runout}.trinity.Trinity.fasta"
+    def trinity_out_dir(self):
+        return self.assemblies_dir / f"{self.runout}.trinity"
+
+    def _trinity_base_cmd(self, cpu, mem):
         cmd = ["Trinity"]
         if self.strand == "RF":
             cmd += ["--SS_lib_type", "RF"]
@@ -399,16 +406,44 @@ class Pipeline:
             cmd.append("--no_normalize_reads")
         cmd += [
             "--seqType", "fq",
-            "--output", str(self.assemblies_dir / f"{self.runout}.trinity"),
+            "--output", str(self.trinity_out_dir()),
             "--max_memory", f"{mem}G",
             "--left", str(self.cor1()), "--right", str(self.cor2()),
-            "--CPU", str(cpu), "--inchworm_cpu", "10", "--full_cleanup",
+            "--CPU", str(cpu), "--inchworm_cpu", "10",
         ]
-        # No retries: Trinity's runtime dwarfs every other step (~37h vs.
-        # minutes), so blindly retrying a deterministic failure could triple
+        return cmd
+
+    def run_trinity_phase1(self, cpu=None, mem=None):
+        # Inchworm + Chrysalis prep only, via Trinity's documented staged-
+        # execution flag (https://github.com/trinityrnaseq/trinityrnaseq/wiki/
+        # Running-Trinity#running-trinity-in-multiple-sequential-stages):
+        # builds the whole-transcriptome contig graph, partitions reads per
+        # gene component, writes the Phase-2 command list, then stops --
+        # doesn't touch the actual per-component assembly (run_trinity_phase2
+        # below). Runs alongside the short-assembler lane at TRINITY_LANE_SHARE
+        # of --cpu/--mem.
+        cpu = self.cpu if cpu is None else cpu
+        mem = self.mem if mem is None else mem
+        cmd = self._trinity_base_cmd(cpu, mem) + ["--no_distributed_trinity_exec"]
+        self.conda_run("orp_trinity", *cmd, retries=0)
+
+    def run_trinity_phase2(self, cpu=None, mem=None):
+        # Same command, no stop flag: per the docs above, Trinity resumes
+        # from Phase 1's on-disk checkpoints straight into Phase 2 -- the
+        # thousands of small, independent, single-threaded per-component
+        # assembly jobs dispatched via ParaFly, and by far Trinity's
+        # dominant cost. Runs alone (short-assembler lane has already
+        # finished, see main()), so it gets the full machine rather than
+        # splitting further.
+        cpu = self.cpu if cpu is None else cpu
+        mem = self.mem if mem is None else mem
+        out = self.assemblies_dir / f"{self.runout}.trinity.Trinity.fasta"
+        cmd = self._trinity_base_cmd(cpu, mem) + ["--full_cleanup"]
+        # No retries: this step's wall time dwarfs every other (hours to
+        # days), so blindly retrying a deterministic failure could multiply
         # the wall time before finally giving up. It also resumes from its
-        # own checkpoints in-place, so a manual re-run of oyster.py after a
-        # transient failure loses little anyway.
+        # own checkpoints in-place (same as Phase 1 above), so a manual
+        # re-run of oyster.py after a transient failure loses little anyway.
         self.conda_run("orp_trinity", *cmd, retries=0)
         tmp = out.with_suffix(".fa")
         awk_first_field(out, tmp)
@@ -1024,14 +1059,14 @@ class Pipeline:
                 flush=True,
             )
 
-        def trinity_lane():
+        def trinity_phase1_lane():
             try:
                 self.step(
-                    "run_trinity", [trinity_fa], [c1],
-                    partial(self.run_trinity, cpu=trinity_cpu, mem=trinity_mem),
+                    "run_trinity_phase1", [self.trinity_out_dir() / "recursive_trinity.cmds.ok"], [c1],
+                    partial(self.run_trinity_phase1, cpu=trinity_cpu, mem=trinity_mem),
                 )
             except Exception as e:
-                _lane_failed("run_trinity", e)
+                _lane_failed("run_trinity_phase1", e)
                 raise
 
         def short_assembler_lane():
@@ -1056,8 +1091,17 @@ class Pipeline:
                 raise
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
-            for f in concurrent.futures.as_completed([ex.submit(trinity_lane), ex.submit(short_assembler_lane)]):
+            for f in concurrent.futures.as_completed([ex.submit(trinity_phase1_lane), ex.submit(short_assembler_lane)]):
                 f.result()
+
+        # Both lanes have released the machine -- Trinity Phase 2 gets the
+        # full --cpu/--mem budget, uncontested (see TRINITY_LANE_SHARE and
+        # run_trinity_phase2 above).
+        self.step(
+            "run_trinity_phase2", [trinity_fa],
+            [self.trinity_out_dir() / "recursive_trinity.cmds.ok"],
+            self.run_trinity_phase2,
+        )
 
         self.step("run_filtershort", short_fastas, [ta, sp75, sp55, trinity_fa], self.run_filtershort)
 
