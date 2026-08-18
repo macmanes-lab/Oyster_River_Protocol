@@ -146,3 +146,52 @@ TOTAL            43:39:49
 | Reads mapped as proper pairs | 96.06% | 97.13% | +1.07 pp |
 
 SPAdes55/75 and Trans-ABySS unique-gene counts are identical between runs (deterministic, single-threaded-per-step assemblers), so all of the ORP/Trinity/BUSCO/TransRate movement traces back to Trinity, whose result varies with concurrency (non-deterministic multi-threaded assembly). The BUSCO shift is the most notable: NOparallel gained 3.2pp complete but nearly all of that came from a jump in duplicated BUSCOs (+8.0pp) rather than single-copy (-4.8pp), which is a mixed signal rather than a clear quality win. `--max-parallel 2` finished 5h11m38s faster overall, mostly from `orthofuser_branch`/`merge_branch` and `run_orthofuser` running concurrently instead of sequentially (each roughly 5x longer under `--max-parallel 1`).
+
+## test37 (`--max-parallel 2`) vs test36 (`--max-parallel 1`) -- 2026-08-18
+
+Sanity-check run on the small CI sample dataset (`sampledata/test.1.fq.gz` / `test.2.fq.gz`) rather than a full-size assembly. No BUSCO/TransRate/unique-gene metrics were captured for this pair -- step timing only.
+
+Command (test37, parallel):
+```
+oyster.py --strand RF --tpm-filt 0.2 --mem 15 --cpu 8 --read1 test.1.fq.gz --read2 test.2.fq.gz --max-parallel 2 --normalize-reads --runout test37
+```
+
+Command (test36, NOparallel):
+```
+oyster.py --strand RF --tpm-filt 0.2 --mem 15 --cpu 8 --read1 test.1.fq.gz --read2 test.2.fq.gz --max-parallel 1 --normalize-reads --runout test36
+```
+
+| Step | test37 (parallel 2) | test36 (parallel 1) |
+| --- | --- | --- |
+| run_trimmomatic | 00:00:01 | 00:00:01 |
+| run_rcorrector | 00:00:01 | 00:00:01 |
+| run_trinity_phase1 | 00:00:06 | 00:00:07 |
+| run_transabyss | 00:00:08 | 00:00:08 |
+| diamond_transabyss | 00:00:12 | 00:00:12 |
+| run_spades55 | 00:00:01 | 00:00:01 |
+| diamond_spades55 | 00:00:12 | 00:00:12 |
+| run_spades75 | 00:00:01 | 00:00:01 |
+| diamond_spades75 | 00:00:12 | 00:00:12 |
+| run_trinity_phase2 | 00:00:58 | 00:01:00 |
+| run_filtershort | 00:00:02 | 00:00:02 |
+| run_orthofuser | 00:00:05 | 00:00:05 |
+| orthofuser_branch | 00:00:05 | 00:00:05 |
+| orthotransrate | 00:00:06 | 00:00:05 |
+| merge_branch | 00:00:06 | 00:00:05 |
+| makeorthout | 00:00:00 | 00:00:00 |
+| orthofusing | 00:00:00 | 00:00:00 |
+| diamond_orthomerged | 00:00:07 | 00:00:07 |
+| diamond_trinity | 00:00:07 | 00:00:07 |
+| make_list5 | 00:00:00 | 00:00:00 |
+| posthack | 00:00:00 | 00:00:00 |
+| cdhit | 00:00:00 | 00:00:00 |
+| orp_diamond | 00:00:07 | 00:00:07 |
+| salmon_index | 00:00:01 | 00:00:01 |
+| salmon | 00:00:00 | 00:00:00 |
+| secondfilter | 00:00:00 | 00:00:00 |
+| busco | 00:01:17 | 00:01:19 |
+| transrate | 00:00:05 | 00:00:04 |
+| strandeval | 00:00:09 | 00:00:09 |
+| TOTAL | 00:04:00 | 00:04:13 |
+
+`--max-parallel 2` finished 13s faster. The step print order confirms the concurrency logic is engaging correctly: under `--max-parallel 2`, `run_orthofuser`/`orthofuser_branch` and `orthotransrate`/`merge_branch` interleave in the log (concurrent completion), while under `--max-parallel 1` they print strictly branch-by-branch (`orthotransrate`, `merge_branch`, then `run_orthofuser`, `orthofuser_branch`). Unlike the SRR1789336 benchmark above, each branch here only takes ~5s on this tiny sample dataset, so overlapping them saves only a few seconds rather than hours -- this run validates the scheduling behavior, not the wall-clock benefit at scale.
