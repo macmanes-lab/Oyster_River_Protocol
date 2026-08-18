@@ -1,0 +1,481 @@
+<title>Oyster Pipeline Schedule</title>
+<style>
+  :root {
+    --paper: #f5f3ee;
+    --ink: #21261f;
+    --muted: #6d7266;
+    --surface: #ffffff;
+    --surface-muted: #e9e6da;
+    --accent: #1e7a72;
+    --accent-soft: #d3e8e2;
+    --accent-strong: #14554f;
+    --border: #d9d4c4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #12181a;
+      --ink: #e9e7dd;
+      --muted: #98a196;
+      --surface: #1a2222;
+      --surface-muted: #202b29;
+      --accent: #56c7bb;
+      --accent-soft: #1d3936;
+      --accent-strong: #8fe0d4;
+      --border: #2c3634;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #12181a;
+    --ink: #e9e7dd;
+    --muted: #98a196;
+    --surface: #1a2222;
+    --surface-muted: #202b29;
+    --accent: #56c7bb;
+    --accent-soft: #1d3936;
+    --accent-strong: #8fe0d4;
+    --border: #2c3634;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+  }
+  .page {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+  .kicker {
+    font-size: 11px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  h1 {
+    margin: 4px 0 0;
+    font-size: 28px;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    font-weight: 650;
+  }
+  .dek {
+    margin: 0;
+    max-width: 62ch;
+    font-size: 15px;
+    line-height: 1.55;
+    color: var(--muted);
+  }
+  .provenance {
+    margin: 10px 0 0;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .provenance a {
+    color: var(--accent);
+  }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.92em;
+    background: var(--surface-muted);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.05em 0.35em;
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px 28px;
+    padding: 14px 18px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 22px; height: 14px; border-radius: 3px; flex: none; }
+  .sw-work { background: var(--surface); border: 1.5px solid var(--ink); }
+  .sw-book { background: var(--surface-muted); border: 1px dashed var(--muted); }
+  .sw-fixed { background: var(--accent-soft); border: 1.5px solid var(--accent); }
+
+  figure { margin: 0; }
+  .diagram-frame {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    padding: 8px 4px;
+  }
+  svg { display: block; width: 100%; height: auto; max-width: 100%; }
+  svg text { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: var(--ink); }
+  .t-band { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: var(--accent-strong); font-weight: 600; letter-spacing: 0.01em; }
+  .t-sub { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: var(--muted); }
+  .t-note { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: var(--muted); font-style: italic; }
+
+  .node-work rect { fill: var(--surface); stroke: var(--ink); stroke-width: 1.4; }
+  .node-book rect { fill: var(--surface-muted); stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 2; }
+  .node-final rect { fill: var(--accent); stroke: var(--accent-strong); stroke-width: 1.4; }
+  .node-final text { fill: var(--paper); font-weight: 650; }
+  .node-input rect { fill: none; stroke: var(--muted); stroke-width: 1; stroke-dasharray: 2 2; }
+  .node-input text { fill: var(--muted); }
+
+  .flow { stroke: var(--ink); stroke-width: 1.4; fill: none; }
+  .dot { fill: var(--ink); }
+
+  .band-fixed { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.4; opacity: 0.9; }
+
+  figcaption {
+    margin-top: 14px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--muted);
+    max-width: 68ch;
+  }
+
+  .notes {
+    display: grid;
+    gap: 14px;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .notes h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin: 0 0 2px;
+    font-weight: 650;
+  }
+  .notes ol { margin: 0; padding-left: 1.25em; display: grid; gap: 8px; }
+  .notes li::marker { color: var(--accent); font-weight: 650; }
+  footer {
+    font-size: 12px;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+  }
+</style>
+
+<div class="page">
+  <div>
+    <div class="kicker">oyster.py &middot; Pipeline.main() &middot; --max-parallel 2</div>
+    <h1>Oyster Pipeline Schedule</h1>
+    <p class="dek">
+      Every box below is a real <code>self.step()</code> call in the order <code>main()</code> issues it, run as it
+      actually executes at <code>--max-parallel 2</code>. The pipeline is a long sequential chain, broken by three
+      concurrent stages &mdash; one always on regardless of the flag, two switched on by it.
+    </p>
+    <p class="provenance">
+      Reflects <code>oyster.py</code> as of commit
+      <a href="https://github.com/macmanes-lab/Oyster_River_Protocol/commit/1b0fdb18dc0475fffa2c5878c618051fe8d468dc">1b0fdb1</a>
+      (2026-08-18) &middot; ORP 3.1.0, pending release (<code>version.txt</code> still reads 3.0.0)
+    </p>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><span class="swatch sw-work"></span>step that does real work (timed)</div>
+    <div class="legend-item"><span class="swatch sw-book"></span>bookkeeping step, sub-second, untimed</div>
+    <div class="legend-item"><span class="swatch sw-fixed"></span>two branches running concurrently</div>
+  </div>
+
+  <figure>
+    <div class="diagram-frame">
+      <svg viewBox="0 0 1000 1870" role="img" aria-label="Directed acyclic graph of oyster.py's pipeline at --max-parallel 2: a long sequential chain of steps interrupted by three concurrent stages -- an always-on two-lane assembler split (Trinity phase 1 vs. Trans-ABySS/SPAdes55/SPAdes75), orthofuser_branch running alongside merge_branch, and transrate running alongside strandeval.">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor" class="flow-marker"></path>
+          </marker>
+        </defs>
+
+        <!-- input -->
+        <g class="node-input">
+          <rect x="420" y="26" width="160" height="24" rx="12"></rect>
+          <text x="500" y="42" text-anchor="middle" font-size="11">read1 / read2</text>
+        </g>
+        <line class="flow" x1="500" y1="50" x2="500" y2="78" marker-end="url(#arrow)"></line>
+
+        <!-- trimmomatic / rcorrector -->
+        <g class="node-work">
+          <rect x="395" y="80" width="210" height="34" rx="6"></rect>
+          <text x="500" y="101" text-anchor="middle">run_trimmomatic</text>
+        </g>
+        <line class="flow" x1="500" y1="114" x2="500" y2="138" marker-end="url(#arrow)"></line>
+
+        <g class="node-work">
+          <rect x="395" y="140" width="210" height="34" rx="6"></rect>
+          <text x="500" y="161" text-anchor="middle">run_rcorrector</text>
+        </g>
+
+        <!-- fan out to band A -->
+        <path class="flow" d="M500,174 L500,196" marker-end="url(#arrow)"></path>
+        <path class="flow" d="M500,196 C500,210 270,205 270,218" marker-end="url(#arrow)"></path>
+        <path class="flow" d="M500,196 C500,210 730,205 730,218" marker-end="url(#arrow)"></path>
+
+        <!-- BAND A -->
+        <rect class="band-fixed" x="110" y="188" width="780" height="285" rx="16"></rect>
+        <text class="t-band" x="500" y="209" text-anchor="middle" font-size="12">FIXED 2-WAY CONCURRENCY &mdash; independent of --max-parallel</text>
+        <text class="t-sub" x="500" y="223" text-anchor="middle" font-size="10.5">ThreadPoolExecutor(max_workers=2)</text>
+
+        <!-- left lane: trinity phase 1, spans the band -->
+        <line class="flow" x1="270" y1="228" x2="270" y2="300" ></line>
+        <g class="node-work">
+          <rect x="175" y="300" width="190" height="58" rx="6"></rect>
+          <text x="270" y="324" text-anchor="middle">run_trinity_phase1</text>
+          <text class="t-note" x="270" y="342" text-anchor="middle" font-size="10">long pole of this lane</text>
+        </g>
+        <line class="flow" x1="270" y1="358" x2="270" y2="440" ></line>
+
+        <!-- right lane: three assemblers, each -> diamond -->
+        <g class="node-work">
+          <rect x="635" y="228" width="190" height="28" rx="6"></rect>
+          <text x="730" y="247" text-anchor="middle" font-size="11.5">run_transabyss</text>
+        </g>
+        <line class="flow" x1="730" y1="256" x2="730" y2="264" marker-end="url(#arrow)"></line>
+        <g class="node-work">
+          <rect x="635" y="266" width="190" height="24" rx="6"></rect>
+          <text x="730" y="282" text-anchor="middle" font-size="11">diamond_transabyss</text>
+        </g>
+        <line class="flow" x1="730" y1="290" x2="730" y2="298" marker-end="url(#arrow)"></line>
+
+        <g class="node-work">
+          <rect x="635" y="300" width="190" height="28" rx="6"></rect>
+          <text x="730" y="319" text-anchor="middle" font-size="11.5">run_spades55</text>
+        </g>
+        <line class="flow" x1="730" y1="328" x2="730" y2="336" marker-end="url(#arrow)"></line>
+        <g class="node-work">
+          <rect x="635" y="338" width="190" height="24" rx="6"></rect>
+          <text x="730" y="354" text-anchor="middle" font-size="11">diamond_spades55</text>
+        </g>
+        <line class="flow" x1="730" y1="362" x2="730" y2="370" marker-end="url(#arrow)"></line>
+
+        <g class="node-work">
+          <rect x="635" y="372" width="190" height="28" rx="6"></rect>
+          <text x="730" y="391" text-anchor="middle" font-size="11.5">run_spades75</text>
+        </g>
+        <line class="flow" x1="730" y1="400" x2="730" y2="408" marker-end="url(#arrow)"></line>
+        <g class="node-work">
+          <rect x="635" y="410" width="190" height="24" rx="6"></rect>
+          <text x="730" y="426" text-anchor="middle" font-size="11">diamond_spades75</text>
+        </g>
+        <line class="flow" x1="730" y1="434" x2="730" y2="440" ></line>
+
+        <!-- converge band A -->
+        <path class="flow" d="M270,440 C270,458 500,450 500,466"></path>
+        <path class="flow" d="M730,440 C730,458 500,450 500,466"></path>
+        <circle class="dot" cx="500" cy="466" r="2.4"></circle>
+        <line class="flow" x1="500" y1="466" x2="500" y2="498" marker-end="url(#arrow)"></line>
+
+        <g class="node-work">
+          <rect x="385" y="500" width="230" height="34" rx="6"></rect>
+          <text x="500" y="521" text-anchor="middle">run_trinity_phase2</text>
+        </g>
+        <text class="t-note" x="500" y="546" text-anchor="middle" font-size="10.5">both lanes released &mdash; runs at full --cpu/--mem</text>
+        <line class="flow" x1="500" y1="534" x2="500" y2="558" marker-end="url(#arrow)"></line>
+
+        <g class="node-work">
+          <rect x="395" y="560" width="210" height="34" rx="6"></rect>
+          <text x="500" y="581" text-anchor="middle">run_filtershort</text>
+        </g>
+
+        <!-- fan out to band B -->
+        <path class="flow" d="M500,594 L500,612" marker-end="url(#arrow)"></path>
+        <path class="flow" d="M500,612 C500,626 340,632 340,644" marker-end="url(#arrow)"></path>
+        <path class="flow" d="M500,612 C500,626 660,632 660,644" marker-end="url(#arrow)"></path>
+
+        <!-- BAND B -->
+        <rect class="band-fixed" x="180" y="604" width="640" height="204" rx="16"></rect>
+        <text class="t-band" x="500" y="625" text-anchor="middle" font-size="12">CONCURRENT AT --max-parallel 2</text>
+        <text class="t-sub" x="500" y="639" text-anchor="middle" font-size="10.5">run_parallel([orthofuser_branch, merge_branch], max_workers=2)</text>
+
+        <!-- left lane: orthofuser_branch -->
+        <text class="t-sub" x="340" y="656" text-anchor="middle" font-size="10">orthofuser_branch</text>
+        <g class="node-work">
+          <rect x="245" y="661" width="190" height="28" rx="6"></rect>
+          <text x="340" y="680" text-anchor="middle" font-size="11.5">run_orthofuser</text>
+        </g>
+        <line class="flow" x1="340" y1="689" x2="340" y2="697" marker-end="url(#arrow)"></line>
+        <g class="node-book">
+          <rect x="255" y="699" width="170" height="22" rx="6"></rect>
+          <text x="340" y="714" text-anchor="middle" font-size="10.5">makelist</text>
+        </g>
+        <line class="flow" x1="340" y1="721" x2="340" y2="729" marker-end="url(#arrow)"></line>
+        <g class="node-book">
+          <rect x="255" y="731" width="170" height="22" rx="6"></rect>
+          <text x="340" y="746" text-anchor="middle" font-size="10.5">makegroups</text>
+        </g>
+
+        <!-- right lane: merge_branch -->
+        <text class="t-sub" x="660" y="656" text-anchor="middle" font-size="10">merge_branch</text>
+        <g class="node-book">
+          <rect x="575" y="661" width="170" height="22" rx="6"></rect>
+          <text x="660" y="676" text-anchor="middle" font-size="10.5">merge</text>
+        </g>
+        <line class="flow" x1="660" y1="683" x2="660" y2="691" marker-end="url(#arrow)"></line>
+        <g class="node-work">
+          <rect x="565" y="693" width="190" height="28" rx="6"></rect>
+          <text x="660" y="712" text-anchor="middle" font-size="11.5">orthotransrate</text>
+        </g>
+
+        <!-- converge band B -->
+        <line class="flow" x1="340" y1="753" x2="340" y2="778"></line>
+        <line class="flow" x1="660" y1="721" x2="660" y2="778"></line>
+        <path class="flow" d="M340,778 C340,796 500,790 500,806"></path>
+        <path class="flow" d="M660,778 C660,796 500,790 500,806"></path>
+        <circle class="dot" cx="500" cy="806" r="2.4"></circle>
+        <line class="flow" x1="500" y1="806" x2="500" y2="838" marker-end="url(#arrow)"></line>
+
+        <g class="node-work">
+          <rect x="395" y="840" width="210" height="34" rx="6"></rect>
+          <text x="500" y="861" text-anchor="middle">makeorthout</text>
+        </g>
+        <line class="flow" x1="500" y1="874" x2="500" y2="898" marker-end="url(#arrow)"></line>
+
+        <g class="node-work">
+          <rect x="395" y="900" width="210" height="34" rx="6"></rect>
+          <text x="500" y="921" text-anchor="middle">orthofusing</text>
+        </g>
+        <line class="flow" x1="500" y1="934" x2="500" y2="958" marker-end="url(#arrow)"></line>
+
+        <g class="node-work">
+          <rect x="390" y="960" width="220" height="30" rx="6"></rect>
+          <text x="500" y="979" text-anchor="middle" font-size="11.5">diamond_orthomerged</text>
+        </g>
+        <line class="flow" x1="500" y1="990" x2="500" y2="1006" marker-end="url(#arrow)"></line>
+
+        <g class="node-work">
+          <rect x="390" y="1008" width="220" height="30" rx="6"></rect>
+          <text x="500" y="1027" text-anchor="middle" font-size="11.5">diamond_trinity</text>
+        </g>
+        <text class="t-note" x="618" y="1027" font-size="10">&larr; trinity_fa, from phase2 above</text>
+        <line class="flow" x1="500" y1="1038" x2="500" y2="1054" marker-end="url(#arrow)"></line>
+
+        <g class="node-book">
+          <rect x="405" y="1056" width="190" height="26" rx="6"></rect>
+          <text x="500" y="1073" text-anchor="middle" font-size="11">diamond_uniq</text>
+        </g>
+        <text class="t-note" x="603" y="1073" font-size="10">&larr; + 3 diamond_* from the lane split above</text>
+
+        <line class="flow" x1="500" y1="1082" x2="500" y2="1098" marker-end="url(#arrow)"></line>
+
+        <g class="node-book">
+          <rect x="370" y="1100" width="260" height="30" rx="6"></rect>
+          <text x="500" y="1119" text-anchor="middle" font-size="11">make_list1 &rarr; make_list7</text>
+        </g>
+        <text class="t-note" x="500" y="1144" text-anchor="middle" font-size="10">list-file bookkeeping, &lt;1s each</text>
+        <line class="flow" x1="500" y1="1130" x2="500" y2="1156" marker-end="url(#arrow)"></line>
+
+        <g class="node-work">
+          <rect x="395" y="1158" width="210" height="34" rx="6"></rect>
+          <text x="500" y="1179" text-anchor="middle">posthack</text>
+        </g>
+        <line class="flow" x1="500" y1="1192" x2="500" y2="1214" marker-end="url(#arrow)"></line>
+
+        <g class="node-work">
+          <rect x="395" y="1216" width="210" height="34" rx="6"></rect>
+          <text x="500" y="1237" text-anchor="middle">cdhit</text>
+        </g>
+        <line class="flow" x1="500" y1="1250" x2="500" y2="1274" marker-end="url(#arrow)"></line>
+
+        <text class="t-note" x="500" y="1268" text-anchor="middle" font-size="10">orp_diamond &rarr; salmon kept sequential by design (splitting CPU costs more than the overlap saves)</text>
+
+        <g class="node-work">
+          <rect x="395" y="1276" width="210" height="34" rx="6"></rect>
+          <text x="500" y="1297" text-anchor="middle">orp_diamond</text>
+        </g>
+        <line class="flow" x1="500" y1="1310" x2="500" y2="1324" marker-end="url(#arrow)"></line>
+
+        <g class="node-book">
+          <rect x="415" y="1326" width="170" height="22" rx="6"></rect>
+          <text x="500" y="1341" text-anchor="middle" font-size="10.5">orp_uniq</text>
+        </g>
+        <line class="flow" x1="500" y1="1348" x2="500" y2="1366" marker-end="url(#arrow)"></line>
+
+        <g class="node-work">
+          <rect x="395" y="1368" width="210" height="30" rx="6"></rect>
+          <text x="500" y="1387" text-anchor="middle" font-size="11.5">salmon_index</text>
+        </g>
+        <line class="flow" x1="500" y1="1398" x2="500" y2="1412" marker-end="url(#arrow)"></line>
+
+        <g class="node-work">
+          <rect x="395" y="1414" width="210" height="30" rx="6"></rect>
+          <text x="500" y="1433" text-anchor="middle" font-size="11.5">salmon</text>
+        </g>
+        <line class="flow" x1="500" y1="1444" x2="500" y2="1462" marker-end="url(#arrow)"></line>
+
+        <g class="node-book">
+          <rect x="415" y="1464" width="170" height="22" rx="6"></rect>
+          <text x="500" y="1479" text-anchor="middle" font-size="10.5">filter</text>
+        </g>
+        <line class="flow" x1="500" y1="1486" x2="500" y2="1502" marker-end="url(#arrow)"></line>
+
+        <g class="node-work">
+          <rect x="395" y="1504" width="210" height="34" rx="6"></rect>
+          <text x="500" y="1525" text-anchor="middle">secondfilter</text>
+        </g>
+        <line class="flow" x1="500" y1="1538" x2="500" y2="1562" marker-end="url(#arrow)"></line>
+
+        <g class="node-work">
+          <rect x="380" y="1564" width="240" height="40" rx="6"></rect>
+          <text x="500" y="1589" text-anchor="middle" font-size="12.5">busco</text>
+        </g>
+        <text class="t-note" x="500" y="1620" text-anchor="middle" font-size="10.5">long pole of this stage &mdash; gets full --cpu/--busco-threads alone</text>
+
+        <!-- fan out to band C -->
+        <path class="flow" d="M500,1604 L500,1626" marker-end="url(#arrow)"></path>
+        <path class="flow" d="M500,1626 C500,1640 380,1646 380,1658" marker-end="url(#arrow)"></path>
+        <path class="flow" d="M500,1626 C500,1640 620,1646 620,1658" marker-end="url(#arrow)"></path>
+
+        <!-- BAND C -->
+        <rect class="band-fixed" x="260" y="1622" width="480" height="140" rx="16"></rect>
+        <text class="t-band" x="500" y="1643" text-anchor="middle" font-size="12">CONCURRENT AT --max-parallel 2</text>
+
+        <g class="node-work">
+          <rect x="285" y="1660" width="190" height="34" rx="6"></rect>
+          <text x="380" y="1681" text-anchor="middle">transrate</text>
+        </g>
+        <g class="node-work">
+          <rect x="525" y="1660" width="190" height="34" rx="6"></rect>
+          <text x="620" y="1681" text-anchor="middle">strandeval</text>
+        </g>
+
+        <!-- converge band C -->
+        <line class="flow" x1="380" y1="1694" x2="380" y2="1738"></line>
+        <line class="flow" x1="620" y1="1694" x2="620" y2="1738"></line>
+        <path class="flow" d="M380,1738 C380,1754 500,1748 500,1764"></path>
+        <path class="flow" d="M620,1738 C620,1754 500,1748 500,1764"></path>
+        <circle class="dot" cx="500" cy="1764" r="2.4"></circle>
+        <line class="flow" x1="500" y1="1764" x2="500" y2="1794" marker-end="url(#arrow)"></line>
+
+        <g class="node-final">
+          <rect x="400" y="1796" width="200" height="38" rx="19"></rect>
+          <text x="500" y="1820" text-anchor="middle" font-size="12.5">reportgen</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>
+      Sequence of every <code>self.step()</code> call in <code>Pipeline.main()</code>, as it runs at
+      <code>--max-parallel 2</code>. Two of the three concurrent stages exist only because of that setting
+      (<code>run_parallel(..., max_workers=self.max_parallel)</code>); the assembler split up top runs concurrently
+      regardless of the flag, at a fixed <code>ThreadPoolExecutor(max_workers=2)</code>.
+    </figcaption>
+  </figure>
+
+  <div class="notes">
+    <h2>The three concurrency decisions</h2>
+    <ol>
+      <li><strong>Assembler split (always on).</strong> Trinity phase 1 and the three short-read assemblers (Trans-ABySS, SPAdes55, SPAdes75, each followed immediately by its own DIAMOND search) run in two threads regardless of <code>--max-parallel</code>. Trinity gets <code>TRINITY_LANE_SHARE</code> of the CPU/mem budget; the short-assembler lane gets the rest. Trinity phase 2 only starts once both lanes release the machine, then runs alone at the full budget.</li>
+      <li><strong>orthofuser_branch alongside merge_branch.</strong> Both only need <code>short_fastas</code>, so they're independent until they join at <code>makeorthout</code>. This is the branch pair behind the test37/test36 timing delta you looked at earlier &mdash; each branch only took ~5s on the sample dataset, so the concurrency saved seconds there, but ~5h11m on the full SRR1789336 benchmark.</li>
+      <li><strong>transrate alongside strandeval.</strong> Cheap and independent, so they still run as a small concurrent pair even though BUSCO right before them deliberately does <em>not</em> share its CPU budget with anything &mdash; it dwarfs both in wall time.</li>
+    </ol>
+  </div>
+
+  <footer>oyster.py, Pipeline.main() &middot; sequential steps not shown branching are strict one-after-another dependencies in the code.</footer>
+</div>
