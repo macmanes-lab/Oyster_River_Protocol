@@ -170,13 +170,13 @@
     <h1>Oyster Pipeline Schedule</h1>
     <p class="dek">
       Every box below is a real <code>self.step()</code> call in the order <code>main()</code> issues it, run as it
-      actually executes at <code>--max-parallel 2</code>. The pipeline is a long sequential chain, broken by three
-      concurrent stages &mdash; one always on regardless of the flag, two switched on by it.
+      actually executes at <code>--max-parallel 2</code>. The pipeline is a long sequential chain, broken by four
+      concurrent stages &mdash; two always on regardless of the flag, two switched on by it.
     </p>
     <p class="provenance">
-      Reflects <code>oyster.py</code> as of commit
-      <a href="https://github.com/macmanes-lab/Oyster_River_Protocol/commit/1b0fdb18dc0475fffa2c5878c618051fe8d468dc">1b0fdb1</a>
-      (2026-08-18) &middot; ORP 3.1.0, pending release (<code>version.txt</code> still reads 3.0.0)
+      Reflects <code>oyster.py</code> on the <code>python_convert</code> branch, working tree as of 2026-08-19
+      (Stage A/Stage B assembler-pairing restructure, see NOTES.md 2026-08-19 &mdash; not yet committed)
+      &middot; ORP 3.1.0, pending release (<code>version.txt</code> still reads 3.0.0)
     </p>
   </div>
 
@@ -188,7 +188,7 @@
 
   <figure>
     <div class="diagram-frame">
-      <svg viewBox="0 0 1000 1870" role="img" aria-label="Directed acyclic graph of oyster.py's pipeline at --max-parallel 2: a long sequential chain of steps interrupted by three concurrent stages -- an always-on two-lane assembler split (Trinity phase 1 vs. Trans-ABySS/SPAdes55/SPAdes75), orthofuser_branch running alongside merge_branch, and transrate running alongside strandeval.">
+      <svg viewBox="0 0 1000 1990" role="img" aria-label="Directed acyclic graph of oyster.py's pipeline at --max-parallel 2: a long sequential chain of steps interrupted by four concurrent stages -- always-on Stage A (Trinity phase 1 vs. SPAdes55/SPAdes75, 25/75 split) then Stage B (Trinity phase 2 vs. Trans-ABySS, 95/5 split), orthofuser_branch running alongside merge_branch, and transrate running alongside strandeval.">
         <defs>
           <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
             <path d="M0,0 L10,5 L0,10 z" fill="currentColor" class="flow-marker"></path>
@@ -214,14 +214,14 @@
           <text x="500" y="161" text-anchor="middle">run_rcorrector</text>
         </g>
 
-        <!-- fan out to band A -->
+        <!-- fan out to stage A -->
         <path class="flow" d="M500,174 L500,196" marker-end="url(#arrow)"></path>
         <path class="flow" d="M500,196 C500,210 270,205 270,218" marker-end="url(#arrow)"></path>
         <path class="flow" d="M500,196 C500,210 730,205 730,218" marker-end="url(#arrow)"></path>
 
-        <!-- BAND A -->
+        <!-- STAGE A -->
         <rect class="band-fixed" x="110" y="188" width="780" height="285" rx="16"></rect>
-        <text class="t-band" x="500" y="209" text-anchor="middle" font-size="12">FIXED 2-WAY CONCURRENCY &mdash; independent of --max-parallel</text>
+        <text class="t-band" x="500" y="209" text-anchor="middle" font-size="12">FIXED 2-WAY CONCURRENCY &mdash; Stage A, 25/75 cpu/mem split</text>
         <text class="t-sub" x="500" y="223" text-anchor="middle" font-size="10.5">ThreadPoolExecutor(max_workers=2)</text>
 
         <!-- left lane: trinity phase 1, spans the band -->
@@ -233,245 +233,264 @@
         </g>
         <line class="flow" x1="270" y1="358" x2="270" y2="440" ></line>
 
-        <!-- right lane: three assemblers, each -> diamond -->
+        <!-- right lane: SPAdes55/75, each -> diamond -->
         <g class="node-work">
           <rect x="635" y="228" width="190" height="28" rx="6"></rect>
-          <text x="730" y="247" text-anchor="middle" font-size="11.5">run_transabyss</text>
+          <text x="730" y="247" text-anchor="middle" font-size="11.5">run_spades55</text>
         </g>
         <line class="flow" x1="730" y1="256" x2="730" y2="264" marker-end="url(#arrow)"></line>
         <g class="node-work">
           <rect x="635" y="266" width="190" height="24" rx="6"></rect>
-          <text x="730" y="282" text-anchor="middle" font-size="11">diamond_transabyss</text>
+          <text x="730" y="282" text-anchor="middle" font-size="11">diamond_spades55</text>
         </g>
         <line class="flow" x1="730" y1="290" x2="730" y2="298" marker-end="url(#arrow)"></line>
 
         <g class="node-work">
           <rect x="635" y="300" width="190" height="28" rx="6"></rect>
-          <text x="730" y="319" text-anchor="middle" font-size="11.5">run_spades55</text>
+          <text x="730" y="319" text-anchor="middle" font-size="11.5">run_spades75</text>
         </g>
         <line class="flow" x1="730" y1="328" x2="730" y2="336" marker-end="url(#arrow)"></line>
         <g class="node-work">
           <rect x="635" y="338" width="190" height="24" rx="6"></rect>
-          <text x="730" y="354" text-anchor="middle" font-size="11">diamond_spades55</text>
+          <text x="730" y="354" text-anchor="middle" font-size="11">diamond_spades75</text>
         </g>
-        <line class="flow" x1="730" y1="362" x2="730" y2="370" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="730" y1="362" x2="730" y2="440" ></line>
 
-        <g class="node-work">
-          <rect x="635" y="372" width="190" height="28" rx="6"></rect>
-          <text x="730" y="391" text-anchor="middle" font-size="11.5">run_spades75</text>
-        </g>
-        <line class="flow" x1="730" y1="400" x2="730" y2="408" marker-end="url(#arrow)"></line>
-        <g class="node-work">
-          <rect x="635" y="410" width="190" height="24" rx="6"></rect>
-          <text x="730" y="426" text-anchor="middle" font-size="11">diamond_spades75</text>
-        </g>
-        <line class="flow" x1="730" y1="434" x2="730" y2="440" ></line>
-
-        <!-- converge band A -->
+        <!-- converge stage A -->
         <path class="flow" d="M270,440 C270,458 500,450 500,466"></path>
         <path class="flow" d="M730,440 C730,458 500,450 500,466"></path>
         <circle class="dot" cx="500" cy="466" r="2.4"></circle>
-        <line class="flow" x1="500" y1="466" x2="500" y2="498" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="500" y1="466" x2="500" y2="488" marker-end="url(#arrow)"></line>
 
+        <!-- fan out to stage B -->
+        <path class="flow" d="M500,488 C500,502 270,497 270,510" marker-end="url(#arrow)"></path>
+        <path class="flow" d="M500,488 C500,502 730,497 730,510" marker-end="url(#arrow)"></path>
+
+        <!-- STAGE B -->
+        <rect class="band-fixed" x="110" y="480" width="780" height="180" rx="16"></rect>
+        <text class="t-band" x="500" y="501" text-anchor="middle" font-size="12">FIXED 2-WAY CONCURRENCY &mdash; Stage B, 95/5 cpu split</text>
+        <text class="t-sub" x="500" y="515" text-anchor="middle" font-size="10.5">ThreadPoolExecutor(max_workers=2)</text>
+
+        <!-- left lane: trinity phase 2 -->
+        <line class="flow" x1="270" y1="520" x2="270" y2="560" ></line>
         <g class="node-work">
-          <rect x="385" y="500" width="230" height="34" rx="6"></rect>
-          <text x="500" y="521" text-anchor="middle">run_trinity_phase2</text>
+          <rect x="175" y="560" width="190" height="58" rx="6"></rect>
+          <text x="270" y="584" text-anchor="middle">run_trinity_phase2</text>
+          <text class="t-note" x="270" y="602" text-anchor="middle" font-size="10">dominant cost, ~34h</text>
         </g>
-        <text class="t-note" x="500" y="546" text-anchor="middle" font-size="10.5">both lanes released &mdash; runs at full --cpu/--mem</text>
-        <line class="flow" x1="500" y1="534" x2="500" y2="558" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="270" y1="618" x2="270" y2="634" ></line>
+
+        <!-- right lane: transabyss -> diamond -->
+        <g class="node-work">
+          <rect x="635" y="520" width="190" height="28" rx="6"></rect>
+          <text x="730" y="539" text-anchor="middle" font-size="11.5">run_transabyss</text>
+        </g>
+        <line class="flow" x1="730" y1="548" x2="730" y2="556" marker-end="url(#arrow)"></line>
+        <g class="node-work">
+          <rect x="635" y="558" width="190" height="24" rx="6"></rect>
+          <text x="730" y="574" text-anchor="middle" font-size="11">diamond_transabyss</text>
+        </g>
+        <line class="flow" x1="730" y1="582" x2="730" y2="634" ></line>
+
+        <!-- converge stage B -->
+        <path class="flow" d="M270,634 C270,648 500,644 500,656"></path>
+        <path class="flow" d="M730,634 C730,648 500,644 500,656"></path>
+        <circle class="dot" cx="500" cy="656" r="2.4"></circle>
+        <line class="flow" x1="500" y1="656" x2="500" y2="678" marker-end="url(#arrow)"></line>
 
         <g class="node-work">
-          <rect x="395" y="560" width="210" height="34" rx="6"></rect>
-          <text x="500" y="581" text-anchor="middle">run_filtershort</text>
+          <rect x="395" y="680" width="210" height="34" rx="6"></rect>
+          <text x="500" y="701" text-anchor="middle">run_filtershort</text>
         </g>
 
         <!-- fan out to band B -->
-        <path class="flow" d="M500,594 L500,612" marker-end="url(#arrow)"></path>
-        <path class="flow" d="M500,612 C500,626 340,632 340,644" marker-end="url(#arrow)"></path>
-        <path class="flow" d="M500,612 C500,626 660,632 660,644" marker-end="url(#arrow)"></path>
+        <path class="flow" d="M500,714 L500,732" marker-end="url(#arrow)"></path>
+        <path class="flow" d="M500,732 C500,746 340,752 340,764" marker-end="url(#arrow)"></path>
+        <path class="flow" d="M500,732 C500,746 660,752 660,764" marker-end="url(#arrow)"></path>
 
         <!-- BAND B -->
-        <rect class="band-fixed" x="180" y="604" width="640" height="204" rx="16"></rect>
-        <text class="t-band" x="500" y="625" text-anchor="middle" font-size="12">CONCURRENT AT --max-parallel 2</text>
-        <text class="t-sub" x="500" y="639" text-anchor="middle" font-size="10.5">run_parallel([orthofuser_branch, merge_branch], max_workers=2)</text>
+        <rect class="band-fixed" x="180" y="724" width="640" height="204" rx="16"></rect>
+        <text class="t-band" x="500" y="745" text-anchor="middle" font-size="12">CONCURRENT AT --max-parallel 2</text>
+        <text class="t-sub" x="500" y="759" text-anchor="middle" font-size="10.5">run_parallel([orthofuser_branch, merge_branch], max_workers=2)</text>
 
         <!-- left lane: orthofuser_branch -->
-        <text class="t-sub" x="340" y="656" text-anchor="middle" font-size="10">orthofuser_branch</text>
+        <text class="t-sub" x="340" y="776" text-anchor="middle" font-size="10">orthofuser_branch</text>
         <g class="node-work">
-          <rect x="245" y="661" width="190" height="28" rx="6"></rect>
-          <text x="340" y="680" text-anchor="middle" font-size="11.5">run_orthofuser</text>
+          <rect x="245" y="781" width="190" height="28" rx="6"></rect>
+          <text x="340" y="800" text-anchor="middle" font-size="11.5">run_orthofuser</text>
         </g>
-        <line class="flow" x1="340" y1="689" x2="340" y2="697" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="340" y1="809" x2="340" y2="817" marker-end="url(#arrow)"></line>
         <g class="node-book">
-          <rect x="255" y="699" width="170" height="22" rx="6"></rect>
-          <text x="340" y="714" text-anchor="middle" font-size="10.5">makelist</text>
+          <rect x="255" y="819" width="170" height="22" rx="6"></rect>
+          <text x="340" y="834" text-anchor="middle" font-size="10.5">makelist</text>
         </g>
-        <line class="flow" x1="340" y1="721" x2="340" y2="729" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="340" y1="841" x2="340" y2="849" marker-end="url(#arrow)"></line>
         <g class="node-book">
-          <rect x="255" y="731" width="170" height="22" rx="6"></rect>
-          <text x="340" y="746" text-anchor="middle" font-size="10.5">makegroups</text>
+          <rect x="255" y="851" width="170" height="22" rx="6"></rect>
+          <text x="340" y="866" text-anchor="middle" font-size="10.5">makegroups</text>
         </g>
 
         <!-- right lane: merge_branch -->
-        <text class="t-sub" x="660" y="656" text-anchor="middle" font-size="10">merge_branch</text>
+        <text class="t-sub" x="660" y="776" text-anchor="middle" font-size="10">merge_branch</text>
         <g class="node-book">
-          <rect x="575" y="661" width="170" height="22" rx="6"></rect>
-          <text x="660" y="676" text-anchor="middle" font-size="10.5">merge</text>
+          <rect x="575" y="781" width="170" height="22" rx="6"></rect>
+          <text x="660" y="796" text-anchor="middle" font-size="10.5">merge</text>
         </g>
-        <line class="flow" x1="660" y1="683" x2="660" y2="691" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="660" y1="803" x2="660" y2="811" marker-end="url(#arrow)"></line>
         <g class="node-work">
-          <rect x="565" y="693" width="190" height="28" rx="6"></rect>
-          <text x="660" y="712" text-anchor="middle" font-size="11.5">orthotransrate</text>
+          <rect x="565" y="813" width="190" height="28" rx="6"></rect>
+          <text x="660" y="832" text-anchor="middle" font-size="11.5">orthotransrate</text>
         </g>
 
         <!-- converge band B -->
-        <line class="flow" x1="340" y1="753" x2="340" y2="778"></line>
-        <line class="flow" x1="660" y1="721" x2="660" y2="778"></line>
-        <path class="flow" d="M340,778 C340,796 500,790 500,806"></path>
-        <path class="flow" d="M660,778 C660,796 500,790 500,806"></path>
-        <circle class="dot" cx="500" cy="806" r="2.4"></circle>
-        <line class="flow" x1="500" y1="806" x2="500" y2="838" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="340" y1="873" x2="340" y2="898"></line>
+        <line class="flow" x1="660" y1="841" x2="660" y2="898"></line>
+        <path class="flow" d="M340,898 C340,916 500,910 500,926"></path>
+        <path class="flow" d="M660,898 C660,916 500,910 500,926"></path>
+        <circle class="dot" cx="500" cy="926" r="2.4"></circle>
+        <line class="flow" x1="500" y1="926" x2="500" y2="958" marker-end="url(#arrow)"></line>
 
         <g class="node-work">
-          <rect x="395" y="840" width="210" height="34" rx="6"></rect>
-          <text x="500" y="861" text-anchor="middle">makeorthout</text>
+          <rect x="395" y="960" width="210" height="34" rx="6"></rect>
+          <text x="500" y="981" text-anchor="middle">makeorthout</text>
         </g>
-        <line class="flow" x1="500" y1="874" x2="500" y2="898" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="500" y1="994" x2="500" y2="1018" marker-end="url(#arrow)"></line>
 
         <g class="node-work">
-          <rect x="395" y="900" width="210" height="34" rx="6"></rect>
-          <text x="500" y="921" text-anchor="middle">orthofusing</text>
+          <rect x="395" y="1020" width="210" height="34" rx="6"></rect>
+          <text x="500" y="1041" text-anchor="middle">orthofusing</text>
         </g>
-        <line class="flow" x1="500" y1="934" x2="500" y2="958" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="500" y1="1054" x2="500" y2="1078" marker-end="url(#arrow)"></line>
 
         <g class="node-work">
-          <rect x="390" y="960" width="220" height="30" rx="6"></rect>
-          <text x="500" y="979" text-anchor="middle" font-size="11.5">diamond_orthomerged</text>
+          <rect x="390" y="1080" width="220" height="30" rx="6"></rect>
+          <text x="500" y="1099" text-anchor="middle" font-size="11.5">diamond_orthomerged</text>
         </g>
-        <line class="flow" x1="500" y1="990" x2="500" y2="1006" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="500" y1="1110" x2="500" y2="1126" marker-end="url(#arrow)"></line>
 
         <g class="node-work">
-          <rect x="390" y="1008" width="220" height="30" rx="6"></rect>
-          <text x="500" y="1027" text-anchor="middle" font-size="11.5">diamond_trinity</text>
+          <rect x="390" y="1128" width="220" height="30" rx="6"></rect>
+          <text x="500" y="1147" text-anchor="middle" font-size="11.5">diamond_trinity</text>
         </g>
-        <text class="t-note" x="618" y="1027" font-size="10">&larr; trinity_fa, from phase2 above</text>
-        <line class="flow" x1="500" y1="1038" x2="500" y2="1054" marker-end="url(#arrow)"></line>
+        <text class="t-note" x="618" y="1147" font-size="10">&larr; trinity_fa, from phase2 above</text>
+        <line class="flow" x1="500" y1="1158" x2="500" y2="1174" marker-end="url(#arrow)"></line>
 
         <g class="node-book">
-          <rect x="405" y="1056" width="190" height="26" rx="6"></rect>
-          <text x="500" y="1073" text-anchor="middle" font-size="11">diamond_uniq</text>
+          <rect x="405" y="1176" width="190" height="26" rx="6"></rect>
+          <text x="500" y="1193" text-anchor="middle" font-size="11">diamond_uniq</text>
         </g>
-        <text class="t-note" x="603" y="1073" font-size="10">&larr; + 3 diamond_* from the lane split above</text>
+        <text class="t-note" x="603" y="1193" font-size="10">&larr; + 3 diamond_* from the lane split above</text>
 
-        <line class="flow" x1="500" y1="1082" x2="500" y2="1098" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="500" y1="1202" x2="500" y2="1218" marker-end="url(#arrow)"></line>
 
         <g class="node-book">
-          <rect x="370" y="1100" width="260" height="30" rx="6"></rect>
-          <text x="500" y="1119" text-anchor="middle" font-size="11">make_list1 &rarr; make_list7</text>
+          <rect x="370" y="1220" width="260" height="30" rx="6"></rect>
+          <text x="500" y="1239" text-anchor="middle" font-size="11">make_list1 &rarr; make_list7</text>
         </g>
-        <text class="t-note" x="500" y="1144" text-anchor="middle" font-size="10">list-file bookkeeping, &lt;1s each</text>
-        <line class="flow" x1="500" y1="1130" x2="500" y2="1156" marker-end="url(#arrow)"></line>
+        <text class="t-note" x="500" y="1264" text-anchor="middle" font-size="10">list-file bookkeeping, &lt;1s each</text>
+        <line class="flow" x1="500" y1="1250" x2="500" y2="1276" marker-end="url(#arrow)"></line>
 
         <g class="node-work">
-          <rect x="395" y="1158" width="210" height="34" rx="6"></rect>
-          <text x="500" y="1179" text-anchor="middle">posthack</text>
+          <rect x="395" y="1278" width="210" height="34" rx="6"></rect>
+          <text x="500" y="1299" text-anchor="middle">posthack</text>
         </g>
-        <line class="flow" x1="500" y1="1192" x2="500" y2="1214" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="500" y1="1312" x2="500" y2="1334" marker-end="url(#arrow)"></line>
 
         <g class="node-work">
-          <rect x="395" y="1216" width="210" height="34" rx="6"></rect>
-          <text x="500" y="1237" text-anchor="middle">cdhit</text>
+          <rect x="395" y="1336" width="210" height="34" rx="6"></rect>
+          <text x="500" y="1357" text-anchor="middle">cdhit</text>
         </g>
-        <line class="flow" x1="500" y1="1250" x2="500" y2="1274" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="500" y1="1370" x2="500" y2="1394" marker-end="url(#arrow)"></line>
 
-        <text class="t-note" x="500" y="1268" text-anchor="middle" font-size="10">orp_diamond &rarr; salmon kept sequential by design (splitting CPU costs more than the overlap saves)</text>
+        <text class="t-note" x="500" y="1388" text-anchor="middle" font-size="10">orp_diamond &rarr; salmon kept sequential by design (splitting CPU costs more than the overlap saves)</text>
 
         <g class="node-work">
-          <rect x="395" y="1276" width="210" height="34" rx="6"></rect>
-          <text x="500" y="1297" text-anchor="middle">orp_diamond</text>
+          <rect x="395" y="1396" width="210" height="34" rx="6"></rect>
+          <text x="500" y="1417" text-anchor="middle">orp_diamond</text>
         </g>
-        <line class="flow" x1="500" y1="1310" x2="500" y2="1324" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="500" y1="1430" x2="500" y2="1444" marker-end="url(#arrow)"></line>
 
         <g class="node-book">
-          <rect x="415" y="1326" width="170" height="22" rx="6"></rect>
-          <text x="500" y="1341" text-anchor="middle" font-size="10.5">orp_uniq</text>
+          <rect x="415" y="1446" width="170" height="22" rx="6"></rect>
+          <text x="500" y="1461" text-anchor="middle" font-size="10.5">orp_uniq</text>
         </g>
-        <line class="flow" x1="500" y1="1348" x2="500" y2="1366" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="500" y1="1468" x2="500" y2="1486" marker-end="url(#arrow)"></line>
 
         <g class="node-work">
-          <rect x="395" y="1368" width="210" height="30" rx="6"></rect>
-          <text x="500" y="1387" text-anchor="middle" font-size="11.5">salmon_index</text>
+          <rect x="395" y="1488" width="210" height="30" rx="6"></rect>
+          <text x="500" y="1507" text-anchor="middle" font-size="11.5">salmon_index</text>
         </g>
-        <line class="flow" x1="500" y1="1398" x2="500" y2="1412" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="500" y1="1518" x2="500" y2="1532" marker-end="url(#arrow)"></line>
 
         <g class="node-work">
-          <rect x="395" y="1414" width="210" height="30" rx="6"></rect>
-          <text x="500" y="1433" text-anchor="middle" font-size="11.5">salmon</text>
+          <rect x="395" y="1534" width="210" height="30" rx="6"></rect>
+          <text x="500" y="1553" text-anchor="middle" font-size="11.5">salmon</text>
         </g>
-        <line class="flow" x1="500" y1="1444" x2="500" y2="1462" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="500" y1="1564" x2="500" y2="1582" marker-end="url(#arrow)"></line>
 
         <g class="node-book">
-          <rect x="415" y="1464" width="170" height="22" rx="6"></rect>
-          <text x="500" y="1479" text-anchor="middle" font-size="10.5">filter</text>
+          <rect x="415" y="1584" width="170" height="22" rx="6"></rect>
+          <text x="500" y="1599" text-anchor="middle" font-size="10.5">filter</text>
         </g>
-        <line class="flow" x1="500" y1="1486" x2="500" y2="1502" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="500" y1="1606" x2="500" y2="1622" marker-end="url(#arrow)"></line>
 
         <g class="node-work">
-          <rect x="395" y="1504" width="210" height="34" rx="6"></rect>
-          <text x="500" y="1525" text-anchor="middle">secondfilter</text>
+          <rect x="395" y="1624" width="210" height="34" rx="6"></rect>
+          <text x="500" y="1645" text-anchor="middle">secondfilter</text>
         </g>
-        <line class="flow" x1="500" y1="1538" x2="500" y2="1562" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="500" y1="1658" x2="500" y2="1682" marker-end="url(#arrow)"></line>
 
         <g class="node-work">
-          <rect x="380" y="1564" width="240" height="40" rx="6"></rect>
-          <text x="500" y="1589" text-anchor="middle" font-size="12.5">busco</text>
+          <rect x="380" y="1684" width="240" height="40" rx="6"></rect>
+          <text x="500" y="1709" text-anchor="middle" font-size="12.5">busco</text>
         </g>
-        <text class="t-note" x="500" y="1620" text-anchor="middle" font-size="10.5">long pole of this stage &mdash; gets full --cpu/--busco-threads alone</text>
+        <text class="t-note" x="500" y="1740" text-anchor="middle" font-size="10.5">long pole of this stage &mdash; gets full --cpu/--busco-threads alone</text>
 
         <!-- fan out to band C -->
-        <path class="flow" d="M500,1604 L500,1626" marker-end="url(#arrow)"></path>
-        <path class="flow" d="M500,1626 C500,1640 380,1646 380,1658" marker-end="url(#arrow)"></path>
-        <path class="flow" d="M500,1626 C500,1640 620,1646 620,1658" marker-end="url(#arrow)"></path>
+        <path class="flow" d="M500,1724 L500,1746" marker-end="url(#arrow)"></path>
+        <path class="flow" d="M500,1746 C500,1760 380,1766 380,1778" marker-end="url(#arrow)"></path>
+        <path class="flow" d="M500,1746 C500,1760 620,1766 620,1778" marker-end="url(#arrow)"></path>
 
         <!-- BAND C -->
-        <rect class="band-fixed" x="260" y="1622" width="480" height="140" rx="16"></rect>
-        <text class="t-band" x="500" y="1643" text-anchor="middle" font-size="12">CONCURRENT AT --max-parallel 2</text>
+        <rect class="band-fixed" x="260" y="1742" width="480" height="140" rx="16"></rect>
+        <text class="t-band" x="500" y="1763" text-anchor="middle" font-size="12">CONCURRENT AT --max-parallel 2</text>
 
         <g class="node-work">
-          <rect x="285" y="1660" width="190" height="34" rx="6"></rect>
-          <text x="380" y="1681" text-anchor="middle">transrate</text>
+          <rect x="285" y="1780" width="190" height="34" rx="6"></rect>
+          <text x="380" y="1801" text-anchor="middle">transrate</text>
         </g>
         <g class="node-work">
-          <rect x="525" y="1660" width="190" height="34" rx="6"></rect>
-          <text x="620" y="1681" text-anchor="middle">strandeval</text>
+          <rect x="525" y="1780" width="190" height="34" rx="6"></rect>
+          <text x="620" y="1801" text-anchor="middle">strandeval</text>
         </g>
 
         <!-- converge band C -->
-        <line class="flow" x1="380" y1="1694" x2="380" y2="1738"></line>
-        <line class="flow" x1="620" y1="1694" x2="620" y2="1738"></line>
-        <path class="flow" d="M380,1738 C380,1754 500,1748 500,1764"></path>
-        <path class="flow" d="M620,1738 C620,1754 500,1748 500,1764"></path>
-        <circle class="dot" cx="500" cy="1764" r="2.4"></circle>
-        <line class="flow" x1="500" y1="1764" x2="500" y2="1794" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="380" y1="1814" x2="380" y2="1858"></line>
+        <line class="flow" x1="620" y1="1814" x2="620" y2="1858"></line>
+        <path class="flow" d="M380,1858 C380,1874 500,1868 500,1884"></path>
+        <path class="flow" d="M620,1858 C620,1874 500,1868 500,1884"></path>
+        <circle class="dot" cx="500" cy="1884" r="2.4"></circle>
+        <line class="flow" x1="500" y1="1884" x2="500" y2="1914" marker-end="url(#arrow)"></line>
 
         <g class="node-final">
-          <rect x="400" y="1796" width="200" height="38" rx="19"></rect>
-          <text x="500" y="1820" text-anchor="middle" font-size="12.5">reportgen</text>
+          <rect x="400" y="1916" width="200" height="38" rx="19"></rect>
+          <text x="500" y="1940" text-anchor="middle" font-size="12.5">reportgen</text>
         </g>
       </svg>
     </div>
     <figcaption>
       Sequence of every <code>self.step()</code> call in <code>Pipeline.main()</code>, as it runs at
-      <code>--max-parallel 2</code>. Two of the three concurrent stages exist only because of that setting
-      (<code>run_parallel(..., max_workers=self.max_parallel)</code>); the assembler split up top runs concurrently
-      regardless of the flag, at a fixed <code>ThreadPoolExecutor(max_workers=2)</code>.
+      <code>--max-parallel 2</code>. Two of the four concurrent stages exist only because of that setting
+      (<code>run_parallel(..., max_workers=self.max_parallel)</code>); Stage A and Stage B run concurrently
+      regardless of the flag, each its own fixed <code>ThreadPoolExecutor(max_workers=2)</code>.
     </figcaption>
   </figure>
 
   <div class="notes">
-    <h2>The three concurrency decisions</h2>
+    <h2>The four concurrency decisions</h2>
     <ol>
-      <li><strong>Assembler split (always on).</strong> Trinity phase 1 and the three short-read assemblers (Trans-ABySS, SPAdes55, SPAdes75, each followed immediately by its own DIAMOND search) run in two threads regardless of <code>--max-parallel</code>. Trinity gets <code>TRINITY_LANE_SHARE</code> of the CPU/mem budget; the short-assembler lane gets the rest. Trinity phase 2 only starts once both lanes release the machine, then runs alone at the full budget.</li>
+      <li><strong>Stage A: Trinity phase 1 vs. SPAdes55/SPAdes75 (always on).</strong> Phase 1 is largely insensitive to its CPU share above Inchworm's own <code>--inchworm_cpu=10</code> cap, so it only needs <code>TRINITY_PHASE1_SHARE</code> (25%) of the CPU/mem budget; SPAdes -- fast, but does scale with cores -- gets the rest. Each SPAdes assembly is followed immediately by its own DIAMOND search.</li>
+      <li><strong>Stage B: Trinity phase 2 vs. Trans-ABySS (always on).</strong> Phase 2 (thousands of independent per-gene-component ParaFly jobs, by far Trinity's dominant cost -- around 34h on the SRR1789336 benchmark) gets <code>TRINITY_PHASE2_SHARE</code> (95%) of CPU; Trans-ABySS gets the rest, since its own dominant cost -- the initial FASTQ read + De Bruijn graph build -- runs single-threaded no matter how many cores it's given (traced to <code>abyss-pe</code> falling through to the plain, unthreaded <code>ABYSS</code> binary; see NOTES.md 2026-08-19). Its mem share isn't cut the same way, since its memory footprint doesn't shrink with fewer cores. Starting Phase 2 here rather than after Trans-ABySS finishes reclaims what was previously idle Trinity-lane time -- not yet validated on a real run.</li>
       <li><strong>orthofuser_branch alongside merge_branch.</strong> Both only need <code>short_fastas</code>, so they're independent until they join at <code>makeorthout</code>. This is the branch pair behind the test37/test36 timing delta you looked at earlier &mdash; each branch only took ~5s on the sample dataset, so the concurrency saved seconds there, but ~5h11m on the full SRR1789336 benchmark.</li>
       <li><strong>transrate alongside strandeval.</strong> Cheap and independent, so they still run as a small concurrent pair even though BUSCO right before them deliberately does <em>not</em> share its CPU budget with anything &mdash; it dwarfs both in wall time.</li>
     </ol>

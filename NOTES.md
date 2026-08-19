@@ -5,6 +5,138 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-08-19 (2)
+
+- **Implemented** the cross-pairing restructure from entry (1) below,
+  based on real numbers from the live `TIME2_SRR1789336_norm_py_5050parallel`
+  run: Phase 2 processes at 36.2/min * 40 cores, 73,737 processes total ->
+  `T100 = 73737/36.2 ~= 33.95h`. User's proposal (pair Phase 1 with
+  SPAdes55/75 instead of the whole short lane, pair Phase 2 with
+  Trans-ABySS instead of making it wait) sidesteps the SPAdes-starvation
+  risk that made a blanket short-lane CPU reservation risky -- SPAdes gets
+  a generous share where it doesn't matter (finishes in minutes either
+  way), and only Trans-ABySS (structurally CPU-insensitive for its
+  dominant cost, see entry (1)) gets squeezed. Pushed the ratio to 95/5
+  (past the user's suggested 90/10, which only broke even) since
+  Trans-ABySS's real slack is large enough to be safe.
+  - `oyster.py`: replaced `TRINITY_LANE_SHARE=0.5` with
+    `TRINITY_PHASE1_SHARE=0.25` (Stage A: `run_trinity_phase1` vs.
+    `run_spades55`/`run_spades75`, sequential, each -> diamond) and
+    `TRINITY_PHASE2_SHARE=0.95` (Stage B: `run_trinity_phase2` vs.
+    `run_transabyss` -> `diamond_transabyss`). Trans-ABySS's mem share is
+    *not* cut by `TRINITY_PHASE2_SHARE` -- kept at Stage A's `spades_mem`
+    level instead, since its memory footprint doesn't shrink with fewer
+    cores the way SPAdes/Phase 1's do. `run_filtershort` (needs all 4
+    assemblies) now runs after both stages, unchanged position otherwise.
+  - Added wall-clock timestamps throughout: `Pipeline._ts()` helper,
+    `step()`/`run_parallel()`'s `run_one()` now print start+done
+    timestamps to stdout and write them into the timing log
+    (`name\telapsed\tstart_ts`, third column); `timing_report()` parses
+    and displays them. Requested so live `squeue`-style monitoring of the
+    new Stage A/Stage B overlap can be correlated against real wall time
+    without cross-referencing separate elapsed-seconds math by hand.
+  - Updated `docs/pipeline-schedule.html` (the DAG), `docs/pipeline-steps.md`,
+    `README.md`'s Parallel task management section, and `changelog.md`'s
+    pending 3.1.0 entry to match. **Not committed yet.**
+  - **Not validated on a real run.** Specifically unconfirmed: (a) whether
+    the actual node has enough free RAM for Trinity Phase 2's real,
+    enforced `--max_memory` cap (95% of `--mem`) running concurrently with
+    Trans-ABySS's own memory footprint, which oyster.py doesn't actually
+    bound at all -- `run_transabyss()`'s `mem` parameter is accepted but
+    unused, since Trans-ABySS's CLI has no memory flag to pass it to (only
+    `--threads` is real). `transabyss_mem` in `main()` is therefore inert
+    bookkeeping, not an enforced reservation; the genuine open question is
+    node headroom, not a percentage-sum bug in the code. (b) Trans-ABySS's
+    threaded sub-stages don't become a real bottleneck at only ~2 cores
+    (40 * 0.05 = 2 at this run's `--cpu 40`), (c) whether the total run
+    actually beats, matches, or loses to the old 38:28:11 baseline on this
+    dataset (see the caveat in entry (1) about this being the "wrong"
+    dataset to validate the split's original motivation on).
+
+## 2026-08-19 (1)
+
+- Real-run validation (in progress) of the 50/50 Phase1/short-lane split
+  from entry (1) on 2026-08-18: `TIME2_SRR1789336_norm_py_5050parallel`,
+  `--cpu 40 --mem 670`. Trinity Phase 1 finished in **90 minutes**,
+  confirming the "largely CPU-insensitive" claim -- Inchworm's hard
+  `--inchworm_cpu 10` cap and Chrysalis's brief clustering mean Phase 1
+  doesn't need its full 20-CPU share.
+- **Trans-ABySS is not meaningfully CPU-scalable, and the reason is
+  structural, not just algorithmic.** Traced `abyss-pe`'s binary dispatch
+  (`bin/abyss-pe` in [bcgsc/abyss](https://github.com/bcgsc/abyss)): the
+  initial De Bruijn graph build (`%-1.fa`, which includes reading the
+  FASTQ files) only threads via `-j` if Bloom-filter mode (`-b`/`B`) is
+  requested, or runs distributed via MPI if `np` is set (`mpirun -np
+  $(np) ABYSS-P`). Neither `oyster.py` nor `transabyss`'s
+  `dbg_assembly()`/`contig_assembly()` ever sets either, so both graph
+  builds (stage 1 and, again, at the start of stage 3) fall to the plain
+  `ABYSS` binary -- confirmed zero `omp`/`pthread`/`std::thread` anywhere
+  in that binary or the `Assembly`/`Common`/`DataLayer` code it links
+  against (including the FASTA/FASTQ reader itself). Also confirmed the
+  middle `unitig_assembly` graph-simplification stage
+  (`unbraid()`/`walk()`, pure single-process igraph) is single-threaded
+  by design regardless of `--useblat` (which oyster.py doesn't set
+  anyway).
+  - Real numbers from this run: Trans-ABySS took **4.5h total**, of which
+    the user measured **~3.2h as the single-threaded FASTQ read-in**
+    stage specifically. Confirms the prediction: 20 CPU (this run) barely
+    beat the old 8-CPU SRR1789336 benchmark's 4h46m (entry, 2026-08-17)
+    -- most of the wall time is core-count-invariant.
+  - Implication: tuning `TRINITY_LANE_SHARE` further (e.g. 25/75) has
+    limited upside for the short lane specifically, since Trans-ABySS
+    dominates it and can't use the extra cores for its dominant stage.
+- SPAdes55/75 just started (sequential after Trans-ABySS in
+  `short_assembler_lane()`); Trinity Phase 2 still gated on the short
+  lane finishing entirely (`main()`'s `as_completed([...])` join before
+  the `run_trinity_phase2` step) -- idle since Phase 1 finished at the
+  90-minute mark, so ~3h+ of idle Trinity-lane capacity so far.
+  - Considered decoupling `run_trinity_phase2` from the short lane (it
+    only actually depends on Phase 1's `recursive_trinity.cmds.ok`
+    checkpoint, not on Trans-ABySS/SPAdes output) so Phase 2 could start
+    immediately and overlap with Trans-ABySS's mostly-idle-of-CPU tail.
+    **Not free**: Trinity's `--CPU` is fixed at process launch for its
+    entire run (same constraint behind the original Phase1/Phase2
+    split), and Phase 2 is the dominant cost by a wide margin (~30h
+    extrapolated from the old 37h/32-CPU benchmark at 40 CPU) -- so
+    starting early at a reduced share trades a one-time ~3.5-4h idle
+    window against a permanent CPU discount applied across Phase 2's
+    entire runtime. Breakeven is roughly a 89%+ CPU share for Phase 2
+    during the overlap; below that, early-start is a net loss. Decided
+    to wait for this run's actual Phase 2 wall-clock time at 100% CPU
+    (the missing data point) before committing to that restructure --
+    too easy to make a multi-day job slower on a bad guess.
+  - Update: short lane (Trans-ABySS + SPAdes55/75 + their diamond
+    searches) finished at the **5h20m** mark; `run_trinity_phase2`
+    started then. Confirms idle Trinity-lane window empirically: 90min
+    (Phase 1 done) to 320min (Phase 2 start) = **3h50m idle**, matching
+    the ~3.5-4h estimate used in the early-start breakeven math above.
+    With that idle figure fixed, breakeven CPU share for an early-start
+    Phase 2 is `T100 / (T100 + 3.83h)` -- e.g. ~88.7% if `T100` lands
+    near the ~30h extrapolation, still needing the real number below.
+- **Early-start restructure: decided against it.** User reported Phase 2
+  processing 36.2 processes/min at 40 cores, 73,737 processes total ->
+  `T100 = 73737/36.2 ≈ 2037min ≈ 33.95h`, higher than the ~30h
+  extrapolation used above. That pushes the early-start breakeven share
+  to `33.95/(33.95+3.83) ≈ 89.9%` -- realistic upside is ~2h off a ~38h
+  run (~5%), only achievable by reserving as little as ~2 cores for the
+  short lane during the overlap, which is tight enough that
+  underestimating the short lane's real minimum (Trans-ABySS's threaded
+  steps, SPAdes) could erase the gain. Given Trinity's CPU is locked in
+  at launch for the full 34h+ duration, not worth the risk for a ~5%
+  upside -- current wait-then-100%-CPU design stands.
+  - Caveat worth revisiting: the original Phase1/Phase2 split (entry,
+    2026-08-18) was motivated by a *different*, larger dataset where the
+    short lane's idle extrapolated to ~110h against Trinity. On
+    SRR1789336, Trinity already dominates so heavily (~34h vs.
+    Trans-ABySS's 4.5h) that the old fixed 80/20 design's idle cost was
+    small to begin with -- this run may land close to the old
+    38:28:11 baseline (entry, 2026-08-17) rather than clearly beating
+    it. Compare final totals once this run finishes to check whether the
+    split actually helped on *this* dataset specifically.
+- Not yet recorded: Phase 2 finish time, final total wallclock vs. the
+  old 38:28:11/43:39:49 baselines (entry, 2026-08-17), and whether the
+  new split beat, matched, or lost to the old one on this dataset.
+
 ## 2026-08-18 (2)
 
 - Real cluster run hit `strandeval()` failing with `Can't exec "samtools":
