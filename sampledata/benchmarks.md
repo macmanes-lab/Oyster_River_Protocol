@@ -195,3 +195,29 @@ oyster.py --strand RF --tpm-filt 0.2 --mem 15 --cpu 8 --read1 test.1.fq.gz --rea
 | TOTAL | 00:04:00 | 00:04:13 |
 
 `--max-parallel 2` finished 13s faster. The step print order confirms the concurrency logic is engaging correctly: under `--max-parallel 2`, `run_orthofuser`/`orthofuser_branch` and `orthotransrate`/`merge_branch` interleave in the log (concurrent completion), while under `--max-parallel 1` they print strictly branch-by-branch (`orthotransrate`, `merge_branch`, then `run_orthofuser`, `orthofuser_branch`). Unlike the SRR1789336 benchmark above, each branch here only takes ~5s on this tiny sample dataset, so overlapping them saves only a few seconds rather than hours -- this run validates the scheduling behavior, not the wall-clock benefit at scale.
+
+## samplerun3 -- Stage A/Stage B assembler-pairing validation (2026-08-19)
+
+First real run of the Stage A/Stage B restructure from NOTES.md 2026-08-19 (2) (commit `fe694de`): `TRINITY_PHASE1_SHARE=0.25` pairs `run_trinity_phase1` with SPAdes55/75, `TRINITY_PHASE2_SHARE=0.95` pairs `run_trinity_phase2` with `run_transabyss` instead of waiting for it. Sample CI dataset, not full-size -- validates scheduling behavior, not wall-clock benefit at scale (see the test37/test36 entry above for that caveat).
+
+Command:
+```
+oyster.py --normalize-reads --tpm-filt 1 --mem 100 --cpu 20 --read1 test.1.fq.gz --read2 test.2.fq.gz --max-parallel 2 --runout samplerun3
+```
+
+| Step | Started | Elapsed |
+| --- | --- | --- |
+| run_trimmomatic | 15:37:57 | 00:00:01 |
+| run_rcorrector | 15:37:59 | 00:00:01 |
+| run_spades55 | 15:38:01 | 00:00:05 |
+| run_trinity_phase1 | 15:38:01 | 00:00:09 |
+| diamond_spades55 | 15:38:06 | 00:00:07 |
+| run_spades75 | 15:38:13 | 00:00:04 |
+| diamond_spades75 | 15:38:18 | 00:00:07 |
+| run_transabyss | 15:38:25 | 00:00:28 |
+| run_trinity_phase2 | 15:38:25 | 00:01:06 |
+| diamond_transabyss | 15:38:53 | 00:01:02 |
+| run_filtershort | 15:39:56 | 00:00:03 |
+| TOTAL | | 00:04:18 |
+
+Timestamps confirm the pairing worked exactly as designed: `run_spades55`/`run_trinity_phase1` start together (15:38:01) -- Stage A's `spades_lane` (spades55 -> diamond55 -> spades75 -> diamond75, chained sequentially) finishes at 15:38:25, well after Phase 1 alone (would've finished ~15:38:10), so Stage A's total duration is SPAdes-bound here rather than Phase-1-bound as on a full-size dataset. `run_transabyss` and `run_trinity_phase2` then start together at exactly 15:38:25 -- the moment Stage A converges -- confirming Phase 2 no longer waits for Trans-ABySS's diamond search to finish (the old design's `short_assembler_lane` ran all three assemblers, slowest first, before Phase 2 could start). `run_filtershort` starts at 15:39:56, 1s after `diamond_transabyss` finishes (15:38:53+62s=15:39:55) -- confirms Stage B correctly gates on both of *its* lanes (Phase 2 alone would've finished at 15:39:31), not on Stage A's assemblers.

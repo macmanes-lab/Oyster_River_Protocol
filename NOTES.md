@@ -38,20 +38,32 @@ stale.
   - Updated `docs/pipeline-schedule.html` (the DAG), `docs/pipeline-steps.md`,
     `README.md`'s Parallel task management section, and `changelog.md`'s
     pending 3.1.0 entry to match. **Not committed yet.**
-  - **Not validated on a real run.** Specifically unconfirmed: (a) whether
-    the actual node has enough free RAM for Trinity Phase 2's real,
-    enforced `--max_memory` cap (95% of `--mem`) running concurrently with
-    Trans-ABySS's own memory footprint, which oyster.py doesn't actually
-    bound at all -- `run_transabyss()`'s `mem` parameter is accepted but
-    unused, since Trans-ABySS's CLI has no memory flag to pass it to (only
-    `--threads` is real). `transabyss_mem` in `main()` is therefore inert
-    bookkeeping, not an enforced reservation; the genuine open question is
-    node headroom, not a percentage-sum bug in the code. (b) Trans-ABySS's
-    threaded sub-stages don't become a real bottleneck at only ~2 cores
-    (40 * 0.05 = 2 at this run's `--cpu 40`), (c) whether the total run
-    actually beats, matches, or loses to the old 38:28:11 baseline on this
+  - **Scheduling confirmed correct** on a real run: `samplerun3`
+    (`--cpu 20 --mem 100`, sample CI dataset, see
+    `sampledata/benchmarks.md` 2026-08-19) shows `run_spades55` and
+    `run_trinity_phase1` starting together, then `run_transabyss` and
+    `run_trinity_phase2` starting together at the exact instant Stage A's
+    `spades_lane` converges (15:38:25 for both), and `run_filtershort`
+    waiting on Stage B's slower lane rather than Phase 2 alone. The
+    Phase-2-waits-for-Trans-ABySS behavior from the old design is
+    confirmed gone.
+  - **Still not validated at real scale.** This was the tiny sample
+    dataset (seconds per step, `--cpu 20`), so it doesn't stress-test:
+    (a) whether the actual node has enough free RAM for Trinity Phase 2's
+    real, enforced `--max_memory` cap (95% of `--mem`) running
+    concurrently with Trans-ABySS's own memory footprint, which
+    oyster.py doesn't actually bound at all -- `run_transabyss()`'s `mem`
+    parameter is accepted but unused, since Trans-ABySS's CLI has no
+    memory flag to pass it to (only `--threads` is real);
+    `transabyss_mem` in `main()` is therefore inert bookkeeping, not an
+    enforced reservation, so the genuine open question is node headroom,
+    not a percentage-sum bug in the code. (b) Trans-ABySS's threaded
+    sub-stages don't become a real bottleneck at only ~2 cores (40 * 0.05
+    = 2 at `--cpu 40`), (c) whether the total run actually beats,
+    matches, or loses to the old 38:28:11 baseline on the SRR1789336
     dataset (see the caveat in entry (1) about this being the "wrong"
-    dataset to validate the split's original motivation on).
+    dataset to validate the split's original motivation on). Needs a
+    full-size run to confirm any of these.
 
 ## 2026-08-19 (1)
 
