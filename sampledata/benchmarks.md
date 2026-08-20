@@ -221,3 +221,47 @@ oyster.py --normalize-reads --tpm-filt 1 --mem 100 --cpu 20 --read1 test.1.fq.gz
 | TOTAL | | 00:04:18 |
 
 Timestamps confirm the pairing worked exactly as designed: `run_spades55`/`run_trinity_phase1` start together (15:38:01) -- Stage A's `spades_lane` (spades55 -> diamond55 -> spades75 -> diamond75, chained sequentially) finishes at 15:38:25, well after Phase 1 alone (would've finished ~15:38:10), so Stage A's total duration is SPAdes-bound here rather than Phase-1-bound as on a full-size dataset. `run_transabyss` and `run_trinity_phase2` then start together at exactly 15:38:25 -- the moment Stage A converges -- confirming Phase 2 no longer waits for Trans-ABySS's diamond search to finish (the old design's `short_assembler_lane` ran all three assemblers, slowest first, before Phase 2 could start). `run_filtershort` starts at 15:39:56, 1s after `diamond_transabyss` finishes (15:38:53+62s=15:39:55) -- confirms Stage B correctly gates on both of *its* lanes (Phase 2 alone would've finished at 15:39:31), not on Stage A's assemblers.
+
+## samplerun4 -- second Stage A/Stage B assembler-pairing validation (2026-08-19)
+
+Repeat of the `samplerun3` validation (same sample CI dataset, `--mem 600 --cpu 40` this time instead of `--mem 100 --cpu 20`), run to confirm the pairing behavior isn't an artifact of one specific timing/CPU configuration.
+
+Command:
+```
+oyster.py --normalize-reads --tpm-filt 1 --mem 600 --cpu 40 --read1 Oyster_River_Protocol/sampledata/test.1.fq.gz --read2 Oyster_River_Protocol/sampledata/test.2.fq.gz --max-parallel 2 --runout samplerun4
+```
+
+| Step | Started | Elapsed |
+| --- | --- | --- |
+| run_trimmomatic | 22:54:20 | 00:00:01 |
+| run_rcorrector | 22:54:22 | 00:00:01 |
+| run_spades55 | 22:54:23 | 00:00:07 |
+| run_trinity_phase1 | 22:54:23 | 00:00:08 |
+| diamond_spades55 | 22:54:31 | 00:00:04 |
+| run_spades75 | 22:54:36 | 00:00:06 |
+| diamond_spades75 | 22:54:42 | 00:00:04 |
+| run_transabyss | 22:54:47 | 00:00:14 |
+| run_trinity_phase2 | 22:54:47 | 00:00:56 |
+| diamond_transabyss | 22:55:01 | 00:00:22 |
+| run_filtershort | 22:55:44 | 00:00:03 |
+| run_orthofuser | 22:55:47 | 00:00:07 |
+| orthofuser_branch | 22:55:47 | 00:00:07 |
+| orthotransrate | 22:55:47 | 00:00:17 |
+| merge_branch | 22:55:47 | 00:00:17 |
+| makeorthout | 22:56:04 | 00:00:00 |
+| orthofusing | 22:56:05 | 00:00:00 |
+| diamond_orthomerged | 22:56:06 | 00:00:04 |
+| diamond_trinity | 22:56:10 | 00:00:04 |
+| make_list5 | 22:56:14 | 00:00:00 |
+| posthack | 22:56:15 | 00:00:00 |
+| cdhit | 22:56:16 | 00:00:00 |
+| orp_diamond | 22:56:16 | 00:00:04 |
+| salmon_index | 22:56:21 | 00:00:00 |
+| salmon | 22:56:22 | 00:00:00 |
+| secondfilter | 22:56:22 | 00:00:00 |
+| busco | 22:56:22 | 00:00:52 |
+| strandeval | 22:57:15 | 00:00:10 |
+| transrate | 22:57:15 | 00:00:14 |
+| TOTAL | | 00:03:15 |
+
+Pairing confirmed again: `run_spades55`/`run_trinity_phase1` start together (22:54:23), `spades_lane` converges at 22:54:46 (diamond_spades75 done), and `run_transabyss`/`run_trinity_phase2` start together at 22:54:47 -- Stage A is SPAdes-bound here too, same pattern as `samplerun3`, expected at this dataset size. The interesting new data point is `run_filtershort`'s gate: this time `run_trinity_phase2` (56s, finishes 22:55:43) outlasts `diamond_transabyss` (finishes 22:55:23) -- the reverse of `samplerun3`, where `diamond_transabyss` was the slower lane. `run_filtershort` starts at 22:55:44, 1s after `run_trinity_phase2`, confirming the gate genuinely waits on whichever of Stage B's two lanes finishes last rather than being keyed to a specific step.

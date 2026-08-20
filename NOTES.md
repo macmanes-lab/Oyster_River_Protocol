@@ -5,6 +5,44 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-08-20 (1)
+
+- First full-scale (non-sample-CI) validation run of the 95/5 Stage
+  A/Stage B restructure from entry, 2026-08-19 (2). Timing so far:
+  - Stage A started 23:20 (`run_trinity_phase1` + the SPAdes lane
+    together).
+  - SPAdes lane (`run_spades55`/`75`, chained with their diamond
+    searches) finished 23:40 -- **20min**.
+  - `run_trinity_phase1` finished 00:40 -- **1h20m**, later than the
+    SPAdes lane. Stage A therefore converges Phase-1-bound here, the
+    opposite of `samplerun3`'s sample-CI result (SPAdes-bound there) --
+    confirms the full-size prediction flagged in the `samplerun3`
+    writeup (`sampledata/benchmarks.md`, 2026-08-19).
+  - Stage B (`run_transabyss` + `run_trinity_phase2`) started 00:40, at
+    the exact moment Stage A converged -- pairing confirmed working at
+    real scale, same as `samplerun3`.
+  - `run_transabyss` finished after **5h9m** (00:40 -> 05:49). Longer
+    than the 4.5h Trans-ABySS took under the old 50/50 short-lane split
+    (entry, 2026-08-19 (1), ~20 cores there) despite now running on only
+    ~5% of `--cpu` -- consistent with that entry's finding that
+    Trans-ABySS's dominant read-in stage is core-count-invariant, so the
+    ~40min increase is coming from its smaller threaded sub-stages, not
+    the bottleneck stage. Supports the 95/5 split's core assumption:
+    squeezing Trans-ABySS's share doesn't blow up its wall time.
+  - `run_trinity_phase2`/Butterfly running at **38.3 jobs/min** on 95%
+    `--cpu`, vs. the 36.2/min measured at 100% `--cpu` (40 cores) in
+    entry 2026-08-19 (2) -- slightly *faster* despite fewer cores
+    available, most likely run-to-run noise in per-component job-size
+    distribution rather than a real effect, but worth noting since it
+    means the 95% share isn't visibly costing throughput here. Assuming
+    the same 73,737-process total from that entry (same dataset), this
+    revises the `T100` extrapolation down slightly: 73737/38.3 ≈ 32h6m,
+    vs. the earlier 33h57m estimate -- projected Phase 2 finish ≈ 08:46
+    on 2026-08-21 (from its 00:40 start).
+  - Not yet recorded: actual Phase 2 finish time, `run_filtershort`
+    start, final total wallclock vs. the old 38:28:11/43:39:49 baselines
+    (entry, 2026-08-17).
+
 ## 2026-08-19 (2)
 
 - **Implemented** the cross-pairing restructure from entry (1) below,
@@ -47,6 +85,15 @@ stale.
     waiting on Stage B's slower lane rather than Phase 2 alone. The
     Phase-2-waits-for-Trans-ABySS behavior from the old design is
     confirmed gone.
+  - **Confirmed again** on `samplerun4` (`--cpu 40 --mem 600`, same
+    sample dataset, different CPU/mem config, see
+    `sampledata/benchmarks.md` 2026-08-19): same pairing behavior, and
+    this time `run_filtershort`'s gate flipped to the *other* Stage B
+    lane -- `run_trinity_phase2` (56s) outlasted `diamond_transabyss`
+    this run, vs. `diamond_transabyss` being the slower one in
+    `samplerun3`. `run_filtershort` correctly waited for whichever was
+    slower both times, confirming the gate isn't hardcoded to one
+    specific step.
   - **Still not validated at real scale.** This was the tiny sample
     dataset (seconds per step, `--cpu 20`), so it doesn't stress-test:
     (a) whether the actual node has enough free RAM for Trinity Phase 2's
