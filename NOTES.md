@@ -5,6 +5,53 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-08-21
+
+- Researched ways to speed up Trinity Phase 1 and Phase 2. Full writeup with
+  source citations and line refs in
+  [docs/trinity-speedup-investigation.md](docs/trinity-speedup-investigation.md)
+  -- **research only, nothing implemented, nothing benchmarked** (no cluster
+  access from this session). Headlines:
+  - Phase 2 is **92.9%** of the `_955parallel` run (34:27:02 of 37:06:19);
+    Phase 1 is 3.7%. Deleting Phase 1 entirely buys under 4%, so Stage A
+    tuning (the 25/75 -> 75/25 question) is bounded at ~45min minus whatever
+    SPAdes gives back. Not the lever.
+  - **Raising `--inchworm_cpu` past 10 will not help.** Inchworm's kmer
+    parsing is hard-capped at 6 threads in the binary
+    (`Inchworm/src/IRKE_run.cpp:29`, only ever clamped *down*), and the part
+    that does use all our threads (contig building, `IRKE.cpp:466`) is
+    exactly the shared-hash-contention code Brian Haas cites when explaining
+    the cap (trinityrnaseq issue #648). We're already at 10, past Trinity's
+    documented default of 6.
+  - Same code path **explains the open reproducibility question in the
+    2026-08-16 (5) entry below**: `PARALLEL_IWORM` (on by default) walks an
+    unsorted kmer list while threads zap kmers from a shared hash, so
+    inchworm output is genuinely thread-count-dependent. The theory in that
+    entry was right; this is the mechanism. It also means `--inchworm_cpu` is
+    not a free knob -- changing it moves our quality metrics.
+  - **Correction to the 2026-08-17 entry below**: it calls the 38:28:11 run
+    the "no `--normalize-reads`" baseline, but `sampledata/benchmarks.md`
+    shows that run's command line *did* pass the flag -- as did all four
+    SRR1789336 runs. Combined with Trinity 2.15's `normalize_max_read_cov`
+    default of **200x** (`Trinity:214`), which discards almost nothing at
+    typical depth, this means **normalization has never actually been tested
+    as a speed lever here**. A real test at 50x is the best cheap experiment
+    available; oyster.py has no flag for it yet.
+  - Biggest single lever if Premise policy allows it: **`--grid_exec`**.
+    Phase 2 is 73,737 independent 1-core/1GB jobs currently squeezed through
+    38 slots on one node. Adding the flag touches only `run_trinity_phase2`
+    and cannot perturb the per-component command list (already written and
+    `.ok`-checkpointed by Phase 1).
+  - Also worth testing, both cheap: oversubscribing ParaFly past physical
+    core count (jobs are 1GB each against 670GB), and getting the Trinity
+    working dir off GPFS onto node-local disk (73,737 job dirs created and
+    torn down = metadata storm). These two conflict with `--grid_exec`;
+    `%iowait` during Phase 2 tells us which regime we're in.
+  - Suggested first moves, none of which need a rerun: read the Phase 1
+    per-stage split straight off the `.ok` file mtimes in a finished run, and
+    read `%iowait` + the ParaFly rate during any live Phase 2. See section 4
+    of the doc.
+
 ## 2026-08-20 (1)
 
 - First full-scale (non-sample-CI) validation run of the 95/5 Stage
@@ -496,7 +543,11 @@ stale.
 
 - New timing run from the user (weekend, home machine), SRR1789336,
   `--max-parallel 1 --normalize-reads`, TOTAL 43:39:49 vs the 38:28:11
-  `--max-parallel 2` (no `--normalize-reads`) baseline in the entry below.
+  `--max-parallel 2` baseline in the entry below. **Correction
+  (2026-08-21):** this entry originally described that baseline as "no
+  `--normalize-reads`". That is wrong -- `sampledata/benchmarks.md` shows
+  both runs passed the flag, so `--normalize-reads` is not a variable
+  between them at all. See the 2026-08-21 entry above.
   Trinity/TransAByss/merge/transrate/busco all ~flat between the two runs;
   the entire regression is `run_orthofuser`: 5:15 -> 30:57 (~6x). Ruled out
   parallelism as the cause -- checked `run_parallel()`
