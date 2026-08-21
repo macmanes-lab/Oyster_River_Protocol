@@ -108,6 +108,121 @@ transrate        00:14:27
 TOTAL            43:39:49
 ```
 
+## TIME2_SRR1789336_norm_py_5050parallel (ORP 3.0.0) -- 2026-08-21
+
+Full completed run of the 50/50 `TRINITY_LANE_SHARE` split (`run_trinity_phase1`/`run_trinity_phase2` vs. the short-assembler lane, the design superseded by the 95/5 Stage A/Stage B restructure in NOTES.md 2026-08-19 (2)). This is the run referenced throughout NOTES.md as `TIME2_SRR1789336_norm_py_5050parallel`.
+
+Assembly: `/mnt/gpfs01/home/macmaneslab/macmanes/assemblies/TIME2_SRR1789336_norm_py_5050parallel.ORP.fasta`
+
+Command:
+```
+oyster.py --normalize-reads --tpm-filt 1 --mem 670 --cpu 40 --read1 SRR1789336_1.fastq.gz --read2 SRR1789336_2.fastq.gz --max-parallel 2 --runout TIME2_SRR1789336_norm_py_5050parallel
+```
+
+| Metric | Value |
+| --- | --- |
+| BUSCO | C:91.2%[S:69.6%,D:21.6%],F:4.0%,M:4.8%,n:125 |
+| TransRate score | 0.51456 |
+| TransRate optimal score | 0.53791 |
+| Unique genes (ORP) | 13771 |
+| Unique genes (Trinity) | 13229 |
+| Unique genes (SPAdes55) | 13493 |
+| Unique genes (SPAdes75) | 12809 |
+| Unique genes (Trans-ABySS) | 12632 |
+| Reads mapped as proper pairs | 97.05% |
+
+Step timing:
+```
+run_trimmomatic  00:05:12
+run_rcorrector   00:14:26
+run_trinity_phase1 01:04:59
+run_transabyss   04:46:03
+diamond_transabyss 00:00:10
+run_spades55     00:09:13
+diamond_spades55 00:00:10
+run_spades75     00:07:52
+diamond_spades75 00:00:09
+run_trinity_phase2 35:57:48
+run_filtershort  00:00:07
+orthotransrate   00:26:31
+merge_branch     00:26:31
+run_orthofuser   00:32:50
+orthofuser_branch 00:33:55
+makeorthout      00:01:14
+orthofusing      00:07:52
+diamond_orthomerged 00:00:09
+diamond_trinity  00:00:08
+make_list5       00:00:00
+posthack         00:00:04
+cdhit            00:00:34
+orp_diamond      00:00:07
+salmon_index     00:00:21
+salmon           00:00:30
+secondfilter     00:01:01
+busco            00:05:38
+strandeval       00:01:38
+transrate        00:15:31
+TOTAL            42:28:36
+```
+
+Phase 1 (1:04:59) + Phase 2 (35:57:48) = 37:02:47 combined Trinity time, in line with the single `run_trinity` step's 37:11:49 in the `_parallel` baseline above (splitting Trinity into two phases doesn't change its total work, only when it can start/overlap). But the short-assembler lane here ran *sequentially* before Phase 2 could start (`run_transabyss` 4:46:03 -> `run_spades55`/`75` -> Phase 2, the pre-Stage-A/B design), so **TOTAL landed at 42:28:36 -- 4h00m25s slower than the no-split `_parallel` baseline (38:28:11) above**, and only 1h11m13s faster than the `_NOparallel` baseline (43:39:49). Confirms the caveat flagged in NOTES.md 2026-08-19 (1): on SRR1789336, Trinity dominates so heavily (~37h vs. Trans-ABySS's ~4.75h) that giving the short lane a dedicated share mostly just delays Phase 2's start without saving anything -- this dataset doesn't show a clear win from lane-splitting at all, which is the motivation for the Stage A/Stage B pairing restructure (95/5 run, see NOTES.md 2026-08-20 (1)) that lets Phase 2 start immediately instead of waiting on the short lane.
+
+## TIME2_SRR1789336_norm_py_955parallel (ORP 3.0.0) -- 2026-08-21
+
+Full completed run of the 95/5 Stage A/Stage B restructure (`TRINITY_PHASE1_SHARE=0.25` pairs `run_trinity_phase1` with SPAdes55/75, `TRINITY_PHASE2_SHARE=0.95` pairs `run_trinity_phase2` with `run_transabyss`, NOTES.md 2026-08-19 (2)) -- the design that superseded the 50/50 split above. Quality report (BUSCO/TransRate/gene counts) not yet available for this run; timing only.
+
+Command:
+```
+oyster.py --normalize-reads --tpm-filt 1 --mem 670 --cpu 40 --read1 SRR1789336_1.fastq.gz --read2 SRR1789336_2.fastq.gz --max-parallel 2 --runout TIME2_SRR1789336_norm_py_955parallel
+```
+
+Step timing:
+```
+run_trimmomatic  00:05:44  (started 2026-08-19 22:57:36)
+run_rcorrector   00:17:35  (started 2026-08-19 23:03:21)
+run_spades55     00:08:36  (started 2026-08-19 23:20:56)
+diamond_spades55 00:00:08  (started 2026-08-19 23:29:32)
+run_spades75     00:07:29  (started 2026-08-19 23:29:41)
+diamond_spades75 00:00:07  (started 2026-08-19 23:37:11)
+run_trinity_phase1 01:22:49  (started 2026-08-19 23:20:56)
+run_transabyss   05:09:29  (started 2026-08-20 00:43:45)
+diamond_transabyss 00:00:49  (started 2026-08-20 05:53:15)
+run_trinity_phase2 34:27:02  (started 2026-08-20 00:43:45)
+run_filtershort  00:00:07  (started 2026-08-21 11:10:48)
+orthotransrate   00:19:15  (started 2026-08-21 11:10:55)
+merge_branch     00:19:16  (started 2026-08-21 11:10:55)
+run_orthofuser   00:26:22  (started 2026-08-21 11:10:55)
+orthofuser_branch 00:27:56  (started 2026-08-21 11:10:55)
+makeorthout      00:01:33  (started 2026-08-21 11:38:52)
+orthofusing      00:04:19  (started 2026-08-21 11:40:25)
+diamond_orthomerged 00:00:09  (started 2026-08-21 11:44:44)
+diamond_trinity  00:00:09  (started 2026-08-21 11:44:53)
+make_list5       00:00:00  (started 2026-08-21 11:45:03)
+posthack         00:00:02  (started 2026-08-21 11:45:05)
+cdhit            00:00:40  (started 2026-08-21 11:45:08)
+orp_diamond      00:00:08  (started 2026-08-21 11:45:48)
+salmon_index     00:00:20  (started 2026-08-21 11:45:56)
+salmon           00:00:18  (started 2026-08-21 11:46:16)
+secondfilter     00:00:32  (started 2026-08-21 11:46:35)
+busco            00:05:04  (started 2026-08-21 11:47:07)
+strandeval       00:01:31  (started 2026-08-21 11:52:12)
+transrate        00:11:36  (started 2026-08-21 11:52:12)
+TOTAL            37:06:19
+```
+
+Timestamps confirm the same pairing behavior seen on `samplerun3`/`samplerun4`, now at full scale: `run_spades55`/`run_trinity_phase1` start together (23:20:56); the SPAdes lane converges at 23:37:18 (diamond_spades75 done) while Phase 1 doesn't finish until 00:43:45 -- Stage A is Phase-1-bound here, matching the prediction from the samplerun3 writeup and the earlier in-progress reading logged in NOTES.md 2026-08-20 (1). `run_transabyss` and `run_trinity_phase2` start together at exactly 00:43:45, the moment Stage A converges. `run_trinity_phase2` (34:27:02, done 2026-08-21 11:10:47) outlasts `diamond_transabyss` (done 05:54:04) by a wide margin, and `run_filtershort` starts at 11:10:48, 1s later -- Stage B's gate again correctly waits on the slower of its two lanes.
+
+**Total wallclock 37:06:19 is the fastest of all four SRR1789336 designs tested**, beating even the original no-split baseline:
+
+| Design | Run | TOTAL |
+| --- | --- | --- |
+| No split, `--max-parallel 2` | `_parallel` (2026-08-17) | 38:28:11 |
+| No split, `--max-parallel 1` | `_NOparallel` (2026-08-17) | 43:39:49 |
+| 50/50 `TRINITY_LANE_SHARE` split | `_5050parallel` (2026-08-21) | 42:28:36 |
+| **95/5 Stage A/Stage B** | `_955parallel` (2026-08-21) | **37:06:19** |
+
+95/5 beats the no-split `_parallel` baseline by 1h21m52s (~3.6%) and the 50/50 split by 5h22m17s (~12.7%). The win comes almost entirely from eliminating Trinity's idle window: Stage A converges in 1h22m49s (vs. the 50/50 design's ~5h sequential short lane before Phase 2 could start, entry NOTES.md 2026-08-19 (1)), so Phase 2 starts nearly 3.7h earlier here. `run_trinity_phase2` itself (34:27:02) is actually close to the 50/50 run's Phase 2 (35:57:48, only 1h30m46s longer) despite running on 95% instead of 100% `--cpu` for its full duration -- confirming NOTES.md 2026-08-19 (2)'s bet that Trans-ABySS's real slack was large enough to absorb a 5% cut without meaningfully slowing Phase 2 down. This is the first dataset/scale where the split design clearly wins over not splitting at all.
+
 ## `--max-parallel 2` vs `--max-parallel 1` comparison
 
 | Metric | parallel (2) | NOparallel (1) |

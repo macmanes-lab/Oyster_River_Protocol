@@ -39,9 +39,72 @@ stale.
     revises the `T100` extrapolation down slightly: 73737/38.3 ≈ 32h6m,
     vs. the earlier 33h57m estimate -- projected Phase 2 finish ≈ 08:46
     on 2026-08-21 (from its 00:40 start).
-  - Not yet recorded: actual Phase 2 finish time, `run_filtershort`
-    start, final total wallclock vs. the old 38:28:11/43:39:49 baselines
-    (entry, 2026-08-17).
+  - **Direct progress comparison against the 50/50 baseline**, both
+    read from ParaFly's `succeeded(N)` counter mid-run: the 50/50 run
+    (`TIME2_SRR1789336_norm_py_5050parallel`) shows `succeeded(55682)
+    75.5143% completed` at the 32.5h Phase-2 mark; the 95/5 run shows
+    `succeeded(33244) 45.0919% completed` at the 17h mark. Both back out
+    to the same 73,737-process total (55682/0.755143 ≈ 73737;
+    33244/0.450919 ≈ 73737, matching entry 2026-08-19 (2)'s figure) --
+    confirms same dataset/job count, so the two `%completed` figures are
+    directly comparable.
+    - Average rate so far: 50/50 = 55682/32.5h ≈ **28.6/min**; 95/5 =
+      33244/17h ≈ **32.6/min**. Both are well below their respective
+      early-run instantaneous readings (36.2/min for 50/50 in entry
+      2026-08-19 (2), 38.3/min for 95/5 above) -- rate decelerates over
+      the run in *both* designs, so that's a property of Butterfly's
+      per-component job-size distribution (slower components running
+      later), not an artifact of the 95/5 pairing.
+    - Linear extrapolation from each run's own average-so-far:
+      50/50 Phase 2 total ≈ 32.5h/0.755143 ≈ **43.0h**; 95/5 Phase 2
+      total ≈ 17h/0.450919 ≈ **37.7h**. If these hold, the 95/5 design's
+      Phase 2 alone finishes ~5.3h (~12%) faster than the 50/50 run's
+      Phase 2 alone -- and that's *before* accounting for the 50/50
+      design's extra ~5h20m of Phase 2 sitting idle while the short lane
+      ran sequentially first (entry, 2026-08-19 (1)), which the 95/5
+      design avoids entirely by starting Phase 2 concurrently with
+      Trans-ABySS at 00:40. Still extrapolation, not a finished number --
+      confirm against actual finish times once both complete.
+  - **Correction, now that the 50/50 run has actually finished** (entry,
+    2026-08-19 (1), results in `sampledata/benchmarks.md` 2026-08-21):
+    real `run_trinity_phase2` was **35:57:48**, well under the 43.0h
+    linear extrapolation above (off by ~7h, ~19% -- the checkpoint's
+    28.6/min average-so-far undershot because the remaining 24.5% of
+    jobs after the 32.5h mark actually ran much faster than the run's
+    own average, ~87/min). So the "95/5 finishes Phase 2 ~12% faster"
+    claim above doesn't hold up: 35.96h (50/50, actual) vs. 37.7h (95/5,
+    still just a same-flawed-method extrapolation) -- if the 95/5 rate
+    also picks up in its back half the way the 50/50 run's did, its real
+    finish could easily undercut 37.7h too, but there's no way to know
+    from a mid-run linear extrapolation alone. Treat both runs'
+    mid-run % complete as directional only; wait for the 95/5 run's
+    actual Phase 2 finish time before drawing any speed conclusion.
+    What *does* still hold from the finished 50/50 run: it lost to the
+    no-split baseline (38:28:11) by 4h00m25s overall, so the old 50/50
+    design was a net regression on this dataset regardless of how the
+    95/5 comparison lands -- see entry 2026-08-19 (1) for the full
+    writeup.
+  - **Run finished** (results, `sampledata/benchmarks.md` 2026-08-21):
+    `run_trinity_phase2` took **34:27:02** -- close to the 50/50 run's
+    actual Phase 2 (35:57:48), only 1h30m46s shorter despite running on
+    95% instead of 100% `--cpu` for its whole duration, confirming
+    Trans-ABySS's slack really was large enough to absorb the 5% cut
+    without meaningfully costing Phase 2. TOTAL wallclock **37:06:19**
+    -- the fastest of all four SRR1789336 designs tested, beating the
+    no-split `_parallel` baseline (38:28:11) by 1h21m52s (~3.6%) and the
+    50/50 split (42:28:36) by 5h22m17s (~12.7%). The win traces to Stage
+    A converging in just 1h22m49s vs. the 50/50 design's ~5h sequential
+    short lane, so Phase 2 starts ~3.7h earlier here -- not from Phase 2
+    itself running meaningfully faster. **This closes out the
+    validation**: the 95/5 Stage A/Stage B restructure is confirmed both
+    correct (scheduling, all sample-CI and full-scale runs) and a real
+    wall-clock win on the one full-scale dataset tested so far, unlike
+    the 50/50 split it replaced. Still outstanding: quality-metric
+    comparison (BUSCO/TransRate/gene counts) for this run wasn't
+    reported yet, and only SRR1789336 has been tested at full scale --
+    the original motivating dataset (entry, 2026-08-18 (1), where the
+    short lane's idle extrapolated to ~110h) hasn't been re-run under
+    the new design.
 
 ## 2026-08-19 (2)
 
@@ -192,9 +255,18 @@ stale.
     38:28:11 baseline (entry, 2026-08-17) rather than clearly beating
     it. Compare final totals once this run finishes to check whether the
     split actually helped on *this* dataset specifically.
-- Not yet recorded: Phase 2 finish time, final total wallclock vs. the
-  old 38:28:11/43:39:49 baselines (entry, 2026-08-17), and whether the
-  new split beat, matched, or lost to the old one on this dataset.
+- **Run finished** (results, `sampledata/benchmarks.md` 2026-08-21):
+  `run_trinity_phase2` took **35:57:48**, close to the 33.95h estimate
+  above (~5.6% under). TOTAL wallclock **42:28:36** -- confirms the
+  worry two paragraphs up: this **lost** to the no-split `_parallel`
+  baseline (38:28:11 from entry, 2026-08-17) by 4h00m25s, and only beat
+  the `_NOparallel` baseline (43:39:49) by 1h11m13s. The 50/50 split, as
+  designed, made SRR1789336 slower than not splitting at all -- the
+  short lane's sequential-before-Phase-2 cost outweighed whatever
+  concurrency benefit it bought elsewhere. Direct motivation for the
+  Stage A/Stage B pairing restructure below (entry, 2026-08-19 (2))
+  that lets Phase 2 start immediately instead of waiting on the short
+  lane.
 
 ## 2026-08-18 (2)
 
