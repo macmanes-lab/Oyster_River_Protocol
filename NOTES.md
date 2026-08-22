@@ -5,6 +5,24 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-08-22
+
+- Closed the Trinity Phase 1/2 speedup investigation
+  ([docs/trinity-speedup-investigation.md](docs/trinity-speedup-investigation.md),
+  entry below). Decision: not pursuing `--grid_exec`, the one option with
+  order-of-magnitude upside. It only works given HpcGridRunner plus a
+  scheduler-specific config (SLURM/SGE/PBS/LSF) tuned to a particular
+  cluster's queues and fair-share policy -- a real win on Premise, but not
+  something that generalizes into ORP for end users, who'd each need their
+  own cluster-specific setup rather than a flag that just works. The
+  remaining candidates (`--normalize_max_read_cov 50`, oversubscribing
+  ParaFly's `-CPU`, `--min_kmer_cov 2`) are plain Trinity flags with no
+  environment-specific setup and would generalize fine, but none is
+  order-of-magnitude and two change the assembly output, requiring a fresh
+  BUSCO/TransRate validation pass. Calling this optimization effort done
+  for now rather than chasing diminishing returns.
+- Tagged this as ORP 3.1.0 and pushed to GitHub.
+
 ## 2026-08-21
 
 - Researched ways to speed up Trinity Phase 1 and Phase 2. Full writeup with

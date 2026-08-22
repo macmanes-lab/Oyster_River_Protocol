@@ -2,7 +2,7 @@
 
 What every `self.step()` in `Pipeline.main()` actually reads and writes, and what it does functionally. For execution order and where concurrency kicks in, see [pipeline-schedule.html](pipeline-schedule.html) — this document is the companion piece: same steps, but focused on inputs/outputs/purpose rather than scheduling, so a reader can tell what each stage is *for* and where the pipeline's CPU/time actually goes.
 
-Reflects `oyster.py` as of commit [53e436f](https://github.com/macmanes-lab/Oyster_River_Protocol/commit/53e436feeaa277ae23468f0c5e2c1decf8202118) (2026-08-18) · ORP 3.1.0, pending release.
+Reflects `oyster.py` as of commit [53e436f](https://github.com/macmanes-lab/Oyster_River_Protocol/commit/53e436feeaa277ae23468f0c5e2c1decf8202118) (2026-08-18) · ORP 3.1.0.
 
 All paths below are relative to the run directory (`--dir`) and use `<run>` for `--runout`. "Env" is the conda environment the step's tool runs in.
 
