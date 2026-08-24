@@ -220,8 +220,136 @@ Timestamps confirm the same pairing behavior seen on `samplerun3`/`samplerun4`, 
 | No split, `--max-parallel 1` | `_NOparallel` (2026-08-17) | 43:39:49 |
 | 50/50 `TRINITY_LANE_SHARE` split | `_5050parallel` (2026-08-21) | 42:28:36 |
 | **95/5 Stage A/Stage B** | `_955parallel` (2026-08-21) | **37:06:19** |
+| 95/5 + `--cpu 80` oversubscribed | (2026-08-24) | 38:46:04 |
 
 95/5 beats the no-split `_parallel` baseline by 1h21m52s (~3.6%) and the 50/50 split by 5h22m17s (~12.7%). The win comes almost entirely from eliminating Trinity's idle window: Stage A converges in 1h22m49s (vs. the 50/50 design's ~5h sequential short lane before Phase 2 could start, entry NOTES.md 2026-08-19 (1)), so Phase 2 starts nearly 3.7h earlier here. `run_trinity_phase2` itself (34:27:02) is actually close to the 50/50 run's Phase 2 (35:57:48, only 1h30m46s longer) despite running on 95% instead of 100% `--cpu` for its full duration -- confirming NOTES.md 2026-08-19 (2)'s bet that Trans-ABySS's real slack was large enough to absorb a 5% cut without meaningfully slowing Phase 2 down. This is the first dataset/scale where the split design clearly wins over not splitting at all.
+
+## SRR1789336 `--cpu 80` oversubscription test (ORP 3.0.0) -- 2026-08-24
+
+Test of the ParaFly-oversubscription idea in
+[docs/trinity-speedup-investigation.md](../docs/trinity-speedup-investigation.md)
+section 3.3: same 95/5 Stage A/Stage B design as `_955parallel` below, but run
+at `--cpu 80` on the same 40-physical-core node, so every stage is nominally 2x
+oversubscribed and `run_trinity_phase2` gets 76 ParaFly slots instead of 38.
+
+**Result: net regression of 1h39m45s (+4.5%). Hypothesis falsified.**
+
+Command: **not captured** -- assumed identical to `_955parallel` below with
+`--cpu 40` replaced by `--cpu 80` (i.e. `--mem 670`, `--normalize-reads`,
+`--tpm-filt 1`, `--max-parallel 2` unchanged). Confirm from the run's own log
+before citing this entry; if `--mem` also moved, the Phase 2 comparison below
+is not clean.
+
+Step timing:
+```
+run_trimmomatic  00:04:38  (started 2026-08-22 11:51:39)
+run_rcorrector   00:14:13  (started 2026-08-22 11:56:18)
+run_spades55     00:08:30  (started 2026-08-22 12:10:31)
+diamond_spades55 00:00:09  (started 2026-08-22 12:19:02)
+run_spades75     00:07:41  (started 2026-08-22 12:19:11)
+diamond_spades75 00:00:07  (started 2026-08-22 12:26:53)
+run_trinity_phase1 01:09:07  (started 2026-08-22 12:10:31)
+run_transabyss   05:42:17  (started 2026-08-22 13:19:39)
+diamond_transabyss 00:00:39  (started 2026-08-22 19:01:56)
+run_trinity_phase2 36:09:58  (started 2026-08-22 13:19:39)
+run_filtershort  00:00:07  (started 2026-08-24 01:29:37)
+orthotransrate   00:27:02  (started 2026-08-24 01:29:45)
+merge_branch     00:27:02  (started 2026-08-24 01:29:45)
+run_orthofuser   00:32:45  (started 2026-08-24 01:29:45)
+orthofuser_branch 00:33:43  (started 2026-08-24 01:29:45)
+makeorthout      00:01:05  (started 2026-08-24 02:03:28)
+orthofusing      00:07:49  (started 2026-08-24 02:04:34)
+diamond_orthomerged 00:00:10  (started 2026-08-24 02:12:24)
+diamond_trinity  00:00:09  (started 2026-08-24 02:12:35)
+make_list5       00:00:00  (started 2026-08-24 02:12:46)
+posthack         00:00:04  (started 2026-08-24 02:12:48)
+cdhit            00:00:39  (started 2026-08-24 02:12:52)
+orp_diamond      00:00:09  (started 2026-08-24 02:13:31)
+salmon_index     00:00:22  (started 2026-08-24 02:13:40)
+salmon           00:00:34  (started 2026-08-24 02:14:03)
+secondfilter     00:01:01  (started 2026-08-24 02:14:37)
+busco            00:07:22  (started 2026-08-24 02:15:39)
+strandeval       00:02:09  (started 2026-08-24 02:23:01)
+transrate        00:14:35  (started 2026-08-24 02:23:01)
+TOTAL            38:46:04
+```
+
+### Critical path decomposition vs `_955parallel`
+
+Derived from the start timestamps, not from summing step durations (steps
+overlap). Reconciles to the second against the TOTAL delta:
+
+| segment | cpu 80 | cpu 40 | delta |
+| --- | --- | --- | --- |
+| preprocessing (trimmomatic + rcorrector) | 0:18:52 | 0:23:20 | **-4m28s** |
+| Stage A (Phase 1-bound both runs) | 1:09:08 | 1:22:49 | **-13m41s** |
+| Stage B (Phase 2-bound both runs) | 36:09:58 | 34:27:02 | **+1h42m56s** |
+| tail (filtershort -> transrate) | 1:08:06 | 0:53:08 | **+14m58s** |
+| **net** | | | **+1h39m45s** |
+
+### Per-step deltas
+
+| step | cpu 80 | cpu 40 | delta | % |
+| --- | --- | --- | --- | --- |
+| run_trimmomatic | 00:04:38 | 00:05:44 | -1m06s | -19.2% |
+| run_rcorrector | 00:14:13 | 00:17:35 | -3m22s | -19.1% |
+| run_spades55 | 00:08:30 | 00:08:36 | -6s | -1.2% |
+| run_spades75 | 00:07:41 | 00:07:29 | +12s | +2.7% |
+| run_trinity_phase1 | 01:09:07 | 01:22:49 | **-13m42s** | **-16.5%** |
+| run_transabyss | 05:42:17 | 05:09:29 | +32m48s | +10.6% |
+| run_trinity_phase2 | 36:09:58 | 34:27:02 | **+1h42m56s** | **+5.0%** |
+| orthotransrate | 00:27:02 | 00:19:15 | +7m47s | +40.4% |
+| run_orthofuser | 00:32:45 | 00:26:22 | +6m23s | +24.2% |
+| orthofuser_branch | 00:33:43 | 00:27:56 | +5m47s | +20.7% |
+| makeorthout | 00:01:05 | 00:01:33 | -28s | -30.1% |
+| orthofusing | 00:07:49 | 00:04:19 | +3m30s | +81.1% |
+| busco | 00:07:22 | 00:05:04 | +2m18s | +45.4% |
+| strandeval | 00:02:09 | 00:01:31 | +38s | +41.8% |
+| transrate | 00:14:35 | 00:11:36 | +2m59s | +25.7% |
+| **TOTAL** | **38:46:04** | **37:06:19** | **+1h39m45s** | **+4.5%** |
+
+### What this run settled
+
+**Phase 2 is CPU-bound, and oversubscribing ParaFly is a net loss.** Throughput
+went from **35.67 jobs/min** (38 slots, assuming 73,737 jobs) to **33.98
+jobs/min** (76 slots). The whole premise of investigation section 3.3 -- that
+Phase 2 sits waiting on I/O and would absorb extra concurrency for free -- is
+wrong. Section 3.3 is marked falsified.
+
+By the same evidence, section 3.4 (move the working dir off GPFS) is
+downgraded: a filesystem-starved Phase 2 would have *gained* from more in-flight
+jobs.
+
+Note on scope: this run was launched on 2026-08-22 at 11:51, a few hours after
+the investigation was formally closed with ORP 3.1.0 that morning. It tests one
+of the three candidates that closure entry left standing as generalizable
+(`--normalize_max_read_cov 50`, ParaFly `-CPU` oversubscription,
+`--min_kmer_cov 2`) and eliminates it. `--grid_exec` remains out of scope by
+that decision, which rested on generalizability rather than on performance, so
+nothing here bears on it -- though with it off the table and 3.3 dead, nothing
+order-of-magnitude remains identified.
+
+**Phase 1 responds to cores, as predicted.** -13m42s (-16.5%) from doubling its
+slots while `--inchworm_cpu` stayed pinned at 10, so the gain is coming from the
+`-t $CPU` Chrysalis stages (investigation section 2d), not from inchworm.
+
+**The oversubscription tax lands on everything already core-saturated.** Every
+post-Trinity step that had been saturating 40 cores got slower by 20-80%.
+Trans-ABySS also lost 32m48s but is off the critical path -- it finished at
+19:02 while Phase 2 ran until 01:29 the next day -- so it cost nothing.
+
+### Follow-up
+
+- **Loose end:** Phase 1 ran at 20 threads instead of 10, and inchworm output is
+  thread-count-dependent (investigation section 2c), so this run's Phase 2 may
+  not have had the baseline's 73,737 jobs. `wc -l recursive_trinity.cmds` on
+  this run's output dir would confirm whether part of the +5.0% is extra work
+  rather than worse throughput. Either way it does not rescue oversubscription.
+- **Next:** take the Stage A win without the tax -- `--cpu 40` with
+  `TRINITY_PHASE1_SHARE = 0.5`. This run showed 52m38s of idle SPAdes headroom
+  in Stage A (SPAdes lane done 12:26:53, Phase 1 done 13:19:38) and SPAdes flat
+  between 30 and 60 slots, so the cores are there to move.
+- Quality metrics (BUSCO/TransRate/gene counts) not reported for this run.
 
 ## `--max-parallel 2` vs `--max-parallel 1` comparison
 

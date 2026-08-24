@@ -5,6 +5,56 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-08-24
+
+- **`--cpu 80` oversubscription run: net regression, 38:46:04 vs the
+  `_955parallel` baseline's 37:06:19 (+1h39m45s, +4.5%).** Full writeup with
+  per-step deltas in `sampledata/benchmarks.md` (2026-08-24 entry); the
+  investigation doc has been updated to match.
+  - Critical-path decomposition (from start timestamps, reconciles to the
+    second): preprocessing **-4m28s**, Stage A **-13m41s**, Stage B
+    **+1h42m56s**, post-Trinity tail **+14m58s**.
+  - **Section 3.3 of the investigation doc is falsified.** Phase 2 throughput
+    *fell* from 35.67 to 33.98 jobs/min when ParaFly went from 38 to 76 slots
+    on 40 physical cores. Phase 2 is **CPU-bound**, not I/O-latency-bound, so
+    the extra concurrency bought nothing but context-switching. Don't retry
+    oversubscription anywhere.
+  - **Section 3.4 (working dir off GPFS) downgraded** by the same evidence: a
+    filesystem-starved Phase 2 would have *gained* from more in-flight jobs.
+    Inference, not direct measurement -- a `%iowait` reading during any future
+    Phase 2 would close it for free.
+  - **Interacts with the 2026-08-22 closure entry below**, which listed three
+    still-generalizable candidates: `--normalize_max_read_cov 50`,
+    oversubscribing ParaFly's `-CPU`, and `--min_kmer_cov 2`. This run kills
+    the second of those. Not reopening the `--grid_exec` decision -- it was
+    ruled out on generalizability, which this run doesn't speak to. It does
+    mean that with `--grid_exec` off the table, nothing order-of-magnitude
+    remains on the list at all.
+  - **Section 2d confirmed.** Phase 1 dropped 1:22:49 -> 1:09:07 (-16.5%) on
+    double the slots with `--inchworm_cpu` still pinned at 10, so the gain is
+    coming from the `-t $CPU` Chrysalis stages, as predicted. Nothing about
+    inchworm changed.
+  - The tax landed on every step already saturating 40 cores: orthotransrate
+    +40%, orthofusing +81%, busco +45%, transrate +26%, strandeval +42%.
+    Trans-ABySS lost 32m48s but is off the critical path (done 19:02 vs Phase 2
+    running to 01:29 next day), so it cost nothing.
+  - **Next move, and it fits the 2026-08-22 generalizability bar better than
+    anything else left: `--cpu 40` with `TRINITY_PHASE1_SHARE = 0.5`**
+    ([oyster.py:61](oyster.py#L61)). One constant in our own code -- no Trinity
+    flag, no cluster-specific setup, no change to assembly output, so no fresh
+    BUSCO/TransRate pass needed. This run showed 52m38s of idle SPAdes headroom
+    in Stage A and SPAdes flat between 30 and 60 slots, so the cores are there
+    to move. Worth ~13 min. Not yet implemented; would ride along with any
+    future run rather than needing one.
+  - **Loose end:** Phase 1 ran at 20 threads instead of 10, and inchworm output
+    is thread-count-dependent (doc 2c), so this run's Phase 2 may not have had
+    the baseline's 73,737 jobs. `wc -l recursive_trinity.cmds` on that run's
+    output dir settles whether part of the +5.0% is extra work rather than
+    worse throughput. Doesn't rescue oversubscription either way.
+  - **Also missing:** the run's actual command line wasn't captured. The
+    benchmarks entry assumes it was `_955parallel`'s with `--cpu 40` swapped
+    for `--cpu 80` and flags the assumption -- worth confirming from the run
+    log, since if `--mem` moved too the Phase 2 comparison isn't clean.
 ## 2026-08-22
 
 - Closed the Trinity Phase 1/2 speedup investigation

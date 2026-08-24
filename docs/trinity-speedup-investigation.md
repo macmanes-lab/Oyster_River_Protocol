@@ -1,9 +1,20 @@
 # Trinity Phase 1 / Phase 2 speedup investigation
 
-**Status:** research only, nothing implemented, nothing benchmarked. Written
-2026-08-21 from a session with no cluster access — every number below is either
-read out of our own finished runs (`sampledata/benchmarks.md`) or read out of
-the Trinity source. No claim here has been tested on a real run.
+**Status:** written 2026-08-21 as research only. **Updated 2026-08-24** with
+results from the first run that actually tested any of it -- the `--cpu 80`
+oversubscription run (`sampledata/benchmarks.md`, 2026-08-24). Section 3.3 is
+now **falsified** and 3.4 is **downgraded** on the strength of that run; 2d
+gained a confirmation. Everything else in here remains untested source-reading.
+
+**This investigation was closed on 2026-08-22 with ORP 3.1.0** (NOTES.md), which
+ruled out 3.1 (`--grid_exec`) on the grounds that it needs cluster-specific
+setup and so would not generalize to ORP's end users. The 2026-08-24 updates
+were folded in afterwards because the run was already in flight; they record a
+result against a closed investigation rather than reopening it.
+
+Original framing, still true of the untested sections: written from a session
+with no cluster access, every number either read out of our own finished runs
+(`sampledata/benchmarks.md`) or read out of the Trinity source.
 
 Trinity version this applies to: **2.15.2**, the version pinned for the
 `orp_trinity` env in [Makefile](../Makefile) (line 50). The `Trinity` driver
@@ -34,6 +45,22 @@ Consequences, before any mechanism discussion:
 
 This is the single most important framing in this document. The 25/75 -> 75/25
 Stage A question is real but small; Phase 2 is where the run lives.
+
+**Second data point, 2026-08-24** (`--cpu 80` oversubscription run, same
+dataset and node):
+
+| stage | cpu 80 | cpu 40 | delta |
+| --- | --- | --- | --- |
+| preprocessing (trim + rcorrector) | 0:18:52 | 0:23:20 | **-4m28s** |
+| Stage A (Phase 1-bound) | 1:09:08 | 1:22:49 | **-13m41s** |
+| Stage B (Phase 2-bound) | 36:09:58 | 34:27:02 | **+1h42m56s** |
+| tail (filtershort -> transrate) | 1:08:06 | 0:53:08 | **+14m58s** |
+| **TOTAL** | **38:46:04** | **37:06:19** | **+1h39m45s (+4.5%)** |
+
+The decomposition reconciles to the second. It reinforces the framing above
+rather than changing it: the two segments that improved are worth ~18 min
+combined and are structurally capped, while the single segment that regressed
+is the one holding 93% of the run.
 
 ---
 
@@ -122,6 +149,23 @@ absolute ceiling of ~45 min, minus whatever SPAdes gives back by dropping from
 30 cores to 10. Probably worth well under half an hour. Matches the intuition
 that this isn't the lever.
 
+> **Confirmed 2026-08-24.** The `--cpu 80` run gave Phase 1 twenty slots instead
+> of ten with `--inchworm_cpu` still pinned at 10, and Phase 1 dropped
+> **1:22:49 -> 1:09:07 (-13m42s, -16.5%)**. Since inchworm's own thread count
+> did not change, that gain has to be coming from the three `-t $CPU` Chrysalis
+> stages in the table above, exactly as predicted. Stage A is Phase-1-bound, so
+> it shrank by the full amount.
+>
+> **But do not buy it with a global `--cpu` bump** -- that run lost far more
+> elsewhere (see 3.3). Buy it with `TRINITY_PHASE1_SHARE`. The slack is
+> demonstrably there: in that same run the SPAdes lane finished at 12:26:53 and
+> Phase 1 ran until 13:19:38, leaving **52m38s** of idle SPAdes headroom, and
+> SPAdes was flat between 30 and 60 slots (8:30 vs 8:36). Concretely:
+> **`--cpu 40` with `TRINITY_PHASE1_SHARE = 0.5`**
+> ([oyster.py:61](../oyster.py#L61)) should capture most of the 13m42s with no
+> oversubscription penalty anywhere else in the run. This is now the
+> recommended Stage A change, and it supersedes the 75/25 framing above.
+
 **Cheaper and lower-risk than the CPU flip: decouple mem share from cpu share in
 Stage A** ([oyster.py:1075-1078](../oyster.py#L1075)). Today both are
 `* TRINITY_PHASE1_SHARE`. That single-threaded `sort -T . -S $max_memory` runs
@@ -167,6 +211,19 @@ node, against a machine with 670 GB of RAM. Options below are ranked by expected
 payoff.
 
 ### 3.1 `--grid_exec` -- the only order-of-magnitude lever
+
+> **Ruled out by decision, 2026-08-22** (NOTES.md, ORP 3.1.0): not being
+> pursued. It needs HpcGridRunner plus a scheduler-specific config tuned to a
+> particular cluster, so it would not generalize to ORP's end users, each of
+> whom would need their own setup rather than a flag that just works. That is a
+> scope judgement about ORP, not a performance one, and the 2026-08-24 run does
+> not bear on it.
+>
+> Recorded here because the mechanics still hold and the section is the
+> reference if that scope judgement is ever revisited: with 3.3 falsified and
+> 3.4 downgraded, this is the only identified option that changes the order of
+> magnitude. A CPU-bound Phase 2 on a single node cannot be fixed on that node;
+> it needs more nodes.
 
 `run_partitioned_cmds` branches (`Trinity:3644-3652`): if `--grid_exec` is set it
 runs `$grid_exec_toolname $cmds_file` instead of ParaFly. Trinity's recommended
@@ -223,7 +280,7 @@ Would need a new flag.
 Caveat: this changes the assembly, so it needs the usual BUSCO / TransRate /
 unique-genes comparison, not just a stopwatch.
 
-### 3.3 Oversubscribe ParaFly
+### 3.3 Oversubscribe ParaFly -- **FALSIFIED 2026-08-24, do not retry**
 
 ParaFly's `-CPU` is just a concurrency count -- it runs each command via
 `system()` in its own slot (`ParaFly.cpp:61`, `:175`). Each of our jobs is
@@ -238,7 +295,32 @@ never exceed `--cpu`.
 `succeeded(N) ...% completed` rate at two different `-CPU` values -- we already
 read that counter for progress monitoring (NOTES.md 2026-08-20 (1)).
 
-### 3.4 Get the Trinity working dir off GPFS
+> **Result: wrong. Tested 2026-08-24 at `--cpu 80` (76 ParaFly slots on 40
+> physical cores).**
+>
+> | | 76 slots | 38 slots |
+> | --- | --- | --- |
+> | `run_trinity_phase2` | 36:09:58 | 34:27:02 |
+> | throughput | **33.98 jobs/min** | **35.67 jobs/min** |
+>
+> Doubling ParaFly's concurrency made Phase 2 **1h42m56s slower (+5.0%)**. The
+> premise of this section -- "if Phase 2 is I/O-latency-bound" -- is false.
+> Phase 2 is **CPU-bound**, and the extra slots bought nothing but
+> context-switching. The memory reasoning above was correct and irrelevant:
+> memory was never the binding constraint.
+>
+> The run also showed the tax lands everywhere else already core-saturated:
+> orthotransrate +40%, orthofusing +81%, busco +45%, transrate +26%, strandeval
+> +42%, for +14m58s on the post-Trinity tail. Net for the whole run
+> **+1h39m45s (+4.5%)**. Full decomposition in `sampledata/benchmarks.md`.
+>
+> One caveat not closed: Phase 1 ran at 20 threads instead of 10, and per 2c
+> inchworm output is thread-count-dependent, so this run's component count may
+> not be the baseline's 73,737. `wc -l recursive_trinity.cmds` would settle
+> whether part of the +5% is extra work rather than worse throughput. Even if
+> it is, nothing here argues for oversubscription.
+
+### 3.4 Get the Trinity working dir off GPFS -- **downgraded 2026-08-24**
 
 Our assemblies live under `/mnt/gpfs01/home/macmaneslab/...`. Phase 2 creates
 73,737 job directories, each doing dozens of small file creates/writes/deletes,
@@ -255,6 +337,18 @@ the same process on the same node, so the dir persists between them.
 
 Diagnose which regime we're in by checking `%iowait` (`sar`, `top`) during
 Phase 2. High iowait -> 3.4 and 3.3. Pegged CPU -> 3.1 is the only real answer.
+
+> **Downgraded 2026-08-24.** The 3.3 result answers that diagnostic from the
+> other direction: if Phase 2 were starved waiting on GPFS metadata, doubling
+> the number of in-flight jobs would have soaked up the idle time and gone
+> *faster*. It went slower. So Phase 2 is CPU-bound and this section's premise
+> -- that the filesystem is the binding constraint -- is probably wrong too.
+>
+> Not fully closed: this is an inference from the 3.3 result, not a direct
+> measurement, and a metadata-server bottleneck could in principle degrade
+> under added concurrency rather than absorb it. A direct `%iowait` reading
+> during any future Phase 2 settles it for free. But it is no longer worth a
+> run of its own, and 3.1 does not depend on the answer.
 
 ### 3.5 `--min_kmer_cov 2`
 
@@ -292,21 +386,41 @@ Like 3.2, this changes the assembly and needs the quality battery to sign off.
 
 ## 4. Suggested order of work
 
-Cheap, non-destructive, no rerun required:
+**Revised 2026-08-24** after the `--cpu 80` run.
 
-1. Pull the Phase 1 `.ok` mtimes from a finished run (section 2e). Tells us
-   whether Stage A tuning has any addressable target at all.
-2. Check `%iowait` and the ParaFly `succeeded()` rate during any Phase 2. Decides
-   between 3.1 / 3.3 / 3.4 without burning a 37-hour run.
-3. Try two `-CPU` values against a live ParaFly (3.3).
+Context: this investigation was formally closed on 2026-08-22 with ORP 3.1.0,
+having ruled out `--grid_exec` on generalizability grounds (3.1). What follows
+is what remains actionable within that decision, not an argument to reopen it.
 
-Then, one run each:
+Free, no rerun required:
 
-4. `--normalize_max_read_cov 50` (3.2) -- one flag, real mechanism, needs a new
-   oyster.py option. Highest value per run spent.
-5. `--grid_exec` (3.1), if Premise policy allows sbatch-from-job.
+1. `wc -l recursive_trinity.cmds` on the `--cpu 80` run. Confirms whether its
+   Phase 2 had the same 73,737 jobs as the baseline, which is the one loose end
+   in the 3.3 falsification.
+2. Pull the Phase 1 `.ok` mtimes from a finished run (section 2e). Now more
+   useful than before: we know Stage A responds to cores, and this says which
+   sub-stage is actually paying.
 
-Not worth a run on their own: the 75/25 Stage A flip, `--inchworm_cpu` changes.
+Then, one run each, in this order:
+
+3. **`--cpu 40` with `TRINITY_PHASE1_SHARE = 0.5`** (2d). One constant, no new
+   flags, ~13 min expected, and it rides along with any other run -- it does not
+   need a dedicated one.
+4. **`--normalize_max_read_cov 50`** (3.2). One flag, real mechanism, needs a
+   new oyster.py option. Still the highest value per run spent, and completely
+   untouched by the `--cpu 80` result.
+5. `--min_kmer_cov 2` (3.5), if 4 disappoints.
+
+Ruled out, do not spend runs on: oversubscribing `--cpu` anywhere (3.3, tested
+2026-08-24 and lost 1h40m), node-local scratch (3.4, downgraded by inference
+from the same run), `--inchworm_cpu` changes (2a-2c), and the 75/25 Stage A CPU
+flip as originally framed -- superseded by item 3. Out of scope by decision:
+`--grid_exec` (3.1).
+
+Worth stating plainly: with 3.1 out of scope and 3.3 dead, nothing
+order-of-magnitude remains identified. Items 3 and 4 are worth roughly 13
+minutes and an unknown-but-probably-hours amount respectively, against a 37-hour
+run. Section 5 is the honest place to look next.
 
 ---
 
