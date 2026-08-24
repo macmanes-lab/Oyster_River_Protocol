@@ -224,7 +224,12 @@ Timestamps confirm the same pairing behavior seen on `samplerun3`/`samplerun4`, 
 
 95/5 beats the no-split `_parallel` baseline by 1h21m52s (~3.6%) and the 50/50 split by 5h22m17s (~12.7%). The win comes almost entirely from eliminating Trinity's idle window: Stage A converges in 1h22m49s (vs. the 50/50 design's ~5h sequential short lane before Phase 2 could start, entry NOTES.md 2026-08-19 (1)), so Phase 2 starts nearly 3.7h earlier here. `run_trinity_phase2` itself (34:27:02) is actually close to the 50/50 run's Phase 2 (35:57:48, only 1h30m46s longer) despite running on 95% instead of 100% `--cpu` for its full duration -- confirming NOTES.md 2026-08-19 (2)'s bet that Trans-ABySS's real slack was large enough to absorb a 5% cut without meaningfully slowing Phase 2 down. This is the first dataset/scale where the split design clearly wins over not splitting at all.
 
-## SRR1789336 `--cpu 80` oversubscription test (ORP 3.0.0) -- 2026-08-24
+## SRR1789336 `--cpu 80` oversubscription test (ORP 3.1.0) -- 2026-08-24
+
+Version note: this run started 2026-08-22 11:51, after that morning's 3.1.0
+tag, so it is labelled 3.1.0 -- but 3.1.0 was a docs/changelog/version bump
+only (`oyster.py` untouched), so it is directly timing-comparable to the 3.0.0
+entries above.
 
 Test of the ParaFly-oversubscription idea in
 [docs/trinity-speedup-investigation.md](../docs/trinity-speedup-investigation.md)
