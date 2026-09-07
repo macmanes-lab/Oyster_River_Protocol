@@ -9,8 +9,10 @@ stale.
 
 - **Opened branch `pytransrate` to swap the bundled Ruby orp-transrate for
   [pytransrate](https://github.com/macmanes-lab/pytransrate) v2.0.0** (local
-  checkout at `~/transrate`, clean, tagged, pushed). Survey done, nothing
-  changed in ORP yet. What follows is the whole integration surface.
+  checkout at `~/transrate`, clean, tagged, pushed). **Swap is done in code**
+  -- both call sites, the preflight check, the env, and the whole install
+  surface. What follows is the survey it was done from; the open items are
+  collected at the end. Nothing has been run yet.
 
 - **The CLI is drop-in and the CSV column contract is preserved on purpose.**
   pytransrate keeps `-a/--assembly`, `-o/--output`, `-t/--threads`,
@@ -153,6 +155,25 @@ stale.
     `sampledata/benchmarks.md` stop being comparable across this boundary.
     Needs a fresh baseline run, and a note in the benchmarks file marking
     where the evaluator changed.
+
+- **Open, and all of it needs the cluster:**
+  1. That `mamba env update -f orp_env.yml --prune` solves with
+     `salmon=2.7.0`, `snap-aligner=2.0.5`, `pysam` and the pytransrate pip
+     line against the existing exact pins. Nothing here is verifiable on the
+     laptop -- no conda.
+  2. A full run, which is the first real exercise of pytransrate under ORP.
+     Watch two things specifically: that `reports/transrate_<run>/` really
+     does get `assemblies.csv` at its top level, since
+     [oyster.py:1096](oyster.py#L1096) hardcodes that path as the step's
+     output and a miss there re-runs the step forever rather than erroring;
+     and that `orthofuse/<run>/merged/contigs.csv` lands where `makeorthout`
+     `rglob`s for it.
+  3. `compare_orthogroup_picks.py` against the old and new orthotransrate
+     `contigs.csv` for the same dataset, to put a number on how much of the
+     assembly actually changes. Needs an old-run CSV kept aside before
+     re-running anything.
+  4. A fresh `sampledata/benchmarks.md` baseline -- the transrate numbers
+     there are Ruby-era and no longer comparable.
 
 - **Runtime is unknown and `STEP_TIME_HINTS["transrate"] = 16`
   ([oyster.py:48](oyster.py#L48)) is a Ruby-era measurement.** It only sets
