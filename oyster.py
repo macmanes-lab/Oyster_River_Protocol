@@ -361,11 +361,10 @@ class Pipeline:
         else:
             sys.exit("*** SALMON is not installed, must fix ***")
 
-        transrate_bin = self.makedir / "software" / "orp-transrate" / "transrate"
-        if os.access(transrate_bin, os.X_OK):
-            print("TRANSRATE installed")
+        if self.which_in_env("orp", "pytransrate"):
+            print("PYTRANSRATE installed")
         else:
-            sys.exit("*** TRANSRATE is not installed, must fix ***")
+            sys.exit("*** PYTRANSRATE is not installed, must fix ***")
 
         for env, binary, label in (
             ("orp", "seqtk", "SEQTK"),
@@ -377,6 +376,9 @@ class Pipeline:
             ("orp_transabyss", "transabyss", "TRANSABYSS"),
             ("orp", "run_rcorrector.pl", "RCORRECTOR"),
             ("orp_orthofinder", "orthofinder", "ORTHOFINDER"),
+            # pytransrate shells out to snap-aligner, so a missing one would
+            # otherwise surface hours in, at orthotransrate.
+            ("orp", "snap-aligner", "SNAP-ALIGNER"),
         ):
             if self.which_in_env(env, binary):
                 print(f"{label} installed")
@@ -614,12 +616,10 @@ class Pipeline:
         cpu = self.cpu if cpu is None else cpu
         outdir = self.orthofuse_dir / "merged"
         self.conda_run(
-            "orp", self.makedir / "software" / "orp-transrate" / "transrate",
+            "orp", "pytransrate",
             "-o", outdir, "-t", cpu, "-a", self.orthofuse_dir / "merged.fasta",
             "--left", self.cor1(), "--right", self.cor2(),
         )
-        for f in outdir.rglob("*.bam"):
-            f.unlink()
 
     def makeorthout(self):
         print("Picking the best contig per orthogroup")
@@ -878,12 +878,10 @@ class Pipeline:
         orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
         outdir = self.reports_dir / f"transrate_{self.runout}"
         self.conda_run(
-            "orp", self.makedir / "software" / "orp-transrate" / "transrate",
+            "orp", "pytransrate",
             "-o", outdir, "-a", orp_fasta,
             "--left", self.cor1(), "--right", self.cor2(), "-t", cpu,
         )
-        for f in outdir.rglob("*.bam"):
-            f.unlink()
 
     def trinity_perllib_dir(self):
         result = subprocess.run(

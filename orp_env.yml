@@ -22,3 +22,4 @@ dependencies:
     - scipy
     - numpy
     - bashplotlib
+    - pytransrate @ git+https://github.com/macmanes-lab/pytransrate.git@v2.0.0

@@ -44,7 +44,7 @@ Two sequential stage-pairings, each a fixed `ThreadPoolExecutor(max_workers=2)`,
 | `makelist` (untimed) | pure Python | `Orthogroups.txt` | `orthofuse/<run>/<run>.list` | Just an index `1..n` (n = orthogroup count) — feeds the range `makegroups` iterates. |
 | `makegroups` (untimed) | pure Python, thread pool | `Orthogroups.txt`, the index list | `orthofuse/<run>/<i>.groups` ×n; `groups.done` | Splits `Orthogroups.txt` into one file per orthogroup, each listing its member contig IDs. |
 | `merge` (untimed) | pure Python (file concat) | the 4 `*.short.fasta` | `orthofuse/<run>/merged.fasta` | Concatenates the four short-filtered assemblies into one pool — no dedup yet, just union. |
-| `orthotransrate` | `orp` orp-transrate | `merged.fasta`, `c1`, `c2` | `orthofuse/<run>/merged/contigs.csv` | Scores every contig in the pooled fasta for assembly quality (read-support based), by aligning `c1`/`c2` back to it. |
+| `orthotransrate` | `orp` pytransrate | `merged.fasta`, `c1`, `c2` | `orthofuse/<run>/merged/contigs.csv` | Scores every contig in the pooled fasta for assembly quality (read-support based), by aligning `c1`/`c2` back to it. |
 | `makeorthout` | `orp` `scripts/pick_best_contigs.py` | `contigs.csv`, the `*.groups` files | `orthofuse/<run>/good.<run>.list` | For each orthogroup, keeps the single highest-transrate-scoring member contig (score must be > 0); this is the actual "best isoform per gene, chosen across all four assemblers" selection. |
 | `orthofusing` | `orp` `scripts/filter.py` | `merged.fasta`, `good.<run>.list` | `assemblies/<run>.orthomerged.fasta` | Filters the pooled fasta down to just the winning contigs — the first cut of the merged, deduplicated assembly. |
 
@@ -84,7 +84,7 @@ This is the least obvious part of the pipeline: a set-algebra pass that finds ge
 | Step | Env / tool | Inputs | Outputs | What it does |
 |---|---|---|---|---|
 | `busco` | `orp_busco` busco, `--offline`, `-m transcriptome` | `ORP.fasta` | `reports/run_<run>.ORP/` | Scores completeness against the `--lineage` ortholog set (default `eukaryota_odb12.2`). |
-| `transrate` | `orp` orp-transrate | `ORP.fasta`, `c1`, `c2` | `reports/transrate_<run>/assemblies.csv` | Same read-support quality scoring as `orthotransrate` earlier, now on the final assembly rather than the mid-pipeline pool. |
+| `transrate` | `orp` pytransrate | `ORP.fasta`, `c1`, `c2` | `reports/transrate_<run>/assemblies.csv` | Same read-support quality scoring as `orthotransrate` earlier, now on the final assembly rather than the mid-pipeline pool. |
 | `strandeval` | `orp_trinity` bwa + `orp` samtools + `scripts/examine_strand.pl` | `ORP.fasta`, a 400k-read subsample of `c1`/`c2` | `reports/<run>.strandeval_summary.txt` | Aligns a read subsample back to the assembly and checks read-orientation-vs-transcript-strand agreement — a sanity check on whether `--strand` was set correctly. |
 | `reportgen` (untimed) | pure Python | BUSCO/transrate/diamond/salmon/strandeval outputs above | `reports/qualreport.<run>` | Pulls one headline number from each prior report into a single human-readable summary (BUSCO score, transrate scores, unique-gene counts per assembler, proper-pair mapping rate, strand histogram). |
 
