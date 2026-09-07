@@ -743,7 +743,7 @@ class Pipeline:
         idx = self.quants_dir / f"{self.runout}.ortho.idx"
         outdir = self.quants_dir / f"salmon_orthomerged_{self.runout}"
         self.conda_run(
-            "orp", "salmon", "quant", "--no-version-check", "--validateMappings",
+            "orp", "salmon", "quant", "--no-version-check",
             "-p", cpu, "-i", idx, "--seqBias", "--gcBias", "--libType", "A",
             "-1", self.cor1(), "-2", self.cor2(), "-o", outdir,
         )

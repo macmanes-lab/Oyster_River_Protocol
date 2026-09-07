@@ -14,7 +14,9 @@ dependencies:
   - trimmomatic=0.41
   - cd-hit=4.8.1
   - diamond=2.2.5
-  - salmon=2.5.1
+  - salmon=2.7.0
+  - snap-aligner=2.0.5
+  - pysam
   - pip=26.2.1
   - pip:
     - scipy

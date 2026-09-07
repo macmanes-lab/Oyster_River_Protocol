@@ -43,7 +43,8 @@ stale.
   `os.access` on the unpacked binary. Becomes a `which_in_env(<env>,
   "pytransrate")` call like every other tool above it.
 
-- **Env: make a dedicated `orp_transrate`, do not extend `orp`.**
+- **Env: superseded -- see the 2.7.0 bump below. Original reasoning kept
+  because the constraint it names is real.**
   pytransrate needs `snap-aligner=2.0.5` and `salmon=2.7.0`, but the `orp`
   env pins `salmon=2.5.1` ([orp_env.yml](orp_env.yml)) and oyster.py runs the
   real quantification against it ([oyster.py:737](oyster.py#L737),
@@ -57,6 +58,62 @@ stale.
     salmon=2.7.0 pip`, then
     `pip install git+https://github.com/macmanes-lab/pytransrate.git@v2.0.0`
     into it. Pin the tag -- scores move between versions.
+
+- **Decision: bump the `orp` env to salmon 2.7.0 and run pytransrate out of
+  that same env, rather than building a separate `orp_transrate`.** Checked
+  every ORP salmon flag against the 2.x migration notes first; consequences
+  below. `orp_env.yml` now carries `salmon=2.7.0`, plus `snap-aligner=2.0.5`
+  and `pysam` for pytransrate. `orp_trinity`'s own `salmon=1.10.3` is a
+  separate env and is untouched.
+
+- **No ORP salmon invocation breaks on 2.x.** Both call sites were checked
+  option by option:
+  - `salmon index` ([oyster.py:732](oyster.py#L732)): `-t`, `-i`, `-k 31`,
+    `--threads` all carried forward unchanged.
+  - `salmon quant` ([oyster.py:741](oyster.py#L741)): `-p`, `-i`,
+    `--seqBias`, `--gcBias`, `--libType A`, `-1/-2`, `-o` all unchanged.
+  - `--validateMappings` is **ignored** in 2.x -- selective alignment is the
+    default now -- so it was a no-op that read as though it still switched
+    something on. Dropped.
+  - `--no-version-check` is also a silent no-op (2.x never contacts the
+    network). Kept: harmless, and still meaningful if the env ever resolves
+    to a 1.x salmon.
+  - `quant.sf` columns are unchanged (Name, Length, EffectiveLength, TPM,
+    NumReads), so `filter_tpm`'s `cols[0]`/`cols[3]`
+    ([oyster.py:762](oyster.py#L762)) is safe, as is pytransrate's own
+    5-column assertion.
+
+- **The one real operational hazard: 2.7.0 requires index format v2 and
+  rejects every older index on load.** ORP's resumability is mtime-based
+  ([oyster.py:221](oyster.py#L221)), and `salmon_index` declares
+  `<run>.ortho.idx` as its output -- so **resuming a run whose index was
+  built by 2.5.1 skips the rebuild and then fails in `salmon quant`**. It
+  fails loudly rather than silently, but `run()` will burn its
+  `STEP_RETRIES` attempts on it first. Anyone resuming an in-flight run
+  across this upgrade must delete `quants/<run>.ortho.idx` by hand. Fresh
+  runs are unaffected. Options if we want this handled rather than
+  documented: stamp the salmon version beside the index and treat a
+  mismatch as stale, or just `rm -rf` the index at the top of
+  `salmon_index`.
+
+- **Quantification numbers move, and that is mostly a win.** 2.6.0 made
+  deterministic quantification the default, so the same reads and assembly
+  now give the same TPMs run to run -- ORP's salmon step stops being a
+  source of run-to-run drift. 2.7.0 itself is byte-identical to 2.6.0, so
+  all of the change lands in the 2.5.1 -> 2.6.0 step.
+  - Downstream, TPM only reaches the assembly through `filter_tpm`, and
+    **with the default `--tpm-filt 0` that path is inert**: `low` is written
+    only when `tpm < 0`, which never happens, so LOWEXP stays empty and
+    `secondfilter` copies the intermediate through unchanged
+    ([oyster.py:765](oyster.py#L765)). Default runs get identical output.
+    Only `--tpm-filt > 0` users see membership shift near the threshold.
+  - 2.6.0 also stopped emitting decoys in `quant.sf`. ORP indexes its own
+    assembly with no decoys, so no effect.
+
+- **Still unverified, and only checkable on the cluster:** that
+  `mamba env create -f orp_env.yml` actually solves with
+  `salmon=2.7.0 + snap-aligner=2.0.5 + pysam` alongside the existing exact
+  pins. No conda on the laptop.
 
 - **Install surface to retire:** `transrate` var
   [Makefile:13](Makefile#L13), the `all` prerequisite
