@@ -91,10 +91,17 @@ stale.
   fails loudly rather than silently, but `run()` will burn its
   `STEP_RETRIES` attempts on it first. Anyone resuming an in-flight run
   across this upgrade must delete `quants/<run>.ortho.idx` by hand. Fresh
-  runs are unaffected. Options if we want this handled rather than
-  documented: stamp the salmon version beside the index and treat a
-  mismatch as stale, or just `rm -rf` the index at the top of
-  `salmon_index`.
+  runs are unaffected.
+  - **Handled** (`stamp_tool_version`, [oyster.py:234](oyster.py#L234)).
+    `quants/salmon.version` records the salmon version and is declared as an
+    *input* to `salmon_index`, so an upgrade invalidates the index through
+    the ordinary mtime path rather than a special case. The stamp is
+    rewritten only when the version actually changes, or a rebuild would
+    fire every run. `salmon_index` also `rmtree`s the index directory before
+    rebuilding, since the rebuild is usually over one salmon has already
+    refused. Checked against a scratch harness on all six cases: cold start,
+    clean resume, the 2.5.1 -> 2.7.0 upgrade, the run after that rebuild, an
+    unreadable version, and a regenerated intermediate fasta.
 
 - **Quantification numbers move, and that is mostly a win.** 2.6.0 made
   deterministic quantification the default, so the same reads and assembly

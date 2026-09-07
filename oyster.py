@@ -231,6 +231,39 @@ class Pipeline:
         oldest_output = min(o.stat().st_mtime for o in outputs)
         return newest_input > oldest_output
 
+    def stamp_tool_version(self, env, binary, stamp):
+        """Record a tool's version beside its artifacts; return the stamp path.
+
+        needs_run only ever compares mtimes, so an artifact that is still
+        newer than its inputs looks up to date even when the tool that has to
+        read it can no longer do so. salmon 2.7.0 is exactly that case: it
+        rejects any index built by an earlier salmon, so on a resumed run a
+        stale <run>.ortho.idx would be kept, salmon_index skipped, and
+        salmon quant left to fail against an index it cannot read.
+
+        Declaring this stamp as an input turns a version change into an
+        ordinary out-of-date input, which is the machinery every other step
+        already uses. The file is rewritten only when the version actually
+        changes -- rewriting unconditionally would force a rebuild on every
+        run.
+        """
+        try:
+            result = subprocess.run(
+                ["conda", "run", "-n", env, binary, "--version"],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True,
+            )
+        except FileNotFoundError:
+            return stamp
+        version = result.stdout.strip() or result.stderr.strip()
+        if not version:
+            # Can't tell. Leave any existing stamp alone rather than writing a
+            # placeholder that would itself look like a version change later.
+            return stamp
+        if not stamp.exists() or stamp.read_text() != version:
+            stamp.parent.mkdir(parents=True, exist_ok=True)
+            stamp.write_text(version)
+        return stamp
+
     def _ts(self, t=None):
         return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(t if t is not None else time.time()))
 
@@ -733,6 +766,10 @@ class Pipeline:
         cpu = self.cpu if cpu is None else cpu
         src = self.assemblies_dir / f"{self.runout}.ORP.intermediate.fasta"
         idx = self.quants_dir / f"{self.runout}.ortho.idx"
+        # A rebuild here is usually a rebuild *over* an index salmon has
+        # already refused to load, so clear it rather than writing into the
+        # old directory alongside whatever format it was in.
+        shutil.rmtree(idx, ignore_errors=True)
         self.conda_run(
             "orp", "salmon", "index", "--no-version-check", "-t", src,
             "-i", idx, "-k", "31", "--threads", cpu,
@@ -1219,7 +1256,8 @@ class Pipeline:
         # run sequentially at full CPU instead.
         self.step("orp_diamond", [orp_diamond_txt], [orp_intermediate], self.orp_diamond)
         self.step("orp_uniq", [unique_orp_done], [orp_diamond_txt], self.orp_uniq, timed=False)
-        self.step("salmon_index", [ortho_idx], [orp_intermediate], self.salmon_index)
+        salmon_stamp = self.stamp_tool_version("orp", "salmon", self.quants_dir / "salmon.version")
+        self.step("salmon_index", [ortho_idx], [orp_intermediate, salmon_stamp], self.salmon_index)
         self.step("salmon", [quant_sf], [ortho_idx, c1, c2], self.salmon)
         self.step("filter", [filter_done], [orp_intermediate, quant_sf, orp_diamond_txt], self.filter_tpm, timed=False)
         self.step(
