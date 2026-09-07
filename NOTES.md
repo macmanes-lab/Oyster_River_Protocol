@@ -5,6 +5,96 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-09-07
+
+- **Opened branch `pytransrate` to swap the bundled Ruby orp-transrate for
+  [pytransrate](https://github.com/macmanes-lab/pytransrate) v2.0.0** (local
+  checkout at `~/transrate`, clean, tagged, pushed). Survey done, nothing
+  changed in ORP yet. What follows is the whole integration surface.
+
+- **The CLI is drop-in and the CSV column contract is preserved on purpose.**
+  pytransrate keeps `-a/--assembly`, `-o/--output`, `-t/--threads`,
+  `--left`, `--right`, and its `tests/test_output.py` pins the exact indices
+  ORP reads: `score`/`optimal_score` at 36/37 of `assemblies.csv`
+  ([oyster.py:949](oyster.py#L949)) and contig score at column 9 of
+  `contigs.csv` ([scripts/pick_best_contigs.py](scripts/pick_best_contigs.py)).
+  So neither `reportgen` nor the picker needs touching.
+  - One layout difference, and it lands safely: with a single `-a`,
+    pytransrate writes both CSVs directly into `-o`, where the Ruby put
+    `contigs.csv` in a per-assembly subdirectory. The two consumers use
+    `rglob` ([oyster.py:593](oyster.py#L593),
+    [oyster.py:947](oyster.py#L947)) so either layout resolves. The one
+    place that hardcodes a path is the step's declared output for
+    resumability, `reports/transrate_<run>/assemblies.csv`
+    ([oyster.py:1064](oyster.py#L1064)) -- that assumes `assemblies.csv`
+    sits at the top of `-o`, which both implementations do. Worth
+    re-checking on the first run rather than trusting it, since a miss here
+    silently re-runs the step forever instead of erroring.
+  - `--reference` is parsed but unimplemented; ORP never passes it.
+
+- **Call sites to change (2):** [oyster.py:580](oyster.py#L580)
+  `orthotransrate()` and [oyster.py:839](oyster.py#L839) `transrate()`. Each
+  swaps `makedir/software/orp-transrate/transrate` for the `pytransrate`
+  console script. The `rglob("*.bam")` unlink loops after both become
+  no-ops -- pytransrate deletes the BAM on success unless `--keep-bam` --
+  harmless to leave, cleaner to drop.
+
+- **Install check to change (1):** [oyster.py:331](oyster.py#L331) tests
+  `os.access` on the unpacked binary. Becomes a `which_in_env(<env>,
+  "pytransrate")` call like every other tool above it.
+
+- **Env: make a dedicated `orp_transrate`, do not extend `orp`.**
+  pytransrate needs `snap-aligner=2.0.5` and `salmon=2.7.0`, but the `orp`
+  env pins `salmon=2.5.1` ([orp_env.yml](orp_env.yml)) and oyster.py runs the
+  real quantification against it ([oyster.py:737](oyster.py#L737),
+  [oyster.py:746](oyster.py#L746)). Bumping salmon there would change
+  `quant.sf` for reasons that have nothing to do with this swap. A separate
+  env matches the existing per-tool pattern (`orp_spades`, `orp_trinity`,
+  `orp_busco`, `orp_transabyss`, `orp_orthofinder`).
+  - Proposed Makefile line, alongside the others in the `orp:` target:
+    `mamba create -y -c bioconda -c conda-forge --override-channels --name
+    orp_transrate python=3.11 numpy scipy pysam snap-aligner=2.0.5
+    salmon=2.7.0 pip`, then
+    `pip install git+https://github.com/macmanes-lab/pytransrate.git@v2.0.0`
+    into it. Pin the tag -- scores move between versions.
+
+- **Install surface to retire:** `transrate` var
+  [Makefile:13](Makefile#L13), the `all` prerequisite
+  [Makefile:20](Makefile#L20), the unpack target
+  [Makefile:77](Makefile#L77), `postscript`
+  [Makefile:84](Makefile#L84), `clean` [Makefile:100](Makefile#L100);
+  `software/orp-transrate.tar.gz` itself; the PATH exports in
+  [Dockerfile/Dockerfile:52](Dockerfile/Dockerfile#L52) and
+  [Dockerfile/Dockerfile:54](Dockerfile/Dockerfile#L54); INSTALL.md steps 5
+  and 8 plus the `make` summary at [INSTALL.md:20](INSTALL.md#L20); the two
+  tool cells in [docs/pipeline-steps.md](docs/pipeline-steps.md). No PATH
+  entry is needed at all now -- the console script lives in the env.
+
+- **Scores will move, and that is expected, not a regression.** pytransrate's
+  CHANGELOG documents it: the assembly score drops 0.008-0.070 across three
+  assemblies of one library, driven by a genuine soft-clip coverage fix
+  (SNAP 2.0 clips; the old `bam-read` advanced the reference cursor over
+  clipped bases, shifting coverage rightward). Good-mapping *rate* agrees to
+  +/-0.001, so the two implementations agree about the reads and disagree
+  about the contigs.
+  - **The part that reaches the assembly is ordering, not level.**
+    14.5-19% of contig pairs order oppositely, so `makeorthout` will pick
+    different representatives for some orthogroups and the final ORP.fasta
+    will differ. Measure it rather than assume: pytransrate ships
+    `scripts/compare_orthogroup_picks.py`, which runs ORP's own selection
+    against two `contigs.csv` files and names the groups that change winner.
+    Feed it the **orthotransrate** CSV over `merged.fasta`, not a run over
+    the finished ORP.fasta.
+  - Consequence for the record: the transrate/orthotransrate numbers in
+    `sampledata/benchmarks.md` stop being comparable across this boundary.
+    Needs a fresh baseline run, and a note in the benchmarks file marking
+    where the evaluator changed.
+
+- **Runtime is unknown and `STEP_TIME_HINTS["transrate"] = 16`
+  ([oyster.py:48](oyster.py#L48)) is a Ruby-era measurement.** It only sets
+  submission order against `strandeval` (2 min), so it is very unlikely to
+  invert, but re-time it on the first full run.
+
 ## 2026-08-24
 
 - **`--cpu 80` oversubscription run: net regression, 38:46:04 vs the
