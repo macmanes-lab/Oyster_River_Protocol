@@ -10,14 +10,13 @@ SHELL=/bin/bash -o pipefail
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 DIR := ${CURDIR}
 CONDAROOT = ${DIR}/software/anaconda/install/
-transrate := $(shell ls ${DIR}/software/orp-transrate/transrate 2>/dev/null)
 diamond_data := $(shell ls ${DIR}/software/diamond/uniprot_sprot.fasta 2>/dev/null)
 busco_data := $(shell find ${DIR}/busco_dbs -iname "eukaryota_odb12*" -type d 2>/dev/null)
 conda := $(shell conda info 2>/dev/null)
 orp := $(shell ${DIR}/software/anaconda/install/bin/conda info --envs | grep orp 2>/dev/null)
 VERSION := ${shell cat  ${MAKEDIR}version.txt}
 
-all: setup conda orp transrate diamond_data busco_data postscript
+all: setup conda orp diamond_data busco_data postscript
 
 .DELETE_ON_ERROR:
 
@@ -74,14 +73,7 @@ else
 		${DIR}/software/anaconda/install/envs/orp_busco/bin/busco --download eukaryota_odb12.2 --download_path ${DIR}/busco_dbs
 endif
 
-transrate:
-ifdef transrate
-else
-	cd ${DIR}/software && tar -zxf orp-transrate.tar.gz
-	@echo PATH=\$$PATH:${DIR}/software/orp-transrate >> pathfile
-endif
-
-postscript: setup orp diamond_data busco_data conda transrate
+postscript: setup orp diamond_data busco_data conda
 	@if [ -f pathfile ]; then\
 		printf "\n\n*** The following location(s), if any print, need to be added to your PATH ***";\
 		printf "\n*** They will be automatically to your ~/.profile or ~/.bash_profile ***\n\n";\
@@ -97,7 +89,6 @@ postscript: setup orp diamond_data busco_data conda transrate
 clean:
 	${DIR}/software/anaconda/install/bin/conda remove -y --name orp --all
 	rm -fr ${DIR}/software/anaconda/install
-	rm -fr ${DIR}/software/orp-transrate
 	rm -fr ${DIR}/software/transabyss
 	rm -fr ${DIR}/software/anaconda/
 	rm -fr ${DIR}/pathfile
