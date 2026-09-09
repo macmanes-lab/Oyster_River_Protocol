@@ -24,6 +24,25 @@ By default, oyster.py runs Trinity with `--no_normalize_reads`, i.e. read normal
 python3 oyster.py --read1 R1.fq.gz --read2 R2.fq.gz --mem 110 --cpu 24 --runout runname --strand RF --normalize-reads
 ```
 
+### Merging assemblies you already have (`chowder.py`)
+
+`chowder.py` runs the second half of the ORP -- everything after the four assemblers -- over assemblies you bring yourself, so two or more existing transcriptomes can be merged into one the same way ORP merges its own:
+
+```bash
+python3 chowder.py --assemblies best.fasta other.fasta third.fasta.gz \
+        --read1 R1.fq.gz --read2 R2.fq.gz --mem 110 --cpu 24 --runout runname
+```
+
+It is the same code rather than a copy of it -- `chowder.py` subclasses `oyster.py`'s pipeline and reuses the merge stages wholesale -- so the orthogroup selection rule, the group ordering that reaches cd-hit-est's tie-breaks, and the pytransrate scoring are identical to a full ORP run's by construction. The output is a `<run>.ORP.fasta` and a `reports/qualreport.<run>` in the usual layout, with one `UNIQUE GENES` line per input assembly.
+
+Three things differ from `oyster.py`, and all three are worth knowing before you run it:
+
+- **The reads are not optional.** The merge scores every contig against them (pytransrate), quantifies the survivors (salmon) and strand-checks the result, so it needs the library the assemblies were built from. It trims and error-corrects that library the way ORP always does; pass `--reads-are-corrected` if your pair has already been through trimmomatic and rcorrector, and it will use it as-is.
+- **Contig names are prefixed with the label of the assembly they came from** (`trinity_TRINITY_DN0_c0_g1_i1`). Two assemblies of one library routinely share contig names -- two Trinity runs both start at `TRINITY_DN0_c0_g1_i1` -- and every stage downstream joins on that name, so without the prefix two different contigs would silently be treated as one. It doubles as provenance: every contig in the final assembly says which input it survived from. Labels come from the filenames unless you pass `--labels`.
+- **The order you list the assemblies in matters.** It sets contig order in the pooled fasta, which reaches cd-hit-est, where input order breaks length ties between near-identical contigs; and it is the order the diamond rescue searches, so for contigs no orthogroup covered, earlier assemblies are preferred. List the assembly you trust most first.
+
+`python3 chowder.py --help` prints the full flag reference. There are no assembler flags -- no k-mers, no `--strand`, no `--normalize-reads` -- and preflight does not require SPAdes, Trinity or Trans-ABySS, since a merge never runs them.
+
 ### Parallel task management
 
 See [docs/pipeline-schedule.html](docs/pipeline-schedule.html) for a full DAG of execution order and concurrency (download and open locally, or view via [htmlpreview](https://htmlpreview.github.io/?https://github.com/macmanes-lab/Oyster_River_Protocol/blob/master/docs/pipeline-schedule.html)), and [docs/pipeline-steps.md](docs/pipeline-steps.md) for what each step actually reads and writes.

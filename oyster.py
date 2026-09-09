@@ -24,12 +24,79 @@ import time
 import concurrent.futures
 from functools import partial
 from pathlib import Path
+from typing import NamedTuple
 
 HERE = Path(__file__).resolve().parent
 RED = "\033[31m"
 RESET = "\033[0m"
 
-SHORT_ASSEMBLY_NAMES = ("spades55.fasta", "spades75.fasta", "transabyss.fasta", "trinity.Trinity.fasta")
+class Assembly(NamedTuple):
+    """One input assembly, and the four names the pipeline knows it by.
+
+    The names are irregular because they are the ones oyster.mk used and the
+    ones every existing run directory on disk already carries: the file is
+    `<runout>.trinity.Trinity.fasta` but its diamond output is
+    `<runout>.trinity.diamond.txt`, while SPAdes' unique-gene count lands in
+    `<runout>.unique.sp75.txt` and not `...spades75...`. Renaming any of
+    them would silently invalidate every resumable run directory that
+    exists, so they are carried as data instead of being derived.
+    """
+
+    fasta_name: str      # assemblies/<runout>.<fasta_name>
+    diamond_label: str   # assemblies/diamond/<runout>.<diamond_label>.diamond.txt
+    unique_label: str    # assemblies/diamond/<runout>.unique.<unique_label>.txt
+    report_label: str    # reportgen's "UNIQUE GENES <report_label>" line
+
+
+SPADES55 = Assembly("spades55.fasta", "spades55", "sp55", "SPADES55")
+SPADES75 = Assembly("spades75.fasta", "spades75", "sp75", "SPADES75")
+TRANSABYSS = Assembly("transabyss.fasta", "transabyss", "transabyss", "TRANSABYSS")
+TRINITY = Assembly("trinity.Trinity.fasta", "trinity", "trinity", "TRINITY")
+
+# oyster.py's own four assemblers, in the three different orders oyster.mk
+# used them in. The three are not interchangeable and two of them reach the
+# assembly, so they are spelled out rather than sorted:
+#
+#   ASSEMBLY_ORDER    concatenation order. Sets contig order in
+#                     orthofuse/merged.fasta and in posthack's `cat` of the
+#                     assemblies, which flows through to cd-hit-est -- where
+#                     input order breaks length ties and so decides which
+#                     representative survives into .ORP.fasta.
+#   DIAMOND_PRIORITY  search order. build_list5.py keeps the *first* diamond
+#                     hit per gene in the order it is given the files, so
+#                     this is a preference ranking between assemblies for
+#                     the contigs the orthogroup pass missed.
+#   REPORT_ORDER      the order the UNIQUE GENES lines appear in
+#                     reports/qualreport.<run>. Cosmetic, but people diff
+#                     those reports across runs.
+ASSEMBLY_ORDER = (SPADES55, SPADES75, TRANSABYSS, TRINITY)
+DIAMOND_PRIORITY = (TRANSABYSS, SPADES75, SPADES55, TRINITY)
+REPORT_ORDER = (TRINITY, SPADES55, SPADES75, TRANSABYSS)
+
+# Preflight, in the order it prints. Everything here is shelled out to at
+# some point in a full run, and finding it missing hours in -- at
+# orthotransrate, or at the assembler that was going to run overnight -- is
+# the thing this list exists to prevent. snap-aligner is on it because
+# pytransrate maps with it.
+SPADES_TOOL = ("orp_spades", "rnaspades.py", "SPADES")
+TRINITY_TOOL = ("orp_trinity", "Trinity", "TRINITY")
+TRANSABYSS_TOOL = ("orp_transabyss", "transabyss", "TRANSABYSS")
+# The three an entry point that doesn't assemble has no use for.
+ASSEMBLER_TOOLS = (SPADES_TOOL, TRINITY_TOOL, TRANSABYSS_TOOL)
+CHECK_TOOLS = (
+    ("orp", "salmon", "SALMON"),
+    ("orp", "pytransrate", "PYTRANSRATE"),
+    ("orp", "seqtk", "SEQTK"),
+    ("orp_busco", "busco", "BUSCO"),
+    ("orp", "mcl", "MCL"),
+    SPADES_TOOL,
+    TRINITY_TOOL,
+    ("orp", "trimmomatic", "TRIMMOMATIC"),
+    TRANSABYSS_TOOL,
+    ("orp", "run_rcorrector.pl", "RCORRECTOR"),
+    ("orp_orthofinder", "orthofinder", "ORTHOFINDER"),
+    ("orp", "snap-aligner", "SNAP-ALIGNER"),
+)
 
 # Reference profile (minutes, from a representative run at --max-parallel 2)
 # used only to decide submission order within the two remaining
@@ -178,18 +245,36 @@ class Pipeline:
         self.cpu = args.cpu
         self.busco_threads = args.busco_threads or self.cpu
         self.mem = args.mem
-        self.spades1_kmer = args.spades1_kmer
-        self.spades2_kmer = args.spades2_kmer
-        self.transabyss_kmer = args.transabyss_kmer
+        # Assembler-only settings. An entry point that doesn't assemble
+        # (chowder.py) has no flags for these and never reads them back.
+        self.spades1_kmer = getattr(args, "spades1_kmer", 55)
+        self.spades2_kmer = getattr(args, "spades2_kmer", 75)
+        self.transabyss_kmer = getattr(args, "transabyss_kmer", 32)
         self.read1 = Path(args.read1)
         self.read2 = Path(args.read2)
         self.runout = args.runout
         self.lineage = args.lineage
-        self.strand = args.strand
-        self.normalize_reads = args.normalize_reads
+        self.strand = getattr(args, "strand", "")
+        self.normalize_reads = getattr(args, "normalize_reads", False)
         self.tpm_filt = args.tpm_filt
         self.max_parallel = max(1, args.max_parallel)
         self.keep_intermediates = args.keep_intermediates
+
+        # Everything from run_filtershort onwards works on "the assemblies"
+        # rather than on four named assemblers, so a caller that brings its
+        # own (chowder.py) supplies them here and shares the whole merge
+        # half. It gives one order and means it for all three uses; only
+        # oyster.py's own four carry the historical split between them (see
+        # ASSEMBLY_ORDER / DIAMOND_PRIORITY / REPORT_ORDER).
+        supplied = getattr(args, "assemblies", None)
+        if supplied:
+            self.assemblies = tuple(supplied)
+            self.diamond_priority = self.assemblies
+            self.report_order = self.assemblies
+        else:
+            self.assemblies = ASSEMBLY_ORDER
+            self.diamond_priority = DIAMOND_PRIORITY
+            self.report_order = REPORT_ORDER
 
         self.version = (self.makedir / "version.txt").read_text().strip()
         self.busco_config = self.makedir / "software" / "config.ini"
@@ -206,7 +291,7 @@ class Pipeline:
         self.quants_dir = self.dir / "quants"
 
         self.timing_log = self.reports_dir / f"{self.runout}.timing.log"
-        self.run_cmd = "oyster.py " + " ".join(sys.argv[1:])
+        self.run_cmd = Path(sys.argv[0]).name + " " + " ".join(sys.argv[1:])
         self.steps = []
         self._timing_lock = threading.Lock()
         # Background gzip of the files a finished run keeps -- see
@@ -385,6 +470,15 @@ class Pipeline:
                   f"(rcorr/{self.runout}.TRIM_*.fastq); the corrected pair is what "
                   "everything downstream reads")
 
+    def run_inputs(self):
+        """The files a finished run is checked for staleness against.
+
+        The raw read pair for oyster.py; chowder.py adds the assemblies it
+        was handed, since replacing one of those is as much a new run as
+        replacing the reads.
+        """
+        return [self.read1, self.read2]
+
     def already_complete(self) -> bool:
         """True if a previous run finished *and* cleanup() already ran on it.
 
@@ -399,7 +493,7 @@ class Pipeline:
         """
         marker = self.reports_dir / f"{self.runout}.cleanup.done"
         orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
-        if not marker.exists() or self.needs_run([orp_fasta], [self.read1, self.read2]):
+        if not marker.exists() or self.needs_run([orp_fasta], self.run_inputs()):
             return False
         print(f"\n=== {self.runout} already finished, and its intermediate files "
               "have been reclaimed ===")
@@ -438,10 +532,15 @@ class Pipeline:
                 f"{self._rel(self.reports_dir)}/  (all reports)"]
         removed = []
 
-        for src in [self.cor1(), self.cor2()] + [
-            self.assemblies_dir / f"{self.runout}.{n}" for n in SHORT_ASSEMBLY_NAMES
-        ]:
+        for src in [self.cor1(), self.cor2()] + self.assembly_fasta_paths():
             gz = src.with_suffix(src.suffix + ".gz")
+            if src.is_symlink():
+                # Not ours to reclaim: chowder.py points the corrected pair
+                # straight at the user's own reads under
+                # --reads-are-corrected, and compressing or unlinking those
+                # is not what "reclaim this run's intermediates" means.
+                kept.append(f"{self._rel(src)}  (symlink to a file this run did not create)")
+                continue
             if src.exists() and self.compression_done(src):
                 freed += path_size(src)
                 src.unlink()
@@ -625,31 +724,17 @@ class Pipeline:
             return path
         return None
 
+    def required_tools(self):
+        """(env, binary, label) for every tool this entry point shells out to.
+
+        Order is the order preflight prints them in. An entry point that
+        doesn't assemble overrides this rather than demanding assemblers it
+        will never run (see chowder.py).
+        """
+        return CHECK_TOOLS
+
     def check(self):
-        if self.which_in_env("orp", "salmon"):
-            print("SALMON installed")
-        else:
-            sys.exit("*** SALMON is not installed, must fix ***")
-
-        if self.which_in_env("orp", "pytransrate"):
-            print("PYTRANSRATE installed")
-        else:
-            sys.exit("*** PYTRANSRATE is not installed, must fix ***")
-
-        for env, binary, label in (
-            ("orp", "seqtk", "SEQTK"),
-            ("orp_busco", "busco", "BUSCO"),
-            ("orp", "mcl", "MCL"),
-            ("orp_spades", "rnaspades.py", "SPADES"),
-            ("orp_trinity", "Trinity", "TRINITY"),
-            ("orp", "trimmomatic", "TRIMMOMATIC"),
-            ("orp_transabyss", "transabyss", "TRANSABYSS"),
-            ("orp", "run_rcorrector.pl", "RCORRECTOR"),
-            ("orp_orthofinder", "orthofinder", "ORTHOFINDER"),
-            # pytransrate shells out to snap-aligner, so a missing one would
-            # otherwise surface hours in, at orthotransrate.
-            ("orp", "snap-aligner", "SNAP-ALIGNER"),
-        ):
+        for env, binary, label in self.required_tools():
             if self.which_in_env(env, binary):
                 print(f"{label} installed")
             else:
@@ -869,13 +954,26 @@ class Pipeline:
 
     # -- orthofuse merge -------------------------------------------------------
 
+    def assembly_fasta(self, assembly):
+        return self.assemblies_dir / f"{self.runout}.{assembly.fasta_name}"
+
+    def assembly_fasta_paths(self):
+        return [self.assembly_fasta(a) for a in self.assemblies]
+
+    def diamond_txt(self, assembly):
+        return self.diamond_dir / f"{self.runout}.{assembly.diamond_label}.diamond.txt"
+
+    def unique_txt(self, assembly):
+        return self.diamond_dir / f"{self.runout}.unique.{assembly.unique_label}.txt"
+
     def short_fasta_paths(self):
-        return [self.orthofuse_working / f"{self.runout}.{n}.short.fasta" for n in SHORT_ASSEMBLY_NAMES]
+        return [self.orthofuse_working / f"{self.assembly_fasta(a).name}.short.fasta"
+                for a in self.assemblies]
 
     def run_filtershort(self):
         self.orthofuse_working.mkdir(parents=True, exist_ok=True)
-        for n in ("transabyss.fasta", "spades75.fasta", "spades55.fasta", "trinity.Trinity.fasta"):
-            fasta = self.assemblies_dir / f"{self.runout}.{n}"
+        for a in self.diamond_priority:
+            fasta = self.assembly_fasta(a)
             outp = self.orthofuse_working / f"{fasta.name}.short.fasta"
             self.conda_run("orp", "python", self.makedir / "scripts" / "long.seq.py", fasta, outp, "200")
 
@@ -952,12 +1050,9 @@ class Pipeline:
 
     def diamond_jobs(self):
         return [
-            (self.assemblies_dir / f"{self.runout}.orthomerged.fasta", self.diamond_dir / f"{self.runout}.orthomerged.diamond.txt"),
-            (self.assemblies_dir / f"{self.runout}.transabyss.fasta", self.diamond_dir / f"{self.runout}.transabyss.diamond.txt"),
-            (self.assemblies_dir / f"{self.runout}.spades75.fasta", self.diamond_dir / f"{self.runout}.spades75.diamond.txt"),
-            (self.assemblies_dir / f"{self.runout}.spades55.fasta", self.diamond_dir / f"{self.runout}.spades55.diamond.txt"),
-            (self.assemblies_dir / f"{self.runout}.trinity.Trinity.fasta", self.diamond_dir / f"{self.runout}.trinity.diamond.txt"),
-        ]
+            (self.assemblies_dir / f"{self.runout}.orthomerged.fasta",
+             self.diamond_dir / f"{self.runout}.orthomerged.diamond.txt"),
+        ] + [(self.assembly_fasta(a), self.diamond_txt(a)) for a in self.diamond_priority]
 
     def run_diamond_one(self, query, out, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
@@ -967,15 +1062,9 @@ class Pipeline:
         )
 
     def diamond_uniq(self):
-        mapping = {
-            "trinity": self.diamond_dir / f"{self.runout}.trinity.diamond.txt",
-            "sp75": self.diamond_dir / f"{self.runout}.spades75.diamond.txt",
-            "sp55": self.diamond_dir / f"{self.runout}.spades55.diamond.txt",
-            "transabyss": self.diamond_dir / f"{self.runout}.transabyss.diamond.txt",
-        }
-        for label, path in mapping.items():
-            count = parse_unique_count(path)
-            (self.diamond_dir / f"{self.runout}.unique.{label}.txt").write_text(f"{count}\n")
+        for a in self.report_order:
+            count = parse_unique_count(self.diamond_txt(a))
+            self.unique_txt(a).write_text(f"{count}\n")
 
     def make_list1(self):
         ids = extract_gene_ids(self.diamond_dir / f"{self.runout}.orthomerged.diamond.txt")
@@ -983,8 +1072,8 @@ class Pipeline:
 
     def make_list2(self):
         ids = set()
-        for name in ("transabyss", "spades75", "spades55", "trinity"):
-            ids |= extract_gene_ids(self.diamond_dir / f"{self.runout}.{name}.diamond.txt")
+        for a in self.diamond_priority:
+            ids |= extract_gene_ids(self.diamond_txt(a))
         write_sorted(self.diamond_dir / f"{self.runout}.list2", ids)
 
     def make_list3(self):
@@ -997,13 +1086,13 @@ class Pipeline:
                     o.write(line)
 
     def make_list5(self):
+        # build_list5.py keeps the first hit per gene in the order it is
+        # given the files, so diamond_priority is a real preference ranking
+        # here, not just an iteration order.
         self.conda_run(
             "orp", "python", self.makedir / "scripts" / "build_list5.py",
             self.diamond_dir / f"{self.runout}.list3", self.diamond_dir / f"{self.runout}.list5",
-            self.diamond_dir / f"{self.runout}.transabyss.diamond.txt",
-            self.diamond_dir / f"{self.runout}.spades75.diamond.txt",
-            self.diamond_dir / f"{self.runout}.spades55.diamond.txt",
-            self.diamond_dir / f"{self.runout}.trinity.diamond.txt",
+            *[self.diamond_txt(a) for a in self.diamond_priority],
         )
 
     def make_list6(self):
@@ -1024,10 +1113,9 @@ class Pipeline:
                     o.write(line)
 
     def posthack(self):
-        fastas = " ".join(
-            str(self.assemblies_dir / f"{self.runout}.{n}")
-            for n in ("spades55.fasta", "spades75.fasta", "transabyss.fasta", "trinity.Trinity.fasta")
-        )
+        # Concatenation order, so ASSEMBLY_ORDER and not diamond_priority:
+        # this reaches cd-hit-est, where input order breaks length ties.
+        fastas = " ".join(str(p) for p in self.assembly_fasta_paths())
         list7 = self.diamond_dir / f"{self.runout}.list7"
         newbies = self.diamond_dir / f"{self.runout}.newbies.fasta"
         orthomerged = self.assemblies_dir / f"{self.runout}.orthomerged.fasta"
@@ -1296,11 +1384,15 @@ class Pipeline:
         def read_count(path):
             return path.read_text().strip() if path.exists() else ""
 
-        emit("*****  UNIQUE GENES ORP ~~~~~~~~~~~~~~~~~>     ", read_count(self.assemblies_working / f"{runout}.unique.ORP.txt"))
-        emit("*****  UNIQUE GENES TRINITY ~~~~~~~~~~~~~>     ", read_count(self.diamond_dir / f"{runout}.unique.trinity.txt"))
-        emit("*****  UNIQUE GENES SPADES55 ~~~~~~~~~~~~>     ", read_count(self.diamond_dir / f"{runout}.unique.sp55.txt"))
-        emit("*****  UNIQUE GENES SPADES75 ~~~~~~~~~~~~>     ", read_count(self.diamond_dir / f"{runout}.unique.sp75.txt"))
-        emit("*****  UNIQUE GENES TRANSABYSS ~~~~~~~~~~>     ", read_count(self.diamond_dir / f"{runout}.unique.transabyss.txt"))
+        def unique_genes(label):
+            # The tildes pad each label out to the same column so the counts
+            # line up under one another; with the four built-in assemblers
+            # this reproduces the hand-written arrows exactly.
+            return f"*****  UNIQUE GENES {label} " + "~" * max(1, 20 - len(label)) + ">     "
+
+        emit(unique_genes("ORP"), read_count(self.assemblies_working / f"{runout}.unique.ORP.txt"))
+        for a in self.report_order:
+            emit(unique_genes(a.report_label), read_count(self.unique_txt(a)))
 
         proper_pairs = ""
         flagstat = self.assemblies_dir / f"{runout}.flagstat"
@@ -1360,55 +1452,21 @@ class Pipeline:
         self.check()
         self.welcome()
         self.readcheck()
+        self.prepare_reads()
+        self.run_assemblers()
+        self.merge_and_report(pipeline_start)
 
+    def prepare_reads(self):
+        """Trim and error-correct the raw pair, and start compressing it.
+
+        Split out of main() because every entry point needs it: the merge
+        half scores, quantifies and strand-checks against the corrected
+        pair, so a run that brings its own assemblies still comes through
+        here.
+        """
         t1, t2 = self.trim1(), self.trim2()
         trim_done = self.rcorr_dir / f"{self.runout}.trim.done"
         c1, c2 = self.cor1(), self.cor2()
-        trinity_fa = self.assemblies_dir / f"{self.runout}.trinity.Trinity.fasta"
-        phase1_done = self.trinity_phase1_done()
-        sp75 = self.assemblies_dir / f"{self.runout}.spades75.fasta"
-        sp55 = self.assemblies_dir / f"{self.runout}.spades55.fasta"
-        ta = self.assemblies_dir / f"{self.runout}.transabyss.fasta"
-        short_fastas = self.short_fasta_paths()
-        orthofuser_done = self.orthofuse_dir / "orthofuser.done"
-        merged_fasta = self.orthofuse_dir / "merged.fasta"
-        merged_csv = self.orthofuse_dir / "merged" / "assemblies.csv"
-        good_list = self.orthofuse_dir / f"good.{self.runout}.list"
-        orthomerged_fasta = self.assemblies_dir / f"{self.runout}.orthomerged.fasta"
-        diamond_outs = [o for _, o in self.diamond_jobs()]
-        diamond_orthomerged = self.diamond_dir / f"{self.runout}.orthomerged.diamond.txt"
-        diamond_ta = self.diamond_dir / f"{self.runout}.transabyss.diamond.txt"
-        diamond_sp75 = self.diamond_dir / f"{self.runout}.spades75.diamond.txt"
-        diamond_sp55 = self.diamond_dir / f"{self.runout}.spades55.diamond.txt"
-        diamond_trinity = self.diamond_dir / f"{self.runout}.trinity.diamond.txt"
-        uniq_outs = [
-            self.diamond_dir / f"{self.runout}.unique.trinity.txt",
-            self.diamond_dir / f"{self.runout}.unique.sp75.txt",
-            self.diamond_dir / f"{self.runout}.unique.sp55.txt",
-            self.diamond_dir / f"{self.runout}.unique.transabyss.txt",
-        ]
-        list1 = self.diamond_dir / f"{self.runout}.list1"
-        list2 = self.diamond_dir / f"{self.runout}.list2"
-        list3 = self.diamond_dir / f"{self.runout}.list3"
-        list5 = self.diamond_dir / f"{self.runout}.list5"
-        list6 = self.diamond_dir / f"{self.runout}.list6"
-        list7 = self.diamond_dir / f"{self.runout}.list7"
-        newbies = self.diamond_dir / f"{self.runout}.newbies.fasta"
-        working_orthomerged = self.assemblies_working / f"{self.runout}.orthomerged.fasta"
-        orp_intermediate = self.assemblies_dir / f"{self.runout}.ORP.intermediate.fasta"
-        orp_diamond_txt = self.assemblies_dir / f"{self.runout}.ORP.diamond.txt"
-        unique_orp_done = self.assemblies_working / f"{self.runout}.unique.ORP.done"
-        ortho_idx = self.quants_dir / f"{self.runout}.ortho.idx"
-        quant_sf = self.quants_dir / f"salmon_orthomerged_{self.runout}" / "quant.sf"
-        filter_done = self.assemblies_dir / f"{self.runout}.filter.done"
-        low_txt = self.assemblies_working / f"{self.runout}.LOWEXP.txt"
-        high_txt = self.assemblies_working / f"{self.runout}.HIGHEXP.txt"
-        orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
-        busco_done = self.reports_dir / f"{self.runout}.busco.done"
-        transrate_csv = self.reports_dir / f"transrate_{self.runout}" / "assemblies.csv"
-        strandeval_done = self.reports_dir / f"{self.runout}.strandeval.done"
-        qualreport_done = self.reports_dir / f"qualreport.{self.runout}.done"
-        cleanup_done = self.reports_dir / f"{self.runout}.cleanup.done"
 
         # Ask for the trimmed pair back as trimmomatic's outputs only while
         # the corrected pair it feeds is missing or stale: reclaim_trimmed_
@@ -1430,6 +1488,23 @@ class Pipeline:
         # for serially once the run is otherwise over.
         self.compress_async(c1)
         self.compress_async(c2)
+
+    def run_assemblers(self):
+        """Build the four assemblies this pipeline is named for.
+
+        oyster.py's own half of the work, and the only half that is specific
+        to a particular set of assemblers -- everything downstream of
+        run_filtershort treats them as an unordered set of inputs.
+        """
+        c1, c2 = self.cor1(), self.cor2()
+        trinity_fa = self.assembly_fasta(TRINITY)
+        phase1_done = self.trinity_phase1_done()
+        sp75 = self.assembly_fasta(SPADES75)
+        sp55 = self.assembly_fasta(SPADES55)
+        ta = self.assembly_fasta(TRANSABYSS)
+        diamond_ta = self.diamond_txt(TRANSABYSS)
+        diamond_sp75 = self.diamond_txt(SPADES75)
+        diamond_sp55 = self.diamond_txt(SPADES55)
 
         # Two sequential stage-pairings rather than one lane split across all
         # four assemblers for the whole run -- see TRINITY_PHASE1_SHARE and
@@ -1533,7 +1608,47 @@ class Pipeline:
                 f.result()
         print(f"=== Stage B done -- {self._ts()} ===")
 
-        self.step("run_filtershort", short_fastas, [ta, sp75, sp55, trinity_fa], self.run_filtershort)
+    def merge_and_report(self, pipeline_start):
+        """Fuse the assemblies into one, then score and report on the result.
+
+        Everything here is generic over `self.assemblies`: it is the half
+        chowder.py reuses wholesale for assemblies it did not build.
+        """
+        c1, c2 = self.cor1(), self.cor2()
+        assembly_fastas = self.assembly_fasta_paths()
+        short_fastas = self.short_fasta_paths()
+        orthofuser_done = self.orthofuse_dir / "orthofuser.done"
+        merged_fasta = self.orthofuse_dir / "merged.fasta"
+        merged_csv = self.orthofuse_dir / "merged" / "assemblies.csv"
+        good_list = self.orthofuse_dir / f"good.{self.runout}.list"
+        orthomerged_fasta = self.assemblies_dir / f"{self.runout}.orthomerged.fasta"
+        diamond_outs = [o for _, o in self.diamond_jobs()]
+        diamond_orthomerged = self.diamond_dir / f"{self.runout}.orthomerged.diamond.txt"
+        uniq_outs = [self.unique_txt(a) for a in self.report_order]
+        list1 = self.diamond_dir / f"{self.runout}.list1"
+        list2 = self.diamond_dir / f"{self.runout}.list2"
+        list3 = self.diamond_dir / f"{self.runout}.list3"
+        list5 = self.diamond_dir / f"{self.runout}.list5"
+        list6 = self.diamond_dir / f"{self.runout}.list6"
+        list7 = self.diamond_dir / f"{self.runout}.list7"
+        newbies = self.diamond_dir / f"{self.runout}.newbies.fasta"
+        working_orthomerged = self.assemblies_working / f"{self.runout}.orthomerged.fasta"
+        orp_intermediate = self.assemblies_dir / f"{self.runout}.ORP.intermediate.fasta"
+        orp_diamond_txt = self.assemblies_dir / f"{self.runout}.ORP.diamond.txt"
+        unique_orp_done = self.assemblies_working / f"{self.runout}.unique.ORP.done"
+        ortho_idx = self.quants_dir / f"{self.runout}.ortho.idx"
+        quant_sf = self.quants_dir / f"salmon_orthomerged_{self.runout}" / "quant.sf"
+        filter_done = self.assemblies_dir / f"{self.runout}.filter.done"
+        low_txt = self.assemblies_working / f"{self.runout}.LOWEXP.txt"
+        high_txt = self.assemblies_working / f"{self.runout}.HIGHEXP.txt"
+        orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
+        busco_done = self.reports_dir / f"{self.runout}.busco.done"
+        transrate_csv = self.reports_dir / f"transrate_{self.runout}" / "assemblies.csv"
+        strandeval_done = self.reports_dir / f"{self.runout}.strandeval.done"
+        qualreport_done = self.reports_dir / f"qualreport.{self.runout}.done"
+        cleanup_done = self.reports_dir / f"{self.runout}.cleanup.done"
+
+        self.step("run_filtershort", short_fastas, assembly_fastas, self.run_filtershort)
 
         def orthofuser_branch(cpu=None, mem=None):
             self.step("run_orthofuser", [orthofuser_done], short_fastas, partial(self.run_orthofuser, cpu=cpu))
@@ -1554,24 +1669,31 @@ class Pipeline:
         self.step("makeorthout", [good_list], [orthofuser_done, merged_csv], self.makeorthout)
         self.step("orthofusing", [orthomerged_fasta], [good_list, merged_fasta], self.orthofusing)
 
-        # diamond_transabyss/spades75/spades55 already ran in the short
-        # assembler lane above. Only these two remain: orthomerged depends
-        # on the merge stage just above, and trinity depends on the trinity
-        # lane -- both are only just now guaranteed to be ready.
+        # Every assembly needs a diamond pass, and under oyster.py most of
+        # them already had one: the assembler lanes fire each assembly's
+        # diamond the moment that assembler returns, rather than leaving all
+        # four to queue up here. Those steps are up to date by now and skip;
+        # what is genuinely left is orthomerged, which depends on the merge
+        # stage just above, and Trinity, whose lane only just finished. A run
+        # that brought its own assemblies had no lanes, so all of them run
+        # here -- which is why this is a loop over the set and not the two
+        # named steps it used to be.
         print("\n\n\n\n Starting diamond \n\n\n\n")
         self.step(
             "diamond_orthomerged", [diamond_orthomerged], [orthomerged_fasta],
             partial(self.run_diamond_one, orthomerged_fasta, diamond_orthomerged),
         )
-        self.step(
-            "diamond_trinity", [diamond_trinity], [trinity_fa],
-            partial(self.run_diamond_one, trinity_fa, diamond_trinity),
-        )
+        for a in self.diamond_priority:
+            fasta, out = self.assembly_fasta(a), self.diamond_txt(a)
+            self.step(
+                f"diamond_{a.diamond_label}", [out], [fasta],
+                partial(self.run_diamond_one, fasta, out),
+            )
         self.step("diamond_uniq", uniq_outs, diamond_outs, self.diamond_uniq, timed=False)
         self.step("make_list1", [list1], [diamond_orthomerged], self.make_list1, timed=False)
-        self.step("make_list2", [list2], [diamond_trinity, diamond_sp75, diamond_sp55, diamond_ta], self.make_list2, timed=False)
+        self.step("make_list2", [list2], [self.diamond_txt(a) for a in self.assemblies], self.make_list2, timed=False)
         self.step("make_list3", [list3], [list1, list2], self.make_list3, timed=False)
-        self.step("make_list5", [list5], [list3, diamond_ta, diamond_sp75, diamond_sp55, diamond_trinity], self.make_list5)
+        self.step("make_list5", [list5], [list3] + [self.diamond_txt(a) for a in self.diamond_priority], self.make_list5)
         self.step("make_list6", [list6], [orthomerged_fasta], self.make_list6, timed=False)
         self.step("make_list7", [list7], [list6, list5], self.make_list7, timed=False)
         self.step("posthack", [newbies, working_orthomerged], [list7], self.posthack)

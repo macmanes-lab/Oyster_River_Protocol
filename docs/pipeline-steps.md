@@ -1,10 +1,12 @@
 # oyster.py Step Reference
 
-What every `self.step()` in `Pipeline.main()` actually reads and writes, and what it does functionally. For execution order and where concurrency kicks in, see [pipeline-schedule.html](pipeline-schedule.html) — this document is the companion piece: same steps, but focused on inputs/outputs/purpose rather than scheduling, so a reader can tell what each stage is *for* and where the pipeline's CPU/time actually goes.
+What every `self.step()` in `Pipeline.main()` actually reads and writes, and what it does functionally. (`main()` is three methods -- `prepare_reads`, `run_assemblers`, `merge_and_report` -- matching the three sections below.) For execution order and where concurrency kicks in, see [pipeline-schedule.html](pipeline-schedule.html) — this document is the companion piece: same steps, but focused on inputs/outputs/purpose rather than scheduling, so a reader can tell what each stage is *for* and where the pipeline's CPU/time actually goes.
 
 Reflects `oyster.py` as of ORP 4.0.0.
 
 All paths below are relative to the run directory (`--dir`) and use `<run>` for `--runout`. "Env" is the conda environment the step's tool runs in.
+
+`chowder.py` runs this same reference from `run_filtershort` down, over assemblies it was handed rather than ones it built: it skips the whole Assembly lanes section and puts one `ingest` step in front of it (pure Python -- copies each input under `assemblies/<run>.<label>.fasta`, prefixing every contig name with `<label>_`, and declares those copies as its outputs so a re-invocation resumes). Everywhere a row below says "the 4 assemblies", read "the N assemblies given to `--assemblies`". See the README for what else differs.
 
 ## Read prep
 

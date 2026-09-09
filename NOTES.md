@@ -7,6 +7,54 @@ stale.
 
 ## 2026-09-09
 
+- **Branched `byo-assemblies` off `pytransrate` and added `chowder.py`:
+  bring your own assemblies, merge them with the ORP.** Decision was
+  shared-engine-plus-thin-entry-point over either a `--skip-assembly` flag
+  on `oyster.py` or a standalone copy. The merge half is where every
+  assembly-changing subtlety lives, so two copies of it would drift
+  invisibly; but half of `oyster.py`'s flags (k-mers, `--strand`,
+  `--normalize-reads`) are meaningless without assemblers, so one CLI would
+  have been half-inert. `Chowder(Pipeline)` overriding `main()` gets both.
+  - **The refactor that made it possible was the risky part, so it was
+    measured, not eyeballed.** Two harnesses in the scratchpad: one dumps
+    every assembly-derived path, order and report line; the other traces the
+    entire step graph with the tools stubbed out. Both were captured from
+    the pre-refactor `oyster.py` first and diffed after. Result: the 40-step
+    graph, every declared input and output, `posthack`'s cat order,
+    `build_list5.py`'s priority order and the `qualreport` line text are all
+    unchanged. Worth keeping those harnesses in mind for the next
+    structural change -- this repo has no test suite at all.
+  - **There were three different orders of the same four assemblers**, and
+    that was the trap. Concatenation order (sp55, sp75, ta, trinity) reaches
+    cd-hit-est through `merged.fasta` and `posthack`, where it breaks length
+    ties; diamond order (ta, sp75, sp55, trinity) is a real preference
+    ranking because `build_list5.py` keeps the first hit per gene; report
+    order (trinity, sp55, sp75, ta) is cosmetic. A tidy-minded "let's just
+    sort them" here would have quietly changed assemblies. They are now
+    named constants with the reason attached.
+    - A *fourth* order existed in `diamond_uniq`'s dict literal (trinity,
+      sp75, sp55, ta) and was inert -- four independent reads, four
+      independent writes. Collapsed onto report order.
+  - **Contig-name prefixing is not cosmetic and is the one thing that would
+    have silently corrupted a merge.** Two Trinity assemblies of one library
+    both start at `TRINITY_DN0_c0_g1_i1`; OrthoFinder, `contigs.csv` and
+    `filter.py` all join on contig name. Ingest renames to
+    `<label>_<original>` and refuses an input with duplicate names inside
+    it.
+  - `--reads-are-corrected` symlinks the user's pair into `rcorr/` rather
+    than copying tens of GB. `cleanup()` now skips symlinks entirely --
+    without that it would have reported someone's own reads as "left
+    uncompressed" and, worse, been one edit away from unlinking them.
+  - **Not yet run against real data.** Same standing item as pytransrate
+    itself: needs the cluster. Fold a chowder run into the same trip --
+    two of the four assemblies from a finished ORP run are the obvious
+    input, since the merge of those should land near that run's own
+    `.ORP.fasta` and gives a sanity check with a known answer.
+  - Noticed in passing and left alone: `oyster.py` has never checked for
+    `bwa`, which `strandeval` needs from the `orp_trinity` env. It gets away
+    with it because the Trinity check proves that env exists. chowder's
+    preflight checks `bwa` directly since it drops the Trinity check.
+
 - **Bumped the pytransrate pin to `v2.1.0`** (`orp_env.yml`). Verified before
   bumping rather than after: the tag is on the remote at 53fe488, `cli.py`'s
   only diff v2.0.0..v2.1.0 is passing `threads=args.threads` through to
