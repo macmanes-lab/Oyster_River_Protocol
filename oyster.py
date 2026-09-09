@@ -464,6 +464,7 @@ class Pipeline:
             self.assemblies_dir / f"{self.runout}.ORP.diamond.txt",
             self.assemblies_dir / f"{self.runout}.flagstat",
             self.assemblies_dir / f"{self.runout}.filter.done",
+            self.trinity_phase1_done(),
         ):
             if not path.exists():
                 continue
@@ -723,6 +724,48 @@ class Pipeline:
     def trinity_out_dir(self):
         return self.assemblies_dir / f"{self.runout}.trinity"
 
+    def trinity_phase1_done(self):
+        """Phase 1's completion sentinel, deliberately outside trinity_out_dir().
+
+        Phase 2 passes --full_cleanup, which deletes the whole
+        <run>.trinity/ working directory -- including
+        recursive_trinity.cmds.ok, the file that used to serve as both
+        phase 1's declared output and phase 2's declared input. So a
+        finished Trinity erased its own evidence that it had run: on the
+        next invocation needs_run() found phase 1's output missing and
+        re-ran it (~90min), which rewrote cmds.ok *newer* than
+        <run>.trinity.Trinity.fasta, which in turn made phase 2 look out of
+        date and re-run against an assembly that was already complete
+        (~34h). The window is a resumed run whose Stage B had succeeded and
+        which then failed or was killed later -- i.e. a walltime kill near
+        the end of a long run, which is exactly when a job gets
+        resubmitted.
+        """
+        return self.assemblies_dir / f"{self.runout}.trinity.phase1.done"
+
+    def seed_trinity_phase1_sentinel(self):
+        """Back-fill the sentinel for run directories created before it existed.
+
+        Without this, the very first resume after upgrading would hit the
+        bug the sentinel exists to prevent, once. Seeds from whatever
+        already proves phase 1 ran -- cmds.ok if Trinity's working dir is
+        still there, otherwise the finished assembly -- and copies that
+        file's mtime rather than stamping 'now', so the ordering needs_run()
+        compares stays exactly what it was.
+        """
+        sentinel = self.trinity_phase1_done()
+        if sentinel.exists():
+            return
+        for evidence in (self.trinity_out_dir() / "recursive_trinity.cmds.ok",
+                         self.assemblies_dir / f"{self.runout}.trinity.Trinity.fasta"):
+            if evidence.exists():
+                sentinel.touch()
+                st = evidence.stat()
+                os.utime(sentinel, (st.st_atime, st.st_mtime))
+                print(f"[resume] seeded {self._rel(sentinel)} from "
+                      f"{self._rel(evidence)} (run directory predates it)")
+                return
+
     def _trinity_base_cmd(self, cpu, mem):
         cmd = ["Trinity"]
         if self.strand == "RF":
@@ -754,6 +797,7 @@ class Pipeline:
         mem = self.mem if mem is None else mem
         cmd = self._trinity_base_cmd(cpu, mem) + ["--no_distributed_trinity_exec"]
         self.conda_run("orp_trinity", *cmd, retries=0)
+        self.trinity_phase1_done().touch()
 
     def run_trinity_phase2(self, cpu=None, mem=None):
         # Same command, no stop flag: per the docs above, Trinity resumes
@@ -1336,6 +1380,7 @@ class Pipeline:
         trim_done = self.rcorr_dir / f"{self.runout}.trim.done"
         c1, c2 = self.cor1(), self.cor2()
         trinity_fa = self.assemblies_dir / f"{self.runout}.trinity.Trinity.fasta"
+        phase1_done = self.trinity_phase1_done()
         sp75 = self.assemblies_dir / f"{self.runout}.spades75.fasta"
         sp55 = self.assemblies_dir / f"{self.runout}.spades55.fasta"
         ta = self.assemblies_dir / f"{self.runout}.transabyss.fasta"
@@ -1412,6 +1457,8 @@ class Pipeline:
         spades_cpu = max(1, self.cpu - phase1_cpu)
         spades_mem = max(1, self.mem - phase1_mem)
 
+        self.seed_trinity_phase1_sentinel()
+
         phase2_cpu = max(1, round(self.cpu * TRINITY_PHASE2_SHARE))
         phase2_mem = max(1, round(self.mem * TRINITY_PHASE2_SHARE))
         transabyss_cpu = max(1, self.cpu - phase2_cpu)
@@ -1437,7 +1484,7 @@ class Pipeline:
         def trinity_phase1_lane():
             try:
                 self.step(
-                    "run_trinity_phase1", [self.trinity_out_dir() / "recursive_trinity.cmds.ok"], [c1],
+                    "run_trinity_phase1", [phase1_done], [c1],
                     partial(self.run_trinity_phase1, cpu=phase1_cpu, mem=phase1_mem),
                 )
             except Exception as e:
@@ -1474,8 +1521,7 @@ class Pipeline:
         def trinity_phase2_lane():
             try:
                 self.step(
-                    "run_trinity_phase2", [trinity_fa],
-                    [self.trinity_out_dir() / "recursive_trinity.cmds.ok"],
+                    "run_trinity_phase2", [trinity_fa], [phase1_done],
                     partial(self.run_trinity_phase2, cpu=phase2_cpu, mem=phase2_mem),
                 )
                 self.compress_async(trinity_fa)

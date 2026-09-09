@@ -7,6 +7,35 @@ stale.
 
 ## 2026-09-09
 
+- **Trinity's `--full_cleanup` was costing a resumed run both phases (~35h);
+  fixed with a sentinel outside the directory it deletes.** `cmds.ok` was
+  Phase 1's declared output *and* Phase 2's declared input, and Phase 2
+  deletes it -- so a resume re-ran Phase 1, which rewrote `cmds.ok` newer than
+  the finished `.Trinity.fasta`, which dragged Phase 2 along with it. Both now
+  hang off `assemblies/<run>.trinity.phase1.done`. Verified against the real
+  `needs_run()` across six states (fresh, phase-1-only, Stage-B-done, the two
+  pre-sentinel migration cases, and stale corrected reads).
+  - `already_complete()` does **not** cover this: the window is a run that
+    finished Stage B and then died later, which is a walltime kill near the
+    end of a long run -- exactly when the job gets resubmitted.
+  - `seed_trinity_phase1_sentinel()` copies the *mtime* of whatever proves
+    Phase 1 ran instead of stamping `now`. Stamping `now` would make the
+    sentinel newer than `.Trinity.fasta` and re-trigger the same 34h re-run it
+    exists to prevent.
+  - `cleanup()` removes the sentinel on purpose. Keeping it would leave a run
+    directory where Phase 1 looks done but the plain `.Trinity.fasta` is gone
+    (only the `.gz` remains), so a forced re-run would skip Phase 1 and send
+    Phase 2 in without its checkpoints.
+
+- **Still open (#2 from the same review, not done):** `makegroups` writes one
+  `<i>.groups` file per orthogroup -- 10^5-ish tiny files into a single
+  directory -- which `scripts/pick_best_contigs.py` globs and reads back one
+  at a time and `makeorthout` then unlinks. Pure metadata churn for data that
+  only has to cross one `conda run` boundary, and it's the kind of thing
+  Lustre/GPFS is worst at. An interrupted run between those two steps also
+  strands all of them. Candidate: hand the picker `Orthogroups.txt` and
+  `contigs.csv` directly and delete the intermediate files entirely.
+
 - **Runs now clean up after themselves (`cleanup`, `reclaim_trimmed_reads`,
   `compress_async`, `already_complete`).** A finished run keeps `reports/`,
   `.ORP.fasta`, the four individual assemblies and the corrected read pair
