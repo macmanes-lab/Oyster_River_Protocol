@@ -24,7 +24,7 @@ Two things to know before running it:
     (pytransrate), quantifies the survivors (salmon), and strand-checks the
     result -- so a merge needs the library the assemblies came from, and
     trims and error-corrects it the way ORP always does. Pass
-    --reads-are-corrected if you are handing over reads that have already
+    --corrected-reads if you are handing over reads that have already
     been through trimmomatic and rcorrector.
 
   * Contig names are prefixed with the label of the assembly they came
@@ -34,7 +34,8 @@ Two things to know before running it:
     them apart. It doubles as provenance: every contig in the final
     assembly says which input it survived from.
 
-Assembly order is significant, and it is the order you list them in:
+Assembly order is significant, and by default it is not yours to get wrong.
+It matters twice:
 
   * it sets contig order in the pooled fasta, which reaches cd-hit-est,
     where input order breaks length ties -- so it can decide which of two
@@ -42,12 +43,28 @@ Assembly order is significant, and it is the order you list them in:
   * build_list5.py keeps the *first* diamond hit per gene in that order, so
     for contigs no orthogroup covered, earlier assemblies are preferred.
 
-List the assembly you trust most first.
+Rather than let the sequence you happened to type decide either of those,
+the assemblies are sorted by label and then permuted with a fixed seed, so
+the order depends on the *set* of assemblies and not on how they were
+listed. It is a seeded shuffle and not a random one on purpose: randomising
+outright would mean the same command gave a different assembly on a
+different day, and a resumed run disagreeing with the run it resumed. The
+order used, and the seed that produced it, are printed at the start of the
+run and written to assemblies/<run>.ingest.done.
+
+This makes the order arbitrary and reproducible. It does not make the
+pipeline order-independent -- the picks still depend on the order, and
+being genuinely independent of it would mean breaking cd-hit-est's ties and
+the rescue ranking on merit rather than on position. To measure what the
+order is worth on your own data, run it twice with different --seed values
+and diff the assemblies. To rank the assemblies yourself -- best first --
+pass --assembly-order given.
 """
 
 import argparse
 import copy
 import gzip
+import random
 import re
 import subprocess
 import sys
@@ -61,6 +78,10 @@ HERE = Path(__file__).resolve().parent
 # Labels that would collide with a file the pipeline writes itself under
 # assemblies/<runout>.*.
 RESERVED_LABELS = frozenset({"orthomerged", "orp", "orp.intermediate", "filter", "flagstat"})
+
+# The seed strandeval already samples reads with, reused rather than adding a
+# second arbitrary constant to the repo.
+DEFAULT_SEED = 23894
 
 
 def sanitise_label(raw):
@@ -89,14 +110,61 @@ def derive_labels(paths, explicit=None):
     else:
         labels = [sanitise_label(Path(p).name) for p in paths]
 
-    seen, out = {}, []
+    labels = [f"{l}_input" if l.lower() in RESERVED_LABELS else l for l in labels]
+
+    # Two inputs can land on the same label -- two files called
+    # trinity.fasta in different directories is an ordinary way to keep two
+    # assemblies of one library. Numbering them in the order they were typed
+    # would put the label assignment back under the user's control, and with
+    # it the order (which is sorted by label), so the group is numbered by
+    # source path instead: same set of files, same labels, however they were
+    # listed. Every member of a colliding group is suffixed, including the
+    # first -- a bare `trinity` beside a `trinity_2` reads as though the
+    # bare one were somehow the real one.
+    counts = {}
     for label in labels:
-        if label.lower() in RESERVED_LABELS:
-            label = f"{label}_input"
-        n = seen.get(label.lower(), 0) + 1
-        seen[label.lower()] = n
-        out.append(label if n == 1 else f"{label}_{n}")
+        counts[label.lower()] = counts.get(label.lower(), 0) + 1
+
+    groups = {}
+    for i, label in enumerate(labels):
+        groups.setdefault(label.lower(), []).append(i)
+
+    out = list(labels)
+    for key, members in groups.items():
+        if counts[key] == 1:
+            continue
+        for n, i in enumerate(sorted(members, key=lambda i: str(paths[i])), start=1):
+            out[i] = f"{labels[i]}_{n}"
     return out
+
+
+def shuffled_order(pairs, seed):
+    """Put the assemblies in an order that doesn't depend on how they were typed.
+
+    Order matters twice over downstream -- it breaks cd-hit-est's length
+    ties and it ranks the diamond rescue -- and for assemblies nobody has
+    ranked against each other, having the command line's order silently
+    decide that is worse than having nothing decide it. So the order is
+    taken out of the user's hands: sort by label first, so the result
+    depends on the *set* of assemblies and not on the sequence they were
+    listed in, then permute with a fixed seed.
+
+    Deliberately a seeded shuffle and not a random one. Randomising outright
+    would mean the same command produced a different assembly on a different
+    day, and a resumed run disagreeing with the run it resumed -- trading a
+    decision nobody made for one nobody can reproduce. With the seed fixed
+    and recorded, the order is arbitrary but stable, and `--seed` makes the
+    dependence measurable: run it twice with different seeds and the
+    difference between the two assemblies is the size of the effect.
+
+    Note what this does *not* do: the picks still depend on the order. It
+    stops that order being an accident of typing; it does not make the
+    pipeline order-independent, which would mean breaking cd-hit-est's ties
+    and the rescue ranking on merit rather than on position.
+    """
+    ordered = sorted(pairs, key=lambda pair: pair[0])
+    random.Random(seed).shuffle(ordered)
+    return ordered
 
 
 def open_maybe_gzip(path):
@@ -109,21 +177,26 @@ class Chowder(Pipeline):
     """oyster.py's Pipeline, fed assemblies instead of building them."""
 
     def __init__(self, args):
-        self.sources = [Path(p).resolve() for p in args.assemblies]
-        labels = derive_labels(self.sources, args.labels)
+        sources = [Path(p).resolve() for p in args.assemblies]
+        labels = derive_labels(sources, args.labels)
         # One label per assembly, used for its file under assemblies/, its
         # diamond output, its unique-gene count, its line in the quality
         # report and the prefix on its contig names -- so a contig can be
         # traced from the final assembly back to the file it came from by
         # reading its name.
+        self.seed = args.seed
+        self.order_mode = args.assembly_order
+        pairs = shuffled_order(list(zip(labels, sources)), self.seed) \
+            if self.order_mode == "shuffled" else list(zip(labels, sources))
+        self.sources = [src for _, src in pairs]
         # On a copy: Pipeline reads the assembly set off args, and quietly
         # rewriting the caller's namespace from paths to Assembly records
         # would make constructing a second pipeline from it fail.
         args = copy.copy(args)
         args.assemblies = [
-            Assembly(f"{label}.fasta", label, label, label.upper()) for label in labels
+            Assembly(f"{label}.fasta", label, label, label.upper()) for label, _ in pairs
         ]
-        self.reads_are_corrected = args.reads_are_corrected
+        self.corrected_reads = args.corrected_reads
         super().__init__(args)
         self.ingest_done = self.assemblies_dir / f"{self.runout}.ingest.done"
 
@@ -169,11 +242,16 @@ class Chowder(Pipeline):
         print(f"                 '-.___________.-'         version {self.version}")
         print("                     '-.___.-'")
         print("    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + RESET + "\n")
-        print(f"    Merging {len(self.assemblies)} assemblies, in this order:\n")
+        if self.order_mode == "shuffled":
+            origin = f"shuffled, seed {self.seed} -- not the order you listed them in"
+        else:
+            origin = "--assembly-order given: your order, so it ranks them"
+        print(f"    Merging {len(self.assemblies)} assemblies ({origin}):\n")
         for a, src in zip(self.assemblies, self.sources):
             print(f"      {a.diamond_label:<24} {src}")
         print("\n    Order matters: it breaks cd-hit-est's length ties and ranks the")
-        print("    diamond rescue. Contigs are renamed <label>_<original>.\n")
+        print("    diamond rescue, so it is recorded above and in reports/. Contigs")
+        print("    are renamed <label>_<original>.\n")
 
     # -- ingest ------------------------------------------------------------
 
@@ -213,8 +291,17 @@ class Chowder(Pipeline):
             # soon as the file stops being written, so cleanup() at the end
             # has nothing to do but unlink.
             self.compress_async(dst)
+        # The order is part of the result, not a detail of the invocation:
+        # it decided cd-hit-est's ties and the rescue ranking, so a run has
+        # to say which order it used and what produced it.
+        header = (f"# assembly order: shuffled, seed {self.seed}"
+                  if self.order_mode == "shuffled" else
+                  "# assembly order: as given on the command line")
         self.ingest_done.write_text(
-            "\n".join(f"{a.diamond_label}\t{src}" for a, src in zip(self.assemblies, self.sources)) + "\n"
+            header + "\n"
+            + "\n".join(f"{i}\t{a.diamond_label}\t{src}"
+                        for i, (a, src) in enumerate(zip(self.assemblies, self.sources), start=1))
+            + "\n"
         )
 
     # -- orchestration -----------------------------------------------------
@@ -238,7 +325,7 @@ class Chowder(Pipeline):
 
     def prepare_reads(self):
         """Trim and correct, unless told the reads are already corrected."""
-        if not self.reads_are_corrected:
+        if not self.corrected_reads:
             return super().prepare_reads()
         c1, c2 = self.cor1(), self.cor2()
         self.rcorr_dir.mkdir(parents=True, exist_ok=True)
@@ -248,7 +335,7 @@ class Chowder(Pipeline):
             if dst.is_symlink() or dst.exists():
                 dst.unlink()
             dst.symlink_to(src.resolve())
-        print(f"[reads] --reads-are-corrected: using {self.read1} / {self.read2} as they are")
+        print(f"[reads] --corrected-reads: using {self.read1} / {self.read2} as they are")
 
 
 def parse_args():
@@ -266,7 +353,17 @@ def parse_args():
                         "its line in the quality report (default: from the filenames)")
     p.add_argument("--read1", required=True, help="path to R1 fastq(.gz)")
     p.add_argument("--read2", required=True, help="path to R2 fastq(.gz)")
-    p.add_argument("--reads-are-corrected", action="store_true",
+    p.add_argument("--assembly-order", choices=["shuffled", "given"], default="shuffled",
+                   help="'shuffled' (default) puts the assemblies in a seeded, "
+                        "reproducible order that does not depend on the order you "
+                        "list them in; 'given' uses your order, which then ranks "
+                        "them -- earlier assemblies win cd-hit-est's length ties "
+                        "and are preferred by the diamond rescue")
+    p.add_argument("--seed", type=int, default=DEFAULT_SEED,
+                   help=f"seed for --assembly-order shuffled (default: {DEFAULT_SEED}). "
+                        "Two runs differing only in this seed differ by exactly the "
+                        "amount assembly order is worth")
+    p.add_argument("--corrected-reads", action="store_true",
                    help="the reads have already been through trimmomatic and "
                         "rcorrector; skip both (default: off)")
     p.add_argument("--mem", type=int, default=110, help="memory in GB (default: 110)")

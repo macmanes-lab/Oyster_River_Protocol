@@ -41,7 +41,31 @@ stale.
     `filter.py` all join on contig name. Ingest renames to
     `<label>_<original>` and refuses an input with duplicate names inside
     it.
-  - `--reads-are-corrected` symlinks the user's pair into `rcorr/` rather
+  - **Assembly order is shuffled, not chosen -- with a fixed seed.** MM's
+    call, to stop the order of the command line being a scientific choice
+    nobody meant to make. Implemented as sort-by-label then permute with
+    `random.Random(23894)` (strandeval's existing seed, rather than a second
+    arbitrary constant), so the order is a function of the *set* of
+    assemblies: all 24 typing orders of four assemblies give one merge
+    order, and colliding labels are numbered by source path so that holds
+    even for two files both called `trinity.fasta`.
+    - **Not a plain `random.shuffle`, and the difference is the point.**
+      Unseeded, the same command would give a different assembly on a
+      different day and a resumed run could disagree with the run it was
+      resuming -- trading a decision nobody made for one nobody can
+      reproduce. Seeded, the order is arbitrary but stable and recorded
+      (printed at startup, written to `<run>.ingest.done` with the seed).
+    - **It does not make the pipeline order-independent, and the docs say
+      so.** The picks still depend on the order; what changed is that the
+      order no longer depends on typing. Genuine independence means breaking
+      cd-hit-est's ties and the rescue ranking on merit instead of position
+      -- the rescue in particular has a real preference to express, since
+      `build_list5.py` picking the first hit per gene is a chance to prefer
+      a better assembly that a shuffle throws away. Worth revisiting if a
+      seed sweep on real data shows the choice is worth anything: `--seed`
+      exists precisely to measure that, and `--assembly-order given` keeps
+      the old behaviour for anyone who wants to rank them by hand.
+  - `--corrected-reads` (renamed from `--reads-are-corrected`) symlinks the user's pair into `rcorr/` rather
     than copying tens of GB. `cleanup()` now skips symlinks entirely --
     without that it would have reported someone's own reads as "left
     uncompressed" and, worse, been one edit away from unlinking them.
