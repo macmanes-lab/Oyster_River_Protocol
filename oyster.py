@@ -1554,8 +1554,18 @@ class Pipeline:
 
         def orthofuser_branch(cpu=None, mem=None):
             self.step("run_orthofuser", [orthofuser_done], short_fastas, partial(self.run_orthofuser, cpu=cpu))
-            self.step("makelist", [list_file], [orthofuser_done], self.makelist, timed=False)
-            self.step("makegroups", [groups_done], [list_file], self.makegroups, timed=False)
+            # Timed on purpose, though both are pure Python: makegroups writes
+            # one <i>.groups file per orthogroup -- of order 1e5 of them into a
+            # single directory -- which pick_best_contigs.py then globs back in
+            # and makeorthout unlinks. makeorthout is the only one of those
+            # three passes that has ever been timed (49s-1m33s on real runs,
+            # sampledata/benchmarks.md), so the write and delete passes have
+            # never been measured at all. They are the metadata-heavy kind of
+            # work a network filesystem is worst at, and the whole round-trip
+            # is a candidate for deletion -- but measure it before rewriting
+            # anything that can reorder good.<run>.list.
+            self.step("makelist", [list_file], [orthofuser_done], self.makelist)
+            self.step("makegroups", [groups_done], [list_file], self.makegroups)
 
         def merge_branch(cpu=None, mem=None):
             self.step("merge", [merged_fasta], short_fastas, self.merge, timed=False)
