@@ -5,6 +5,59 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-09-09
+
+- **Runs now clean up after themselves (`cleanup`, `reclaim_trimmed_reads`,
+  `compress_async`, `already_complete`).** A finished run keeps `reports/`,
+  `.ORP.fasta`, the four individual assemblies and the corrected read pair
+  (the last two gzipped) and reclaims everything else. Written and unit-smoke-
+  tested against a synthetic run directory; **not yet exercised on a real
+  run** -- fold it into the same full run that first exercises pytransrate.
+
+- **The compression is deliberately decoupled from the deletion**, and that's
+  the whole design. A file stops being *written* long before it stops being
+  *read*: `c1`/`c2` feed every assembler and every alignment step through to
+  `strandeval`, and the four assemblies are read again at `run_filtershort`,
+  `diamond_*` and `posthack`. So `compress_async()` builds the `.gz` beside
+  the original as soon as the producing step returns, on a two-worker
+  background pool, and `cleanup()` at the very end only unlinks. Net effect:
+  the gzip cost lands in parallel with an assembler instead of being added to
+  the end of the run. Peak disk goes up by roughly the `.gz` size (~25% of the
+  reads) for the duration, which the trimmed-read reclaim below more than
+  covers.
+  - `pigz=2.8` added to `orp_env.yml`, with a `shutil.which` -> env -> plain
+    `gzip` fallback chain. Thread count is capped at `min(4, cpu//8)` on
+    purpose: this is background work sharing a machine an assembler already
+    owns, not a stage of its own.
+
+- **Two resumability traps, both handled, both worth remembering.** Deleting
+  intermediates interacts badly with `needs_run()`, which decides everything
+  from output presence/mtime:
+  1. Deleting the `TRIM_*.fastq` makes `run_trimmomatic` look permanently out
+     of date. Fixed with a `rcorr/<run>.trim.done` sentinel that `main()`
+     swaps in as the step's declared output whenever the corrected pair is
+     present and current. Old working dirs (no sentinel, TRIM files still
+     there) take the original branch and behave exactly as before.
+  2. Deleting most steps' outputs makes a *re-invocation* of a finished run
+     reassemble from scratch instead of no-opping -- the failure mode a
+     resubmitted cluster job would hit. `already_complete()` short-circuits
+     `main()` on `reports/<run>.cleanup.done` + an `.ORP.fasta` newer than the
+     raw reads. It has to return *before* `timing_init()`, which truncates
+     `reports/<run>.timing.log` unconditionally and would otherwise wipe the
+     finished run's timing report on the way past.
+
+- **Open items for the first real run:** confirm the corrected-read gzip
+  actually finishes inside Stage A (it should -- Stage A is hours, and pigz on
+  4 threads does tens of GB in minutes -- but the fallback is a plain `gzip`
+  on an env without pigz, which is the case worth watching); confirm nothing
+  in `reports/` turns out to depend on something `cleanup` removes (`reportgen`
+  runs before it and reads `assemblies/diamond/*.unique.*`, `assemblies/
+  <run>.flagstat` and the transrate CSV, all of which is why `cleanup` is
+  ordered last); and record the reclaimed total from
+  `reports/<run>.cleanup.done` in `sampledata/benchmarks.md` alongside the
+  timing, since "how much disk does a run leave behind" is now a number worth
+  tracking.
+
 ## 2026-09-07
 
 - **Opened branch `pytransrate` to swap the bundled Ruby orp-transrate for

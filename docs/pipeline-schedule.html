@@ -188,7 +188,7 @@
 
   <figure>
     <div class="diagram-frame">
-      <svg viewBox="0 0 1000 1990" role="img" aria-label="Directed acyclic graph of oyster.py's pipeline at --max-parallel 2: a long sequential chain of steps interrupted by four concurrent stages -- always-on Stage A (Trinity phase 1 vs. SPAdes55/SPAdes75, 25/75 split) then Stage B (Trinity phase 2 vs. Trans-ABySS, 95/5 split), orthofuser_branch running alongside merge_branch, and transrate running alongside strandeval.">
+      <svg viewBox="0 0 1000 2070" role="img" aria-label="Directed acyclic graph of oyster.py's pipeline at --max-parallel 2: a long sequential chain of steps interrupted by four concurrent stages -- always-on Stage A (Trinity phase 1 vs. SPAdes55/SPAdes75, 25/75 split) then Stage B (Trinity phase 2 vs. Trans-ABySS, 95/5 split), orthofuser_branch running alongside merge_branch, and transrate running alongside strandeval. The chain ends at reportgen and then cleanup.">
         <defs>
           <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
             <path d="M0,0 L10,5 L0,10 z" fill="currentColor" class="flow-marker"></path>
@@ -472,9 +472,16 @@
         <circle class="dot" cx="500" cy="1884" r="2.4"></circle>
         <line class="flow" x1="500" y1="1884" x2="500" y2="1914" marker-end="url(#arrow)"></line>
 
+        <g class="node-work">
+          <rect x="405" y="1916" width="190" height="34" rx="6"></rect>
+          <text x="500" y="1937" text-anchor="middle">reportgen</text>
+        </g>
+
+        <line class="flow" x1="500" y1="1950" x2="500" y2="1994" marker-end="url(#arrow)"></line>
+
         <g class="node-final">
-          <rect x="400" y="1916" width="200" height="38" rx="19"></rect>
-          <text x="500" y="1940" text-anchor="middle" font-size="12.5">reportgen</text>
+          <rect x="400" y="1996" width="200" height="38" rx="19"></rect>
+          <text x="500" y="2020" text-anchor="middle" font-size="12.5">cleanup</text>
         </g>
       </svg>
     </div>
@@ -494,6 +501,20 @@
       <li><strong>orthofuser_branch alongside merge_branch.</strong> Both only need <code>short_fastas</code>, so they're independent until they join at <code>makeorthout</code>. This is the branch pair behind the test37/test36 timing delta you looked at earlier &mdash; each branch only took ~5s on the sample dataset, so the concurrency saved seconds there, but ~5h11m on the full SRR1789336 benchmark.</li>
       <li><strong>transrate alongside strandeval.</strong> Cheap and independent, so they still run as a small concurrent pair even though BUSCO right before them deliberately does <em>not</em> share its CPU budget with anything &mdash; it dwarfs both in wall time.</li>
     </ol>
+
+    <h2>One thing this diagram deliberately doesn't show</h2>
+    <p>
+      Gzipping the files a finished run keeps &mdash; the corrected read pair and the four individual
+      assemblies &mdash; isn't a step and has no place in the chain above. <code>compress_async()</code>
+      queues each file on a two-worker background pool the moment the step that <em>writes</em> it
+      returns: the corrected pair right after <code>run_rcorrector</code>, so it compresses underneath
+      Stage A and Stage B, and each assembly as its own assembler finishes. That's much earlier than
+      the pipeline is finished <em>reading</em> those files (<code>c1</code>/<code>c2</code> are read
+      through to <code>strandeval</code> at the very bottom), which is why the originals stay in place
+      until <code>cleanup</code> &mdash; by which point there is nothing left to compress and the last
+      node is a series of unlinks. The one place the pool is ever waited on is <code>cleanup</code>
+      itself, which refuses to delete an original whose <code>.gz</code> didn't finish.
+    </p>
   </div>
 
   <footer>oyster.py, Pipeline.main() &middot; sequential steps not shown branching are strict one-after-another dependencies in the code. For what each step reads and writes, see <a href="pipeline-steps.md">pipeline-steps.md</a>.</footer>

@@ -53,7 +53,7 @@ mamba create -y -c bioconda -c conda-forge --override-channels --name orp_orthof
 
 **3. Create the consolidated `orp` environment**
 
-Everything else — rcorrector, trimmomatic, cd-hit, diamond, salmon (the pipeline's own, modern version), samtools, seqtk, mcl, sra-tools, blast, parallel, biopython, scipy, numpy, bashplotlib, plus pytransrate and the snap-aligner it maps with — lives in one `orp` environment, defined in `orp_env.yml`:
+Everything else — rcorrector, trimmomatic, cd-hit, diamond, salmon (the pipeline's own, modern version), samtools, seqtk, mcl, sra-tools, blast, parallel, biopython, scipy, numpy, bashplotlib, pigz, plus pytransrate and the snap-aligner it maps with — lives in one `orp` environment, defined in `orp_env.yml`:
 
 ```bash
 mamba env create -f orp_env.yml

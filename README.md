@@ -44,6 +44,24 @@ CPU-bound stages that don't benefit from splitting cores — diamond, orp_diamon
 
 Set `--max-parallel 1` to disable concurrency for those stages and run them one at a time (useful when debugging, or on a machine where you'd rather not split cores). Raise it above 2 to run more jobs at once within a stage, at the cost of each job getting a smaller slice of `--cpu`/`--mem`.
 
+### What a finished run leaves behind
+
+A completed run keeps five things and reclaims the rest:
+
+| Kept | |
+|---|---|
+| `assemblies/<run>.ORP.fasta` | the assembly — the point of the run, left uncompressed |
+| `assemblies/<run>.{spades55,spades75,transabyss,trinity.Trinity}.fasta.gz` | the four individual assemblies, gzipped |
+| `rcorr/<run>.TRIM_{1,2}P.cor.fq.gz` | the trimmed **and error-corrected** reads, gzipped — the pair every assembler actually read |
+| `reports/` | BUSCO, transrate, strand evaluation, `qualreport.<run>`, timings |
+| `reports/<run>.cleanup.done` | what was reclaimed and what was kept, with sizes |
+
+Everything else goes: the trimmed-but-uncorrected reads (deleted as soon as read correction is done with them — nothing downstream ever reads them again), the `orthofuse/` tree (OrthoFinder's all-vs-all output and the transrate scoring of the pooled fasta, normally the largest directory in a run), `quants/`, `assemblies/diamond/`, `assemblies/working/`, and the chain of working assemblies between `orthofusing` and `.ORP.fasta`. Every number any of those contributed is already in `reports/qualreport.<run>`.
+
+The gzipping runs in the background, starting the moment each file is finished being written rather than at the end of the run — the corrected reads compress alongside the assemblers, and each assembly compresses while the next stage runs — so cleanup itself is just an unlink and adds no wall time. Pass `--keep-intermediates` to switch all of this off and keep a run exactly as it was, which is what you want when debugging a run rather than shipping its results.
+
+Re-running `oyster.py` on a directory whose run already finished and was cleaned up is a no-op: it reports where the assembly and reports are and exits, rather than treating the reclaimed intermediates as work to redo. To assemble the same reads again, use a different `--runout`/`--dir`, or delete `reports/<run>.cleanup.done` to force a full re-run in place.
+
 ### All flags
 
 | Flag | Default | Description |
@@ -62,6 +80,7 @@ Set `--max-parallel 1` to disable concurrency for those stages and run them one 
 | `--spades2-kmer` | `75` | rnaSPAdes k-mer for the spades75 assembly |
 | `--transabyss-kmer` | `32` | Trans-ABySS k-mer |
 | `--max-parallel` | `2` | Max concurrent jobs per stage (see [Parallel task management](#parallel-task-management) above) |
+| `--keep-intermediates` | off | Keep every file a run produces, uncompressed (see [What a finished run leaves behind](#what-a-finished-run-leaves-behind) below) |
 | `--dir` | current directory | Working directory |
 | `--version` | — | Print the installed ORP version and exit |
 | `--help` | — | Print this same flag reference and exit |

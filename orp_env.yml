@@ -13,6 +13,11 @@ dependencies:
   - rcorrector=1.0.7
   - trimmomatic=0.41
   - cd-hit=4.8.1
+  # Only used by oyster.py's background compression of the assemblies and
+  # corrected reads. Optional: it falls back to plain gzip when absent, but
+  # a corrected read pair is tens of GB and the point of that compression is
+  # for it to finish while an assembler is still running.
+  - pigz=2.8
   - diamond=2.2.5
   # salmon >=2.6 is required by pytransrate: it passes --errorModel, which
   # only exists from 2.6 on (it was --useErrorModel before). snap-aligner and

@@ -123,6 +123,32 @@ def write_sorted(path: Path, ids) -> None:
             f.write(i + "\n")
 
 
+def human_size(nbytes) -> str:
+    size = float(nbytes)
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if size < 1024 or unit == "TB":
+            return f"{size:.0f} {unit}" if unit == "B" else f"{size:.1f} {unit}"
+        size /= 1024
+
+
+def path_size(path: Path) -> int:
+    """Bytes on disk under `path`, whether it's one file or a whole tree."""
+    path = Path(path)
+    if not path.is_dir():
+        try:
+            return path.lstat().st_size
+        except OSError:
+            return 0
+    total = 0
+    for root, _dirs, files in os.walk(path):
+        for name in files:
+            try:
+                total += (Path(root) / name).lstat().st_size
+            except OSError:
+                pass
+    return total
+
+
 def is_gzip(path: Path) -> bool:
     with open(path, "rb") as fh:
         return fh.read(2) == b"\x1f\x8b"
@@ -163,13 +189,13 @@ class Pipeline:
         self.normalize_reads = args.normalize_reads
         self.tpm_filt = args.tpm_filt
         self.max_parallel = max(1, args.max_parallel)
+        self.keep_intermediates = args.keep_intermediates
 
         self.version = (self.makedir / "version.txt").read_text().strip()
         self.busco_config = self.makedir / "software" / "config.ini"
         os.environ["BUSCO_CONFIG_FILE"] = str(self.busco_config)
         self.diamond_db = self.makedir / "software" / "diamond" / "swissprot"
 
-        self.reads_dir = self.dir / "reads"
         self.rcorr_dir = self.dir / "rcorr"
         self.assemblies_dir = self.dir / "assemblies"
         self.assemblies_working = self.assemblies_dir / "working"
@@ -183,6 +209,15 @@ class Pipeline:
         self.run_cmd = "oyster.py " + " ".join(sys.argv[1:])
         self.steps = []
         self._timing_lock = threading.Lock()
+        # Background gzip of the files a finished run keeps -- see
+        # compress_async(). Two workers is enough: the six files queued over
+        # a run are queued in pairs, and this is meant to run *beside* an
+        # assembler, not to compete with one.
+        self._compress_pool = concurrent.futures.ThreadPoolExecutor(
+            max_workers=2, thread_name_prefix="compress")
+        self._compressions = {}
+        self._compress_lock = threading.Lock()
+        self._compress_cmd = None
 
     # -- process helpers -------------------------------------------------
 
@@ -215,6 +250,240 @@ class Pipeline:
 
     def conda_run(self, env, *cmd, **kwargs):
         self.run(["conda", "run", "--no-capture-output", "-n", env, *[str(c) for c in cmd]], **kwargs)
+
+    # -- background compression / reclaim -----------------------------------
+
+    def _rel(self, path):
+        try:
+            return str(Path(path).relative_to(self.dir))
+        except ValueError:
+            return str(path)
+
+    def _resolve_compressor(self):
+        """argv prefix that writes a gzip stream of its file argument to stdout.
+
+        pigz wherever one is available: these jobs are hidden behind a stage
+        that already owns most of the machine, but a corrected read pair is
+        tens of GB and single-threaded gzip can still be running long after
+        the stage that was meant to hide it has ended. The thread count is
+        deliberately small for the same reason -- this is background work,
+        not a stage of its own. Falls back to plain gzip so an `orp` env
+        built before pigz was added to orp_env.yml keeps working.
+        """
+        if self._compress_cmd is None:
+            threads = str(max(1, min(4, self.cpu // 8)))
+            if shutil.which("pigz"):
+                self._compress_cmd = ["pigz", "-c", "-p", threads]
+            elif self.which_in_env("orp", "pigz"):
+                self._compress_cmd = ["conda", "run", "--no-capture-output", "-n", "orp",
+                                      "pigz", "-c", "-p", threads]
+            else:
+                self._compress_cmd = ["gzip", "-c"]
+            print(f"[compress] using: {' '.join(self._compress_cmd)}")
+        return self._compress_cmd
+
+    def compress_async(self, path):
+        """Queue `path` for gzipping in the background, original left in place.
+
+        Called when a file stops being *written*, which is much earlier than
+        when it stops being *read*: the corrected reads feed every assembler
+        and every alignment step through to `strandeval`, and the four
+        assemblies are read again at `run_filtershort`, `diamond_*` and
+        `posthack`. So the .gz is built alongside the original while the
+        pipeline runs, and cleanup() at the end only has to unlink -- which
+        is what puts the compression cost in parallel with an assembler
+        instead of on the end of the run, where it would be pure added wall
+        time.
+
+        A no-op if the .gz is already at least as new as its source, so a
+        resumed run doesn't recompress work the previous one finished.
+        """
+        path = Path(path)
+        if self.keep_intermediates or not path.exists():
+            return
+        gz = path.with_suffix(path.suffix + ".gz")
+        if gz.exists() and gz.stat().st_mtime >= path.stat().st_mtime:
+            return
+        with self._compress_lock:
+            if path in self._compressions:
+                return
+            self._resolve_compressor()
+            self._compressions[path] = self._compress_pool.submit(self._compress, path, gz)
+
+    def _compress(self, src, gz):
+        # _compress_cmd was resolved by compress_async() under _compress_lock
+        # before this job was submitted, so workers only ever read it.
+        part = gz.with_name(gz.name + ".part")
+        start = time.time()
+        try:
+            with open(part, "wb") as out:
+                subprocess.run(self._compress_cmd + [str(src)], check=True,
+                               stdout=out, cwd=str(self.dir))
+            part.replace(gz)
+        except BaseException:
+            # Never leave a truncated .gz behind that a later run would
+            # mistake for a finished one on mtime alone.
+            if part.exists():
+                part.unlink()
+            raise
+        print(f"[compress] {self._rel(gz)} written in {int(time.time() - start)}s "
+              f"({human_size(path_size(src))} -> {human_size(path_size(gz))})", flush=True)
+
+    def compression_done(self, path) -> bool:
+        """Block until `path`'s .gz is finished; True only if it really is.
+
+        The precondition for deleting the uncompressed original. A failed
+        compression is reported and returns False rather than raising --
+        losing a background gzip is a reason to keep the plain file, not to
+        fail a run whose actual work is already done.
+        """
+        path = Path(path)
+        future = self._compressions.get(path)
+        if future is not None:
+            try:
+                future.result()
+            except Exception as e:
+                print(f"*** compressing {self._rel(path)} failed ({e}); "
+                      "keeping the uncompressed file ***")
+                return False
+        gz = path.with_suffix(path.suffix + ".gz")
+        return gz.exists() and gz.stat().st_size > 0
+
+    def finish_compression(self):
+        """Join the background pool. Called on every exit path, including failure."""
+        pending = [p for p, f in self._compressions.items() if not f.done()]
+        if pending:
+            print("\n=== waiting on background compression: "
+                  + ", ".join(self._rel(p) for p in pending) + " ===", flush=True)
+        self._compress_pool.shutdown(wait=True)
+
+    def reclaim_trimmed_reads(self):
+        """Delete the trimmed-but-uncorrected reads, once rcorrector has read them.
+
+        Trimmomatic writes four files (both paired mates and both unpaired
+        ones) and nothing past run_rcorrector ever opens any of them again --
+        every assembler and every alignment step reads the corrected pair.
+        They're the same order of magnitude as the raw input, so this is both
+        the largest reclaim in the run and the earliest one available, which
+        is why it doesn't wait for cleanup() at the end.
+
+        The sentinel is what keeps this from costing a resumed run a re-trim:
+        main() asks for the TRIM files back as outputs only while the
+        corrected pair is missing or stale.
+        """
+        if self.keep_intermediates:
+            return
+        freed = 0
+        for suffix in ("1P", "2P", "1U", "2U"):
+            p = self.rcorr_dir / f"{self.runout}.TRIM_{suffix}.fastq"
+            if p.exists():
+                freed += path_size(p)
+                p.unlink()
+        (self.rcorr_dir / f"{self.runout}.trim.done").touch()
+        if freed:
+            print(f"[cleanup] reclaimed {human_size(freed)} of trimmed reads "
+                  f"(rcorr/{self.runout}.TRIM_*.fastq); the corrected pair is what "
+                  "everything downstream reads")
+
+    def already_complete(self) -> bool:
+        """True if a previous run finished *and* cleanup() already ran on it.
+
+        needs_run() decides each step from its outputs, and cleanup deletes
+        most of those -- so without this guard, re-invoking oyster.py on a
+        finished, cleaned run directory (a resubmitted cluster job, say)
+        would find nearly every stage 'out of date' and quietly reassemble
+        from scratch over a completed run, where today it no-ops. The marker
+        plus a .ORP.fasta still newer than the raw reads is the whole
+        condition; anything else (new reads, a deleted assembly) falls
+        through to the normal resume path.
+        """
+        marker = self.reports_dir / f"{self.runout}.cleanup.done"
+        orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
+        if not marker.exists() or self.needs_run([orp_fasta], [self.read1, self.read2]):
+            return False
+        print(f"\n=== {self.runout} already finished, and its intermediate files "
+              "have been reclaimed ===")
+        print(f"    assembly:  {orp_fasta}")
+        print(f"    reports:   {self.reports_dir}")
+        print(f"    reclaimed: {marker}")
+        print("\n    Nothing to do. Assemble these reads again under a different "
+              "--runout/--dir,\n    or delete the marker above to force a full "
+              "re-run in place.\n")
+        return True
+
+    def cleanup(self):
+        """Reclaim everything a finished run doesn't need any more.
+
+        What survives: reports/, the final .ORP.fasta, the four individual
+        assemblies and the corrected read pair -- the last two as the .gz
+        compress_async() has been building in the background since each was
+        written, so this step only unlinks. A file whose compression didn't
+        finish is kept uncompressed instead of being deleted.
+
+        Everything removed here is reproducible from what's kept: the
+        orthofuse tree (OrthoFinder's all-vs-all output plus pytransrate's
+        scoring of the pooled fasta -- normally the largest directory in the
+        run), the diamond hits and the list1-list7 set algebra built from
+        them, the salmon index and quantification, and the chain of working
+        assemblies between orthofusing and .ORP.fasta. Every number any of
+        it contributed is already in reports/qualreport.<run>.
+        """
+        if self.keep_intermediates:
+            print("[cleanup] --keep-intermediates given; leaving intermediates in place")
+            return
+
+        orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
+        freed = 0
+        kept = [f"{self._rel(orp_fasta)}  (the assembly)",
+                f"{self._rel(self.reports_dir)}/  (all reports)"]
+        removed = []
+
+        for src in [self.cor1(), self.cor2()] + [
+            self.assemblies_dir / f"{self.runout}.{n}" for n in SHORT_ASSEMBLY_NAMES
+        ]:
+            gz = src.with_suffix(src.suffix + ".gz")
+            if src.exists() and self.compression_done(src):
+                freed += path_size(src)
+                src.unlink()
+            elif src.exists():
+                kept.append(f"{self._rel(src)}  (left uncompressed -- gzip did not finish)")
+                continue
+            if gz.exists():
+                kept.append(f"{self._rel(gz)}  ({human_size(path_size(gz))})")
+
+        for path in (
+            self.dir / "orthofuse",
+            self.assemblies_working,
+            self.diamond_dir,
+            self.quants_dir,
+            # Trinity's --full_cleanup normally removes this itself; a run
+            # that was interrupted and resumed can still leave it behind.
+            self.trinity_out_dir(),
+            self.assemblies_dir / f"{self.runout}.orthomerged.fasta",
+            self.assemblies_dir / f"{self.runout}.ORP.intermediate.fasta",
+            self.assemblies_dir / f"{self.runout}.ORP.diamond.txt",
+            self.assemblies_dir / f"{self.runout}.flagstat",
+            self.assemblies_dir / f"{self.runout}.filter.done",
+        ):
+            if not path.exists():
+                continue
+            size, is_dir = path_size(path), path.is_dir()
+            if is_dir:
+                shutil.rmtree(path, ignore_errors=True)
+            else:
+                path.unlink()
+            freed += size
+            removed.append(f"{self._rel(path)}{'/' if is_dir else ''}  ({human_size(size)})")
+
+        lines = [f"Command: {self.run_cmd}", "",
+                 f"Reclaimed {human_size(freed)} of intermediate files "
+                 f"at {self._ts()}.", "", "kept:"]
+        lines += [f"  {k}" for k in kept]
+        lines += ["", "removed:"]
+        lines += [f"  {r}" for r in removed] or ["  (nothing left to remove)"]
+        text = "\n".join(lines) + "\n"
+        (self.reports_dir / f"{self.runout}.cleanup.done").write_text(text)
+        print("\n" + text)
 
     # -- resumability ------------------------------------------------------
 
@@ -333,7 +602,7 @@ class Pipeline:
 
     def setup(self):
         for d in (
-            self.reads_dir, self.assemblies_dir, self.rcorr_dir, self.reports_dir,
+            self.assemblies_dir, self.rcorr_dir, self.reports_dir,
             self.orthofuse_dir, self.quants_dir, self.diamond_dir, self.assemblies_working,
         ):
             d.mkdir(parents=True, exist_ok=True)
@@ -1056,12 +1325,15 @@ class Pipeline:
     def main(self):
         pipeline_start = time.time()
         self.setup()
+        if self.already_complete():
+            return
         self.timing_init()
         self.check()
         self.welcome()
         self.readcheck()
 
         t1, t2 = self.trim1(), self.trim2()
+        trim_done = self.rcorr_dir / f"{self.runout}.trim.done"
         c1, c2 = self.cor1(), self.cor2()
         trinity_fa = self.assemblies_dir / f"{self.runout}.trinity.Trinity.fasta"
         sp75 = self.assemblies_dir / f"{self.runout}.spades75.fasta"
@@ -1108,9 +1380,28 @@ class Pipeline:
         transrate_csv = self.reports_dir / f"transrate_{self.runout}" / "assemblies.csv"
         strandeval_done = self.reports_dir / f"{self.runout}.strandeval.done"
         qualreport_done = self.reports_dir / f"qualreport.{self.runout}.done"
+        cleanup_done = self.reports_dir / f"{self.runout}.cleanup.done"
 
-        self.step("run_trimmomatic", [t1, t2], [self.read1, self.read2], self.run_trimmomatic)
+        # Ask for the trimmed pair back as trimmomatic's outputs only while
+        # the corrected pair it feeds is missing or stale: reclaim_trimmed_
+        # reads() deletes those files as soon as rcorrector is done with them,
+        # so on a resumed run they're legitimately gone and their sentinel,
+        # not the files, is what records that trimming happened. A working
+        # directory from before the sentinel existed has no sentinel and its
+        # TRIM files still present, so it takes the first branch and skips
+        # the same way it always did.
+        trim_outputs = [t1, t2]
+        if trim_done.exists() and not self.needs_run([c1, c2], [self.read1, self.read2]):
+            trim_outputs = [trim_done]
+        self.step("run_trimmomatic", trim_outputs, [self.read1, self.read2], self.run_trimmomatic)
         self.step("run_rcorrector", [c1, c2], [t1, t2], self.run_rcorrector)
+        self.reclaim_trimmed_reads()
+        # Every stage from here through strandeval reads c1/c2, so they can't
+        # be replaced by their .gz until cleanup() -- but the compression
+        # itself starts now, behind the assemblers, rather than being paid
+        # for serially once the run is otherwise over.
+        self.compress_async(c1)
+        self.compress_async(c2)
 
         # Two sequential stage-pairings rather than one lane split across all
         # four assemblers for the whole run -- see TRINITY_PHASE1_SHARE and
@@ -1165,6 +1456,7 @@ class Pipeline:
                 ):
                     self.step(step_name, outputs, inputs, partial(assemble, cpu=spades_cpu, mem=spades_mem))
                     query = outputs[0]
+                    self.compress_async(query)
                     self.step(
                         f"diamond_{diamond_name}", [diamond_out], [query],
                         partial(self.run_diamond_one, query, diamond_out, cpu=spades_cpu),
@@ -1186,6 +1478,7 @@ class Pipeline:
                     [self.trinity_out_dir() / "recursive_trinity.cmds.ok"],
                     partial(self.run_trinity_phase2, cpu=phase2_cpu, mem=phase2_mem),
                 )
+                self.compress_async(trinity_fa)
             except Exception as e:
                 _lane_failed("run_trinity_phase2", e)
                 raise
@@ -1196,6 +1489,7 @@ class Pipeline:
                     "run_transabyss", [ta], [c1, c2],
                     partial(self.run_transabyss, cpu=transabyss_cpu, mem=transabyss_mem),
                 )
+                self.compress_async(ta)
                 self.step(
                     "diamond_transabyss", [diamond_ta], [ta],
                     partial(self.run_diamond_one, ta, diamond_ta, cpu=transabyss_cpu),
@@ -1286,6 +1580,8 @@ class Pipeline:
             max_workers=self.max_parallel,
         )
         self.step("reportgen", [qualreport_done], [unique_orp_done, orp_fasta], self.reportgen, timed=False)
+        # Last, because it deletes inputs several of the steps above declare.
+        self.step("cleanup", [cleanup_done], [qualreport_done], self.cleanup, timed=False)
 
         self.timing_report(int(time.time() - pipeline_start))
 
@@ -1319,6 +1615,13 @@ def parse_args():
              "sequentially at full --cpu; 1 disables concurrency for the remaining "
              "stages entirely (default: 2)",
     )
+    p.add_argument(
+        "--keep-intermediates", action="store_true",
+        help="keep every file a run produces: skips both the end-of-run cleanup "
+             "(orthofuse/, quants/, diamond/, the working assemblies) and the "
+             "reclaim of the trimmed reads, and leaves the four assemblies and "
+             "the corrected reads uncompressed. For debugging a run (default: off)",
+    )
     p.add_argument("--dir", default=None, help="working directory (default: current directory)")
     return p.parse_args()
 
@@ -1332,6 +1635,12 @@ def main():
         sys.exit(f"\n*** step failed: {' '.join(str(c) for c in e.cmd)} (exit {e.returncode}) ***")
     except FileNotFoundError as e:
         sys.exit(f"\n*** required command not found: {e.filename} ***")
+    finally:
+        # The pool's threads are not daemons, so a run that dies mid-stage
+        # would otherwise sit at interpreter exit with no explanation of what
+        # it's waiting for. The .gz files themselves are still worth
+        # finishing: nothing has been deleted on this path.
+        pipeline.finish_compression()
 
 
 if __name__ == "__main__":
