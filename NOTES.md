@@ -7,6 +7,31 @@ stale.
 
 ## 2026-09-09
 
+- **Bumped the pytransrate pin to `v2.1.0`** (`orp_env.yml`). Verified before
+  bumping rather than after: the tag is on the remote at 53fe488, `cli.py`'s
+  only diff v2.0.0..v2.1.0 is passing `threads=args.threads` through to
+  `read_metrics`, and `tests/test_output.py` still pins `score`/`optimal_score`
+  at indices 36/37 of `assemblies.csv` and the contig score at column 9. So no
+  ORP-side code change: both call sites already pass `-t <cpu>`, which is now
+  what divides the scoring step too.
+  - **Deliberately did *not* add a `stamp_tool_version("orp", "pytransrate", ...)`**
+    alongside the salmon one. The salmon stamp exists because 2.7.0 *rejects*
+    an index an older salmon wrote -- a hard failure a resumed run walks into.
+    A pytransrate upgrade has no such edge: the artifacts stay readable, and
+    the only thing a stamp would buy is forcing a rescore. Across 2.0.0 ->
+    2.1.0 that rescore would cost hours of `orthotransrate` to reproduce the
+    same numbers to the fifteenth decimal. Revisit at the next pytransrate
+    release that actually moves scores -- that one wants the stamp, and wants
+    it added *with* the bump so an in-flight run directory is invalidated.
+  - `p_seq_true` is the one number that moves (<=3.3e-15, and only because it
+    was made exact and thread-independent). `contigs.csv` rounds to six
+    decimals, so the realistic blast radius is nil; noting it so it is not
+    mistaken for drift if a rescored run differs in the last digit.
+  - The stale-docstring item from the entry below is closed upstream: 2.1.0
+    carries "Correct compare_orthogroup_picks' account of where groups come
+    from", and its `--pick-best` now imports this repo's `best_in_group` when
+    the target is ORP 4.0.0+, rather than mirroring the rule.
+
 - **Did #2: the `.groups` round-trip is deleted.** `makelist`/`makegroups`
   are gone, `scripts/pick_best_contigs.py` takes `Orthogroups.txt` instead of
   a directory of `*.groups`. Went with option B (keep the script, change its

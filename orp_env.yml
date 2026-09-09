@@ -31,4 +31,4 @@ dependencies:
     - numpy
     - bashplotlib
     # Not on PyPI; pinned to a tag so an install is reproducible.
-    - pytransrate @ git+https://github.com/macmanes-lab/pytransrate.git@v2.0.0
+    - pytransrate @ git+https://github.com/macmanes-lab/pytransrate.git@v2.1.0
