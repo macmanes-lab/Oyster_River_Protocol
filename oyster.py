@@ -328,11 +328,13 @@ class Pipeline:
         else:
             sys.exit("*** SALMON is not installed, must fix ***")
 
+        transrate_bin = self.makedir / "software" / "orp-transrate" / "transrate"
+        if os.access(transrate_bin, os.X_OK):
+            print("TRANSRATE installed")
+        else:
+            sys.exit("*** TRANSRATE is not installed, must fix ***")
+
         for env, binary, label in (
-            ("orp", "pytransrate", "PYTRANSRATE"),
-            # pytransrate shells out to snap-aligner; salmon above is its
-            # other external binary.
-            ("orp", "snap-aligner", "SNAP"),
             ("orp", "seqtk", "SEQTK"),
             ("orp_busco", "busco", "BUSCO"),
             ("orp", "mcl", "MCL"),
@@ -578,16 +580,13 @@ class Pipeline:
     def orthotransrate(self, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
         outdir = self.orthofuse_dir / "merged"
-        # pytransrate refuses an output directory that already holds an
-        # assemblies.csv rather than overwriting it, so clear a previous
-        # result first -- needs_run() re-runs this step whenever the reads
-        # are newer than the csv, not only when the csv is absent.
-        shutil.rmtree(outdir, ignore_errors=True)
         self.conda_run(
-            "orp", "pytransrate",
+            "orp", self.makedir / "software" / "orp-transrate" / "transrate",
             "-o", outdir, "-t", cpu, "-a", self.orthofuse_dir / "merged.fasta",
             "--left", self.cor1(), "--right", self.cor2(),
         )
+        for f in outdir.rglob("*.bam"):
+            f.unlink()
 
     def makeorthout(self):
         print("Picking the best contig per orthogroup")
@@ -841,14 +840,13 @@ class Pipeline:
         cpu = self.cpu if cpu is None else cpu
         orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
         outdir = self.reports_dir / f"transrate_{self.runout}"
-        # See orthotransrate() -- pytransrate will not overwrite an existing
-        # assemblies.csv.
-        shutil.rmtree(outdir, ignore_errors=True)
         self.conda_run(
-            "orp", "pytransrate",
+            "orp", self.makedir / "software" / "orp-transrate" / "transrate",
             "-o", outdir, "-a", orp_fasta,
             "--left", self.cor1(), "--right", self.cor2(), "-t", cpu,
         )
+        for f in outdir.rglob("*.bam"):
+            f.unlink()
 
     def trinity_perllib_dir(self):
         result = subprocess.run(

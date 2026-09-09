@@ -17,7 +17,7 @@ cd Oyster_River_Protocol
 make
 ```
 
-`make` chains through everything: creates the conda environments (including OrthoFinder's), builds the diamond search database, downloads the BUSCO lineage database, and appends any needed PATH entries to `~/.profile`/`~/.bash_profile`. Each step checks whether it's already done and skips itself if so, so re-running `make` after a partial or failed install picks up where it left off rather than starting over.
+`make` chains through everything: creates the conda environments (including OrthoFinder's), unpacks orp-transrate, builds the diamond search database, downloads the BUSCO lineage database, and appends any needed PATH entries to `~/.profile`/`~/.bash_profile`. Each step checks whether it's already done and skips itself if so, so re-running `make` after a partial or failed install picks up where it left off rather than starting over.
 
 When it finishes, run:
 
@@ -53,7 +53,7 @@ mamba create -y -c bioconda -c conda-forge --override-channels --name orp_orthof
 
 **3. Create the consolidated `orp` environment**
 
-Everything else — rcorrector, trimmomatic, cd-hit, diamond, salmon (the pipeline's own, modern version), samtools, seqtk, mcl, sra-tools, blast, parallel, biopython, scipy, numpy, bashplotlib — lives in one `orp` environment, defined in `orp_env.yml`. That file also installs [pytransrate](https://github.com/macmanes-lab/pytransrate) from its git tag, along with the `snap-aligner` and `salmon` builds it needs (pytransrate requires salmon ≥ 2.6, which is why `orp` pins 2.7.0):
+Everything else — rcorrector, trimmomatic, cd-hit, diamond, salmon (the pipeline's own, modern version), samtools, seqtk, mcl, sra-tools, blast, parallel, biopython, scipy, numpy, bashplotlib — lives in one `orp` environment, defined in `orp_env.yml`:
 
 ```bash
 mamba env create -f orp_env.yml
@@ -63,7 +63,15 @@ mamba env create -f orp_env.yml
 
 Already created in step 2 above (`orp_orthofinder`) — nothing further needed here.
 
-**5. Diamond's Swiss-Prot search database**
+**5. orp-transrate** (already bundled in the repo — just unpack it)
+
+```bash
+cd software
+tar -zxf orp-transrate.tar.gz
+cd ..
+```
+
+**6. Diamond's Swiss-Prot search database**
 
 ```bash
 mkdir -p software/diamond
@@ -74,11 +82,18 @@ conda run -n orp diamond makedb --in uniprot_sprot.fasta -d swissprot
 cd ../..
 ```
 
-**6. BUSCO's eukaryota lineage database**
+**7. BUSCO's eukaryota lineage database**
 
 ```bash
 mkdir -p busco_dbs
 conda run -n orp_busco busco --download eukaryota_odb12.2 --download_path busco_dbs
+```
+
+**8. Add orp-transrate to your PATH**
+
+```bash
+echo "export PATH=\$PATH:$(pwd)/software/orp-transrate" >> ~/.profile
+source ~/.profile
 ```
 
 ## Updating an existing `orp` environment

@@ -3,6 +3,7 @@ pathfile
 shared/
 busco_dbs/
 software/anaconda/
+software/orp-transrate/
 software/diamond/*.fasta
 software/diamond/*.dmnd
 __pycache__/
