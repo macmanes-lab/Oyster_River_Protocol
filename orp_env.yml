@@ -14,12 +14,16 @@ dependencies:
   - trimmomatic=0.41
   - cd-hit=4.8.1
   - diamond=2.2.5
+  # salmon >=2.6 is required by pytransrate: it passes --errorModel, which
+  # only exists from 2.6 on (it was --useErrorModel before). snap-aligner and
+  # pysam are pytransrate's other two runtime requirements.
   - salmon=2.7.0
   - snap-aligner=2.0.5
-  - pysam
+  - pysam=0.24.1
   - pip=26.2.1
   - pip:
     - scipy
     - numpy
     - bashplotlib
+    # Not on PyPI; pinned to a tag so an install is reproducible.
     - pytransrate @ git+https://github.com/macmanes-lab/pytransrate.git@v2.0.0

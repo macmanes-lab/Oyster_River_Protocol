@@ -615,6 +615,12 @@ class Pipeline:
     def orthotransrate(self, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
         outdir = self.orthofuse_dir / "merged"
+        # pytransrate refuses an output directory that already holds an
+        # assemblies.csv rather than overwriting it, the way the Ruby did.
+        # needs_run() re-runs this step whenever the corrected reads are
+        # newer than that csv -- not only when it is absent -- so a resumed
+        # run would abort here unless the previous result is cleared first.
+        shutil.rmtree(outdir, ignore_errors=True)
         self.conda_run(
             "orp", "pytransrate",
             "-o", outdir, "-t", cpu, "-a", self.orthofuse_dir / "merged.fasta",
@@ -877,6 +883,9 @@ class Pipeline:
         cpu = self.cpu if cpu is None else cpu
         orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
         outdir = self.reports_dir / f"transrate_{self.runout}"
+        # See orthotransrate() -- pytransrate will not overwrite an existing
+        # assemblies.csv.
+        shutil.rmtree(outdir, ignore_errors=True)
         self.conda_run(
             "orp", "pytransrate",
             "-o", outdir, "-a", orp_fasta,
