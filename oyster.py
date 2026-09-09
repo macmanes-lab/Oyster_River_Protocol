@@ -900,31 +900,6 @@ class Pipeline:
             sys.exit("Orthogroups.txt not found under orthofuse working directory")
         return match
 
-    def makelist(self):
-        orthogroups = self.find_orthogroups_txt()
-        with open(orthogroups) as f:
-            n = sum(1 for _ in f)
-        out = self.orthofuse_dir / f"{self.runout}.list"
-        with open(out, "w") as f:
-            for i in range(1, n + 1):
-                f.write(f"{i}\n")
-
-    def makegroups(self):
-        orthogroups = self.find_orthogroups_txt()
-        with open(orthogroups) as f:
-            lines = f.readlines()
-
-        def write_group(i):
-            tokens = lines[i - 1].split()
-            group_file = self.orthofuse_dir / f"{i}.groups"
-            with open(group_file, "w") as f:
-                for tok in tokens[1:]:
-                    f.write(tok + "\n")
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.cpu) as ex:
-            list(ex.map(write_group, range(1, len(lines) + 1)))
-        (self.orthofuse_dir / "groups.done").touch()
-
     def orthotransrate(self, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
         outdir = self.orthofuse_dir / "merged"
@@ -941,6 +916,18 @@ class Pipeline:
         )
 
     def makeorthout(self):
+        """Pick the best-scoring contig per orthogroup.
+
+        The picker used to consume a directory of one <i>.groups file per
+        orthogroup, written by a makelist/makegroups pair here and unlinked
+        again on the way out -- of order 1e5 small files created, globbed
+        back in and deleted, purely to hand data between two Python
+        processes. It reads Orthogroups.txt directly now; the group ordering
+        that used to come out of sorting those filenames is reproduced
+        inside the script, deliberately, because it reaches cd-hit-est and
+        so the final assembly (see the note at the top of
+        scripts/pick_best_contigs.py).
+        """
         print("Picking the best contig per orthogroup")
         contigs_csv = next(self.orthofuse_dir.rglob("contigs.csv"), None)
         if contigs_csv is None:
@@ -948,10 +935,8 @@ class Pipeline:
         good_list = self.orthofuse_dir / f"good.{self.runout}.list"
         self.conda_run(
             "orp", "python", self.makedir / "scripts" / "pick_best_contigs.py",
-            contigs_csv, self.orthofuse_dir, good_list,
+            contigs_csv, self.find_orthogroups_txt(), good_list,
         )
-        for f in self.orthofuse_dir.glob("*groups"):
-            f.unlink()
 
     def orthofusing(self):
         good_list = self.orthofuse_dir / f"good.{self.runout}.list"
@@ -1387,8 +1372,6 @@ class Pipeline:
         short_fastas = self.short_fasta_paths()
         orthofuser_done = self.orthofuse_dir / "orthofuser.done"
         merged_fasta = self.orthofuse_dir / "merged.fasta"
-        list_file = self.orthofuse_dir / f"{self.runout}.list"
-        groups_done = self.orthofuse_dir / "groups.done"
         merged_csv = self.orthofuse_dir / "merged" / "assemblies.csv"
         good_list = self.orthofuse_dir / f"good.{self.runout}.list"
         orthomerged_fasta = self.assemblies_dir / f"{self.runout}.orthomerged.fasta"
@@ -1554,34 +1537,21 @@ class Pipeline:
 
         def orthofuser_branch(cpu=None, mem=None):
             self.step("run_orthofuser", [orthofuser_done], short_fastas, partial(self.run_orthofuser, cpu=cpu))
-            # Timed on purpose, though both are pure Python: makegroups writes
-            # one <i>.groups file per orthogroup -- of order 1e5 of them into a
-            # single directory -- which pick_best_contigs.py then globs back in
-            # and makeorthout unlinks. makeorthout is the only one of those
-            # three passes that has ever been timed (49s-1m33s on real runs,
-            # sampledata/benchmarks.md), so the write and delete passes have
-            # never been measured at all. They are the metadata-heavy kind of
-            # work a network filesystem is worst at, and the whole round-trip
-            # is a candidate for deletion -- but measure it before rewriting
-            # anything that can reorder good.<run>.list.
-            self.step("makelist", [list_file], [orthofuser_done], self.makelist)
-            self.step("makegroups", [groups_done], [list_file], self.makegroups)
 
         def merge_branch(cpu=None, mem=None):
             self.step("merge", [merged_fasta], short_fastas, self.merge, timed=False)
             self.step("orthotransrate", [merged_csv], [merged_fasta, c1, c2], partial(self.orthotransrate, cpu=cpu))
 
-        # run_orthofuser->makelist->makegroups and merge->orthotransrate are
-        # independent chains that both only need short_fastas; they join at
-        # makeorthout below.
+        # run_orthofuser and merge->orthotransrate are independent chains that
+        # both only need short_fastas; they join at makeorthout below.
         self.run_parallel(
             [
-                ("orthofuser_branch", [groups_done], short_fastas, orthofuser_branch),
+                ("orthofuser_branch", [orthofuser_done], short_fastas, orthofuser_branch),
                 ("merge_branch", [merged_csv], short_fastas, merge_branch),
             ],
             max_workers=self.max_parallel,
         )
-        self.step("makeorthout", [good_list], [groups_done, merged_csv], self.makeorthout)
+        self.step("makeorthout", [good_list], [orthofuser_done, merged_csv], self.makeorthout)
         self.step("orthofusing", [orthomerged_fasta], [good_list, merged_fasta], self.orthofusing)
 
         # diamond_transabyss/spades75/spades55 already ran in the short

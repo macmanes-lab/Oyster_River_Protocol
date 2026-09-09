@@ -7,6 +7,30 @@ stale.
 
 ## 2026-09-09
 
+- **Did #2: the `.groups` round-trip is deleted.** `makelist`/`makegroups`
+  are gone, `scripts/pick_best_contigs.py` takes `Orthogroups.txt` instead of
+  a directory of `*.groups`. Went with option B (keep the script, change its
+  input) over folding it into `Pipeline`: the only thing A saved was one
+  `conda run` activation, a second or two, against a round-trip worth minutes
+  -- and keeping the picker runnable on its own matters for a step that makes
+  a scientific choice you may want to re-run by hand.
+  - **Ordering was the whole risk and it is preserved.** The old glob sorted
+    filenames, so lexicographic (`1, 10, 100, 2, ...`), not numeric; that
+    order reaches `cd-hit-est` through `good.<run>.list` and
+    `orthomerged.fasta`, where it breaks length ties. `good.<run>.list` is
+    byte-identical old-vs-new on synthetic sets n=1..1111 (ties, zero and
+    negative scores, contigs missing from `contigs.csv`, duplicate rows,
+    blank lines), and the test asserts its own data distinguishes
+    lexicographic from numeric order so it would actually catch a regression.
+  - `compare_orthogroup_picks.py` in pytransrate was never at risk -- its
+    `--orthogroups` mode already rebuilt groups from `Orthogroups.txt`.
+    **Its docstring is now stale though**: it says "makeorthout deletes the
+    *.groups files", when ORP no longer writes them at all, and its
+    `oyster.py:580`/`oyster.py:601` line references have drifted. Worth a
+    small commit in that repo; `--groups DIR` is now dead in practice.
+  - `makelist`'s `<run>.list` went too: written, declared as `makegroups`'s
+    input, never opened by anything.
+
 - **Trinity's `--full_cleanup` was costing a resumed run both phases (~35h);
   fixed with a sentinel outside the directory it deletes.** `cmds.ok` was
   Phase 1's declared output *and* Phase 2's declared input, and Phase 2
@@ -26,15 +50,6 @@ stale.
     directory where Phase 1 looks done but the plain `.Trinity.fasta` is gone
     (only the `.gz` remains), so a forced re-run would skip Phase 1 and send
     Phase 2 in without its checkpoints.
-
-- **Still open (#2 from the same review, not done):** `makegroups` writes one
-  `<i>.groups` file per orthogroup -- 10^5-ish tiny files into a single
-  directory -- which `scripts/pick_best_contigs.py` globs and reads back one
-  at a time and `makeorthout` then unlinks. Pure metadata churn for data that
-  only has to cross one `conda run` boundary, and it's the kind of thing
-  Lustre/GPFS is worst at. An interrupted run between those two steps also
-  strands all of them. Candidate: hand the picker `Orthogroups.txt` and
-  `contigs.csv` directly and delete the intermediate files entirely.
 
 - **Runs now clean up after themselves (`cleanup`, `reclaim_trimmed_reads`,
   `compress_async`, `already_complete`).** A finished run keeps `reports/`,
