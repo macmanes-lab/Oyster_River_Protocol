@@ -342,12 +342,19 @@ def parse_args():
     p = argparse.ArgumentParser(
         description="Merge assemblies you already have, using the ORP.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="Assemblies are merged in the order given; list the one you trust most first.",
+        epilog="Assembly order matters -- it breaks cd-hit-est's length ties and ranks\n"
+               "the diamond rescue -- so by default it is not taken from the command\n"
+               "line: the assemblies are sorted by label and permuted with a fixed\n"
+               "seed, making the order a function of the set of assemblies rather than\n"
+               "of how you listed them. Pass --assembly-order given to rank them\n"
+               "yourself, best first.",
     )
     version = (HERE / "version.txt").read_text().strip()
     p.add_argument("--version", action="version", version=f"Oyster River Protocol {version} (chowder)")
     p.add_argument("--assemblies", nargs="+", required=True, metavar="FASTA",
-                   help="two or more assemblies to merge, best first (.gz is fine)")
+                   help="two or more assemblies to merge (.gz is fine); the order you "
+                        "list them in does not decide the merge order -- see "
+                        "--assembly-order")
     p.add_argument("--labels", nargs="+", default=None, metavar="LABEL",
                    help="one name per assembly, used for its contig-name prefix and "
                         "its line in the quality report (default: from the filenames)")
