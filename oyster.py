@@ -159,6 +159,18 @@ TRINITY_PHASE2_SHARE = 0.95
 STEP_RETRIES = 2
 STEP_RETRY_DELAY = 60
 
+# OrthoFinder's -t is the count of *concurrent diamond processes* it launches
+# for its all-vs-all -- n_assemblies^2 of them, each given `-p 1` -- and every
+# one sizes its own block against whatever memory looks free at the moment it
+# starts, in ignorance of its siblings. Set from cores alone, -t 20 on a
+# four-assembly run puts 16 `--more-sensitive` diamonds on the node at once,
+# each budgeting as though it owned the machine, and the OOM killer takes them
+# out mid-search: SIGKILL surfaces as returncode -9 in OrthoFinder's error
+# report, while the ones that lose the allocation race more politely exit 1
+# from their own bad_alloc. So cap -t by memory as well as by cores, at
+# roughly one concurrent search per this many GB.
+ORTHOFINDER_GB_PER_SEARCH = 8
+
 
 def awk_first_field(src: Path, dst: Path) -> None:
     with open(src) as inf, open(dst, "w") as outf:
@@ -991,9 +1003,19 @@ class Pipeline:
 
     def run_orthofuser(self, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
+        mem = self.mem if mem is None else mem
+        # -t is a memory knob and not only a core count -- see
+        # ORTHOFINDER_GB_PER_SEARCH. -a, the analysis threads, is RAM-hungry
+        # in its own right and OrthoFinder's own default is t/8; it used to be
+        # handed the whole core count here, which under -og buys nothing at
+        # all, since that run stops at orthogroups and never reaches the
+        # MSA/tree work -a exists to parallelise.
+        searches = max(1, min(cpu, mem // ORTHOFINDER_GB_PER_SEARCH))
+        analysis = max(1, searches // 8)
         self.conda_run(
             "orp_orthofinder", "orthofinder",
-            "-d", "-I", "12", "-f", self.orthofuse_working, "-og", "-t", cpu, "-a", cpu,
+            "-d", "-I", "12", "-f", self.orthofuse_working,
+            "-og", "-t", searches, "-a", analysis,
         )
         (self.orthofuse_dir / "orthofuser.done").touch()
 
@@ -1018,11 +1040,19 @@ class Pipeline:
         # needs_run() re-runs this step whenever the corrected reads are
         # newer than that csv -- not only when it is absent -- so a resumed
         # run would abort here unless the previous result is cleared first.
+        # retry_cleanup repeats that rmtree before each retry, because the
+        # clear above happens once, outside run()'s retry loop. pytransrate
+        # reuses whatever mapping and quantification it finds already sitting
+        # in -o, so a step killed part-way through leaves a BAM with no BGZF
+        # EOF marker behind and every later attempt picks that same truncated
+        # file back up and dies on it -- paying for the contig-metrics pass
+        # again each time to reach an identical traceback.
         shutil.rmtree(outdir, ignore_errors=True)
         self.conda_run(
             "orp", "pytransrate",
             "-o", outdir, "-t", cpu, "-a", self.orthofuse_dir / "merged.fasta",
             "--left", self.cor1(), "--right", self.cor2(),
+            retry_cleanup=outdir,
         )
 
     def makeorthout(self):
@@ -1288,6 +1318,7 @@ class Pipeline:
             "orp", "pytransrate",
             "-o", outdir, "-a", orp_fasta,
             "--left", self.cor1(), "--right", self.cor2(), "-t", cpu,
+            retry_cleanup=outdir,
         )
 
     def trinity_perllib_dir(self):
@@ -1665,7 +1696,11 @@ class Pipeline:
         self.step("run_filtershort", short_fastas, assembly_fastas, self.run_filtershort)
 
         def orthofuser_branch(cpu=None, mem=None):
-            self.step("run_orthofuser", [orthofuser_done], short_fastas, partial(self.run_orthofuser, cpu=cpu))
+            # mem reaches run_orthofuser because OrthoFinder's search
+            # concurrency is now capped against it; left unforwarded it would
+            # cap against the whole machine while holding half of it.
+            self.step("run_orthofuser", [orthofuser_done], short_fastas,
+                      partial(self.run_orthofuser, cpu=cpu, mem=mem))
 
         def merge_branch(cpu=None, mem=None):
             self.step("merge", [merged_fasta], short_fastas, self.merge, timed=False)
