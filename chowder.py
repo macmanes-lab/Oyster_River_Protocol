@@ -347,7 +347,7 @@ class Chowder(Pipeline):
         self.assemblycheck()
         self.step(
             "ingest", self.assembly_fasta_paths() + [self.ingest_done],
-            self.sources, self.ingest, timed=False,
+            self.sources, self.ingest,
         )
         self.prepare_reads()
         self.merge_and_report(pipeline_start)

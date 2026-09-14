@@ -1703,7 +1703,7 @@ class Pipeline:
                       partial(self.run_orthofuser, cpu=cpu, mem=mem))
 
         def merge_branch(cpu=None, mem=None):
-            self.step("merge", [merged_fasta], short_fastas, self.merge, timed=False)
+            self.step("merge", [merged_fasta], short_fastas, self.merge)
             self.step("orthotransrate", [merged_csv], [merged_fasta, c1, c2], partial(self.orthotransrate, cpu=cpu))
 
         # run_orthofuser and merge->orthotransrate are independent chains that
@@ -1738,13 +1738,13 @@ class Pipeline:
                 f"diamond_{a.diamond_label}", [out], [fasta],
                 partial(self.run_diamond_one, fasta, out),
             )
-        self.step("diamond_uniq", uniq_outs, diamond_outs, self.diamond_uniq, timed=False)
-        self.step("make_list1", [list1], [diamond_orthomerged], self.make_list1, timed=False)
-        self.step("make_list2", [list2], [self.diamond_txt(a) for a in self.assemblies], self.make_list2, timed=False)
-        self.step("make_list3", [list3], [list1, list2], self.make_list3, timed=False)
+        self.step("diamond_uniq", uniq_outs, diamond_outs, self.diamond_uniq)
+        self.step("make_list1", [list1], [diamond_orthomerged], self.make_list1)
+        self.step("make_list2", [list2], [self.diamond_txt(a) for a in self.assemblies], self.make_list2)
+        self.step("make_list3", [list3], [list1, list2], self.make_list3)
         self.step("make_list5", [list5], [list3] + [self.diamond_txt(a) for a in self.diamond_priority], self.make_list5)
-        self.step("make_list6", [list6], [orthomerged_fasta], self.make_list6, timed=False)
-        self.step("make_list7", [list7], [list6, list5], self.make_list7, timed=False)
+        self.step("make_list6", [list6], [orthomerged_fasta], self.make_list6)
+        self.step("make_list7", [list7], [list6, list5], self.make_list7)
         self.step("posthack", [newbies, working_orthomerged], [list7], self.posthack)
         self.step("cdhit", [orp_intermediate], [working_orthomerged], self.cdhit)
 
@@ -1753,11 +1753,11 @@ class Pipeline:
         # CPU to overlap with it costs more than the overlap saves, so both
         # run sequentially at full CPU instead.
         self.step("orp_diamond", [orp_diamond_txt], [orp_intermediate], self.orp_diamond)
-        self.step("orp_uniq", [unique_orp_done], [orp_diamond_txt], self.orp_uniq, timed=False)
+        self.step("orp_uniq", [unique_orp_done], [orp_diamond_txt], self.orp_uniq)
         salmon_stamp = self.stamp_tool_version("orp", "salmon", self.quants_dir / "salmon.version")
         self.step("salmon_index", [ortho_idx], [orp_intermediate, salmon_stamp], self.salmon_index)
         self.step("salmon", [quant_sf], [ortho_idx, c1, c2], self.salmon)
-        self.step("filter", [filter_done], [orp_intermediate, quant_sf, orp_diamond_txt], self.filter_tpm, timed=False)
+        self.step("filter", [filter_done], [orp_intermediate, quant_sf, orp_diamond_txt], self.filter_tpm)
         self.step(
             "secondfilter", [orp_fasta],
             [filter_done, low_txt, high_txt, orp_intermediate, quant_sf, orp_diamond_txt],
@@ -1776,9 +1776,9 @@ class Pipeline:
             ],
             max_workers=self.max_parallel,
         )
-        self.step("reportgen", [qualreport_done], [unique_orp_done, orp_fasta], self.reportgen, timed=False)
+        self.step("reportgen", [qualreport_done], [unique_orp_done, orp_fasta], self.reportgen)
         # Last, because it deletes inputs several of the steps above declare.
-        self.step("cleanup", [cleanup_done], [qualreport_done], self.cleanup, timed=False)
+        self.step("cleanup", [cleanup_done], [qualreport_done], self.cleanup)
 
         self.timing_report(int(time.time() - pipeline_start))
 
