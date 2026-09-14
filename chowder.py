@@ -68,6 +68,7 @@ import random
 import re
 import subprocess
 import sys
+import textwrap
 import time
 from pathlib import Path
 
@@ -176,6 +177,10 @@ def open_maybe_gzip(path):
 class Chowder(Pipeline):
     """oyster.py's Pipeline, fed assemblies instead of building them."""
 
+    # The qualreport a merge writes is otherwise identical in layout to a
+    # full run's; this is the line that tells them apart afterwards.
+    RUN_DESCRIPTION = "ORP chowder (merge only, assemblies supplied)"
+
     def __init__(self, args):
         sources = [Path(p).resolve() for p in args.assemblies]
         labels = derive_labels(sources, args.labels)
@@ -234,14 +239,35 @@ class Chowder(Pipeline):
         return [self.read1, self.read2] + self.sources
 
     def welcome(self):
+        """Say which program this is, at what version, on what command line.
+
+        Deliberately not oyster.py's oyster with one word changed. A merge
+        run and a full run share every stage after ingest and write the
+        same files into the same layout, so the banner is where the
+        difference has to be legible: a bowl rather than a shell, and a
+        line saying in as many words that the assemblers never ran. The
+        command is echoed because the interesting half of it -- which
+        assemblies, in what order, under which seed -- is what someone
+        reading the scrollback three weeks later needs and cannot
+        reconstruct from the output.
+        """
         print(RED)
         print("    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-        print("                    _.-~~~~~-._")
-        print("                 .-~   o   o   ~-.")
-        print("                (   .-'~~~~~'-.   )        OYSTER RIVER CHOWDER")
-        print(f"                 '-.___________.-'         version {self.version}")
-        print("                     '-.___.-'")
+        print("                        )   )   )")
+        print("                       (   (   (              OYSTER RIVER CHOWDER")
+        print("                     .-------------.")
+        print("                     \\  o   o   o  /          assemblies in,")
+        print("                      '-._______.-'           one assembly out")
         print("    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + RESET + "\n")
+        print(f"    version   {self.version} (chowder)")
+        print(textwrap.fill(
+            self.run_cmd, width=78, break_long_words=False, break_on_hyphens=False,
+            initial_indent="    command   ", subsequent_indent=" " * 14,
+        ))
+        print("\n    This is chowder, NOT a full ORP run: rnaSPAdes, TransABySS and")
+        print("    Trinity are never invoked here, and the assemblies merged are the")
+        print("    ones you supplied. Everything from OrthoFinder onward is oyster.py's")
+        print("    own code, so the merge itself is exactly a full ORP's.\n")
         if self.order_mode == "shuffled":
             origin = f"shuffled, seed {self.seed} -- not the order you listed them in"
         else:
@@ -312,8 +338,11 @@ class Chowder(Pipeline):
         if self.already_complete():
             return
         self.timing_init()
-        self.check()
+        # Before check(), unlike oyster.py: preflight opens with a dozen
+        # "<TOOL> installed" lines, and the first thing on the screen should
+        # be which program is doing the installing-checking.
         self.welcome()
+        self.check()
         self.readcheck()
         self.assemblycheck()
         self.step(

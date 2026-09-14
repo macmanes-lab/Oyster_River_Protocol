@@ -15,6 +15,7 @@ import csv
 import gzip
 import os
 import re
+import shlex
 import shutil
 import socket
 import subprocess
@@ -239,6 +240,12 @@ def hostname_suffix() -> str:
 
 
 class Pipeline:
+    # What a run calls itself in its quality report. chowder.py overrides it:
+    # a merge-only run writes a qualreport in exactly the same layout as a
+    # full one, so without this the file is the one place a finished run
+    # can't be told apart from an ORP that ran its own assemblers.
+    RUN_DESCRIPTION = "the ORP"
+
     def __init__(self, args):
         self.dir = Path(args.dir).resolve() if args.dir else Path.cwd()
         self.makedir = HERE
@@ -291,7 +298,12 @@ class Pipeline:
         self.quants_dir = self.dir / "quants"
 
         self.timing_log = self.reports_dir / f"{self.runout}.timing.log"
-        self.run_cmd = Path(sys.argv[0]).name + " " + " ".join(sys.argv[1:])
+        # Quoted, so the line a run prints and logs is the line you can paste
+        # back to repeat it: a read path with a space in it is otherwise
+        # recorded as two arguments.
+        self.run_cmd = " ".join(
+            shlex.quote(a) for a in [Path(sys.argv[0]).name] + sys.argv[1:]
+        )
         self.steps = []
         self._timing_lock = threading.Lock()
         # Background gzip of the files a finished run keeps -- see
@@ -1362,7 +1374,9 @@ class Pipeline:
             print(text)
             lines.append(text)
 
-        print(f"\n\n*****  QUALITY REPORT FOR: {runout} using the ORP version {self.version} ****")
+        header = f"*****  QUALITY REPORT FOR: {runout} using {self.RUN_DESCRIPTION} version {self.version} ****"
+        print(f"\n\n{header}")
+        lines.append(header)
         orp_fasta = self.assemblies_dir / f"{runout}.ORP.fasta"
         print(f"\n*****  THE ASSEMBLY CAN BE FOUND HERE: {orp_fasta} **** \n")
 
