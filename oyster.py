@@ -278,6 +278,10 @@ class Pipeline:
         self.tpm_filt = args.tpm_filt
         self.max_parallel = max(1, args.max_parallel)
         self.keep_intermediates = args.keep_intermediates
+        # Appended to both pytransrate invocations. shlex so a value can be
+        # quoted, and so the flags arrive as separate argv entries rather
+        # than one string pytransrate would reject.
+        self.pytransrate_args = shlex.split(getattr(args, "pytransrate_args", "") or "")
 
         # Everything from run_filtershort onwards works on "the assemblies"
         # rather than on four named assemblers, so a caller that brings its
@@ -1089,6 +1093,7 @@ class Pipeline:
             "orp", "pytransrate",
             "-o", outdir, "-t", cpu, "-a", self.orthofuse_dir / "merged.fasta",
             "--left", self.cor1(), "--right", self.cor2(),
+            *self.pytransrate_args,
             retry_cleanup=partial(self.clear_transrate_outdir, outdir),
         )
 
@@ -1354,6 +1359,7 @@ class Pipeline:
             "orp", "pytransrate",
             "-o", outdir, "-a", orp_fasta,
             "--left", self.cor1(), "--right", self.cor2(), "-t", cpu,
+            *self.pytransrate_args,
             retry_cleanup=partial(self.clear_transrate_outdir, outdir),
         )
 
@@ -1854,6 +1860,16 @@ def parse_args():
              "(orthofuse/, quants/, diamond/, the working assemblies) and the "
              "reclaim of the trimmed reads, and leaves the four assemblies and "
              "the corrected reads uncompressed. For debugging a run (default: off)",
+    )
+    p.add_argument(
+        "--pytransrate-args", default="",
+        help="extra arguments passed verbatim to both pytransrate runs, as one "
+             "quoted string, e.g. --pytransrate-args '--location-size 5'. For "
+             "the snap index tuning a large merge needs: --location-size skips "
+             "the sweep when you already know four byte locations will not hold "
+             "the genome, and --padding lowers what snap counts as genome in "
+             "the first place. Run `pytransrate --help` for the full set "
+             "(default: none)",
     )
     p.add_argument("--dir", default=None, help="working directory (default: current directory)")
     return p.parse_args()

@@ -420,6 +420,16 @@ def parse_args():
         help="keep every file the run produces: skips the end-of-run cleanup and "
              "the reclaim of the trimmed reads. For debugging (default: off)",
     )
+    p.add_argument(
+        "--pytransrate-args", default="",
+        help="extra arguments passed verbatim to both pytransrate runs, as one "
+             "quoted string, e.g. --pytransrate-args '--location-size 5'. For "
+             "the snap index tuning a large merge needs: --location-size skips "
+             "the sweep when you already know four byte locations will not hold "
+             "the genome, and --padding lowers what snap counts as genome in "
+             "the first place. Run `pytransrate --help` for the full set "
+             "(default: none)",
+    )
     p.add_argument("--dir", default=None, help="working directory (default: current directory)")
     return p.parse_args()
 
