@@ -332,11 +332,16 @@ class Pipeline:
 
     def run(self, cmd, cwd=None, retries=STEP_RETRIES, retry_delay=STEP_RETRY_DELAY,
             retry_cleanup=None, **kwargs):
-        """retry_cleanup: path or iterable of paths to rmtree before each retry --
-        for tools (SPAdes, TransAByss) that refuse to reuse a non-empty output
-        dir rather than resuming, so a bare retry would just fail differently
-        instead of actually re-attempting the work. Not needed for tools like
-        Trinity that resume from their own checkpoints in-place.
+        """retry_cleanup: what to clear before each retry, for tools (SPAdes,
+        TransAByss) that refuse to reuse a non-empty output dir rather than
+        resuming, so a bare retry would just fail differently instead of
+        actually re-attempting the work. Not needed for tools like Trinity
+        that resume from their own checkpoints in-place.
+
+        A path or iterable of paths is rmtree'd. A callable is called
+        instead, for a step where "clear the output directory" is too blunt
+        and something in it has to survive the retry -- see
+        clear_transrate_outdir.
         """
         printable = " ".join(str(c) for c in cmd)
         for attempt in range(retries + 1):
@@ -351,7 +356,9 @@ class Pipeline:
                     f"*** step failed (exit {e.returncode}), retrying in {retry_delay}s "
                     f"[attempt {attempt + 2}/{retries + 1}] ***"
                 )
-                if retry_cleanup is not None:
+                if callable(retry_cleanup):
+                    retry_cleanup()
+                elif retry_cleanup is not None:
                     paths = [retry_cleanup] if isinstance(retry_cleanup, (str, Path)) else retry_cleanup
                     for path in paths:
                         shutil.rmtree(path, ignore_errors=True)
@@ -1032,27 +1039,57 @@ class Pipeline:
             sys.exit("Orthogroups.txt not found under orthofuse working directory")
         return match
 
+    @staticmethod
+    def clear_transrate_outdir(outdir):
+        """Empty pytransrate's -o, keeping any completed snap index.
+
+        A retry has to start from a clear directory: pytransrate will not
+        overwrite an existing assemblies.csv, and it reuses whatever BAM it
+        finds already sitting in -o, so a step killed part-way leaves a BAM
+        with no BGZF EOF marker behind and every later attempt picks that
+        same truncated file back up and dies on it.
+
+        What a retry must not start from is a cold index. snap's index of
+        the merged assembly is the longest single piece of work in the run
+        -- the better part of an hour on a multi-million-contig merge, and
+        two builds rather than one whenever the -locationSize sweep steps up
+        -- and pytransrate reuses an index it finds, keyed on the
+        GenomeIndex marker snap writes when a build completes. rmtree'ing
+        the whole of -o threw that away every time, so three attempts at a
+        failing step meant three identical index builds and three identical
+        waits to reach the same failure. It also took logs/snap.log with it,
+        which is the file that would have said why the step failed at all.
+
+        A partial index carries no marker and so is not kept, which is the
+        behaviour we want: trusting a build that died half way yields a
+        corrupt index.
+        """
+        outdir = Path(outdir)
+        if not outdir.is_dir():
+            return
+        for path in outdir.iterdir():
+            if path.is_dir():
+                if (path / "GenomeIndex").is_file():
+                    continue
+                shutil.rmtree(path, ignore_errors=True)
+            else:
+                path.unlink(missing_ok=True)
+
     def orthotransrate(self, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
         outdir = self.orthofuse_dir / "merged"
-        # pytransrate refuses an output directory that already holds an
-        # assemblies.csv rather than overwriting it, the way the Ruby did.
         # needs_run() re-runs this step whenever the corrected reads are
-        # newer than that csv -- not only when it is absent -- so a resumed
-        # run would abort here unless the previous result is cleared first.
-        # retry_cleanup repeats that rmtree before each retry, because the
-        # clear above happens once, outside run()'s retry loop. pytransrate
-        # reuses whatever mapping and quantification it finds already sitting
-        # in -o, so a step killed part-way through leaves a BAM with no BGZF
-        # EOF marker behind and every later attempt picks that same truncated
-        # file back up and dies on it -- paying for the contig-metrics pass
-        # again each time to reach an identical traceback.
-        shutil.rmtree(outdir, ignore_errors=True)
+        # newer than merged/assemblies.csv -- not only when it is absent --
+        # so a resumed run would abort on that csv unless it is cleared
+        # first. retry_cleanup repeats the clear before each retry, because
+        # the one below happens once, outside run()'s retry loop. See
+        # clear_transrate_outdir for what survives it and why.
+        self.clear_transrate_outdir(outdir)
         self.conda_run(
             "orp", "pytransrate",
             "-o", outdir, "-t", cpu, "-a", self.orthofuse_dir / "merged.fasta",
             "--left", self.cor1(), "--right", self.cor2(),
-            retry_cleanup=outdir,
+            retry_cleanup=partial(self.clear_transrate_outdir, outdir),
         )
 
     def makeorthout(self):
@@ -1311,14 +1348,13 @@ class Pipeline:
         cpu = self.cpu if cpu is None else cpu
         orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
         outdir = self.reports_dir / f"transrate_{self.runout}"
-        # See orthotransrate() -- pytransrate will not overwrite an existing
-        # assemblies.csv.
-        shutil.rmtree(outdir, ignore_errors=True)
+        # See orthotransrate() and clear_transrate_outdir.
+        self.clear_transrate_outdir(outdir)
         self.conda_run(
             "orp", "pytransrate",
             "-o", outdir, "-a", orp_fasta,
             "--left", self.cor1(), "--right", self.cor2(), "-t", cpu,
-            retry_cleanup=outdir,
+            retry_cleanup=partial(self.clear_transrate_outdir, outdir),
         )
 
     def trinity_perllib_dir(self):
