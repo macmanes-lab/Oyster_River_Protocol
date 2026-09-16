@@ -13,6 +13,7 @@ can be re-invoked to resume where it left off.
 import argparse
 import csv
 import gzip
+import io
 import os
 import re
 import shlex
@@ -184,6 +185,51 @@ STEP_RETRY_DELAY = 60
 # the merged assembly on the pipeline's other branch, which no budget here or
 # anywhere else bounds.
 ORTHOFINDER_GB_PER_SEARCH = 12
+
+
+def line_buffer_stdio():
+    """Make our own output appear where it happened in a redirected log.
+
+    Python block-buffers stdout in 4-8 KB chunks when it is not a terminal,
+    which on a cluster it never is. Every tool we launch, though, inherits
+    the same file descriptor and writes to it directly, unbuffered. So the
+    pipeline's own narrative -- the banner, the `=== step -- start ===`
+    lines, the `+ <command>` echoes, the retry warnings -- sits in our
+    buffer while hours of OrthoFinder and pytransrate output stream past it,
+    and only lands when the buffer happens to fill.
+
+    It is not a cosmetic problem. On the 380C_0C5D_001F run the banner and
+    the whole of the first stage appeared *after* OrthoFinder's 15:54:51
+    output even though run_filtershort's own timestamp says 15:53:16, which
+    makes a log read as though steps ran in an order they did not, and puts
+    a failure's explanation somewhere other than next to the failure.
+
+    Line buffering also guarantees we have flushed before a child we spawn
+    writes anything, so the interleaving is right and not merely closer.
+
+    Not sys.stdout.reconfigure(): that is 3.7+, and the cluster launches
+    this under the system python3, which is 3.6.8. detach() rather than
+    wrapping .buffer directly, so replacing sys.stdout cannot leave the old
+    wrapper to close the descriptor out from under the new one when it is
+    collected.
+    """
+    for name in ("stdout", "stderr"):
+        stream = getattr(sys, name, None)
+        if stream is None:
+            continue
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(line_buffering=True)
+            continue
+        if not hasattr(stream, "detach") or not hasattr(stream, "encoding"):
+            continue  # already replaced by something that isn't a text stream
+        encoding, errors = stream.encoding, stream.errors
+        try:
+            detached = stream.detach()
+        except (AttributeError, ValueError):
+            continue
+        setattr(sys, name, io.TextIOWrapper(
+            detached, encoding=encoding, errors=errors, line_buffering=True))
 
 
 def awk_first_field(src: Path, dst: Path) -> None:
@@ -1947,6 +1993,7 @@ def parse_args():
 
 
 def main():
+    line_buffer_stdio()
     args = parse_args()
     pipeline = Pipeline(args)
     try:

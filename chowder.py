@@ -72,7 +72,9 @@ import textwrap
 import time
 from pathlib import Path
 
-from oyster import ASSEMBLER_TOOLS, CHECK_TOOLS, RED, RESET, Assembly, Pipeline
+from oyster import (
+    ASSEMBLER_TOOLS, CHECK_TOOLS, RED, RESET, Assembly, Pipeline, line_buffer_stdio,
+)
 
 HERE = Path(__file__).resolve().parent
 
@@ -435,6 +437,10 @@ def parse_args():
 
 
 def main():
+    # Before parse_args, and so before welcome(): a block-buffered stdout is
+    # why the banner landed halfway down the 380C_0C5D_001F log instead of at
+    # the top of it. See line_buffer_stdio.
+    line_buffer_stdio()
     args = parse_args()
     pipeline = Chowder(args)
     try:

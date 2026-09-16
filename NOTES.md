@@ -7,6 +7,30 @@ stale.
 
 ## 2026-09-16
 
+- **The chowder banner landed halfway down the 380C log, and the cause was
+  stdout buffering, not print order.** 5251238 already calls `welcome()`
+  before `check()`, and it does; what was wrong is that Python
+  block-buffers stdout in 4-8 KB chunks whenever it is not a terminal --
+  which on a cluster it never is -- while every tool we launch inherits the
+  same descriptor and writes to it directly, unbuffered. So the whole
+  parent-side narrative sat in our buffer while hours of OrthoFinder output
+  streamed past it.
+  - **The timestamps in the log prove it**: `run_filtershort` records
+    `15:53:16`, OrthoFinder's first line is `15:54:51`, and yet every
+    chowder line -- banner, `=== step -- start ===`, the `+ conda run`
+    echoes, the retry warnings -- appears *after* OrthoFinder's. Not
+    cosmetic: it makes a log read as though steps ran in an order they did
+    not, and it puts a failure's explanation somewhere other than next to
+    the failure.
+  - `line_buffer_stdio()` in oyster.py, called first thing in both entry
+    points' `main()`. Line buffering also guarantees we have flushed before
+    a child we spawn writes anything, so the interleaving is correct rather
+    than merely closer. **Not `sys.stdout.reconfigure()`** -- 3.7+, and the
+    cluster is on 3.6.8; the fallback wraps `detach()` rather than `.buffer`
+    so the discarded wrapper cannot close the descriptor out from under the
+    replacement when it is collected. Both paths verified against a parent
+    that prints and then spawns children, redirected to a file.
+
 - **The 380C_0C5D_001F chowder run died OOM; four oyster.py bugs came out of
   the post-mortem, and only one of them is the OOM.** `sacct` on the job:
   `OUT_OF_MEMORY`, `MaxRSS 751,425,356K` = **716.6 GiB against a 720 GiB
