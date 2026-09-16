@@ -5,6 +5,103 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-09-16
+
+- **The 380C_0C5D_001F chowder run died OOM; four oyster.py bugs came out of
+  the post-mortem, and only one of them is the OOM.** `sacct` on the job:
+  `OUT_OF_MEMORY`, `MaxRSS 751,425,356K` = **716.6 GiB against a 720 GiB
+  ReqMem**, 99.5% of the wall. Not close -- into it.
+  - **The memory is snap's, not diamond's, and 494e0a8 tuned the wrong half
+    of the node.** That commit's premise -- each diamond sizing its block
+    against whatever memory looks free when it starts -- is simply not what
+    diamond does. Its default block size is a fixed `-b2.0` and the manual's
+    own rule is "roughly six times this number of memory (in GB)", so ~12 GB
+    per process whatever the node. (`--more-sensitive` does not change it;
+    only `--very-sensitive`/`--ultra-sensitive` do, to `-b0.4`.)
+  - **And concurrency is capped by n_assemblies^2 before it is capped by
+    anything in oyster.py.** Four assemblies = 16 searches total (the log
+    says `16/16`), so `-t 20` could never have put more than 16 diamonds on
+    that node: **16 x 12 = ~192 GB**, comfortably inside the orthofuser
+    branch's 335 G budget. Which leaves **~525 GiB for the merge branch** --
+    73% of the whole node, against the same 335 G budget, and
+    `merge_branch` does not so much as pass `mem` to `orthotransrate`.
+    `ORTHOFINDER_GB_PER_SEARCH` corrected 8 -> 12 so the constant is at
+    least diamond's real number, but on a node over ~200 GB this cap is
+    structurally incapable of being what OOMs a four-assembly run. It is
+    not the lever and cannot be made into one.
+  - **Diamond died first but is the victim, not the cause.** Killing a 12 GB
+    diamond frees 12 GB, so the kernel has to keep going -- hence 27
+    oom-kill events, picking off what it could actually reclaim while the
+    process actually holding the memory ran on for another 8.4 hours.
+    `ERROR: Blast1_1.txt is corrupted` is a red herring: that "offending
+    line" is well-formed BLAST6, it is the last line read before the
+    *truncated* file gave out.
+  - From log ordering the peak looks like the snap **index build**
+    (16:11->16:49), not the alignment -- every diamond ERROR block lands
+    immediately after the "index built" line, and the 8.4 h alignment that
+    followed drew no further kills. Inference from interleaving, not a
+    measurement.
+  - **Open: how much of `11,019,008,229` is real sequence vs padding.**
+    Decides the fix and nobody has measured it. snap writes padding as `N`
+    and skips seeds containing `N`, so padding inflates the genome array
+    (1 byte/base) and forces `--location-size 5`, but adds *no* hash-table
+    entries. If padding dominates (2ac5d8d assumed 2000/contig) the build
+    should be cheap and 475 GiB does not add up -- something else holds it,
+    and `--padding` will not save the run. If real sequence dominates, the
+    build is one entry per non-N base through a sort and `--padding` helps
+    the genome array but not the wall. Count it off `merged.fasta`, or off
+    the BAM header (`@SQ` count = n, sum of `LN` = real bases).
+  - **Immediate mitigation regardless: `--max-parallel 1`.** Serialising the
+    branches makes the peak the larger of them alone rather than their sum:
+    orthofuser ~192 GB (528 GiB headroom), merge ~525 GiB (195 GiB
+    headroom). Both fit on this node; together they do not. Costs the
+    overlap -- roughly 19-20 h instead of ~10 h -- and note it is a fix for
+    *this* assembly, not a general one: at ~525 GiB the merge branch alone
+    is already at 73% of a 720 GiB node, so a somewhat larger merge OOMs
+    with nothing to serialise against.
+  - **chowder on a smaller dataset ran clean start to finish.** So none of
+    this is a code-path problem; it is purely resource sizing at scale, and
+    the scale variable is the merged assembly snap has to index.
+
+- **`unlink(missing_ok=True)` in `clear_transrate_outdir` -- 3.8+, and the
+  cluster launches oyster.py under the system python3, 3.6.8.** It fires
+  only on the retry path, so it converts a retryable failure into a crash
+  whose traceback buries the failure that caused it. That is what the
+  `TypeError` at the bottom of the 380C log is.
+  - **It also destroyed the evidence, and the run directory proves it.**
+    `iterdir()` reached `logs/` (a directory with no `GenomeIndex` marker)
+    and rmtree'd it, then hit the first *file* and raised -- so zero files
+    were deleted. Confirmed against the real directory: `logs/snap.log`
+    gone, snap index and the 159 GB BAM still there. snap.log was the only
+    thing that would have said why snap took SIGFPE, and it is
+    unrecoverable.
+  - **837e23f claimed logs/ was already preserved; it was not.** The commit
+    message says "It took merged/logs/snap.log with it too ... the evidence
+    was destroyed by the retry that needed it", but the code only ever
+    spared directories carrying a `GenomeIndex` marker. `logs/` is now
+    spared by name.
+  - **Next resume on the unfixed cluster code dies in seconds.** On the
+    failed run the pre-step clear returned early through
+    `if not outdir.is_dir()`. `merged/` now exists and holds files, so that
+    same call -- the one *outside* the retry loop -- raises immediately.
+    Deploying the fix is a precondition for resuming, not an improvement.
+
+- **OrthoFinder exits 0 after printing its own fatal errors**, so
+  `orthofuser.done` was written for a run that produced nothing.
+  `needs_run` would then skip the 10-hour step on every later resume and
+  hand `makeorthout` either nothing or a stale `Orthogroups.txt`, and the
+  run would go on to build a final assembly off an orthogroup set that was
+  never computed -- silently. `run_orthofuser` now drops a marker before
+  launching and requires a non-empty `Orthogroups.txt` newer than it, so the
+  sentinel comes from the artifact rather than from the exit status.
+  - `find_orthogroups_txt` took `rglob`'s first match. OrthoFinder never
+    reuses a results directory -- it makes a fresh `Results_<Mon><Day>`,
+    then `_1`, `_2` -- so after a failed attempt there are several and the
+    order is the filesystem's. Now newest by mtime.
+  - **The existing `orthofuser.done` in the 380C directory is already
+    poisoned.** The gate protects future runs, not that directory: delete
+    it and `Results_Sep15` by hand before resuming.
+
 ## 2026-09-09
 
 - **Branched `byo-assemblies` off `pytransrate` and added `chowder.py`:

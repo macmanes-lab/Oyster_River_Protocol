@@ -160,16 +160,30 @@ STEP_RETRIES = 2
 STEP_RETRY_DELAY = 60
 
 # OrthoFinder's -t is the count of *concurrent diamond processes* it launches
-# for its all-vs-all -- n_assemblies^2 of them, each given `-p 1` -- and every
-# one sizes its own block against whatever memory looks free at the moment it
-# starts, in ignorance of its siblings. Set from cores alone, -t 20 on a
-# four-assembly run puts 16 `--more-sensitive` diamonds on the node at once,
-# each budgeting as though it owned the machine, and the OOM killer takes them
-# out mid-search: SIGKILL surfaces as returncode -9 in OrthoFinder's error
-# report, while the ones that lose the allocation race more politely exit 1
-# from their own bad_alloc. So cap -t by memory as well as by cores, at
+# for its all-vs-all -- n_assemblies^2 of them, each given `-p 1` -- so set
+# from cores alone, -t 20 on a four-assembly run puts 16 `--more-sensitive`
+# diamonds on the node at once. Cap it by memory as well as by cores, at
 # roughly one concurrent search per this many GB.
-ORTHOFINDER_GB_PER_SEARCH = 8
+#
+# The figure is diamond's own: its default block size is a fixed -b2.0, and
+# "the program can be expected to use roughly six times this number of memory
+# (in GB)" -- so ~12 GB per process, whatever the node. (--more-sensitive does
+# not change it; only --very-sensitive and --ultra-sensitive do, to -b0.4.)
+# An earlier version of this comment had each diamond sizing its block against
+# whatever memory looked free when it started. That is not what diamond does,
+# and it is worth being precise about: a fixed per-process cost is one this
+# cap can actually model.
+#
+# Modelling it shows how little headroom this knob has. Concurrency is capped
+# by the searches that exist, n_assemblies^2, before it is capped by anything
+# here -- so a four-assembly run cannot put more than 16 diamonds on a node
+# whatever -t says, and its search memory cannot exceed ~16 * 12 = 192 GB. On
+# anything bigger than a ~200 GB node this cap is structurally incapable of
+# being what OOMs the job. When one does OOM anyway, the memory went somewhere
+# other than the searches -- on the run that prompted this, to snap's index of
+# the merged assembly on the pipeline's other branch, which no budget here or
+# anywhere else bounds.
+ORTHOFINDER_GB_PER_SEARCH = 12
 
 
 def awk_first_field(src: Path, dst: Path) -> None:
