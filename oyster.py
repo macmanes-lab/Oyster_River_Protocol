@@ -1061,23 +1061,37 @@ class Pipeline:
         GenomeIndex marker snap writes when a build completes. rmtree'ing
         the whole of -o threw that away every time, so three attempts at a
         failing step meant three identical index builds and three identical
-        waits to reach the same failure. It also took logs/snap.log with it,
-        which is the file that would have said why the step failed at all.
+        waits to reach the same failure.
 
         A partial index carries no marker and so is not kept, which is the
         behaviour we want: trusting a build that died half way yields a
         corrupt index.
+
+        logs/ is kept for a different reason: it holds snap.log, the file
+        pytransrate points at when snap dies without explaining itself, so
+        deleting it is deleting the evidence the retry exists to gather.
+        pytransrate rewrites it per attempt, so what survives the last
+        retry is the last attempt's output, which is the one worth reading.
         """
         outdir = Path(outdir)
         if not outdir.is_dir():
             return
         for path in outdir.iterdir():
             if path.is_dir():
-                if (path / "GenomeIndex").is_file():
+                if path.name == "logs" or (path / "GenomeIndex").is_file():
                     continue
                 shutil.rmtree(path, ignore_errors=True)
             else:
-                path.unlink(missing_ok=True)
+                # Not unlink(missing_ok=True): that keyword is 3.8+, and
+                # oyster.py is launched by whatever system python3 the
+                # cluster has -- 3.6.8 on ours. A TypeError raised here
+                # fires only on the retry path, i.e. only once a step has
+                # already failed, so it converts a retryable failure into a
+                # crash whose traceback hides the failure that caused it.
+                try:
+                    path.unlink()
+                except OSError:
+                    pass
 
     def orthotransrate(self, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
