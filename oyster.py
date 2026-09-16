@@ -1023,11 +1023,38 @@ class Pipeline:
         # MSA/tree work -a exists to parallelise.
         searches = max(1, min(cpu, mem // ORTHOFINDER_GB_PER_SEARCH))
         analysis = max(1, searches // 8)
+        # OrthoFinder reports its own fatal errors and then exits 0. A run
+        # whose diamonds were OOM-killed leaves truncated Blast*.txt behind,
+        # prints "ERROR: Blast1_1.txt is corrupted" and "ERROR: An error
+        # occurred", and still returns success -- so conda_run is happy, the
+        # sentinel gets written, and needs_run skips this step on every
+        # later resume. makeorthout is then handed either nothing or a stale
+        # Orthogroups.txt from an earlier attempt, and the run goes on to
+        # build a final assembly off an orthogroup set that was never
+        # computed. Take the sentinel from the artifact instead of from the
+        # exit status: drop a marker first, and require orthogroups newer
+        # than it, so a stale result from a previous attempt cannot pass.
+        marker = self.orthofuse_dir / "orthofuser.attempt"
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.touch()
         self.conda_run(
             "orp_orthofinder", "orthofinder",
             "-d", "-I", "12", "-f", self.orthofuse_working,
             "-og", "-t", searches, "-a", analysis,
         )
+        groups = self.newest_orthogroups_txt()
+        if groups is None or groups.stat().st_mtime < marker.stat().st_mtime:
+            sys.exit(
+                "orthofinder exited 0 but produced no Orthogroups.txt for this "
+                "attempt -- read its ERROR lines above. Its usual cause is "
+                "diamond being OOM-killed mid-search (returncode -9), which "
+                "leaves truncated Blast*.txt that OrthoFinder then reports as "
+                "corrupted. Lower --cpu or --max-parallel, or raise "
+                f"ORTHOFINDER_GB_PER_SEARCH (currently {ORTHOFINDER_GB_PER_SEARCH}), "
+                "and delete the failed Results_* directory before resuming."
+            )
+        if groups.stat().st_size == 0:
+            sys.exit(f"orthofinder produced an empty {groups}")
         (self.orthofuse_dir / "orthofuser.done").touch()
 
     def merge(self):
@@ -1037,8 +1064,24 @@ class Pipeline:
                 with open(p, "rb") as inf:
                     shutil.copyfileobj(inf, outf)
 
+    def newest_orthogroups_txt(self):
+        """The most recently written Orthogroups.txt, or None.
+
+        Newest rather than rglob's first: OrthoFinder never reuses a results
+        directory, it makes a new Results_<Mon><Day> (then _1, _2, ...) per
+        invocation, so a working directory that has seen a failed attempt
+        holds several. rglob's order is the filesystem's, which on a resume
+        after a failure is as likely to hand back the attempt that died as
+        the one that succeeded -- and makeorthout would pick contigs from it
+        without complaint.
+        """
+        matches = list(self.orthofuse_working.rglob("Orthogroups.txt"))
+        if not matches:
+            return None
+        return max(matches, key=lambda p: p.stat().st_mtime)
+
     def find_orthogroups_txt(self):
-        match = next(self.orthofuse_working.rglob("Orthogroups.txt"), None)
+        match = self.newest_orthogroups_txt()
         if match is None:
             sys.exit("Orthogroups.txt not found under orthofuse working directory")
         return match
