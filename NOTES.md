@@ -65,16 +65,41 @@ stale.
     immediately after the "index built" line, and the 8.4 h alignment that
     followed drew no further kills. Inference from interleaving, not a
     measurement.
-  - **Open: how much of `11,019,008,229` is real sequence vs padding.**
-    Decides the fix and nobody has measured it. snap writes padding as `N`
-    and skips seeds containing `N`, so padding inflates the genome array
-    (1 byte/base) and forces `--location-size 5`, but adds *no* hash-table
-    entries. If padding dominates (2ac5d8d assumed 2000/contig) the build
-    should be cheap and 475 GiB does not add up -- something else holds it,
-    and `--padding` will not save the run. If real sequence dominates, the
-    build is one entry per non-N base through a sort and `--padding` helps
-    the genome array but not the wall. Count it off `merged.fasta`, or off
-    the BAM header (`@SQ` count = n, sum of `LN` = real bases).
+  - **Measured off the dead run's BAM header, and it closes the `--padding`
+    question in the negative.** `5,354,958` contigs, `5,664,049,229` real
+    bases, padding `5,354,959,000` = **1000 per contig, not the 2000
+    2ac5d8d assumed**. Mean contig 1058 bp. (The same header reported
+    `EOF marker is absent`, so the BAM was indeed truncated -- restarting
+    rather than resuming was right on the facts.)
+    - **`--location-size 5` is mandatory here, not a tuning choice.** Real
+      sequence *alone* is 5.664 Gbp = **1.32x the 4.295 Gbp four-byte
+      ceiling**, so even `--padding 0` cannot get the genome back under it.
+      That was the main prize and it is not available.
+    - **Padding is worth ~1% and nothing else.** It is written as `N` and
+      seeds containing `N` are skipped, so it grows the 1 byte/base genome
+      array and touches nothing else: `--padding 0` saves 5.35 GB out of a
+      ~525 GiB branch. What does not shrink is the location table --
+      ~5.55e9 seed positions x 5 B = ~27.7 GB -- because that is set by
+      real sequence. **So drop `--padding`; 2ac5d8d's premise that it
+      "lowers what snap counts as genome" as a memory lever does not
+      survive the measurement, and its help text is corrected here.**
+  - **Still unaccounted for: genome array (11 GB) + location table (28 GB)
+    + hash overhead is ~50-70 GB for the finished index, against a merge
+    branch measured at ~525 GiB.** Do not invent a story for the gap. The
+    honest candidates are the index *build* (sorting 5.55e9 seed entries
+    needs several times the finished index) and Slurm `MaxRSS` under cgroup
+    v1 counting page cache -- this job wrote a 159 GB BAM plus a ~50 GB
+    index. The next run settles it: `merged/logs/snap.log` now survives,
+    and snap reports its own index and alignment memory there.
+  - **The lever that is left is the size of the merge itself.** 5.35M
+    contigs at 1058 bp mean is ~1.34M contigs / 1.42 Gbp *per input
+    assembly* -- genome-scale for a transcriptome, and the reason snap is
+    at the edge of what it can index. The knobs that would actually move it
+    are `long.seq.py`'s threshold (currently 200 bp; short contigs dominate
+    the count, which drives both padding total and per-contig overhead),
+    pre-filtering inputs by expression, or merging fewer assemblies. All
+    three change the science, so they are the user's call -- but that is
+    where the order of magnitude is.
   - **Immediate mitigation regardless: `--max-parallel 1`.** Serialising the
     branches makes the peak the larger of them alone rather than their sum:
     orthofuser ~192 GB (528 GiB headroom), merge ~525 GiB (195 GiB

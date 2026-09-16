@@ -1984,9 +1984,12 @@ def parse_args():
              "quoted string, e.g. --pytransrate-args '--location-size 5'. For "
              "the snap index tuning a large merge needs: --location-size skips "
              "the sweep when you already know four byte locations will not hold "
-             "the genome, and --padding lowers what snap counts as genome in "
-             "the first place. Run `pytransrate --help` for the full set "
-             "(default: none)",
+             "the genome. Note --padding is not the memory lever it looks like: "
+             "snap writes it as N and skips seeds containing N, so it grows the "
+             "1 byte/base genome array and nothing else -- on a 5.4M-contig, "
+             "5.7 Gbp merge, dropping it entirely saved 1%% of the branch, while "
+             "real sequence alone still exceeded the four-byte ceiling. Run "
+             "`pytransrate --help` for the full set (default: none)",
     )
     p.add_argument("--dir", default=None, help="working directory (default: current directory)")
     return p.parse_args()
