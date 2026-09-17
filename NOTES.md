@@ -5,6 +5,60 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-09-17
+
+- **`clear_transrate_outdir` was deleting the two most expensive things in
+  `-o` on every failed attempt: the BAM and `salmon/`.** It kept `logs/`
+  and any directory with a `GenomeIndex` marker and deleted everything
+  else, so a step that failed after mapping threw away 159 GB of snap
+  output and a finished `quant.sf` -- the same two artifacts the 380C run
+  proved were still on disk and still good when the retry fired. Three
+  attempts at a failing step therefore paid for three mappings to reach the
+  same failure.
+  - **Keeping them unconditionally would have been worse than deleting
+    them.** pytransrate 2.1.0 -- what ORP pinned when this was found --
+    reuses both on existence alone: `if os.path.exists(self.bam): return
+    self.bam`, and the same for `quant.sf`. So a half-written copy of
+    either is picked straight back up. The BAM at least dies loudly on the
+    missing BGZF EOF marker; a `quant.sf` cut at a line boundary does not
+    fail at all, it scores the assembly off whichever contigs made it into
+    the file, and those scores are what `pick_best_contigs.py` selects on.
+    2.2.0 (now pinned) checks the BAM and **still** reuses `quant.sf`
+    blind, so the `quant.sf` check stays load-bearing and the BAM check
+    becomes a question of disk rather than of correctness -- keeping a
+    truncated BAM is keeping hundreds of gigabytes nothing will read.
+  - **`quant.sf` is only as good as the BAM it came from**, so `salmon/` is
+    kept only beside a BAM that was kept, and then only when it holds one
+    whole row per contig in the assembly. That is why the function now
+    takes the assembly path -- it is the only thing that says how many rows
+    a complete `quant.sf` has.
+  - **Keep `*-read_count.txt` with the BAM.** Without it the reuse path
+    falls to `_load_read_count`'s fallback, which counts lines in the fastq
+    with a plain `open(path, "rb")` -- a full pass over the library, and
+    nonsense if the reads are ever handed over gzipped.
+  - **Every check fails towards deleting**, so being wrong about one costs
+    a recomputation, never a wrong score. Worth keeping that property in
+    mind before adding a fifth thing to spare.
+  - **The pin moved to `v2.2.0` in the same change.** Checked first, not
+    assumed: `score.py` and `output.py` are byte-identical across
+    2.1.0..2.2.0, so the formulas and the CSV column order ORP reads
+    positionally are untouched; the CLI is a strict superset, so nothing
+    either call site passes was dropped; `requires-python` and the three
+    runtime deps are unchanged, so only the tag in `orp_env.yml` moved.
+    Scores still move, through snap's input rather than the scorer --
+    contig padding 2000 -> 1000 on every assembly, and pipes no longer cut
+    out of deflines, which is inert for oyster.py and a real fix for
+    chowder on ENA/TSA input.
+  - **What is still ahead of the pin.** The commits that fix pytransrate's
+    own half of this -- `.align.done`, partial BAMs moved to `.partial`,
+    BAM deletion deferred to the end of a successful run -- are on
+    pytransrate master and **not pushed** (`master...origin/master [ahead
+    2]` as of 2026-09-17), so there is nothing to pin to. Push and tag
+    them, then this is worth revisiting. `clear_transrate_outdir` already
+    keeps `.align.done` beside a kept BAM so the move needs no ORP change:
+    drop it and that pytransrate would move a good BAM aside and map
+    again.
+
 ## 2026-09-16
 
 - **The snap SIGFPE is amplab/snap#171: an upstream bug, diagnosed and

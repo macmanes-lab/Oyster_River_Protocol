@@ -8,7 +8,9 @@
 > because `makeorthout` selects on contig-score *rank*, the assemblies themselves
 > differ, not only the reported number. The timings are still a useful scale, with
 > the caveat that `orthotransrate`/`transrate` are also the two steps pytransrate
-> 2.1.0's threading changed. A 4.0.0 baseline has to be measured, not adjusted.
+> changed most across the bumps 4.0.0 carries — 2.1.0's threading, and then
+> 2.2.0's contig padding, which changes snap's index and so the alignments
+> themselves. A 4.0.0 baseline has to be measured, not adjusted.
 
 
 ## TIME2_SRR1789336_norm_py_parallel (ORP 3.0.0) -- 2026-08-17
