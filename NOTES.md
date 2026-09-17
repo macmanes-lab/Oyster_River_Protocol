@@ -5,6 +5,638 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-09-16
+
+- **The snap SIGFPE is amplab/snap#171: an upstream bug, diagnosed and
+  fixed fourteen months ago, never released.** The backtrace settled in one
+  run what the log structurally could not. `AffineGapVectorized.cpp:351`,
+  with `patternLen = 0`: `numVec = (patternLen + 7) / 8` is then 0 and
+  `(patternLen - 1) % numVec` divides by zero. It is on the CIGAR path at
+  *write* time, not in the aligner -- `SimpleReadWriter::writePairs` ->
+  `BAMFormat::writePairs` -> `computeCigarOps` -> `SAMFormat::computeCigar`
+  -> `computeGlobalScoreNormalized`. Issue #171 was opened 2025-06-06 by
+  someone running transrate's Ruby flags against a Trinity assembly: same
+  provenance as ours, reached independently.
+  - **Bolosky's diagnosis (2025-07-21)**: the read must have multiple
+    alignments, one secondary alignment must back-clip it to exactly half
+    its length, and the writer must then run out of output buffer partway
+    through writing it. The flush-and-retry retains the back clipping, which
+    clips the *original* alignment to zero bases. His own note that
+    "different lengths would result in incorrect alignments but no crash"
+    is the part worth remembering: wherever this did not divide by zero it
+    was quietly writing wrong alignments.
+  - **The fix is `0e0997b` (2.0.6.dev.2) on `dev`, and it is two functional
+    lines** -- a `setAdditionalBackClipping(0)` reset at the top of each
+    alignment loop in `SimpleReadWriter::writePairs`. It has never been
+    released: master's last code change is the v2.0.5 release of May 2025,
+    there is no 2.0.6 tag, and so bioconda's latest is still 2.0.5. It is
+    unreleased only because the reporter said they would test it and went
+    quiet, which makes confirming it the cheapest lever anyone has on this.
+  - **The fix appears to carry a typo.** Its rewritten loop indexes
+    `reads[whichRead]` but leaves the subscript on
+    `clippingForReadAdjustment` at `[0]`, where 2.0.5 used `[0]` for read 0
+    and `[1]` for read 1 -- so read 1 takes read 0's front-clipping
+    adjustment. Raised as a question on the issue, not asserted.
+  - **`--max-parallel 1` worked; this was never the same failure.** The OOM
+    is fixed -- the run mapped for 17m44s and passed 100 GB of BAM before it
+    died. SIGFPE is not a memory symptom: x86-64 masks FP exceptions, so
+    signal 8 is always integer divide-by-zero or `idiv` overflow, and an
+    OOM would be SIGKILL.
+  - **The scale variable is the size of the BAM, not the size of the
+    assembly.** A full library against this merge produces ~160 GB of
+    output, so the writer refills its buffer more or less continuously and a
+    per-read-rare event becomes a certainty. Same pipeline, same flags, a
+    smaller assembly: clean. It also explains why the crash reproduces every
+    time at roughly the same elapsed point without being deterministic in
+    *which* read it kills.
+  - **MULTI_ALIGNMENT_SETTINGS' diagnosis was right and stays right; its
+    remedy is wrong.** "The fault is in the multiple-alignment path" is
+    exactly correct -- the bug requires a secondary alignment -- so last
+    session's bisect was measuring the real mechanism. But "try lowering
+    --max-alignments-per-pair and --max-seed-hits", which mapper.py's SIGFPE
+    message also says, does not work: we are already at `-H 4000 -D 2 -om 2`
+    against the Ruby's `-H 300000 -D 5 -om 5` and it still dies. Only
+    dropping `-om`/`-omax` outright would help, and that is not reachable
+    from the CLI. Both need correcting.
+  - **Three hypotheses from the session were wrong**, and are recorded so
+    they are not re-derived. (1) The >4 Gbase / `locationSize 5` story:
+    CIGAR generation does not care about location size, and
+    `doesGenomeIndexHave64BitLocations` gates nothing on this path. (2) "The
+    alignment start lands in the inter-contig padding" is a genuine *second*
+    route to `patternLen == 0` -- on the hangs-off-the-end branch the
+    algebra reduces to `patternLen = (contig end) - (alignment start)` --
+    but it is not the one that fires; ours reaches zero through `dataLength`
+    itself. (3) Contig count is not the exposure driver.
+  - **`--padding` is irrelevant here**, which closes that question a second
+    time and by a simpler argument than 507ab63's measurement: nothing on
+    the retained-back-clipping path touches padding at all.
+  - **The retry loop costs ~35 minutes an attempt for nothing** -- 14.5 min
+    of contig metrics, then ~17 min to the identical SIGFPE, three times
+    over. pytransrate exits 1 for everything (`cli.py:573`), so `run()`
+    cannot tell a deterministic crash from a transient failure. A distinct
+    exit code for "snap died on a signal", with `retries=0` against it,
+    pays for itself on the first failed merge.
+
+- **Taking the patched snap costs this run nothing, and changes
+  pytransrate's dependency story for everyone else.** pytransrate resolves
+  the aligner with `which("snap-aligner")` (`mapper.py:445`) and there is no
+  version gate anywhere -- `2.0.5` appears only in comments and docstrings,
+  and oyster.py's preflight checks presence, not version. So a patched
+  binary ahead of the env's copy on PATH is a drop-in: no `orp_env.yml`
+  change, no pytransrate change, no chowder change. (Overwriting in place
+  inside the env works but conda owns that file and a later install can
+  revert it silently.)
+  - **The whole delta from v2.0.5 to the fix is the fix.** Checked rather
+    than assumed: `git diff v2.0.5 0e0997b` is ReadWriter.cpp, the version
+    string, one help-text typo and one longer error message in
+    `validateCigarString` -- 2.0.4.dev.1 and 2.0.5.dev.1 predate the v2.0.5
+    tag and are already in it. ReadWriter.cpp is untouched by anything else
+    since v2.0.5, so `git checkout 0e0997b -- SNAPLib/ReadWriter.cpp` onto
+    v2.0.5 is exactly the fix and conflicts with nothing; building `dev` tip
+    is equivalent. Everything that was not crashing comes out identical
+    either way.
+  - **The cost that cannot be packaged away**: pytransrate's requirement
+    becomes "snap with #171 fixed", and no public release satisfies it.
+    Anyone installing standalone takes 2.0.5 from bioconda and hits this on
+    a large enough assembly. A lab conda package of 2.0.6.dev.2 would keep
+    `conda env create` declarative and is the sane stopgap, but it is a
+    binary we own until upstream tags 2.0.6. The real fix is the tag.
+  - **`-G-` (disable affine gap) was considered and rejected.** It routes
+    CIGAR generation to Landau-Vishkin, which has no such division, and
+    needs no rebuild -- but it is not reachable from the CLI today, and it
+    is assembly-changing: `contigs.csv` column 9 from orthotransrate is what
+    `pick_best_contigs.py` uses to choose each orthogroup's representative,
+    so different alignments mean a different `.ORP.fasta`.
+    `--pytransrate-args` reaches both pytransrate call sites, so it cannot
+    be confined to the report either. And with no pytransrate version stamp,
+    adding it to an existing run directory would silently pair affine-gap
+    picks with non-affine-gap scores -- the case the 2.1.0 entry below said
+    to revisit when a release finally moves scores.
+  - **The patched binary clears the reproduction.** v2.0.5 with
+    `0e0997b`'s ReadWriter.cpp and the subscript restored to `[whichRead]`,
+    built and installed over the env's copy as `2.0.5+snap171`, run against
+    the standalone snap command that died at 17m44s on stock 2.0.5: past it.
+    The full chowder run is going out on this binary, so this run's
+    `.ORP.fasta` and its transrate score are the first produced with a
+    patched aligner -- the `+snap171` banner in `merged/logs/snap.log` is
+    the only trace of that, which is why the version string was changed.
+  - **Outstanding**: post the confirmation on #171; correct mapper.py's
+    SIGFPE message and MULTI_ALIGNMENT_SETTINGS' remedy paragraph; decide on
+    packaging.
+
+- **The chowder banner landed halfway down the 380C log, and the cause was
+  stdout buffering, not print order.** 5251238 already calls `welcome()`
+  before `check()`, and it does; what was wrong is that Python
+  block-buffers stdout in 4-8 KB chunks whenever it is not a terminal --
+  which on a cluster it never is -- while every tool we launch inherits the
+  same descriptor and writes to it directly, unbuffered. So the whole
+  parent-side narrative sat in our buffer while hours of OrthoFinder output
+  streamed past it.
+  - **The timestamps in the log prove it**: `run_filtershort` records
+    `15:53:16`, OrthoFinder's first line is `15:54:51`, and yet every
+    chowder line -- banner, `=== step -- start ===`, the `+ conda run`
+    echoes, the retry warnings -- appears *after* OrthoFinder's. Not
+    cosmetic: it makes a log read as though steps ran in an order they did
+    not, and it puts a failure's explanation somewhere other than next to
+    the failure.
+  - `line_buffer_stdio()` in oyster.py, called first thing in both entry
+    points' `main()`. Line buffering also guarantees we have flushed before
+    a child we spawn writes anything, so the interleaving is correct rather
+    than merely closer. **Not `sys.stdout.reconfigure()`** -- 3.7+, and the
+    cluster is on 3.6.8; the fallback wraps `detach()` rather than `.buffer`
+    so the discarded wrapper cannot close the descriptor out from under the
+    replacement when it is collected. Both paths verified against a parent
+    that prints and then spawns children, redirected to a file.
+
+- **The 380C_0C5D_001F chowder run died OOM; four oyster.py bugs came out of
+  the post-mortem, and only one of them is the OOM.** `sacct` on the job:
+  `OUT_OF_MEMORY`, `MaxRSS 751,425,356K` = **716.6 GiB against a 720 GiB
+  ReqMem**, 99.5% of the wall. Not close -- into it.
+  - **The memory is snap's, not diamond's, and 494e0a8 tuned the wrong half
+    of the node.** That commit's premise -- each diamond sizing its block
+    against whatever memory looks free when it starts -- is simply not what
+    diamond does. Its default block size is a fixed `-b2.0` and the manual's
+    own rule is "roughly six times this number of memory (in GB)", so ~12 GB
+    per process whatever the node. (`--more-sensitive` does not change it;
+    only `--very-sensitive`/`--ultra-sensitive` do, to `-b0.4`.)
+  - **And concurrency is capped by n_assemblies^2 before it is capped by
+    anything in oyster.py.** Four assemblies = 16 searches total (the log
+    says `16/16`), so `-t 20` could never have put more than 16 diamonds on
+    that node: **16 x 12 = ~192 GB**, comfortably inside the orthofuser
+    branch's 335 G budget. Which leaves **~525 GiB for the merge branch** --
+    73% of the whole node, against the same 335 G budget, and
+    `merge_branch` does not so much as pass `mem` to `orthotransrate`.
+    `ORTHOFINDER_GB_PER_SEARCH` corrected 8 -> 12 so the constant is at
+    least diamond's real number, but on a node over ~200 GB this cap is
+    structurally incapable of being what OOMs a four-assembly run. It is
+    not the lever and cannot be made into one.
+  - **Diamond died first but is the victim, not the cause.** Killing a 12 GB
+    diamond frees 12 GB, so the kernel has to keep going -- hence 27
+    oom-kill events, picking off what it could actually reclaim while the
+    process actually holding the memory ran on for another 8.4 hours.
+    `ERROR: Blast1_1.txt is corrupted` is a red herring: that "offending
+    line" is well-formed BLAST6, it is the last line read before the
+    *truncated* file gave out.
+  - From log ordering the peak looks like the snap **index build**
+    (16:11->16:49), not the alignment -- every diamond ERROR block lands
+    immediately after the "index built" line, and the 8.4 h alignment that
+    followed drew no further kills. Inference from interleaving, not a
+    measurement.
+  - **Measured off the dead run's BAM header, and it closes the `--padding`
+    question in the negative.** `5,354,958` contigs, `5,664,049,229` real
+    bases, padding `5,354,959,000` = **1000 per contig, not the 2000
+    2ac5d8d assumed**. Mean contig 1058 bp. (The same header reported
+    `EOF marker is absent`, so the BAM was indeed truncated -- restarting
+    rather than resuming was right on the facts.)
+    - **`--location-size 5` is mandatory here, not a tuning choice.** Real
+      sequence *alone* is 5.664 Gbp = **1.32x the 4.295 Gbp four-byte
+      ceiling**, so even `--padding 0` cannot get the genome back under it.
+      That was the main prize and it is not available.
+    - **Padding is worth ~1% and nothing else.** It is written as `N` and
+      seeds containing `N` are skipped, so it grows the 1 byte/base genome
+      array and touches nothing else: `--padding 0` saves 5.35 GB out of a
+      ~525 GiB branch. What does not shrink is the location table --
+      ~5.55e9 seed positions x 5 B = ~27.7 GB -- because that is set by
+      real sequence. **So drop `--padding`; 2ac5d8d's premise that it
+      "lowers what snap counts as genome" as a memory lever does not
+      survive the measurement, and its help text is corrected here.**
+  - **Still unaccounted for: genome array (11 GB) + location table (28 GB)
+    + hash overhead is ~50-70 GB for the finished index, against a merge
+    branch measured at ~525 GiB.** Do not invent a story for the gap. The
+    honest candidates are the index *build* (sorting 5.55e9 seed entries
+    needs several times the finished index) and Slurm `MaxRSS` under cgroup
+    v1 counting page cache -- this job wrote a 159 GB BAM plus a ~50 GB
+    index. The next run settles it: `merged/logs/snap.log` now survives,
+    and snap reports its own index and alignment memory there.
+  - **The lever that is left is the size of the merge itself.** 5.35M
+    contigs at 1058 bp mean is ~1.34M contigs / 1.42 Gbp *per input
+    assembly* -- genome-scale for a transcriptome, and the reason snap is
+    at the edge of what it can index. The knobs that would actually move it
+    are `long.seq.py`'s threshold (currently 200 bp; short contigs dominate
+    the count, which drives both padding total and per-contig overhead),
+    pre-filtering inputs by expression, or merging fewer assemblies. All
+    three change the science, so they are the user's call -- but that is
+    where the order of magnitude is.
+  - **Immediate mitigation regardless: `--max-parallel 1`.** Serialising the
+    branches makes the peak the larger of them alone rather than their sum:
+    orthofuser ~192 GB (528 GiB headroom), merge ~525 GiB (195 GiB
+    headroom). Both fit on this node; together they do not. Costs the
+    overlap -- roughly 19-20 h instead of ~10 h -- and note it is a fix for
+    *this* assembly, not a general one: at ~525 GiB the merge branch alone
+    is already at 73% of a 720 GiB node, so a somewhat larger merge OOMs
+    with nothing to serialise against.
+  - **chowder on a smaller dataset ran clean start to finish.** So none of
+    this is a code-path problem; it is purely resource sizing at scale, and
+    the scale variable is the merged assembly snap has to index.
+
+- **`unlink(missing_ok=True)` in `clear_transrate_outdir` -- 3.8+, and the
+  cluster launches oyster.py under the system python3, 3.6.8.** It fires
+  only on the retry path, so it converts a retryable failure into a crash
+  whose traceback buries the failure that caused it. That is what the
+  `TypeError` at the bottom of the 380C log is.
+  - **It also destroyed the evidence, and the run directory proves it.**
+    `iterdir()` reached `logs/` (a directory with no `GenomeIndex` marker)
+    and rmtree'd it, then hit the first *file* and raised -- so zero files
+    were deleted. Confirmed against the real directory: `logs/snap.log`
+    gone, snap index and the 159 GB BAM still there. snap.log was the only
+    thing that would have said why snap took SIGFPE, and it is
+    unrecoverable.
+  - **837e23f claimed logs/ was already preserved; it was not.** The commit
+    message says "It took merged/logs/snap.log with it too ... the evidence
+    was destroyed by the retry that needed it", but the code only ever
+    spared directories carrying a `GenomeIndex` marker. `logs/` is now
+    spared by name.
+  - **Next resume on the unfixed cluster code dies in seconds.** On the
+    failed run the pre-step clear returned early through
+    `if not outdir.is_dir()`. `merged/` now exists and holds files, so that
+    same call -- the one *outside* the retry loop -- raises immediately.
+    Deploying the fix is a precondition for resuming, not an improvement.
+
+- **OrthoFinder exits 0 after printing its own fatal errors**, so
+  `orthofuser.done` was written for a run that produced nothing.
+  `needs_run` would then skip the 10-hour step on every later resume and
+  hand `makeorthout` either nothing or a stale `Orthogroups.txt`, and the
+  run would go on to build a final assembly off an orthogroup set that was
+  never computed -- silently. `run_orthofuser` now drops a marker before
+  launching and requires a non-empty `Orthogroups.txt` newer than it, so the
+  sentinel comes from the artifact rather than from the exit status.
+  - `find_orthogroups_txt` took `rglob`'s first match. OrthoFinder never
+    reuses a results directory -- it makes a fresh `Results_<Mon><Day>`,
+    then `_1`, `_2` -- so after a failed attempt there are several and the
+    order is the filesystem's. Now newest by mtime.
+  - **The existing `orthofuser.done` in the 380C directory is already
+    poisoned.** The gate protects future runs, not that directory: delete
+    it and `Results_Sep15` by hand before resuming.
+
+## 2026-09-09
+
+- **Branched `byo-assemblies` off `pytransrate` and added `chowder.py`:
+  bring your own assemblies, merge them with the ORP.** Decision was
+  shared-engine-plus-thin-entry-point over either a `--skip-assembly` flag
+  on `oyster.py` or a standalone copy. The merge half is where every
+  assembly-changing subtlety lives, so two copies of it would drift
+  invisibly; but half of `oyster.py`'s flags (k-mers, `--strand`,
+  `--normalize-reads`) are meaningless without assemblers, so one CLI would
+  have been half-inert. `Chowder(Pipeline)` overriding `main()` gets both.
+  - **The refactor that made it possible was the risky part, so it was
+    measured, not eyeballed.** Two harnesses in the scratchpad: one dumps
+    every assembly-derived path, order and report line; the other traces the
+    entire step graph with the tools stubbed out. Both were captured from
+    the pre-refactor `oyster.py` first and diffed after. Result: the 40-step
+    graph, every declared input and output, `posthack`'s cat order,
+    `build_list5.py`'s priority order and the `qualreport` line text are all
+    unchanged. Worth keeping those harnesses in mind for the next
+    structural change -- this repo has no test suite at all.
+  - **There were three different orders of the same four assemblers**, and
+    that was the trap. Concatenation order (sp55, sp75, ta, trinity) reaches
+    cd-hit-est through `merged.fasta` and `posthack`, where it breaks length
+    ties; diamond order (ta, sp75, sp55, trinity) is a real preference
+    ranking because `build_list5.py` keeps the first hit per gene; report
+    order (trinity, sp55, sp75, ta) is cosmetic. A tidy-minded "let's just
+    sort them" here would have quietly changed assemblies. They are now
+    named constants with the reason attached.
+    - A *fourth* order existed in `diamond_uniq`'s dict literal (trinity,
+      sp75, sp55, ta) and was inert -- four independent reads, four
+      independent writes. Collapsed onto report order.
+  - **Contig-name prefixing is not cosmetic and is the one thing that would
+    have silently corrupted a merge.** Two Trinity assemblies of one library
+    both start at `TRINITY_DN0_c0_g1_i1`; OrthoFinder, `contigs.csv` and
+    `filter.py` all join on contig name. Ingest renames to
+    `<label>_<original>` and refuses an input with duplicate names inside
+    it.
+  - **Assembly order is shuffled, not chosen -- with a fixed seed.** MM's
+    call, to stop the order of the command line being a scientific choice
+    nobody meant to make. Implemented as sort-by-label then permute with
+    `random.Random(23894)` (strandeval's existing seed, rather than a second
+    arbitrary constant), so the order is a function of the *set* of
+    assemblies: all 24 typing orders of four assemblies give one merge
+    order, and colliding labels are numbered by source path so that holds
+    even for two files both called `trinity.fasta`.
+    - **Not a plain `random.shuffle`, and the difference is the point.**
+      Unseeded, the same command would give a different assembly on a
+      different day and a resumed run could disagree with the run it was
+      resuming -- trading a decision nobody made for one nobody can
+      reproduce. Seeded, the order is arbitrary but stable and recorded
+      (printed at startup, written to `<run>.ingest.done` with the seed).
+    - **It does not make the pipeline order-independent, and the docs say
+      so.** The picks still depend on the order; what changed is that the
+      order no longer depends on typing. Genuine independence means breaking
+      cd-hit-est's ties and the rescue ranking on merit instead of position
+      -- the rescue in particular has a real preference to express, since
+      `build_list5.py` picking the first hit per gene is a chance to prefer
+      a better assembly that a shuffle throws away. Worth revisiting if a
+      seed sweep on real data shows the choice is worth anything: `--seed`
+      exists precisely to measure that, and `--assembly-order given` keeps
+      the old behaviour for anyone who wants to rank them by hand.
+  - `--corrected-reads` (renamed from `--reads-are-corrected`) symlinks the user's pair into `rcorr/` rather
+    than copying tens of GB. `cleanup()` now skips symlinks entirely --
+    without that it would have reported someone's own reads as "left
+    uncompressed" and, worse, been one edit away from unlinking them.
+  - **Not yet run against real data.** Same standing item as pytransrate
+    itself: needs the cluster. Fold a chowder run into the same trip --
+    two of the four assemblies from a finished ORP run are the obvious
+    input, since the merge of those should land near that run's own
+    `.ORP.fasta` and gives a sanity check with a known answer.
+  - Noticed in passing and left alone: `oyster.py` has never checked for
+    `bwa`, which `strandeval` needs from the `orp_trinity` env. It gets away
+    with it because the Trinity check proves that env exists. chowder's
+    preflight checks `bwa` directly since it drops the Trinity check.
+
+- **Bumped the pytransrate pin to `v2.1.0`** (`orp_env.yml`). Verified before
+  bumping rather than after: the tag is on the remote at 53fe488, `cli.py`'s
+  only diff v2.0.0..v2.1.0 is passing `threads=args.threads` through to
+  `read_metrics`, and `tests/test_output.py` still pins `score`/`optimal_score`
+  at indices 36/37 of `assemblies.csv` and the contig score at column 9. So no
+  ORP-side code change: both call sites already pass `-t <cpu>`, which is now
+  what divides the scoring step too.
+  - **Deliberately did *not* add a `stamp_tool_version("orp", "pytransrate", ...)`**
+    alongside the salmon one. The salmon stamp exists because 2.7.0 *rejects*
+    an index an older salmon wrote -- a hard failure a resumed run walks into.
+    A pytransrate upgrade has no such edge: the artifacts stay readable, and
+    the only thing a stamp would buy is forcing a rescore. Across 2.0.0 ->
+    2.1.0 that rescore would cost hours of `orthotransrate` to reproduce the
+    same numbers to the fifteenth decimal. Revisit at the next pytransrate
+    release that actually moves scores -- that one wants the stamp, and wants
+    it added *with* the bump so an in-flight run directory is invalidated.
+  - `p_seq_true` is the one number that moves (<=3.3e-15, and only because it
+    was made exact and thread-independent). `contigs.csv` rounds to six
+    decimals, so the realistic blast radius is nil; noting it so it is not
+    mistaken for drift if a rescored run differs in the last digit.
+  - The stale-docstring item from the entry below is closed upstream: 2.1.0
+    carries "Correct compare_orthogroup_picks' account of where groups come
+    from", and its `--pick-best` now imports this repo's `best_in_group` when
+    the target is ORP 4.0.0+, rather than mirroring the rule.
+
+- **Did #2: the `.groups` round-trip is deleted.** `makelist`/`makegroups`
+  are gone, `scripts/pick_best_contigs.py` takes `Orthogroups.txt` instead of
+  a directory of `*.groups`. Went with option B (keep the script, change its
+  input) over folding it into `Pipeline`: the only thing A saved was one
+  `conda run` activation, a second or two, against a round-trip worth minutes
+  -- and keeping the picker runnable on its own matters for a step that makes
+  a scientific choice you may want to re-run by hand.
+  - **Ordering was the whole risk and it is preserved.** The old glob sorted
+    filenames, so lexicographic (`1, 10, 100, 2, ...`), not numeric; that
+    order reaches `cd-hit-est` through `good.<run>.list` and
+    `orthomerged.fasta`, where it breaks length ties. `good.<run>.list` is
+    byte-identical old-vs-new on synthetic sets n=1..1111 (ties, zero and
+    negative scores, contigs missing from `contigs.csv`, duplicate rows,
+    blank lines), and the test asserts its own data distinguishes
+    lexicographic from numeric order so it would actually catch a regression.
+  - `compare_orthogroup_picks.py` in pytransrate was never at risk -- its
+    `--orthogroups` mode already rebuilt groups from `Orthogroups.txt`.
+    **Its docstring is now stale though**: it says "makeorthout deletes the
+    *.groups files", when ORP no longer writes them at all, and its
+    `oyster.py:580`/`oyster.py:601` line references have drifted. Worth a
+    small commit in that repo; `--groups DIR` is now dead in practice.
+  - `makelist`'s `<run>.list` went too: written, declared as `makegroups`'s
+    input, never opened by anything.
+
+- **Trinity's `--full_cleanup` was costing a resumed run both phases (~35h);
+  fixed with a sentinel outside the directory it deletes.** `cmds.ok` was
+  Phase 1's declared output *and* Phase 2's declared input, and Phase 2
+  deletes it -- so a resume re-ran Phase 1, which rewrote `cmds.ok` newer than
+  the finished `.Trinity.fasta`, which dragged Phase 2 along with it. Both now
+  hang off `assemblies/<run>.trinity.phase1.done`. Verified against the real
+  `needs_run()` across six states (fresh, phase-1-only, Stage-B-done, the two
+  pre-sentinel migration cases, and stale corrected reads).
+  - `already_complete()` does **not** cover this: the window is a run that
+    finished Stage B and then died later, which is a walltime kill near the
+    end of a long run -- exactly when the job gets resubmitted.
+  - `seed_trinity_phase1_sentinel()` copies the *mtime* of whatever proves
+    Phase 1 ran instead of stamping `now`. Stamping `now` would make the
+    sentinel newer than `.Trinity.fasta` and re-trigger the same 34h re-run it
+    exists to prevent.
+  - `cleanup()` removes the sentinel on purpose. Keeping it would leave a run
+    directory where Phase 1 looks done but the plain `.Trinity.fasta` is gone
+    (only the `.gz` remains), so a forced re-run would skip Phase 1 and send
+    Phase 2 in without its checkpoints.
+
+- **Runs now clean up after themselves (`cleanup`, `reclaim_trimmed_reads`,
+  `compress_async`, `already_complete`).** A finished run keeps `reports/`,
+  `.ORP.fasta`, the four individual assemblies and the corrected read pair
+  (the last two gzipped) and reclaims everything else. Written and unit-smoke-
+  tested against a synthetic run directory; **not yet exercised on a real
+  run** -- fold it into the same full run that first exercises pytransrate.
+
+- **The compression is deliberately decoupled from the deletion**, and that's
+  the whole design. A file stops being *written* long before it stops being
+  *read*: `c1`/`c2` feed every assembler and every alignment step through to
+  `strandeval`, and the four assemblies are read again at `run_filtershort`,
+  `diamond_*` and `posthack`. So `compress_async()` builds the `.gz` beside
+  the original as soon as the producing step returns, on a two-worker
+  background pool, and `cleanup()` at the very end only unlinks. Net effect:
+  the gzip cost lands in parallel with an assembler instead of being added to
+  the end of the run. Peak disk goes up by roughly the `.gz` size (~25% of the
+  reads) for the duration, which the trimmed-read reclaim below more than
+  covers.
+  - `pigz=2.8` added to `orp_env.yml`, with a `shutil.which` -> env -> plain
+    `gzip` fallback chain. Thread count is capped at `min(4, cpu//8)` on
+    purpose: this is background work sharing a machine an assembler already
+    owns, not a stage of its own.
+
+- **Two resumability traps, both handled, both worth remembering.** Deleting
+  intermediates interacts badly with `needs_run()`, which decides everything
+  from output presence/mtime:
+  1. Deleting the `TRIM_*.fastq` makes `run_trimmomatic` look permanently out
+     of date. Fixed with a `rcorr/<run>.trim.done` sentinel that `main()`
+     swaps in as the step's declared output whenever the corrected pair is
+     present and current. Old working dirs (no sentinel, TRIM files still
+     there) take the original branch and behave exactly as before.
+  2. Deleting most steps' outputs makes a *re-invocation* of a finished run
+     reassemble from scratch instead of no-opping -- the failure mode a
+     resubmitted cluster job would hit. `already_complete()` short-circuits
+     `main()` on `reports/<run>.cleanup.done` + an `.ORP.fasta` newer than the
+     raw reads. It has to return *before* `timing_init()`, which truncates
+     `reports/<run>.timing.log` unconditionally and would otherwise wipe the
+     finished run's timing report on the way past.
+
+- **Open items for the first real run:** confirm the corrected-read gzip
+  actually finishes inside Stage A (it should -- Stage A is hours, and pigz on
+  4 threads does tens of GB in minutes -- but the fallback is a plain `gzip`
+  on an env without pigz, which is the case worth watching); confirm nothing
+  in `reports/` turns out to depend on something `cleanup` removes (`reportgen`
+  runs before it and reads `assemblies/diamond/*.unique.*`, `assemblies/
+  <run>.flagstat` and the transrate CSV, all of which is why `cleanup` is
+  ordered last); and record the reclaimed total from
+  `reports/<run>.cleanup.done` in `sampledata/benchmarks.md` alongside the
+  timing, since "how much disk does a run leave behind" is now a number worth
+  tracking.
+
+## 2026-09-07
+
+- **Opened branch `pytransrate` to swap the bundled Ruby orp-transrate for
+  [pytransrate](https://github.com/macmanes-lab/pytransrate) v2.0.0** (local
+  checkout at `~/transrate`, clean, tagged, pushed). **Swap is done in code**
+  -- both call sites, the preflight check, the env, and the whole install
+  surface. What follows is the survey it was done from; the open items are
+  collected at the end. Nothing has been run yet.
+
+- **The CLI is drop-in and the CSV column contract is preserved on purpose.**
+  pytransrate keeps `-a/--assembly`, `-o/--output`, `-t/--threads`,
+  `--left`, `--right`, and its `tests/test_output.py` pins the exact indices
+  ORP reads: `score`/`optimal_score` at 36/37 of `assemblies.csv`
+  ([oyster.py:949](oyster.py#L949)) and contig score at column 9 of
+  `contigs.csv` ([scripts/pick_best_contigs.py](scripts/pick_best_contigs.py)).
+  So neither `reportgen` nor the picker needs touching.
+  - One layout difference, and it lands safely: with a single `-a`,
+    pytransrate writes both CSVs directly into `-o`, where the Ruby put
+    `contigs.csv` in a per-assembly subdirectory. The two consumers use
+    `rglob` ([oyster.py:593](oyster.py#L593),
+    [oyster.py:947](oyster.py#L947)) so either layout resolves. The one
+    place that hardcodes a path is the step's declared output for
+    resumability, `reports/transrate_<run>/assemblies.csv`
+    ([oyster.py:1064](oyster.py#L1064)) -- that assumes `assemblies.csv`
+    sits at the top of `-o`, which both implementations do. Worth
+    re-checking on the first run rather than trusting it, since a miss here
+    silently re-runs the step forever instead of erroring.
+  - `--reference` is parsed but unimplemented; ORP never passes it.
+
+- **Call sites to change (2):** [oyster.py:580](oyster.py#L580)
+  `orthotransrate()` and [oyster.py:839](oyster.py#L839) `transrate()`. Each
+  swaps `makedir/software/orp-transrate/transrate` for the `pytransrate`
+  console script. The `rglob("*.bam")` unlink loops after both become
+  no-ops -- pytransrate deletes the BAM on success unless `--keep-bam` --
+  harmless to leave, cleaner to drop.
+
+- **Install check to change (1):** [oyster.py:331](oyster.py#L331) tests
+  `os.access` on the unpacked binary. Becomes a `which_in_env(<env>,
+  "pytransrate")` call like every other tool above it.
+
+- **Env: superseded -- see the 2.7.0 bump below. Original reasoning kept
+  because the constraint it names is real.**
+  pytransrate needs `snap-aligner=2.0.5` and `salmon=2.7.0`, but the `orp`
+  env pins `salmon=2.5.1` ([orp_env.yml](orp_env.yml)) and oyster.py runs the
+  real quantification against it ([oyster.py:737](oyster.py#L737),
+  [oyster.py:746](oyster.py#L746)). Bumping salmon there would change
+  `quant.sf` for reasons that have nothing to do with this swap. A separate
+  env matches the existing per-tool pattern (`orp_spades`, `orp_trinity`,
+  `orp_busco`, `orp_transabyss`, `orp_orthofinder`).
+  - Proposed Makefile line, alongside the others in the `orp:` target:
+    `mamba create -y -c bioconda -c conda-forge --override-channels --name
+    orp_transrate python=3.11 numpy scipy pysam snap-aligner=2.0.5
+    salmon=2.7.0 pip`, then
+    `pip install git+https://github.com/macmanes-lab/pytransrate.git@v2.0.0`
+    into it. Pin the tag -- scores move between versions.
+
+- **Decision: bump the `orp` env to salmon 2.7.0 and run pytransrate out of
+  that same env, rather than building a separate `orp_transrate`.** Checked
+  every ORP salmon flag against the 2.x migration notes first; consequences
+  below. `orp_env.yml` now carries `salmon=2.7.0`, plus `snap-aligner=2.0.5`
+  and `pysam` for pytransrate. `orp_trinity`'s own `salmon=1.10.3` is a
+  separate env and is untouched.
+
+- **No ORP salmon invocation breaks on 2.x.** Both call sites were checked
+  option by option:
+  - `salmon index` ([oyster.py:732](oyster.py#L732)): `-t`, `-i`, `-k 31`,
+    `--threads` all carried forward unchanged.
+  - `salmon quant` ([oyster.py:741](oyster.py#L741)): `-p`, `-i`,
+    `--seqBias`, `--gcBias`, `--libType A`, `-1/-2`, `-o` all unchanged.
+  - `--validateMappings` is **ignored** in 2.x -- selective alignment is the
+    default now -- so it was a no-op that read as though it still switched
+    something on. Dropped.
+  - `--no-version-check` is also a silent no-op (2.x never contacts the
+    network). Kept: harmless, and still meaningful if the env ever resolves
+    to a 1.x salmon.
+  - `quant.sf` columns are unchanged (Name, Length, EffectiveLength, TPM,
+    NumReads), so `filter_tpm`'s `cols[0]`/`cols[3]`
+    ([oyster.py:762](oyster.py#L762)) is safe, as is pytransrate's own
+    5-column assertion.
+
+- **The one real operational hazard: 2.7.0 requires index format v2 and
+  rejects every older index on load.** ORP's resumability is mtime-based
+  ([oyster.py:221](oyster.py#L221)), and `salmon_index` declares
+  `<run>.ortho.idx` as its output -- so **resuming a run whose index was
+  built by 2.5.1 skips the rebuild and then fails in `salmon quant`**. It
+  fails loudly rather than silently, but `run()` will burn its
+  `STEP_RETRIES` attempts on it first. Anyone resuming an in-flight run
+  across this upgrade must delete `quants/<run>.ortho.idx` by hand. Fresh
+  runs are unaffected.
+  - **Handled** (`stamp_tool_version`, [oyster.py:234](oyster.py#L234)).
+    `quants/salmon.version` records the salmon version and is declared as an
+    *input* to `salmon_index`, so an upgrade invalidates the index through
+    the ordinary mtime path rather than a special case. The stamp is
+    rewritten only when the version actually changes, or a rebuild would
+    fire every run. `salmon_index` also `rmtree`s the index directory before
+    rebuilding, since the rebuild is usually over one salmon has already
+    refused. Checked against a scratch harness on all six cases: cold start,
+    clean resume, the 2.5.1 -> 2.7.0 upgrade, the run after that rebuild, an
+    unreadable version, and a regenerated intermediate fasta.
+
+- **Quantification numbers move, and that is mostly a win.** 2.6.0 made
+  deterministic quantification the default, so the same reads and assembly
+  now give the same TPMs run to run -- ORP's salmon step stops being a
+  source of run-to-run drift. 2.7.0 itself is byte-identical to 2.6.0, so
+  all of the change lands in the 2.5.1 -> 2.6.0 step.
+  - Downstream, TPM only reaches the assembly through `filter_tpm`, and
+    **with the default `--tpm-filt 0` that path is inert**: `low` is written
+    only when `tpm < 0`, which never happens, so LOWEXP stays empty and
+    `secondfilter` copies the intermediate through unchanged
+    ([oyster.py:765](oyster.py#L765)). Default runs get identical output.
+    Only `--tpm-filt > 0` users see membership shift near the threshold.
+  - 2.6.0 also stopped emitting decoys in `quant.sf`. ORP indexes its own
+    assembly with no decoys, so no effect.
+
+- **Still unverified, and only checkable on the cluster:** that
+  `mamba env create -f orp_env.yml` actually solves with
+  `salmon=2.7.0 + snap-aligner=2.0.5 + pysam` alongside the existing exact
+  pins. No conda on the laptop.
+
+- **Install surface to retire:** `transrate` var
+  [Makefile:13](Makefile#L13), the `all` prerequisite
+  [Makefile:20](Makefile#L20), the unpack target
+  [Makefile:77](Makefile#L77), `postscript`
+  [Makefile:84](Makefile#L84), `clean` [Makefile:100](Makefile#L100);
+  `software/orp-transrate.tar.gz` itself; the PATH exports in
+  [Dockerfile/Dockerfile:52](Dockerfile/Dockerfile#L52) and
+  [Dockerfile/Dockerfile:54](Dockerfile/Dockerfile#L54); INSTALL.md steps 5
+  and 8 plus the `make` summary at [INSTALL.md:20](INSTALL.md#L20); the two
+  tool cells in [docs/pipeline-steps.md](docs/pipeline-steps.md). No PATH
+  entry is needed at all now -- the console script lives in the env.
+
+- **Scores will move, and that is expected, not a regression.** pytransrate's
+  CHANGELOG documents it: the assembly score drops 0.008-0.070 across three
+  assemblies of one library, driven by a genuine soft-clip coverage fix
+  (SNAP 2.0 clips; the old `bam-read` advanced the reference cursor over
+  clipped bases, shifting coverage rightward). Good-mapping *rate* agrees to
+  +/-0.001, so the two implementations agree about the reads and disagree
+  about the contigs.
+  - **The part that reaches the assembly is ordering, not level.**
+    14.5-19% of contig pairs order oppositely, so `makeorthout` will pick
+    different representatives for some orthogroups and the final ORP.fasta
+    will differ. Measure it rather than assume: pytransrate ships
+    `scripts/compare_orthogroup_picks.py`, which runs ORP's own selection
+    against two `contigs.csv` files and names the groups that change winner.
+    Feed it the **orthotransrate** CSV over `merged.fasta`, not a run over
+    the finished ORP.fasta.
+  - Consequence for the record: the transrate/orthotransrate numbers in
+    `sampledata/benchmarks.md` stop being comparable across this boundary.
+    Needs a fresh baseline run, and a note in the benchmarks file marking
+    where the evaluator changed.
+
+- **Open, and all of it needs the cluster:**
+  1. That `mamba env update -f orp_env.yml --prune` solves with
+     `salmon=2.7.0`, `snap-aligner=2.0.5`, `pysam` and the pytransrate pip
+     line against the existing exact pins. Nothing here is verifiable on the
+     laptop -- no conda.
+  2. A full run, which is the first real exercise of pytransrate under ORP.
+     Watch two things specifically: that `reports/transrate_<run>/` really
+     does get `assemblies.csv` at its top level, since
+     [oyster.py:1096](oyster.py#L1096) hardcodes that path as the step's
+     output and a miss there re-runs the step forever rather than erroring;
+     and that `orthofuse/<run>/merged/contigs.csv` lands where `makeorthout`
+     `rglob`s for it.
+  3. `compare_orthogroup_picks.py` against the old and new orthotransrate
+     `contigs.csv` for the same dataset, to put a number on how much of the
+     assembly actually changes. Needs an old-run CSV kept aside before
+     re-running anything.
+  4. A fresh `sampledata/benchmarks.md` baseline -- the transrate numbers
+     there are Ruby-era and no longer comparable.
+
+- **Runtime is unknown and `STEP_TIME_HINTS["transrate"] = 16`
+  ([oyster.py:48](oyster.py#L48)) is a Ruby-era measurement.** It only sets
+  submission order against `strandeval` (2 min), so it is very unlikely to
+  invert, but re-time it on the first full run.
+
 ## 2026-08-24
 
 - **`--cpu 80` oversubscription run: net regression, 38:46:04 vs the

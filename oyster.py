@@ -13,8 +13,10 @@ can be re-invoked to resume where it left off.
 import argparse
 import csv
 import gzip
+import io
 import os
 import re
+import shlex
 import shutil
 import socket
 import subprocess
@@ -24,12 +26,79 @@ import time
 import concurrent.futures
 from functools import partial
 from pathlib import Path
+from typing import NamedTuple
 
 HERE = Path(__file__).resolve().parent
 RED = "\033[31m"
 RESET = "\033[0m"
 
-SHORT_ASSEMBLY_NAMES = ("spades55.fasta", "spades75.fasta", "transabyss.fasta", "trinity.Trinity.fasta")
+class Assembly(NamedTuple):
+    """One input assembly, and the four names the pipeline knows it by.
+
+    The names are irregular because they are the ones oyster.mk used and the
+    ones every existing run directory on disk already carries: the file is
+    `<runout>.trinity.Trinity.fasta` but its diamond output is
+    `<runout>.trinity.diamond.txt`, while SPAdes' unique-gene count lands in
+    `<runout>.unique.sp75.txt` and not `...spades75...`. Renaming any of
+    them would silently invalidate every resumable run directory that
+    exists, so they are carried as data instead of being derived.
+    """
+
+    fasta_name: str      # assemblies/<runout>.<fasta_name>
+    diamond_label: str   # assemblies/diamond/<runout>.<diamond_label>.diamond.txt
+    unique_label: str    # assemblies/diamond/<runout>.unique.<unique_label>.txt
+    report_label: str    # reportgen's "UNIQUE GENES <report_label>" line
+
+
+SPADES55 = Assembly("spades55.fasta", "spades55", "sp55", "SPADES55")
+SPADES75 = Assembly("spades75.fasta", "spades75", "sp75", "SPADES75")
+TRANSABYSS = Assembly("transabyss.fasta", "transabyss", "transabyss", "TRANSABYSS")
+TRINITY = Assembly("trinity.Trinity.fasta", "trinity", "trinity", "TRINITY")
+
+# oyster.py's own four assemblers, in the three different orders oyster.mk
+# used them in. The three are not interchangeable and two of them reach the
+# assembly, so they are spelled out rather than sorted:
+#
+#   ASSEMBLY_ORDER    concatenation order. Sets contig order in
+#                     orthofuse/merged.fasta and in posthack's `cat` of the
+#                     assemblies, which flows through to cd-hit-est -- where
+#                     input order breaks length ties and so decides which
+#                     representative survives into .ORP.fasta.
+#   DIAMOND_PRIORITY  search order. build_list5.py keeps the *first* diamond
+#                     hit per gene in the order it is given the files, so
+#                     this is a preference ranking between assemblies for
+#                     the contigs the orthogroup pass missed.
+#   REPORT_ORDER      the order the UNIQUE GENES lines appear in
+#                     reports/qualreport.<run>. Cosmetic, but people diff
+#                     those reports across runs.
+ASSEMBLY_ORDER = (SPADES55, SPADES75, TRANSABYSS, TRINITY)
+DIAMOND_PRIORITY = (TRANSABYSS, SPADES75, SPADES55, TRINITY)
+REPORT_ORDER = (TRINITY, SPADES55, SPADES75, TRANSABYSS)
+
+# Preflight, in the order it prints. Everything here is shelled out to at
+# some point in a full run, and finding it missing hours in -- at
+# orthotransrate, or at the assembler that was going to run overnight -- is
+# the thing this list exists to prevent. snap-aligner is on it because
+# pytransrate maps with it.
+SPADES_TOOL = ("orp_spades", "rnaspades.py", "SPADES")
+TRINITY_TOOL = ("orp_trinity", "Trinity", "TRINITY")
+TRANSABYSS_TOOL = ("orp_transabyss", "transabyss", "TRANSABYSS")
+# The three an entry point that doesn't assemble has no use for.
+ASSEMBLER_TOOLS = (SPADES_TOOL, TRINITY_TOOL, TRANSABYSS_TOOL)
+CHECK_TOOLS = (
+    ("orp", "salmon", "SALMON"),
+    ("orp", "pytransrate", "PYTRANSRATE"),
+    ("orp", "seqtk", "SEQTK"),
+    ("orp_busco", "busco", "BUSCO"),
+    ("orp", "mcl", "MCL"),
+    SPADES_TOOL,
+    TRINITY_TOOL,
+    ("orp", "trimmomatic", "TRIMMOMATIC"),
+    TRANSABYSS_TOOL,
+    ("orp", "run_rcorrector.pl", "RCORRECTOR"),
+    ("orp_orthofinder", "orthofinder", "ORTHOFINDER"),
+    ("orp", "snap-aligner", "SNAP-ALIGNER"),
+)
 
 # Reference profile (minutes, from a representative run at --max-parallel 2)
 # used only to decide submission order within the two remaining
@@ -91,6 +160,77 @@ TRINITY_PHASE2_SHARE = 0.95
 STEP_RETRIES = 2
 STEP_RETRY_DELAY = 60
 
+# OrthoFinder's -t is the count of *concurrent diamond processes* it launches
+# for its all-vs-all -- n_assemblies^2 of them, each given `-p 1` -- so set
+# from cores alone, -t 20 on a four-assembly run puts 16 `--more-sensitive`
+# diamonds on the node at once. Cap it by memory as well as by cores, at
+# roughly one concurrent search per this many GB.
+#
+# The figure is diamond's own: its default block size is a fixed -b2.0, and
+# "the program can be expected to use roughly six times this number of memory
+# (in GB)" -- so ~12 GB per process, whatever the node. (--more-sensitive does
+# not change it; only --very-sensitive and --ultra-sensitive do, to -b0.4.)
+# An earlier version of this comment had each diamond sizing its block against
+# whatever memory looked free when it started. That is not what diamond does,
+# and it is worth being precise about: a fixed per-process cost is one this
+# cap can actually model.
+#
+# Modelling it shows how little headroom this knob has. Concurrency is capped
+# by the searches that exist, n_assemblies^2, before it is capped by anything
+# here -- so a four-assembly run cannot put more than 16 diamonds on a node
+# whatever -t says, and its search memory cannot exceed ~16 * 12 = 192 GB. On
+# anything bigger than a ~200 GB node this cap is structurally incapable of
+# being what OOMs the job. When one does OOM anyway, the memory went somewhere
+# other than the searches -- on the run that prompted this, to snap's index of
+# the merged assembly on the pipeline's other branch, which no budget here or
+# anywhere else bounds.
+ORTHOFINDER_GB_PER_SEARCH = 12
+
+
+def line_buffer_stdio():
+    """Make our own output appear where it happened in a redirected log.
+
+    Python block-buffers stdout in 4-8 KB chunks when it is not a terminal,
+    which on a cluster it never is. Every tool we launch, though, inherits
+    the same file descriptor and writes to it directly, unbuffered. So the
+    pipeline's own narrative -- the banner, the `=== step -- start ===`
+    lines, the `+ <command>` echoes, the retry warnings -- sits in our
+    buffer while hours of OrthoFinder and pytransrate output stream past it,
+    and only lands when the buffer happens to fill.
+
+    It is not a cosmetic problem. On the 380C_0C5D_001F run the banner and
+    the whole of the first stage appeared *after* OrthoFinder's 15:54:51
+    output even though run_filtershort's own timestamp says 15:53:16, which
+    makes a log read as though steps ran in an order they did not, and puts
+    a failure's explanation somewhere other than next to the failure.
+
+    Line buffering also guarantees we have flushed before a child we spawn
+    writes anything, so the interleaving is right and not merely closer.
+
+    Not sys.stdout.reconfigure(): that is 3.7+, and the cluster launches
+    this under the system python3, which is 3.6.8. detach() rather than
+    wrapping .buffer directly, so replacing sys.stdout cannot leave the old
+    wrapper to close the descriptor out from under the new one when it is
+    collected.
+    """
+    for name in ("stdout", "stderr"):
+        stream = getattr(sys, name, None)
+        if stream is None:
+            continue
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(line_buffering=True)
+            continue
+        if not hasattr(stream, "detach") or not hasattr(stream, "encoding"):
+            continue  # already replaced by something that isn't a text stream
+        encoding, errors = stream.encoding, stream.errors
+        try:
+            detached = stream.detach()
+        except (AttributeError, ValueError):
+            continue
+        setattr(sys, name, io.TextIOWrapper(
+            detached, encoding=encoding, errors=errors, line_buffering=True))
+
 
 def awk_first_field(src: Path, dst: Path) -> None:
     with open(src) as inf, open(dst, "w") as outf:
@@ -123,6 +263,32 @@ def write_sorted(path: Path, ids) -> None:
             f.write(i + "\n")
 
 
+def human_size(nbytes) -> str:
+    size = float(nbytes)
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if size < 1024 or unit == "TB":
+            return f"{size:.0f} {unit}" if unit == "B" else f"{size:.1f} {unit}"
+        size /= 1024
+
+
+def path_size(path: Path) -> int:
+    """Bytes on disk under `path`, whether it's one file or a whole tree."""
+    path = Path(path)
+    if not path.is_dir():
+        try:
+            return path.lstat().st_size
+        except OSError:
+            return 0
+    total = 0
+    for root, _dirs, files in os.walk(path):
+        for name in files:
+            try:
+                total += (Path(root) / name).lstat().st_size
+            except OSError:
+                pass
+    return total
+
+
 def is_gzip(path: Path) -> bool:
     with open(path, "rb") as fh:
         return fh.read(2) == b"\x1f\x8b"
@@ -146,30 +312,58 @@ def hostname_suffix() -> str:
 
 
 class Pipeline:
+    # What a run calls itself in its quality report. chowder.py overrides it:
+    # a merge-only run writes a qualreport in exactly the same layout as a
+    # full one, so without this the file is the one place a finished run
+    # can't be told apart from an ORP that ran its own assemblers.
+    RUN_DESCRIPTION = "the ORP"
+
     def __init__(self, args):
         self.dir = Path(args.dir).resolve() if args.dir else Path.cwd()
         self.makedir = HERE
         self.cpu = args.cpu
         self.busco_threads = args.busco_threads or self.cpu
         self.mem = args.mem
-        self.spades1_kmer = args.spades1_kmer
-        self.spades2_kmer = args.spades2_kmer
-        self.transabyss_kmer = args.transabyss_kmer
+        # Assembler-only settings. An entry point that doesn't assemble
+        # (chowder.py) has no flags for these and never reads them back.
+        self.spades1_kmer = getattr(args, "spades1_kmer", 55)
+        self.spades2_kmer = getattr(args, "spades2_kmer", 75)
+        self.transabyss_kmer = getattr(args, "transabyss_kmer", 32)
         self.read1 = Path(args.read1)
         self.read2 = Path(args.read2)
         self.runout = args.runout
         self.lineage = args.lineage
-        self.strand = args.strand
-        self.normalize_reads = args.normalize_reads
+        self.strand = getattr(args, "strand", "")
+        self.normalize_reads = getattr(args, "normalize_reads", False)
         self.tpm_filt = args.tpm_filt
         self.max_parallel = max(1, args.max_parallel)
+        self.keep_intermediates = args.keep_intermediates
+        # Appended to both pytransrate invocations. shlex so a value can be
+        # quoted, and so the flags arrive as separate argv entries rather
+        # than one string pytransrate would reject.
+        self.pytransrate_args = shlex.split(getattr(args, "pytransrate_args", "") or "")
+
+        # Everything from run_filtershort onwards works on "the assemblies"
+        # rather than on four named assemblers, so a caller that brings its
+        # own (chowder.py) supplies them here and shares the whole merge
+        # half. It gives one order and means it for all three uses; only
+        # oyster.py's own four carry the historical split between them (see
+        # ASSEMBLY_ORDER / DIAMOND_PRIORITY / REPORT_ORDER).
+        supplied = getattr(args, "assemblies", None)
+        if supplied:
+            self.assemblies = tuple(supplied)
+            self.diamond_priority = self.assemblies
+            self.report_order = self.assemblies
+        else:
+            self.assemblies = ASSEMBLY_ORDER
+            self.diamond_priority = DIAMOND_PRIORITY
+            self.report_order = REPORT_ORDER
 
         self.version = (self.makedir / "version.txt").read_text().strip()
         self.busco_config = self.makedir / "software" / "config.ini"
         os.environ["BUSCO_CONFIG_FILE"] = str(self.busco_config)
         self.diamond_db = self.makedir / "software" / "diamond" / "swissprot"
 
-        self.reads_dir = self.dir / "reads"
         self.rcorr_dir = self.dir / "rcorr"
         self.assemblies_dir = self.dir / "assemblies"
         self.assemblies_working = self.assemblies_dir / "working"
@@ -180,19 +374,38 @@ class Pipeline:
         self.quants_dir = self.dir / "quants"
 
         self.timing_log = self.reports_dir / f"{self.runout}.timing.log"
-        self.run_cmd = "oyster.py " + " ".join(sys.argv[1:])
+        # Quoted, so the line a run prints and logs is the line you can paste
+        # back to repeat it: a read path with a space in it is otherwise
+        # recorded as two arguments.
+        self.run_cmd = " ".join(
+            shlex.quote(a) for a in [Path(sys.argv[0]).name] + sys.argv[1:]
+        )
         self.steps = []
         self._timing_lock = threading.Lock()
+        # Background gzip of the files a finished run keeps -- see
+        # compress_async(). Two workers is enough: the six files queued over
+        # a run are queued in pairs, and this is meant to run *beside* an
+        # assembler, not to compete with one.
+        self._compress_pool = concurrent.futures.ThreadPoolExecutor(
+            max_workers=2, thread_name_prefix="compress")
+        self._compressions = {}
+        self._compress_lock = threading.Lock()
+        self._compress_cmd = None
 
     # -- process helpers -------------------------------------------------
 
     def run(self, cmd, cwd=None, retries=STEP_RETRIES, retry_delay=STEP_RETRY_DELAY,
             retry_cleanup=None, **kwargs):
-        """retry_cleanup: path or iterable of paths to rmtree before each retry --
-        for tools (SPAdes, TransAByss) that refuse to reuse a non-empty output
-        dir rather than resuming, so a bare retry would just fail differently
-        instead of actually re-attempting the work. Not needed for tools like
-        Trinity that resume from their own checkpoints in-place.
+        """retry_cleanup: what to clear before each retry, for tools (SPAdes,
+        TransAByss) that refuse to reuse a non-empty output dir rather than
+        resuming, so a bare retry would just fail differently instead of
+        actually re-attempting the work. Not needed for tools like Trinity
+        that resume from their own checkpoints in-place.
+
+        A path or iterable of paths is rmtree'd. A callable is called
+        instead, for a step where "clear the output directory" is too blunt
+        and something in it has to survive the retry -- see
+        clear_transrate_outdir.
         """
         printable = " ".join(str(c) for c in cmd)
         for attempt in range(retries + 1):
@@ -207,7 +420,9 @@ class Pipeline:
                     f"*** step failed (exit {e.returncode}), retrying in {retry_delay}s "
                     f"[attempt {attempt + 2}/{retries + 1}] ***"
                 )
-                if retry_cleanup is not None:
+                if callable(retry_cleanup):
+                    retry_cleanup()
+                elif retry_cleanup is not None:
                     paths = [retry_cleanup] if isinstance(retry_cleanup, (str, Path)) else retry_cleanup
                     for path in paths:
                         shutil.rmtree(path, ignore_errors=True)
@@ -215,6 +430,255 @@ class Pipeline:
 
     def conda_run(self, env, *cmd, **kwargs):
         self.run(["conda", "run", "--no-capture-output", "-n", env, *[str(c) for c in cmd]], **kwargs)
+
+    # -- background compression / reclaim -----------------------------------
+
+    def _rel(self, path):
+        try:
+            return str(Path(path).relative_to(self.dir))
+        except ValueError:
+            return str(path)
+
+    def _resolve_compressor(self):
+        """argv prefix that writes a gzip stream of its file argument to stdout.
+
+        pigz wherever one is available: these jobs are hidden behind a stage
+        that already owns most of the machine, but a corrected read pair is
+        tens of GB and single-threaded gzip can still be running long after
+        the stage that was meant to hide it has ended. The thread count is
+        deliberately small for the same reason -- this is background work,
+        not a stage of its own. Falls back to plain gzip so an `orp` env
+        built before pigz was added to orp_env.yml keeps working.
+        """
+        if self._compress_cmd is None:
+            threads = str(max(1, min(4, self.cpu // 8)))
+            if shutil.which("pigz"):
+                self._compress_cmd = ["pigz", "-c", "-p", threads]
+            elif self.which_in_env("orp", "pigz"):
+                self._compress_cmd = ["conda", "run", "--no-capture-output", "-n", "orp",
+                                      "pigz", "-c", "-p", threads]
+            else:
+                self._compress_cmd = ["gzip", "-c"]
+            print(f"[compress] using: {' '.join(self._compress_cmd)}")
+        return self._compress_cmd
+
+    def compress_async(self, path):
+        """Queue `path` for gzipping in the background, original left in place.
+
+        Called when a file stops being *written*, which is much earlier than
+        when it stops being *read*: the corrected reads feed every assembler
+        and every alignment step through to `strandeval`, and the four
+        assemblies are read again at `run_filtershort`, `diamond_*` and
+        `posthack`. So the .gz is built alongside the original while the
+        pipeline runs, and cleanup() at the end only has to unlink -- which
+        is what puts the compression cost in parallel with an assembler
+        instead of on the end of the run, where it would be pure added wall
+        time.
+
+        A no-op if the .gz is already at least as new as its source, so a
+        resumed run doesn't recompress work the previous one finished.
+        """
+        path = Path(path)
+        if self.keep_intermediates or not path.exists():
+            return
+        gz = path.with_suffix(path.suffix + ".gz")
+        if gz.exists() and gz.stat().st_mtime >= path.stat().st_mtime:
+            return
+        with self._compress_lock:
+            if path in self._compressions:
+                return
+            self._resolve_compressor()
+            self._compressions[path] = self._compress_pool.submit(self._compress, path, gz)
+
+    def _compress(self, src, gz):
+        # _compress_cmd was resolved by compress_async() under _compress_lock
+        # before this job was submitted, so workers only ever read it.
+        part = gz.with_name(gz.name + ".part")
+        start = time.time()
+        try:
+            with open(part, "wb") as out:
+                subprocess.run(self._compress_cmd + [str(src)], check=True,
+                               stdout=out, cwd=str(self.dir))
+            part.replace(gz)
+        except BaseException:
+            # Never leave a truncated .gz behind that a later run would
+            # mistake for a finished one on mtime alone.
+            if part.exists():
+                part.unlink()
+            raise
+        print(f"[compress] {self._rel(gz)} written in {int(time.time() - start)}s "
+              f"({human_size(path_size(src))} -> {human_size(path_size(gz))})", flush=True)
+
+    def compression_done(self, path) -> bool:
+        """Block until `path`'s .gz is finished; True only if it really is.
+
+        The precondition for deleting the uncompressed original. A failed
+        compression is reported and returns False rather than raising --
+        losing a background gzip is a reason to keep the plain file, not to
+        fail a run whose actual work is already done.
+        """
+        path = Path(path)
+        future = self._compressions.get(path)
+        if future is not None:
+            try:
+                future.result()
+            except Exception as e:
+                print(f"*** compressing {self._rel(path)} failed ({e}); "
+                      "keeping the uncompressed file ***")
+                return False
+        gz = path.with_suffix(path.suffix + ".gz")
+        return gz.exists() and gz.stat().st_size > 0
+
+    def finish_compression(self):
+        """Join the background pool. Called on every exit path, including failure."""
+        pending = [p for p, f in self._compressions.items() if not f.done()]
+        if pending:
+            print("\n=== waiting on background compression: "
+                  + ", ".join(self._rel(p) for p in pending) + " ===", flush=True)
+        self._compress_pool.shutdown(wait=True)
+
+    def reclaim_trimmed_reads(self):
+        """Delete the trimmed-but-uncorrected reads, once rcorrector has read them.
+
+        Trimmomatic writes four files (both paired mates and both unpaired
+        ones) and nothing past run_rcorrector ever opens any of them again --
+        every assembler and every alignment step reads the corrected pair.
+        They're the same order of magnitude as the raw input, so this is both
+        the largest reclaim in the run and the earliest one available, which
+        is why it doesn't wait for cleanup() at the end.
+
+        The sentinel is what keeps this from costing a resumed run a re-trim:
+        main() asks for the TRIM files back as outputs only while the
+        corrected pair is missing or stale.
+        """
+        if self.keep_intermediates:
+            return
+        freed = 0
+        for suffix in ("1P", "2P", "1U", "2U"):
+            p = self.rcorr_dir / f"{self.runout}.TRIM_{suffix}.fastq"
+            if p.exists():
+                freed += path_size(p)
+                p.unlink()
+        (self.rcorr_dir / f"{self.runout}.trim.done").touch()
+        if freed:
+            print(f"[cleanup] reclaimed {human_size(freed)} of trimmed reads "
+                  f"(rcorr/{self.runout}.TRIM_*.fastq); the corrected pair is what "
+                  "everything downstream reads")
+
+    def run_inputs(self):
+        """The files a finished run is checked for staleness against.
+
+        The raw read pair for oyster.py; chowder.py adds the assemblies it
+        was handed, since replacing one of those is as much a new run as
+        replacing the reads.
+        """
+        return [self.read1, self.read2]
+
+    def already_complete(self) -> bool:
+        """True if a previous run finished *and* cleanup() already ran on it.
+
+        needs_run() decides each step from its outputs, and cleanup deletes
+        most of those -- so without this guard, re-invoking oyster.py on a
+        finished, cleaned run directory (a resubmitted cluster job, say)
+        would find nearly every stage 'out of date' and quietly reassemble
+        from scratch over a completed run, where today it no-ops. The marker
+        plus a .ORP.fasta still newer than the raw reads is the whole
+        condition; anything else (new reads, a deleted assembly) falls
+        through to the normal resume path.
+        """
+        marker = self.reports_dir / f"{self.runout}.cleanup.done"
+        orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
+        if not marker.exists() or self.needs_run([orp_fasta], self.run_inputs()):
+            return False
+        print(f"\n=== {self.runout} already finished, and its intermediate files "
+              "have been reclaimed ===")
+        print(f"    assembly:  {orp_fasta}")
+        print(f"    reports:   {self.reports_dir}")
+        print(f"    reclaimed: {marker}")
+        print("\n    Nothing to do. Assemble these reads again under a different "
+              "--runout/--dir,\n    or delete the marker above to force a full "
+              "re-run in place.\n")
+        return True
+
+    def cleanup(self):
+        """Reclaim everything a finished run doesn't need any more.
+
+        What survives: reports/, the final .ORP.fasta, the four individual
+        assemblies and the corrected read pair -- the last two as the .gz
+        compress_async() has been building in the background since each was
+        written, so this step only unlinks. A file whose compression didn't
+        finish is kept uncompressed instead of being deleted.
+
+        Everything removed here is reproducible from what's kept: the
+        orthofuse tree (OrthoFinder's all-vs-all output plus pytransrate's
+        scoring of the pooled fasta -- normally the largest directory in the
+        run), the diamond hits and the list1-list7 set algebra built from
+        them, the salmon index and quantification, and the chain of working
+        assemblies between orthofusing and .ORP.fasta. Every number any of
+        it contributed is already in reports/qualreport.<run>.
+        """
+        if self.keep_intermediates:
+            print("[cleanup] --keep-intermediates given; leaving intermediates in place")
+            return
+
+        orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
+        freed = 0
+        kept = [f"{self._rel(orp_fasta)}  (the assembly)",
+                f"{self._rel(self.reports_dir)}/  (all reports)"]
+        removed = []
+
+        for src in [self.cor1(), self.cor2()] + self.assembly_fasta_paths():
+            gz = src.with_suffix(src.suffix + ".gz")
+            if src.is_symlink():
+                # Not ours to reclaim: chowder.py points the corrected pair
+                # straight at the user's own reads under
+                # --reads-are-corrected, and compressing or unlinking those
+                # is not what "reclaim this run's intermediates" means.
+                kept.append(f"{self._rel(src)}  (symlink to a file this run did not create)")
+                continue
+            if src.exists() and self.compression_done(src):
+                freed += path_size(src)
+                src.unlink()
+            elif src.exists():
+                kept.append(f"{self._rel(src)}  (left uncompressed -- gzip did not finish)")
+                continue
+            if gz.exists():
+                kept.append(f"{self._rel(gz)}  ({human_size(path_size(gz))})")
+
+        for path in (
+            self.dir / "orthofuse",
+            self.assemblies_working,
+            self.diamond_dir,
+            self.quants_dir,
+            # Trinity's --full_cleanup normally removes this itself; a run
+            # that was interrupted and resumed can still leave it behind.
+            self.trinity_out_dir(),
+            self.assemblies_dir / f"{self.runout}.orthomerged.fasta",
+            self.assemblies_dir / f"{self.runout}.ORP.intermediate.fasta",
+            self.assemblies_dir / f"{self.runout}.ORP.diamond.txt",
+            self.assemblies_dir / f"{self.runout}.flagstat",
+            self.assemblies_dir / f"{self.runout}.filter.done",
+            self.trinity_phase1_done(),
+        ):
+            if not path.exists():
+                continue
+            size, is_dir = path_size(path), path.is_dir()
+            if is_dir:
+                shutil.rmtree(path, ignore_errors=True)
+            else:
+                path.unlink()
+            freed += size
+            removed.append(f"{self._rel(path)}{'/' if is_dir else ''}  ({human_size(size)})")
+
+        lines = [f"Command: {self.run_cmd}", "",
+                 f"Reclaimed {human_size(freed)} of intermediate files "
+                 f"at {self._ts()}.", "", "kept:"]
+        lines += [f"  {k}" for k in kept]
+        lines += ["", "removed:"]
+        lines += [f"  {r}" for r in removed] or ["  (nothing left to remove)"]
+        text = "\n".join(lines) + "\n"
+        (self.reports_dir / f"{self.runout}.cleanup.done").write_text(text)
+        print("\n" + text)
 
     # -- resumability ------------------------------------------------------
 
@@ -230,6 +694,39 @@ class Pipeline:
         newest_input = max(i.stat().st_mtime for i in existing_inputs)
         oldest_output = min(o.stat().st_mtime for o in outputs)
         return newest_input > oldest_output
+
+    def stamp_tool_version(self, env, binary, stamp):
+        """Record a tool's version beside its artifacts; return the stamp path.
+
+        needs_run only ever compares mtimes, so an artifact that is still
+        newer than its inputs looks up to date even when the tool that has to
+        read it can no longer do so. salmon 2.7.0 is exactly that case: it
+        rejects any index built by an earlier salmon, so on a resumed run a
+        stale <run>.ortho.idx would be kept, salmon_index skipped, and
+        salmon quant left to fail against an index it cannot read.
+
+        Declaring this stamp as an input turns a version change into an
+        ordinary out-of-date input, which is the machinery every other step
+        already uses. The file is rewritten only when the version actually
+        changes -- rewriting unconditionally would force a rebuild on every
+        run.
+        """
+        try:
+            result = subprocess.run(
+                ["conda", "run", "-n", env, binary, "--version"],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True,
+            )
+        except FileNotFoundError:
+            return stamp
+        version = result.stdout.strip() or result.stderr.strip()
+        if not version:
+            # Can't tell. Leave any existing stamp alone rather than writing a
+            # placeholder that would itself look like a version change later.
+            return stamp
+        if not stamp.exists() or stamp.read_text() != version:
+            stamp.parent.mkdir(parents=True, exist_ok=True)
+            stamp.write_text(version)
+        return stamp
 
     def _ts(self, t=None):
         return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(t if t is not None else time.time()))
@@ -300,7 +797,7 @@ class Pipeline:
 
     def setup(self):
         for d in (
-            self.reads_dir, self.assemblies_dir, self.rcorr_dir, self.reports_dir,
+            self.assemblies_dir, self.rcorr_dir, self.reports_dir,
             self.orthofuse_dir, self.quants_dir, self.diamond_dir, self.assemblies_working,
         ):
             d.mkdir(parents=True, exist_ok=True)
@@ -322,32 +819,23 @@ class Pipeline:
             return path
         return None
 
+    def required_tools(self):
+        """(env, binary, label) for every tool this entry point shells out to.
+
+        Order is the order preflight prints them in. An entry point that
+        doesn't assemble overrides this rather than demanding assemblers it
+        will never run (see chowder.py).
+        """
+        return CHECK_TOOLS
+
     def check(self):
-        if self.which_in_env("orp", "salmon"):
-            print("SALMON installed")
-        else:
-            sys.exit("*** SALMON is not installed, must fix ***")
+        """Verify every tool is present, saying nothing when they all are.
 
-        transrate_bin = self.makedir / "software" / "orp-transrate" / "transrate"
-        if os.access(transrate_bin, os.X_OK):
-            print("TRANSRATE installed")
-        else:
-            sys.exit("*** TRANSRATE is not installed, must fix ***")
-
-        for env, binary, label in (
-            ("orp", "seqtk", "SEQTK"),
-            ("orp_busco", "busco", "BUSCO"),
-            ("orp", "mcl", "MCL"),
-            ("orp_spades", "rnaspades.py", "SPADES"),
-            ("orp_trinity", "Trinity", "TRINITY"),
-            ("orp", "trimmomatic", "TRIMMOMATIC"),
-            ("orp_transabyss", "transabyss", "TRANSABYSS"),
-            ("orp", "run_rcorrector.pl", "RCORRECTOR"),
-            ("orp_orthofinder", "orthofinder", "ORTHOFINDER"),
-        ):
-            if self.which_in_env(env, binary):
-                print(f"{label} installed")
-            else:
+        A dozen "installed" lines is noise on every successful run; the only
+        news preflight has is a tool that is missing.
+        """
+        for env, binary, label in self.required_tools():
+            if not self.which_in_env(env, binary):
                 sys.exit(f"*** {label} is not installed, must fix ***")
 
     def welcome(self):
@@ -419,6 +907,48 @@ class Pipeline:
     def trinity_out_dir(self):
         return self.assemblies_dir / f"{self.runout}.trinity"
 
+    def trinity_phase1_done(self):
+        """Phase 1's completion sentinel, deliberately outside trinity_out_dir().
+
+        Phase 2 passes --full_cleanup, which deletes the whole
+        <run>.trinity/ working directory -- including
+        recursive_trinity.cmds.ok, the file that used to serve as both
+        phase 1's declared output and phase 2's declared input. So a
+        finished Trinity erased its own evidence that it had run: on the
+        next invocation needs_run() found phase 1's output missing and
+        re-ran it (~90min), which rewrote cmds.ok *newer* than
+        <run>.trinity.Trinity.fasta, which in turn made phase 2 look out of
+        date and re-run against an assembly that was already complete
+        (~34h). The window is a resumed run whose Stage B had succeeded and
+        which then failed or was killed later -- i.e. a walltime kill near
+        the end of a long run, which is exactly when a job gets
+        resubmitted.
+        """
+        return self.assemblies_dir / f"{self.runout}.trinity.phase1.done"
+
+    def seed_trinity_phase1_sentinel(self):
+        """Back-fill the sentinel for run directories created before it existed.
+
+        Without this, the very first resume after upgrading would hit the
+        bug the sentinel exists to prevent, once. Seeds from whatever
+        already proves phase 1 ran -- cmds.ok if Trinity's working dir is
+        still there, otherwise the finished assembly -- and copies that
+        file's mtime rather than stamping 'now', so the ordering needs_run()
+        compares stays exactly what it was.
+        """
+        sentinel = self.trinity_phase1_done()
+        if sentinel.exists():
+            return
+        for evidence in (self.trinity_out_dir() / "recursive_trinity.cmds.ok",
+                         self.assemblies_dir / f"{self.runout}.trinity.Trinity.fasta"):
+            if evidence.exists():
+                sentinel.touch()
+                st = evidence.stat()
+                os.utime(sentinel, (st.st_atime, st.st_mtime))
+                print(f"[resume] seeded {self._rel(sentinel)} from "
+                      f"{self._rel(evidence)} (run directory predates it)")
+                return
+
     def _trinity_base_cmd(self, cpu, mem):
         cmd = ["Trinity"]
         if self.strand == "RF":
@@ -450,6 +980,7 @@ class Pipeline:
         mem = self.mem if mem is None else mem
         cmd = self._trinity_base_cmd(cpu, mem) + ["--no_distributed_trinity_exec"]
         self.conda_run("orp_trinity", *cmd, retries=0)
+        self.trinity_phase1_done().touch()
 
     def run_trinity_phase2(self, cpu=None, mem=None):
         # Same command, no stop flag: per the docs above, Trinity resumes
@@ -521,22 +1052,72 @@ class Pipeline:
 
     # -- orthofuse merge -------------------------------------------------------
 
+    def assembly_fasta(self, assembly):
+        return self.assemblies_dir / f"{self.runout}.{assembly.fasta_name}"
+
+    def assembly_fasta_paths(self):
+        return [self.assembly_fasta(a) for a in self.assemblies]
+
+    def diamond_txt(self, assembly):
+        return self.diamond_dir / f"{self.runout}.{assembly.diamond_label}.diamond.txt"
+
+    def unique_txt(self, assembly):
+        return self.diamond_dir / f"{self.runout}.unique.{assembly.unique_label}.txt"
+
     def short_fasta_paths(self):
-        return [self.orthofuse_working / f"{self.runout}.{n}.short.fasta" for n in SHORT_ASSEMBLY_NAMES]
+        return [self.orthofuse_working / f"{self.assembly_fasta(a).name}.short.fasta"
+                for a in self.assemblies]
 
     def run_filtershort(self):
         self.orthofuse_working.mkdir(parents=True, exist_ok=True)
-        for n in ("transabyss.fasta", "spades75.fasta", "spades55.fasta", "trinity.Trinity.fasta"):
-            fasta = self.assemblies_dir / f"{self.runout}.{n}"
+        for a in self.diamond_priority:
+            fasta = self.assembly_fasta(a)
             outp = self.orthofuse_working / f"{fasta.name}.short.fasta"
             self.conda_run("orp", "python", self.makedir / "scripts" / "long.seq.py", fasta, outp, "200")
 
     def run_orthofuser(self, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
+        mem = self.mem if mem is None else mem
+        # -t is a memory knob and not only a core count -- see
+        # ORTHOFINDER_GB_PER_SEARCH. -a, the analysis threads, is RAM-hungry
+        # in its own right and OrthoFinder's own default is t/8; it used to be
+        # handed the whole core count here, which under -og buys nothing at
+        # all, since that run stops at orthogroups and never reaches the
+        # MSA/tree work -a exists to parallelise.
+        searches = max(1, min(cpu, mem // ORTHOFINDER_GB_PER_SEARCH))
+        analysis = max(1, searches // 8)
+        # OrthoFinder reports its own fatal errors and then exits 0. A run
+        # whose diamonds were OOM-killed leaves truncated Blast*.txt behind,
+        # prints "ERROR: Blast1_1.txt is corrupted" and "ERROR: An error
+        # occurred", and still returns success -- so conda_run is happy, the
+        # sentinel gets written, and needs_run skips this step on every
+        # later resume. makeorthout is then handed either nothing or a stale
+        # Orthogroups.txt from an earlier attempt, and the run goes on to
+        # build a final assembly off an orthogroup set that was never
+        # computed. Take the sentinel from the artifact instead of from the
+        # exit status: drop a marker first, and require orthogroups newer
+        # than it, so a stale result from a previous attempt cannot pass.
+        marker = self.orthofuse_dir / "orthofuser.attempt"
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.touch()
         self.conda_run(
             "orp_orthofinder", "orthofinder",
-            "-d", "-I", "12", "-f", self.orthofuse_working, "-og", "-t", cpu, "-a", cpu,
+            "-d", "-I", "12", "-f", self.orthofuse_working,
+            "-og", "-t", searches, "-a", analysis,
         )
+        groups = self.newest_orthogroups_txt()
+        if groups is None or groups.stat().st_mtime < marker.stat().st_mtime:
+            sys.exit(
+                "orthofinder exited 0 but produced no Orthogroups.txt for this "
+                "attempt -- read its ERROR lines above. Its usual cause is "
+                "diamond being OOM-killed mid-search (returncode -9), which "
+                "leaves truncated Blast*.txt that OrthoFinder then reports as "
+                "corrupted. Lower --cpu or --max-parallel, or raise "
+                f"ORTHOFINDER_GB_PER_SEARCH (currently {ORTHOFINDER_GB_PER_SEARCH}), "
+                "and delete the failed Results_* directory before resuming."
+            )
+        if groups.stat().st_size == 0:
+            sys.exit(f"orthofinder produced an empty {groups}")
         (self.orthofuse_dir / "orthofuser.done").touch()
 
     def merge(self):
@@ -546,49 +1127,109 @@ class Pipeline:
                 with open(p, "rb") as inf:
                     shutil.copyfileobj(inf, outf)
 
+    def newest_orthogroups_txt(self):
+        """The most recently written Orthogroups.txt, or None.
+
+        Newest rather than rglob's first: OrthoFinder never reuses a results
+        directory, it makes a new Results_<Mon><Day> (then _1, _2, ...) per
+        invocation, so a working directory that has seen a failed attempt
+        holds several. rglob's order is the filesystem's, which on a resume
+        after a failure is as likely to hand back the attempt that died as
+        the one that succeeded -- and makeorthout would pick contigs from it
+        without complaint.
+        """
+        matches = list(self.orthofuse_working.rglob("Orthogroups.txt"))
+        if not matches:
+            return None
+        return max(matches, key=lambda p: p.stat().st_mtime)
+
     def find_orthogroups_txt(self):
-        match = next(self.orthofuse_working.rglob("Orthogroups.txt"), None)
+        match = self.newest_orthogroups_txt()
         if match is None:
             sys.exit("Orthogroups.txt not found under orthofuse working directory")
         return match
 
-    def makelist(self):
-        orthogroups = self.find_orthogroups_txt()
-        with open(orthogroups) as f:
-            n = sum(1 for _ in f)
-        out = self.orthofuse_dir / f"{self.runout}.list"
-        with open(out, "w") as f:
-            for i in range(1, n + 1):
-                f.write(f"{i}\n")
+    @staticmethod
+    def clear_transrate_outdir(outdir):
+        """Empty pytransrate's -o, keeping any completed snap index.
 
-    def makegroups(self):
-        orthogroups = self.find_orthogroups_txt()
-        with open(orthogroups) as f:
-            lines = f.readlines()
+        A retry has to start from a clear directory: pytransrate will not
+        overwrite an existing assemblies.csv, and it reuses whatever BAM it
+        finds already sitting in -o, so a step killed part-way leaves a BAM
+        with no BGZF EOF marker behind and every later attempt picks that
+        same truncated file back up and dies on it.
 
-        def write_group(i):
-            tokens = lines[i - 1].split()
-            group_file = self.orthofuse_dir / f"{i}.groups"
-            with open(group_file, "w") as f:
-                for tok in tokens[1:]:
-                    f.write(tok + "\n")
+        What a retry must not start from is a cold index. snap's index of
+        the merged assembly is the longest single piece of work in the run
+        -- the better part of an hour on a multi-million-contig merge, and
+        two builds rather than one whenever the -locationSize sweep steps up
+        -- and pytransrate reuses an index it finds, keyed on the
+        GenomeIndex marker snap writes when a build completes. rmtree'ing
+        the whole of -o threw that away every time, so three attempts at a
+        failing step meant three identical index builds and three identical
+        waits to reach the same failure.
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.cpu) as ex:
-            list(ex.map(write_group, range(1, len(lines) + 1)))
-        (self.orthofuse_dir / "groups.done").touch()
+        A partial index carries no marker and so is not kept, which is the
+        behaviour we want: trusting a build that died half way yields a
+        corrupt index.
+
+        logs/ is kept for a different reason: it holds snap.log, the file
+        pytransrate points at when snap dies without explaining itself, so
+        deleting it is deleting the evidence the retry exists to gather.
+        pytransrate rewrites it per attempt, so what survives the last
+        retry is the last attempt's output, which is the one worth reading.
+        """
+        outdir = Path(outdir)
+        if not outdir.is_dir():
+            return
+        for path in outdir.iterdir():
+            if path.is_dir():
+                if path.name == "logs" or (path / "GenomeIndex").is_file():
+                    continue
+                shutil.rmtree(path, ignore_errors=True)
+            else:
+                # Not unlink(missing_ok=True): that keyword is 3.8+, and
+                # oyster.py is launched by whatever system python3 the
+                # cluster has -- 3.6.8 on ours. A TypeError raised here
+                # fires only on the retry path, i.e. only once a step has
+                # already failed, so it converts a retryable failure into a
+                # crash whose traceback hides the failure that caused it.
+                try:
+                    path.unlink()
+                except OSError:
+                    pass
 
     def orthotransrate(self, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
         outdir = self.orthofuse_dir / "merged"
+        # needs_run() re-runs this step whenever the corrected reads are
+        # newer than merged/assemblies.csv -- not only when it is absent --
+        # so a resumed run would abort on that csv unless it is cleared
+        # first. retry_cleanup repeats the clear before each retry, because
+        # the one below happens once, outside run()'s retry loop. See
+        # clear_transrate_outdir for what survives it and why.
+        self.clear_transrate_outdir(outdir)
         self.conda_run(
-            "orp", self.makedir / "software" / "orp-transrate" / "transrate",
+            "orp", "pytransrate",
             "-o", outdir, "-t", cpu, "-a", self.orthofuse_dir / "merged.fasta",
             "--left", self.cor1(), "--right", self.cor2(),
+            *self.pytransrate_args,
+            retry_cleanup=partial(self.clear_transrate_outdir, outdir),
         )
-        for f in outdir.rglob("*.bam"):
-            f.unlink()
 
     def makeorthout(self):
+        """Pick the best-scoring contig per orthogroup.
+
+        The picker used to consume a directory of one <i>.groups file per
+        orthogroup, written by a makelist/makegroups pair here and unlinked
+        again on the way out -- of order 1e5 small files created, globbed
+        back in and deleted, purely to hand data between two Python
+        processes. It reads Orthogroups.txt directly now; the group ordering
+        that used to come out of sorting those filenames is reproduced
+        inside the script, deliberately, because it reaches cd-hit-est and
+        so the final assembly (see the note at the top of
+        scripts/pick_best_contigs.py).
+        """
         print("Picking the best contig per orthogroup")
         contigs_csv = next(self.orthofuse_dir.rglob("contigs.csv"), None)
         if contigs_csv is None:
@@ -596,10 +1237,8 @@ class Pipeline:
         good_list = self.orthofuse_dir / f"good.{self.runout}.list"
         self.conda_run(
             "orp", "python", self.makedir / "scripts" / "pick_best_contigs.py",
-            contigs_csv, self.orthofuse_dir, good_list,
+            contigs_csv, self.find_orthogroups_txt(), good_list,
         )
-        for f in self.orthofuse_dir.glob("*groups"):
-            f.unlink()
 
     def orthofusing(self):
         good_list = self.orthofuse_dir / f"good.{self.runout}.list"
@@ -615,12 +1254,9 @@ class Pipeline:
 
     def diamond_jobs(self):
         return [
-            (self.assemblies_dir / f"{self.runout}.orthomerged.fasta", self.diamond_dir / f"{self.runout}.orthomerged.diamond.txt"),
-            (self.assemblies_dir / f"{self.runout}.transabyss.fasta", self.diamond_dir / f"{self.runout}.transabyss.diamond.txt"),
-            (self.assemblies_dir / f"{self.runout}.spades75.fasta", self.diamond_dir / f"{self.runout}.spades75.diamond.txt"),
-            (self.assemblies_dir / f"{self.runout}.spades55.fasta", self.diamond_dir / f"{self.runout}.spades55.diamond.txt"),
-            (self.assemblies_dir / f"{self.runout}.trinity.Trinity.fasta", self.diamond_dir / f"{self.runout}.trinity.diamond.txt"),
-        ]
+            (self.assemblies_dir / f"{self.runout}.orthomerged.fasta",
+             self.diamond_dir / f"{self.runout}.orthomerged.diamond.txt"),
+        ] + [(self.assembly_fasta(a), self.diamond_txt(a)) for a in self.diamond_priority]
 
     def run_diamond_one(self, query, out, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
@@ -630,15 +1266,9 @@ class Pipeline:
         )
 
     def diamond_uniq(self):
-        mapping = {
-            "trinity": self.diamond_dir / f"{self.runout}.trinity.diamond.txt",
-            "sp75": self.diamond_dir / f"{self.runout}.spades75.diamond.txt",
-            "sp55": self.diamond_dir / f"{self.runout}.spades55.diamond.txt",
-            "transabyss": self.diamond_dir / f"{self.runout}.transabyss.diamond.txt",
-        }
-        for label, path in mapping.items():
-            count = parse_unique_count(path)
-            (self.diamond_dir / f"{self.runout}.unique.{label}.txt").write_text(f"{count}\n")
+        for a in self.report_order:
+            count = parse_unique_count(self.diamond_txt(a))
+            self.unique_txt(a).write_text(f"{count}\n")
 
     def make_list1(self):
         ids = extract_gene_ids(self.diamond_dir / f"{self.runout}.orthomerged.diamond.txt")
@@ -646,8 +1276,8 @@ class Pipeline:
 
     def make_list2(self):
         ids = set()
-        for name in ("transabyss", "spades75", "spades55", "trinity"):
-            ids |= extract_gene_ids(self.diamond_dir / f"{self.runout}.{name}.diamond.txt")
+        for a in self.diamond_priority:
+            ids |= extract_gene_ids(self.diamond_txt(a))
         write_sorted(self.diamond_dir / f"{self.runout}.list2", ids)
 
     def make_list3(self):
@@ -660,13 +1290,13 @@ class Pipeline:
                     o.write(line)
 
     def make_list5(self):
+        # build_list5.py keeps the first hit per gene in the order it is
+        # given the files, so diamond_priority is a real preference ranking
+        # here, not just an iteration order.
         self.conda_run(
             "orp", "python", self.makedir / "scripts" / "build_list5.py",
             self.diamond_dir / f"{self.runout}.list3", self.diamond_dir / f"{self.runout}.list5",
-            self.diamond_dir / f"{self.runout}.transabyss.diamond.txt",
-            self.diamond_dir / f"{self.runout}.spades75.diamond.txt",
-            self.diamond_dir / f"{self.runout}.spades55.diamond.txt",
-            self.diamond_dir / f"{self.runout}.trinity.diamond.txt",
+            *[self.diamond_txt(a) for a in self.diamond_priority],
         )
 
     def make_list6(self):
@@ -687,10 +1317,9 @@ class Pipeline:
                     o.write(line)
 
     def posthack(self):
-        fastas = " ".join(
-            str(self.assemblies_dir / f"{self.runout}.{n}")
-            for n in ("spades55.fasta", "spades75.fasta", "transabyss.fasta", "trinity.Trinity.fasta")
-        )
+        # Concatenation order, so ASSEMBLY_ORDER and not diamond_priority:
+        # this reaches cd-hit-est, where input order breaks length ties.
+        fastas = " ".join(str(p) for p in self.assembly_fasta_paths())
         list7 = self.diamond_dir / f"{self.runout}.list7"
         newbies = self.diamond_dir / f"{self.runout}.newbies.fasta"
         orthomerged = self.assemblies_dir / f"{self.runout}.orthomerged.fasta"
@@ -733,6 +1362,10 @@ class Pipeline:
         cpu = self.cpu if cpu is None else cpu
         src = self.assemblies_dir / f"{self.runout}.ORP.intermediate.fasta"
         idx = self.quants_dir / f"{self.runout}.ortho.idx"
+        # A rebuild here is usually a rebuild *over* an index salmon has
+        # already refused to load, so clear it rather than writing into the
+        # old directory alongside whatever format it was in.
+        shutil.rmtree(idx, ignore_errors=True)
         self.conda_run(
             "orp", "salmon", "index", "--no-version-check", "-t", src,
             "-i", idx, "-k", "31", "--threads", cpu,
@@ -743,7 +1376,7 @@ class Pipeline:
         idx = self.quants_dir / f"{self.runout}.ortho.idx"
         outdir = self.quants_dir / f"salmon_orthomerged_{self.runout}"
         self.conda_run(
-            "orp", "salmon", "quant", "--no-version-check", "--validateMappings",
+            "orp", "salmon", "quant", "--no-version-check",
             "-p", cpu, "-i", idx, "--seqBias", "--gcBias", "--libType", "A",
             "-1", self.cor1(), "-2", self.cor2(), "-o", outdir,
         )
@@ -840,13 +1473,15 @@ class Pipeline:
         cpu = self.cpu if cpu is None else cpu
         orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
         outdir = self.reports_dir / f"transrate_{self.runout}"
+        # See orthotransrate() and clear_transrate_outdir.
+        self.clear_transrate_outdir(outdir)
         self.conda_run(
-            "orp", self.makedir / "software" / "orp-transrate" / "transrate",
+            "orp", "pytransrate",
             "-o", outdir, "-a", orp_fasta,
             "--left", self.cor1(), "--right", self.cor2(), "-t", cpu,
+            *self.pytransrate_args,
+            retry_cleanup=partial(self.clear_transrate_outdir, outdir),
         )
-        for f in outdir.rglob("*.bam"):
-            f.unlink()
 
     def trinity_perllib_dir(self):
         result = subprocess.run(
@@ -932,7 +1567,9 @@ class Pipeline:
             print(text)
             lines.append(text)
 
-        print(f"\n\n*****  QUALITY REPORT FOR: {runout} using the ORP version {self.version} ****")
+        header = f"*****  QUALITY REPORT FOR: {runout} using {self.RUN_DESCRIPTION} version {self.version} ****"
+        print(f"\n\n{header}")
+        lines.append(header)
         orp_fasta = self.assemblies_dir / f"{runout}.ORP.fasta"
         print(f"\n*****  THE ASSEMBLY CAN BE FOUND HERE: {orp_fasta} **** \n")
 
@@ -954,11 +1591,15 @@ class Pipeline:
         def read_count(path):
             return path.read_text().strip() if path.exists() else ""
 
-        emit("*****  UNIQUE GENES ORP ~~~~~~~~~~~~~~~~~>     ", read_count(self.assemblies_working / f"{runout}.unique.ORP.txt"))
-        emit("*****  UNIQUE GENES TRINITY ~~~~~~~~~~~~~>     ", read_count(self.diamond_dir / f"{runout}.unique.trinity.txt"))
-        emit("*****  UNIQUE GENES SPADES55 ~~~~~~~~~~~~>     ", read_count(self.diamond_dir / f"{runout}.unique.sp55.txt"))
-        emit("*****  UNIQUE GENES SPADES75 ~~~~~~~~~~~~>     ", read_count(self.diamond_dir / f"{runout}.unique.sp75.txt"))
-        emit("*****  UNIQUE GENES TRANSABYSS ~~~~~~~~~~>     ", read_count(self.diamond_dir / f"{runout}.unique.transabyss.txt"))
+        def unique_genes(label):
+            # The tildes pad each label out to the same column so the counts
+            # line up under one another; with the four built-in assemblers
+            # this reproduces the hand-written arrows exactly.
+            return f"*****  UNIQUE GENES {label} " + "~" * max(1, 20 - len(label)) + ">     "
+
+        emit(unique_genes("ORP"), read_count(self.assemblies_working / f"{runout}.unique.ORP.txt"))
+        for a in self.report_order:
+            emit(unique_genes(a.report_label), read_count(self.unique_txt(a)))
 
         proper_pairs = ""
         flagstat = self.assemblies_dir / f"{runout}.flagstat"
@@ -1012,61 +1653,65 @@ class Pipeline:
     def main(self):
         pipeline_start = time.time()
         self.setup()
+        if self.already_complete():
+            return
         self.timing_init()
         self.check()
         self.welcome()
         self.readcheck()
+        self.prepare_reads()
+        self.run_assemblers()
+        self.merge_and_report(pipeline_start)
 
+    def prepare_reads(self):
+        """Trim and error-correct the raw pair, and start compressing it.
+
+        Split out of main() because every entry point needs it: the merge
+        half scores, quantifies and strand-checks against the corrected
+        pair, so a run that brings its own assemblies still comes through
+        here.
+        """
         t1, t2 = self.trim1(), self.trim2()
+        trim_done = self.rcorr_dir / f"{self.runout}.trim.done"
         c1, c2 = self.cor1(), self.cor2()
-        trinity_fa = self.assemblies_dir / f"{self.runout}.trinity.Trinity.fasta"
-        sp75 = self.assemblies_dir / f"{self.runout}.spades75.fasta"
-        sp55 = self.assemblies_dir / f"{self.runout}.spades55.fasta"
-        ta = self.assemblies_dir / f"{self.runout}.transabyss.fasta"
-        short_fastas = self.short_fasta_paths()
-        orthofuser_done = self.orthofuse_dir / "orthofuser.done"
-        merged_fasta = self.orthofuse_dir / "merged.fasta"
-        list_file = self.orthofuse_dir / f"{self.runout}.list"
-        groups_done = self.orthofuse_dir / "groups.done"
-        merged_csv = self.orthofuse_dir / "merged" / "assemblies.csv"
-        good_list = self.orthofuse_dir / f"good.{self.runout}.list"
-        orthomerged_fasta = self.assemblies_dir / f"{self.runout}.orthomerged.fasta"
-        diamond_outs = [o for _, o in self.diamond_jobs()]
-        diamond_orthomerged = self.diamond_dir / f"{self.runout}.orthomerged.diamond.txt"
-        diamond_ta = self.diamond_dir / f"{self.runout}.transabyss.diamond.txt"
-        diamond_sp75 = self.diamond_dir / f"{self.runout}.spades75.diamond.txt"
-        diamond_sp55 = self.diamond_dir / f"{self.runout}.spades55.diamond.txt"
-        diamond_trinity = self.diamond_dir / f"{self.runout}.trinity.diamond.txt"
-        uniq_outs = [
-            self.diamond_dir / f"{self.runout}.unique.trinity.txt",
-            self.diamond_dir / f"{self.runout}.unique.sp75.txt",
-            self.diamond_dir / f"{self.runout}.unique.sp55.txt",
-            self.diamond_dir / f"{self.runout}.unique.transabyss.txt",
-        ]
-        list1 = self.diamond_dir / f"{self.runout}.list1"
-        list2 = self.diamond_dir / f"{self.runout}.list2"
-        list3 = self.diamond_dir / f"{self.runout}.list3"
-        list5 = self.diamond_dir / f"{self.runout}.list5"
-        list6 = self.diamond_dir / f"{self.runout}.list6"
-        list7 = self.diamond_dir / f"{self.runout}.list7"
-        newbies = self.diamond_dir / f"{self.runout}.newbies.fasta"
-        working_orthomerged = self.assemblies_working / f"{self.runout}.orthomerged.fasta"
-        orp_intermediate = self.assemblies_dir / f"{self.runout}.ORP.intermediate.fasta"
-        orp_diamond_txt = self.assemblies_dir / f"{self.runout}.ORP.diamond.txt"
-        unique_orp_done = self.assemblies_working / f"{self.runout}.unique.ORP.done"
-        ortho_idx = self.quants_dir / f"{self.runout}.ortho.idx"
-        quant_sf = self.quants_dir / f"salmon_orthomerged_{self.runout}" / "quant.sf"
-        filter_done = self.assemblies_dir / f"{self.runout}.filter.done"
-        low_txt = self.assemblies_working / f"{self.runout}.LOWEXP.txt"
-        high_txt = self.assemblies_working / f"{self.runout}.HIGHEXP.txt"
-        orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
-        busco_done = self.reports_dir / f"{self.runout}.busco.done"
-        transrate_csv = self.reports_dir / f"transrate_{self.runout}" / "assemblies.csv"
-        strandeval_done = self.reports_dir / f"{self.runout}.strandeval.done"
-        qualreport_done = self.reports_dir / f"qualreport.{self.runout}.done"
 
-        self.step("run_trimmomatic", [t1, t2], [self.read1, self.read2], self.run_trimmomatic)
+        # Ask for the trimmed pair back as trimmomatic's outputs only while
+        # the corrected pair it feeds is missing or stale: reclaim_trimmed_
+        # reads() deletes those files as soon as rcorrector is done with them,
+        # so on a resumed run they're legitimately gone and their sentinel,
+        # not the files, is what records that trimming happened. A working
+        # directory from before the sentinel existed has no sentinel and its
+        # TRIM files still present, so it takes the first branch and skips
+        # the same way it always did.
+        trim_outputs = [t1, t2]
+        if trim_done.exists() and not self.needs_run([c1, c2], [self.read1, self.read2]):
+            trim_outputs = [trim_done]
+        self.step("run_trimmomatic", trim_outputs, [self.read1, self.read2], self.run_trimmomatic)
         self.step("run_rcorrector", [c1, c2], [t1, t2], self.run_rcorrector)
+        self.reclaim_trimmed_reads()
+        # Every stage from here through strandeval reads c1/c2, so they can't
+        # be replaced by their .gz until cleanup() -- but the compression
+        # itself starts now, behind the assemblers, rather than being paid
+        # for serially once the run is otherwise over.
+        self.compress_async(c1)
+        self.compress_async(c2)
+
+    def run_assemblers(self):
+        """Build the four assemblies this pipeline is named for.
+
+        oyster.py's own half of the work, and the only half that is specific
+        to a particular set of assemblers -- everything downstream of
+        run_filtershort treats them as an unordered set of inputs.
+        """
+        c1, c2 = self.cor1(), self.cor2()
+        trinity_fa = self.assembly_fasta(TRINITY)
+        phase1_done = self.trinity_phase1_done()
+        sp75 = self.assembly_fasta(SPADES75)
+        sp55 = self.assembly_fasta(SPADES55)
+        ta = self.assembly_fasta(TRANSABYSS)
+        diamond_ta = self.diamond_txt(TRANSABYSS)
+        diamond_sp75 = self.diamond_txt(SPADES75)
+        diamond_sp55 = self.diamond_txt(SPADES55)
 
         # Two sequential stage-pairings rather than one lane split across all
         # four assemblers for the whole run -- see TRINITY_PHASE1_SHARE and
@@ -1076,6 +1721,8 @@ class Pipeline:
         phase1_mem = max(1, round(self.mem * TRINITY_PHASE1_SHARE))
         spades_cpu = max(1, self.cpu - phase1_cpu)
         spades_mem = max(1, self.mem - phase1_mem)
+
+        self.seed_trinity_phase1_sentinel()
 
         phase2_cpu = max(1, round(self.cpu * TRINITY_PHASE2_SHARE))
         phase2_mem = max(1, round(self.mem * TRINITY_PHASE2_SHARE))
@@ -1102,7 +1749,7 @@ class Pipeline:
         def trinity_phase1_lane():
             try:
                 self.step(
-                    "run_trinity_phase1", [self.trinity_out_dir() / "recursive_trinity.cmds.ok"], [c1],
+                    "run_trinity_phase1", [phase1_done], [c1],
                     partial(self.run_trinity_phase1, cpu=phase1_cpu, mem=phase1_mem),
                 )
             except Exception as e:
@@ -1121,6 +1768,7 @@ class Pipeline:
                 ):
                     self.step(step_name, outputs, inputs, partial(assemble, cpu=spades_cpu, mem=spades_mem))
                     query = outputs[0]
+                    self.compress_async(query)
                     self.step(
                         f"diamond_{diamond_name}", [diamond_out], [query],
                         partial(self.run_diamond_one, query, diamond_out, cpu=spades_cpu),
@@ -1138,10 +1786,10 @@ class Pipeline:
         def trinity_phase2_lane():
             try:
                 self.step(
-                    "run_trinity_phase2", [trinity_fa],
-                    [self.trinity_out_dir() / "recursive_trinity.cmds.ok"],
+                    "run_trinity_phase2", [trinity_fa], [phase1_done],
                     partial(self.run_trinity_phase2, cpu=phase2_cpu, mem=phase2_mem),
                 )
+                self.compress_async(trinity_fa)
             except Exception as e:
                 _lane_failed("run_trinity_phase2", e)
                 raise
@@ -1152,6 +1800,7 @@ class Pipeline:
                     "run_transabyss", [ta], [c1, c2],
                     partial(self.run_transabyss, cpu=transabyss_cpu, mem=transabyss_mem),
                 )
+                self.compress_async(ta)
                 self.step(
                     "diamond_transabyss", [diamond_ta], [ta],
                     partial(self.run_diamond_one, ta, diamond_ta, cpu=transabyss_cpu),
@@ -1166,50 +1815,98 @@ class Pipeline:
                 f.result()
         print(f"=== Stage B done -- {self._ts()} ===")
 
-        self.step("run_filtershort", short_fastas, [ta, sp75, sp55, trinity_fa], self.run_filtershort)
+    def merge_and_report(self, pipeline_start):
+        """Fuse the assemblies into one, then score and report on the result.
+
+        Everything here is generic over `self.assemblies`: it is the half
+        chowder.py reuses wholesale for assemblies it did not build.
+        """
+        c1, c2 = self.cor1(), self.cor2()
+        assembly_fastas = self.assembly_fasta_paths()
+        short_fastas = self.short_fasta_paths()
+        orthofuser_done = self.orthofuse_dir / "orthofuser.done"
+        merged_fasta = self.orthofuse_dir / "merged.fasta"
+        merged_csv = self.orthofuse_dir / "merged" / "assemblies.csv"
+        good_list = self.orthofuse_dir / f"good.{self.runout}.list"
+        orthomerged_fasta = self.assemblies_dir / f"{self.runout}.orthomerged.fasta"
+        diamond_outs = [o for _, o in self.diamond_jobs()]
+        diamond_orthomerged = self.diamond_dir / f"{self.runout}.orthomerged.diamond.txt"
+        uniq_outs = [self.unique_txt(a) for a in self.report_order]
+        list1 = self.diamond_dir / f"{self.runout}.list1"
+        list2 = self.diamond_dir / f"{self.runout}.list2"
+        list3 = self.diamond_dir / f"{self.runout}.list3"
+        list5 = self.diamond_dir / f"{self.runout}.list5"
+        list6 = self.diamond_dir / f"{self.runout}.list6"
+        list7 = self.diamond_dir / f"{self.runout}.list7"
+        newbies = self.diamond_dir / f"{self.runout}.newbies.fasta"
+        working_orthomerged = self.assemblies_working / f"{self.runout}.orthomerged.fasta"
+        orp_intermediate = self.assemblies_dir / f"{self.runout}.ORP.intermediate.fasta"
+        orp_diamond_txt = self.assemblies_dir / f"{self.runout}.ORP.diamond.txt"
+        unique_orp_done = self.assemblies_working / f"{self.runout}.unique.ORP.done"
+        ortho_idx = self.quants_dir / f"{self.runout}.ortho.idx"
+        quant_sf = self.quants_dir / f"salmon_orthomerged_{self.runout}" / "quant.sf"
+        filter_done = self.assemblies_dir / f"{self.runout}.filter.done"
+        low_txt = self.assemblies_working / f"{self.runout}.LOWEXP.txt"
+        high_txt = self.assemblies_working / f"{self.runout}.HIGHEXP.txt"
+        orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
+        busco_done = self.reports_dir / f"{self.runout}.busco.done"
+        transrate_csv = self.reports_dir / f"transrate_{self.runout}" / "assemblies.csv"
+        strandeval_done = self.reports_dir / f"{self.runout}.strandeval.done"
+        qualreport_done = self.reports_dir / f"qualreport.{self.runout}.done"
+        cleanup_done = self.reports_dir / f"{self.runout}.cleanup.done"
+
+        self.step("run_filtershort", short_fastas, assembly_fastas, self.run_filtershort)
 
         def orthofuser_branch(cpu=None, mem=None):
-            self.step("run_orthofuser", [orthofuser_done], short_fastas, partial(self.run_orthofuser, cpu=cpu))
-            self.step("makelist", [list_file], [orthofuser_done], self.makelist, timed=False)
-            self.step("makegroups", [groups_done], [list_file], self.makegroups, timed=False)
+            # mem reaches run_orthofuser because OrthoFinder's search
+            # concurrency is now capped against it; left unforwarded it would
+            # cap against the whole machine while holding half of it.
+            self.step("run_orthofuser", [orthofuser_done], short_fastas,
+                      partial(self.run_orthofuser, cpu=cpu, mem=mem))
 
         def merge_branch(cpu=None, mem=None):
-            self.step("merge", [merged_fasta], short_fastas, self.merge, timed=False)
+            self.step("merge", [merged_fasta], short_fastas, self.merge)
             self.step("orthotransrate", [merged_csv], [merged_fasta, c1, c2], partial(self.orthotransrate, cpu=cpu))
 
-        # run_orthofuser->makelist->makegroups and merge->orthotransrate are
-        # independent chains that both only need short_fastas; they join at
-        # makeorthout below.
+        # run_orthofuser and merge->orthotransrate are independent chains that
+        # both only need short_fastas; they join at makeorthout below.
         self.run_parallel(
             [
-                ("orthofuser_branch", [groups_done], short_fastas, orthofuser_branch),
+                ("orthofuser_branch", [orthofuser_done], short_fastas, orthofuser_branch),
                 ("merge_branch", [merged_csv], short_fastas, merge_branch),
             ],
             max_workers=self.max_parallel,
         )
-        self.step("makeorthout", [good_list], [groups_done, merged_csv], self.makeorthout)
+        self.step("makeorthout", [good_list], [orthofuser_done, merged_csv], self.makeorthout)
         self.step("orthofusing", [orthomerged_fasta], [good_list, merged_fasta], self.orthofusing)
 
-        # diamond_transabyss/spades75/spades55 already ran in the short
-        # assembler lane above. Only these two remain: orthomerged depends
-        # on the merge stage just above, and trinity depends on the trinity
-        # lane -- both are only just now guaranteed to be ready.
+        # Every assembly needs a diamond pass, and under oyster.py most of
+        # them already had one: the assembler lanes fire each assembly's
+        # diamond the moment that assembler returns, rather than leaving all
+        # four to queue up here. Those steps are up to date by now and skip;
+        # what is genuinely left is orthomerged, which depends on the merge
+        # stage just above, and Trinity, whose lane only just finished. A run
+        # that brought its own assemblies had no lanes, so all of them run
+        # here -- which is why this is a loop over the set and not the two
+        # named steps it used to be.
         print("\n\n\n\n Starting diamond \n\n\n\n")
         self.step(
             "diamond_orthomerged", [diamond_orthomerged], [orthomerged_fasta],
             partial(self.run_diamond_one, orthomerged_fasta, diamond_orthomerged),
         )
-        self.step(
-            "diamond_trinity", [diamond_trinity], [trinity_fa],
-            partial(self.run_diamond_one, trinity_fa, diamond_trinity),
-        )
-        self.step("diamond_uniq", uniq_outs, diamond_outs, self.diamond_uniq, timed=False)
-        self.step("make_list1", [list1], [diamond_orthomerged], self.make_list1, timed=False)
-        self.step("make_list2", [list2], [diamond_trinity, diamond_sp75, diamond_sp55, diamond_ta], self.make_list2, timed=False)
-        self.step("make_list3", [list3], [list1, list2], self.make_list3, timed=False)
-        self.step("make_list5", [list5], [list3, diamond_ta, diamond_sp75, diamond_sp55, diamond_trinity], self.make_list5)
-        self.step("make_list6", [list6], [orthomerged_fasta], self.make_list6, timed=False)
-        self.step("make_list7", [list7], [list6, list5], self.make_list7, timed=False)
+        for a in self.diamond_priority:
+            fasta, out = self.assembly_fasta(a), self.diamond_txt(a)
+            self.step(
+                f"diamond_{a.diamond_label}", [out], [fasta],
+                partial(self.run_diamond_one, fasta, out),
+            )
+        self.step("diamond_uniq", uniq_outs, diamond_outs, self.diamond_uniq)
+        self.step("make_list1", [list1], [diamond_orthomerged], self.make_list1)
+        self.step("make_list2", [list2], [self.diamond_txt(a) for a in self.assemblies], self.make_list2)
+        self.step("make_list3", [list3], [list1, list2], self.make_list3)
+        self.step("make_list5", [list5], [list3] + [self.diamond_txt(a) for a in self.diamond_priority], self.make_list5)
+        self.step("make_list6", [list6], [orthomerged_fasta], self.make_list6)
+        self.step("make_list7", [list7], [list6, list5], self.make_list7)
         self.step("posthack", [newbies, working_orthomerged], [list7], self.posthack)
         self.step("cdhit", [orp_intermediate], [working_orthomerged], self.cdhit)
 
@@ -1218,10 +1915,11 @@ class Pipeline:
         # CPU to overlap with it costs more than the overlap saves, so both
         # run sequentially at full CPU instead.
         self.step("orp_diamond", [orp_diamond_txt], [orp_intermediate], self.orp_diamond)
-        self.step("orp_uniq", [unique_orp_done], [orp_diamond_txt], self.orp_uniq, timed=False)
-        self.step("salmon_index", [ortho_idx], [orp_intermediate], self.salmon_index)
+        self.step("orp_uniq", [unique_orp_done], [orp_diamond_txt], self.orp_uniq)
+        salmon_stamp = self.stamp_tool_version("orp", "salmon", self.quants_dir / "salmon.version")
+        self.step("salmon_index", [ortho_idx], [orp_intermediate, salmon_stamp], self.salmon_index)
         self.step("salmon", [quant_sf], [ortho_idx, c1, c2], self.salmon)
-        self.step("filter", [filter_done], [orp_intermediate, quant_sf, orp_diamond_txt], self.filter_tpm, timed=False)
+        self.step("filter", [filter_done], [orp_intermediate, quant_sf, orp_diamond_txt], self.filter_tpm)
         self.step(
             "secondfilter", [orp_fasta],
             [filter_done, low_txt, high_txt, orp_intermediate, quant_sf, orp_diamond_txt],
@@ -1240,7 +1938,9 @@ class Pipeline:
             ],
             max_workers=self.max_parallel,
         )
-        self.step("reportgen", [qualreport_done], [unique_orp_done, orp_fasta], self.reportgen, timed=False)
+        self.step("reportgen", [qualreport_done], [unique_orp_done, orp_fasta], self.reportgen)
+        # Last, because it deletes inputs several of the steps above declare.
+        self.step("cleanup", [cleanup_done], [qualreport_done], self.cleanup)
 
         self.timing_report(int(time.time() - pipeline_start))
 
@@ -1274,11 +1974,32 @@ def parse_args():
              "sequentially at full --cpu; 1 disables concurrency for the remaining "
              "stages entirely (default: 2)",
     )
+    p.add_argument(
+        "--keep-intermediates", action="store_true",
+        help="keep every file a run produces: skips both the end-of-run cleanup "
+             "(orthofuse/, quants/, diamond/, the working assemblies) and the "
+             "reclaim of the trimmed reads, and leaves the four assemblies and "
+             "the corrected reads uncompressed. For debugging a run (default: off)",
+    )
+    p.add_argument(
+        "--pytransrate-args", default="",
+        help="extra arguments passed verbatim to both pytransrate runs, as one "
+             "quoted string, e.g. --pytransrate-args '--location-size 5'. For "
+             "the snap index tuning a large merge needs: --location-size skips "
+             "the sweep when you already know four byte locations will not hold "
+             "the genome. Note --padding is not the memory lever it looks like: "
+             "snap writes it as N and skips seeds containing N, so it grows the "
+             "1 byte/base genome array and nothing else -- on a 5.4M-contig, "
+             "5.7 Gbp merge, dropping it entirely saved 1%% of the branch, while "
+             "real sequence alone still exceeded the four-byte ceiling. Run "
+             "`pytransrate --help` for the full set (default: none)",
+    )
     p.add_argument("--dir", default=None, help="working directory (default: current directory)")
     return p.parse_args()
 
 
 def main():
+    line_buffer_stdio()
     args = parse_args()
     pipeline = Pipeline(args)
     try:
@@ -1287,6 +2008,12 @@ def main():
         sys.exit(f"\n*** step failed: {' '.join(str(c) for c in e.cmd)} (exit {e.returncode}) ***")
     except FileNotFoundError as e:
         sys.exit(f"\n*** required command not found: {e.filename} ***")
+    finally:
+        # The pool's threads are not daemons, so a run that dies mid-stage
+        # would otherwise sit at interpreter exit with no explanation of what
+        # it's waiting for. The .gz files themselves are still worth
+        # finishing: nothing has been deleted on this path.
+        pipeline.finish_compression()
 
 
 if __name__ == "__main__":

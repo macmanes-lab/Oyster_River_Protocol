@@ -24,6 +24,27 @@ By default, oyster.py runs Trinity with `--no_normalize_reads`, i.e. read normal
 python3 oyster.py --read1 R1.fq.gz --read2 R2.fq.gz --mem 110 --cpu 24 --runout runname --strand RF --normalize-reads
 ```
 
+### Merging assemblies you already have (`chowder.py`)
+
+`chowder.py` runs the second half of the ORP -- everything after the four assemblers -- over assemblies you bring yourself, so two or more existing transcriptomes can be merged into one the same way ORP merges its own:
+
+```bash
+python3 chowder.py --assemblies best.fasta other.fasta third.fasta.gz \
+        --read1 R1.fq.gz --read2 R2.fq.gz --mem 110 --cpu 24 --runout runname
+```
+
+It is the same code rather than a copy of it -- `chowder.py` subclasses `oyster.py`'s pipeline and reuses the merge stages wholesale -- so the orthogroup selection rule, the group ordering that reaches cd-hit-est's tie-breaks, and the pytransrate scoring are identical to a full ORP run's by construction. The output is a `<run>.ORP.fasta` and a `reports/qualreport.<run>` in the usual layout, with one `UNIQUE GENES` line per input assembly.
+
+Three things differ from `oyster.py`, and all three are worth knowing before you run it:
+
+- **The reads are not optional.** The merge scores every contig against them (pytransrate), quantifies the survivors (salmon) and strand-checks the result, so it needs the library the assemblies were built from. It trims and error-corrects that library the way ORP always does; pass `--corrected-reads` if your pair has already been through trimmomatic and rcorrector, and it will use it as-is.
+- **Contig names are prefixed with the label of the assembly they came from** (`trinity_TRINITY_DN0_c0_g1_i1`). Two assemblies of one library routinely share contig names -- two Trinity runs both start at `TRINITY_DN0_c0_g1_i1` -- and every stage downstream joins on that name, so without the prefix two different contigs would silently be treated as one. It doubles as provenance: every contig in the final assembly says which input it survived from. Labels come from the filenames unless you pass `--labels`.
+- **Assembly order matters, and by default it is not yours to get wrong.** It sets contig order in the pooled fasta, which reaches cd-hit-est, where input order breaks length ties between near-identical contigs; and it is the order the diamond rescue searches, so for contigs no orthogroup covered, earlier assemblies are preferred. Rather than let the sequence you happened to type decide either of those, chowder sorts the assemblies by label and permutes them with a fixed seed, so the order depends on the *set* of assemblies and not on how you listed them. It is a seeded shuffle rather than a random one on purpose: randomising outright would mean the same command gave a different assembly on a different day, and a resumed run disagreeing with the run it resumed. The order used and the seed that produced it are printed when the run starts and written to `assemblies/<run>.ingest.done`.
+
+  This makes the order arbitrary and reproducible; it does not make the pipeline order-*independent*, which would mean breaking cd-hit-est's ties and the rescue ranking on merit rather than on position. To find out what the order is worth on your own data, run it twice with different `--seed` values and diff the assemblies. To rank the assemblies yourself, best first, pass `--assembly-order given`.
+
+`python3 chowder.py --help` prints the full flag reference, and [All flags (`chowder.py`)](#all-flags-chowderpy) below is the same list. There are no assembler flags -- no k-mers, no `--strand`, no `--normalize-reads` -- and preflight does not require SPAdes, Trinity or Trans-ABySS, since a merge never runs them. It does check for `bwa`, which `strandeval` runs.
+
 ### Parallel task management
 
 See [docs/pipeline-schedule.html](docs/pipeline-schedule.html) for a full DAG of execution order and concurrency (download and open locally, or view via [htmlpreview](https://htmlpreview.github.io/?https://github.com/macmanes-lab/Oyster_River_Protocol/blob/master/docs/pipeline-schedule.html)), and [docs/pipeline-steps.md](docs/pipeline-steps.md) for what each step actually reads and writes.
@@ -44,7 +65,41 @@ CPU-bound stages that don't benefit from splitting cores — diamond, orp_diamon
 
 Set `--max-parallel 1` to disable concurrency for those stages and run them one at a time (useful when debugging, or on a machine where you'd rather not split cores). Raise it above 2 to run more jobs at once within a stage, at the cost of each job getting a smaller slice of `--cpu`/`--mem`.
 
-### All flags
+### What a finished run leaves behind
+
+A completed run keeps five things and reclaims the rest:
+
+| Kept | |
+|---|---|
+| `assemblies/<run>.ORP.fasta` | the assembly — the point of the run, left uncompressed |
+| `assemblies/<run>.{spades55,spades75,transabyss,trinity.Trinity}.fasta.gz` | the four individual assemblies, gzipped |
+| `rcorr/<run>.TRIM_{1,2}P.cor.fq.gz` | the trimmed **and error-corrected** reads, gzipped — the pair every assembler actually read |
+| `reports/` | BUSCO, transrate, strand evaluation, `qualreport.<run>`, timings |
+| `reports/<run>.cleanup.done` | what was reclaimed and what was kept, with sizes |
+
+Everything else goes: the trimmed-but-uncorrected reads (deleted as soon as read correction is done with them — nothing downstream ever reads them again), the `orthofuse/` tree (OrthoFinder's all-vs-all output and the transrate scoring of the pooled fasta, normally the largest directory in a run), `quants/`, `assemblies/diamond/`, `assemblies/working/`, and the chain of working assemblies between `orthofusing` and `.ORP.fasta`. Every number any of those contributed is already in `reports/qualreport.<run>`.
+
+The gzipping runs in the background, starting the moment each file is finished being written rather than at the end of the run — the corrected reads compress alongside the assemblers, and each assembly compresses while the next stage runs — so cleanup itself is just an unlink and adds no wall time. Pass `--keep-intermediates` to switch all of this off and keep a run exactly as it was, which is what you want when debugging a run rather than shipping its results.
+
+Re-running `oyster.py` on a directory whose run already finished and was cleaned up is a no-op: it reports where the assembly and reports are and exits, rather than treating the reclaimed intermediates as work to redo. To assemble the same reads again, use a different `--runout`/`--dir`, or delete `reports/<run>.cleanup.done` to force a full re-run in place.
+
+### Tuning pytransrate
+
+Both pytransrate runs -- the one that scores the pooled fasta for orthogroup selection, and the one that scores the finished assembly for the report -- take a fixed argument list. `--pytransrate-args` appends to both, as one quoted string, `shlex`-split so the arguments arrive separately:
+
+```bash
+python3 chowder.py --assemblies a.fasta b.fasta --read1 R1.fq.gz --read2 R2.fq.gz \
+        --pytransrate-args '--location-size 5'
+```
+
+Because it appends, a value given here overrides the same flag ORP passes above it. `pytransrate --help` (inside the `orp` env) lists the full set. Two are worth calling out for a large merge:
+
+- **`--location-size`** is the one that matters. snap encodes genome locations in a fixed number of bytes and sweeps upward until they fit; passing `5` skips the sweep when you already know four bytes will not hold the merge. The sweep is not cheap to get wrong -- a failed four-byte attempt is a full index build thrown away.
+- **`--padding` is not the memory lever it looks like.** snap writes padding between contigs as `N` and skips any seed containing `N`, so it grows the 1 byte/base genome array and nothing else. Measured on a 5.4M-contig, 5.7 Gbp merge: dropping it entirely saved 1% of the branch, and real sequence alone still exceeded the four-byte ceiling.
+
+`oyster.py` takes the same flag. It is on both entry points because they carry separate parsers, but a merge is where an assembly large enough to need it normally shows up.
+
+### All flags (`oyster.py`)
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -62,6 +117,34 @@ Set `--max-parallel 1` to disable concurrency for those stages and run them one 
 | `--spades2-kmer` | `75` | rnaSPAdes k-mer for the spades75 assembly |
 | `--transabyss-kmer` | `32` | Trans-ABySS k-mer |
 | `--max-parallel` | `2` | Max concurrent jobs per stage (see [Parallel task management](#parallel-task-management) above) |
+| `--keep-intermediates` | off | Keep every file a run produces, uncompressed (see [What a finished run leaves behind](#what-a-finished-run-leaves-behind) below) |
+| `--pytransrate-args` | none | Extra arguments passed verbatim to both pytransrate runs, as one quoted string (see [Tuning pytransrate](#tuning-pytransrate) below) |
+| `--dir` | current directory | Working directory |
+| `--version` | — | Print the installed ORP version and exit |
+| `--help` | — | Print this same flag reference and exit |
+
+### All flags (`chowder.py`)
+
+There are no assembler flags — no k-mers, no `--strand`, no `--normalize-reads` — since a merge never runs an assembler. Everything below `--corrected-reads` means exactly what it does under `oyster.py`.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--assemblies` | *(required)* | Two or more assembly fasta(.gz) files to merge |
+| `--read1` | *(required)* | Path to R1 fastq(.gz) — the library the assemblies were built from |
+| `--read2` | *(required)* | Path to R2 fastq(.gz) |
+| `--labels` | from the filenames | One label per assembly, used as the contig-name prefix and in the report |
+| `--assembly-order` | `shuffled` | `shuffled` orders the assemblies by `--seed`, independently of how you typed them; `given` uses your order, best first (see [Merging assemblies you already have](#merging-assemblies-you-already-have-chowderpy) above) |
+| `--seed` | `23894` | Seed for `--assembly-order shuffled`; change it to measure what the order is worth on your data |
+| `--corrected-reads` | off | Treat `--read1`/`--read2` as already trimmed and error-corrected, and skip both steps |
+| `--mem` | `110` | Memory in GB |
+| `--cpu` | `16` | CPU threads |
+| `--busco-threads` | same as `--cpu` | BUSCO threads |
+| `--runout` | `USER_RUN` | Run name prefix |
+| `--lineage` | `eukaryota_odb12.2` | BUSCO lineage |
+| `--tpm-filt` | `0` | TPM filter threshold |
+| `--max-parallel` | `2` | Max concurrent jobs per stage (see [Parallel task management](#parallel-task-management) above) |
+| `--keep-intermediates` | off | Keep every file the run produces, uncompressed |
+| `--pytransrate-args` | none | Extra arguments passed verbatim to both pytransrate runs (see [Tuning pytransrate](#tuning-pytransrate) above) |
 | `--dir` | current directory | Working directory |
 | `--version` | — | Print the installed ORP version and exit |
 | `--help` | — | Print this same flag reference and exit |
