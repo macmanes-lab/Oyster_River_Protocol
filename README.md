@@ -43,7 +43,7 @@ Three things differ from `oyster.py`, and all three are worth knowing before you
 
   This makes the order arbitrary and reproducible; it does not make the pipeline order-*independent*, which would mean breaking cd-hit-est's ties and the rescue ranking on merit rather than on position. To find out what the order is worth on your own data, run it twice with different `--seed` values and diff the assemblies. To rank the assemblies yourself, best first, pass `--assembly-order given`.
 
-`python3 chowder.py --help` prints the full flag reference. There are no assembler flags -- no k-mers, no `--strand`, no `--normalize-reads` -- and preflight does not require SPAdes, Trinity or Trans-ABySS, since a merge never runs them.
+`python3 chowder.py --help` prints the full flag reference, and [All flags (`chowder.py`)](#all-flags-chowderpy) below is the same list. There are no assembler flags -- no k-mers, no `--strand`, no `--normalize-reads` -- and preflight does not require SPAdes, Trinity or Trans-ABySS, since a merge never runs them. It does check for `bwa`, which `strandeval` runs.
 
 ### Parallel task management
 
@@ -83,7 +83,23 @@ The gzipping runs in the background, starting the moment each file is finished b
 
 Re-running `oyster.py` on a directory whose run already finished and was cleaned up is a no-op: it reports where the assembly and reports are and exits, rather than treating the reclaimed intermediates as work to redo. To assemble the same reads again, use a different `--runout`/`--dir`, or delete `reports/<run>.cleanup.done` to force a full re-run in place.
 
-### All flags
+### Tuning pytransrate
+
+Both pytransrate runs -- the one that scores the pooled fasta for orthogroup selection, and the one that scores the finished assembly for the report -- take a fixed argument list. `--pytransrate-args` appends to both, as one quoted string, `shlex`-split so the arguments arrive separately:
+
+```bash
+python3 chowder.py --assemblies a.fasta b.fasta --read1 R1.fq.gz --read2 R2.fq.gz \
+        --pytransrate-args '--location-size 5'
+```
+
+Because it appends, a value given here overrides the same flag ORP passes above it. `pytransrate --help` (inside the `orp` env) lists the full set. Two are worth calling out for a large merge:
+
+- **`--location-size`** is the one that matters. snap encodes genome locations in a fixed number of bytes and sweeps upward until they fit; passing `5` skips the sweep when you already know four bytes will not hold the merge. The sweep is not cheap to get wrong -- a failed four-byte attempt is a full index build thrown away.
+- **`--padding` is not the memory lever it looks like.** snap writes padding between contigs as `N` and skips any seed containing `N`, so it grows the 1 byte/base genome array and nothing else. Measured on a 5.4M-contig, 5.7 Gbp merge: dropping it entirely saved 1% of the branch, and real sequence alone still exceeded the four-byte ceiling.
+
+`oyster.py` takes the same flag. It is on both entry points because they carry separate parsers, but a merge is where an assembly large enough to need it normally shows up.
+
+### All flags (`oyster.py`)
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -102,6 +118,33 @@ Re-running `oyster.py` on a directory whose run already finished and was cleaned
 | `--transabyss-kmer` | `32` | Trans-ABySS k-mer |
 | `--max-parallel` | `2` | Max concurrent jobs per stage (see [Parallel task management](#parallel-task-management) above) |
 | `--keep-intermediates` | off | Keep every file a run produces, uncompressed (see [What a finished run leaves behind](#what-a-finished-run-leaves-behind) below) |
+| `--pytransrate-args` | none | Extra arguments passed verbatim to both pytransrate runs, as one quoted string (see [Tuning pytransrate](#tuning-pytransrate) below) |
+| `--dir` | current directory | Working directory |
+| `--version` | — | Print the installed ORP version and exit |
+| `--help` | — | Print this same flag reference and exit |
+
+### All flags (`chowder.py`)
+
+There are no assembler flags — no k-mers, no `--strand`, no `--normalize-reads` — since a merge never runs an assembler. Everything below `--corrected-reads` means exactly what it does under `oyster.py`.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--assemblies` | *(required)* | Two or more assembly fasta(.gz) files to merge |
+| `--read1` | *(required)* | Path to R1 fastq(.gz) — the library the assemblies were built from |
+| `--read2` | *(required)* | Path to R2 fastq(.gz) |
+| `--labels` | from the filenames | One label per assembly, used as the contig-name prefix and in the report |
+| `--assembly-order` | `shuffled` | `shuffled` orders the assemblies by `--seed`, independently of how you typed them; `given` uses your order, best first (see [Merging assemblies you already have](#merging-assemblies-you-already-have-chowderpy) above) |
+| `--seed` | `23894` | Seed for `--assembly-order shuffled`; change it to measure what the order is worth on your data |
+| `--corrected-reads` | off | Treat `--read1`/`--read2` as already trimmed and error-corrected, and skip both steps |
+| `--mem` | `110` | Memory in GB |
+| `--cpu` | `16` | CPU threads |
+| `--busco-threads` | same as `--cpu` | BUSCO threads |
+| `--runout` | `USER_RUN` | Run name prefix |
+| `--lineage` | `eukaryota_odb12.2` | BUSCO lineage |
+| `--tpm-filt` | `0` | TPM filter threshold |
+| `--max-parallel` | `2` | Max concurrent jobs per stage (see [Parallel task management](#parallel-task-management) above) |
+| `--keep-intermediates` | off | Keep every file the run produces, uncompressed |
+| `--pytransrate-args` | none | Extra arguments passed verbatim to both pytransrate runs (see [Tuning pytransrate](#tuning-pytransrate) above) |
 | `--dir` | current directory | Working directory |
 | `--version` | — | Print the installed ORP version and exit |
 | `--help` | — | Print this same flag reference and exit |

@@ -7,6 +7,123 @@ stale.
 
 ## 2026-09-16
 
+- **The snap SIGFPE is amplab/snap#171: an upstream bug, diagnosed and
+  fixed fourteen months ago, never released.** The backtrace settled in one
+  run what the log structurally could not. `AffineGapVectorized.cpp:351`,
+  with `patternLen = 0`: `numVec = (patternLen + 7) / 8` is then 0 and
+  `(patternLen - 1) % numVec` divides by zero. It is on the CIGAR path at
+  *write* time, not in the aligner -- `SimpleReadWriter::writePairs` ->
+  `BAMFormat::writePairs` -> `computeCigarOps` -> `SAMFormat::computeCigar`
+  -> `computeGlobalScoreNormalized`. Issue #171 was opened 2025-06-06 by
+  someone running transrate's Ruby flags against a Trinity assembly: same
+  provenance as ours, reached independently.
+  - **Bolosky's diagnosis (2025-07-21)**: the read must have multiple
+    alignments, one secondary alignment must back-clip it to exactly half
+    its length, and the writer must then run out of output buffer partway
+    through writing it. The flush-and-retry retains the back clipping, which
+    clips the *original* alignment to zero bases. His own note that
+    "different lengths would result in incorrect alignments but no crash"
+    is the part worth remembering: wherever this did not divide by zero it
+    was quietly writing wrong alignments.
+  - **The fix is `0e0997b` (2.0.6.dev.2) on `dev`, and it is two functional
+    lines** -- a `setAdditionalBackClipping(0)` reset at the top of each
+    alignment loop in `SimpleReadWriter::writePairs`. It has never been
+    released: master's last code change is the v2.0.5 release of May 2025,
+    there is no 2.0.6 tag, and so bioconda's latest is still 2.0.5. It is
+    unreleased only because the reporter said they would test it and went
+    quiet, which makes confirming it the cheapest lever anyone has on this.
+  - **The fix appears to carry a typo.** Its rewritten loop indexes
+    `reads[whichRead]` but leaves the subscript on
+    `clippingForReadAdjustment` at `[0]`, where 2.0.5 used `[0]` for read 0
+    and `[1]` for read 1 -- so read 1 takes read 0's front-clipping
+    adjustment. Raised as a question on the issue, not asserted.
+  - **`--max-parallel 1` worked; this was never the same failure.** The OOM
+    is fixed -- the run mapped for 17m44s and passed 100 GB of BAM before it
+    died. SIGFPE is not a memory symptom: x86-64 masks FP exceptions, so
+    signal 8 is always integer divide-by-zero or `idiv` overflow, and an
+    OOM would be SIGKILL.
+  - **The scale variable is the size of the BAM, not the size of the
+    assembly.** A full library against this merge produces ~160 GB of
+    output, so the writer refills its buffer more or less continuously and a
+    per-read-rare event becomes a certainty. Same pipeline, same flags, a
+    smaller assembly: clean. It also explains why the crash reproduces every
+    time at roughly the same elapsed point without being deterministic in
+    *which* read it kills.
+  - **MULTI_ALIGNMENT_SETTINGS' diagnosis was right and stays right; its
+    remedy is wrong.** "The fault is in the multiple-alignment path" is
+    exactly correct -- the bug requires a secondary alignment -- so last
+    session's bisect was measuring the real mechanism. But "try lowering
+    --max-alignments-per-pair and --max-seed-hits", which mapper.py's SIGFPE
+    message also says, does not work: we are already at `-H 4000 -D 2 -om 2`
+    against the Ruby's `-H 300000 -D 5 -om 5` and it still dies. Only
+    dropping `-om`/`-omax` outright would help, and that is not reachable
+    from the CLI. Both need correcting.
+  - **Three hypotheses from the session were wrong**, and are recorded so
+    they are not re-derived. (1) The >4 Gbase / `locationSize 5` story:
+    CIGAR generation does not care about location size, and
+    `doesGenomeIndexHave64BitLocations` gates nothing on this path. (2) "The
+    alignment start lands in the inter-contig padding" is a genuine *second*
+    route to `patternLen == 0` -- on the hangs-off-the-end branch the
+    algebra reduces to `patternLen = (contig end) - (alignment start)` --
+    but it is not the one that fires; ours reaches zero through `dataLength`
+    itself. (3) Contig count is not the exposure driver.
+  - **`--padding` is irrelevant here**, which closes that question a second
+    time and by a simpler argument than 507ab63's measurement: nothing on
+    the retained-back-clipping path touches padding at all.
+  - **The retry loop costs ~35 minutes an attempt for nothing** -- 14.5 min
+    of contig metrics, then ~17 min to the identical SIGFPE, three times
+    over. pytransrate exits 1 for everything (`cli.py:573`), so `run()`
+    cannot tell a deterministic crash from a transient failure. A distinct
+    exit code for "snap died on a signal", with `retries=0` against it,
+    pays for itself on the first failed merge.
+
+- **Taking the patched snap costs this run nothing, and changes
+  pytransrate's dependency story for everyone else.** pytransrate resolves
+  the aligner with `which("snap-aligner")` (`mapper.py:445`) and there is no
+  version gate anywhere -- `2.0.5` appears only in comments and docstrings,
+  and oyster.py's preflight checks presence, not version. So a patched
+  binary ahead of the env's copy on PATH is a drop-in: no `orp_env.yml`
+  change, no pytransrate change, no chowder change. (Overwriting in place
+  inside the env works but conda owns that file and a later install can
+  revert it silently.)
+  - **The whole delta from v2.0.5 to the fix is the fix.** Checked rather
+    than assumed: `git diff v2.0.5 0e0997b` is ReadWriter.cpp, the version
+    string, one help-text typo and one longer error message in
+    `validateCigarString` -- 2.0.4.dev.1 and 2.0.5.dev.1 predate the v2.0.5
+    tag and are already in it. ReadWriter.cpp is untouched by anything else
+    since v2.0.5, so `git checkout 0e0997b -- SNAPLib/ReadWriter.cpp` onto
+    v2.0.5 is exactly the fix and conflicts with nothing; building `dev` tip
+    is equivalent. Everything that was not crashing comes out identical
+    either way.
+  - **The cost that cannot be packaged away**: pytransrate's requirement
+    becomes "snap with #171 fixed", and no public release satisfies it.
+    Anyone installing standalone takes 2.0.5 from bioconda and hits this on
+    a large enough assembly. A lab conda package of 2.0.6.dev.2 would keep
+    `conda env create` declarative and is the sane stopgap, but it is a
+    binary we own until upstream tags 2.0.6. The real fix is the tag.
+  - **`-G-` (disable affine gap) was considered and rejected.** It routes
+    CIGAR generation to Landau-Vishkin, which has no such division, and
+    needs no rebuild -- but it is not reachable from the CLI today, and it
+    is assembly-changing: `contigs.csv` column 9 from orthotransrate is what
+    `pick_best_contigs.py` uses to choose each orthogroup's representative,
+    so different alignments mean a different `.ORP.fasta`.
+    `--pytransrate-args` reaches both pytransrate call sites, so it cannot
+    be confined to the report either. And with no pytransrate version stamp,
+    adding it to an existing run directory would silently pair affine-gap
+    picks with non-affine-gap scores -- the case the 2.1.0 entry below said
+    to revisit when a release finally moves scores.
+  - **The patched binary clears the reproduction.** v2.0.5 with
+    `0e0997b`'s ReadWriter.cpp and the subscript restored to `[whichRead]`,
+    built and installed over the env's copy as `2.0.5+snap171`, run against
+    the standalone snap command that died at 17m44s on stock 2.0.5: past it.
+    The full chowder run is going out on this binary, so this run's
+    `.ORP.fasta` and its transrate score are the first produced with a
+    patched aligner -- the `+snap171` banner in `merged/logs/snap.log` is
+    the only trace of that, which is why the version string was changed.
+  - **Outstanding**: post the confirmation on #171; correct mapper.py's
+    SIGFPE message and MULTI_ALIGNMENT_SETTINGS' remedy paragraph; decide on
+    packaging.
+
 - **The chowder banner landed halfway down the 380C log, and the cause was
   stdout buffering, not print order.** 5251238 already calls `welcome()`
   before `check()`, and it does; what was wrong is that Python

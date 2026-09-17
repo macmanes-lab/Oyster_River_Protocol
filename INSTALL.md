@@ -110,6 +110,12 @@ Then run the pipeline once on real (or the bundled sample) data — `oyster.py`'
 python3 oyster.py --read1 R1.fq.gz --read2 R2.fq.gz --runout myrun --cpu 24 --mem 110 --strand RF
 ```
 
+`chowder.py` — the merge-only entry point, for assemblies you already have — shares that preflight, less the three assemblers it never runs and plus `bwa`:
+
+```bash
+python3 chowder.py --assemblies a.fasta b.fasta --read1 R1.fq.gz --read2 R2.fq.gz --runout mymerge --cpu 24 --mem 110
+```
+
 ## Uninstalling
 
 ```bash
@@ -122,3 +128,4 @@ Removes the conda install and downloaded software directories.
 
 - **"Python version 3.6.8 is not supported"** from SPAdes: a [known SPAdes bug](https://github.com/ablab/spades/issues/1319) where it detects a stray system Python instead of its own environment's interpreter. Fixed by `orp_spades`'s explicit `python=3.14` pin above — if you hit this anyway, double check nothing earlier in your `PATH` (an HPC module system, for example) is shadowing the conda environment's own Python.
 - **`nothing provides _python_rc needed by python-3.14.0rc1-...`**: means mamba is resolving to a Python 3.14 *release candidate* build because no stable 3.14 build exists yet for that particular package's dependency set. This is why only `orp_spades` pins `python=3.14` — pinning it on older/less-actively-maintained packages (like `transabyss=2.0.1`) can hit exactly this wall.
+- **snap-aligner dies with SIGFPE (`Floating point exception`) partway through `orthotransrate` on a large merge.** This is [amplab/snap#171](https://github.com/amplab/snap/issues/171), an upstream integer divide-by-zero on snap's CIGAR-writing path, not a memory problem and not something ORP's flags can steer around: the crash needs a read with a secondary alignment that back-clips it to exactly half its length, and the output buffer to run out partway through writing it, at which point the flush-and-retry retains the back clipping and clips the original alignment to zero bases. The scale variable is therefore the size of the BAM rather than the size of the assembly — a merge producing ~160 GB of output refills that buffer more or less continuously, so a per-read-rare event becomes a certainty, while the same pipeline and flags against a smaller assembly are clean. The fix is two functional lines, sitting unreleased on snap's `dev` branch (`0e0997b`, `2.0.6.dev.2`), so bioconda's latest — the `snap-aligner=2.0.5` in `orp_env.yml` — still has the bug. Until upstream tags 2.0.6, the workaround is to build v2.0.5 with that commit's `SNAPLib/ReadWriter.cpp` and put the result ahead of the env's copy on `PATH`: pytransrate resolves the aligner with a plain `which("snap-aligner")` and gates nothing on its version, so a patched binary is a drop-in needing no change to `orp_env.yml`, pytransrate or ORP. Do not overwrite the binary inside the env — conda owns that file and a later `mamba env update` will silently revert it. Note that this changes the assembly, not just the report: the run gets past the crash, and the contig scores it then produces are what `pick_best_contigs.py` selects on.
