@@ -829,10 +829,13 @@ class Pipeline:
         return CHECK_TOOLS
 
     def check(self):
+        """Verify every tool is present, saying nothing when they all are.
+
+        A dozen "installed" lines is noise on every successful run; the only
+        news preflight has is a tool that is missing.
+        """
         for env, binary, label in self.required_tools():
-            if self.which_in_env(env, binary):
-                print(f"{label} installed")
-            else:
+            if not self.which_in_env(env, binary):
                 sys.exit(f"*** {label} is not installed, must fix ***")
 
     def welcome(self):

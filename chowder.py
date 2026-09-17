@@ -340,9 +340,9 @@ class Chowder(Pipeline):
         if self.already_complete():
             return
         self.timing_init()
-        # Before check(), unlike oyster.py: preflight opens with a dozen
-        # "<TOOL> installed" lines, and the first thing on the screen should
-        # be which program is doing the installing-checking.
+        # Before check(), unlike oyster.py: check() is silent unless a tool
+        # is missing, and that complaint should land under a banner saying
+        # which program is doing the checking.
         self.welcome()
         self.check()
         self.readcheck()
