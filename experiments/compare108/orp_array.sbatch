@@ -79,6 +79,12 @@ mkdir -p "$RUNS/$SRR" "$LOGDIR"
 ln -sfn "orp_${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}.log" "$LOGDIR/${SRR}.log"
 ln -sfn "orp_${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}.log" "$LOGDIR/${TSA}.log"
 
+# Slurm starts a task in the directory it was submitted from, which is now
+# inside the git checkout. Everything below addresses absolute paths, but a
+# sub-tool that drops a scratch file relative to cwd would leave it in the
+# repo; from here on cwd is the run's own directory instead.
+cd "$RUNS/$SRR" || { echo "cannot cd to $RUNS/$SRR" >&2; exit 1; }
+
 echo "=== sample: $SRR ($TSA) ==="
 echo "    R1  $R1"
 echo "    R2  $R2"
