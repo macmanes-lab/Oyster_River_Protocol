@@ -1,5 +1,16 @@
 # Benchmarks
 
+> **Every TransRate score below predates ORP 4.0.0 and is not comparable to one.**
+> They were produced by the bundled Ruby `orp-transrate`, whose `bam-read` helper
+> advanced its reference cursor over soft-clipped bases as though they consumed
+> reference. pytransrate follows the SAM spec instead, so `bases_uncovered` rises
+> 3.1-4.5x and the assembly score drops 0.008-0.070 on identical input — and
+> because `makeorthout` selects on contig-score *rank*, the assemblies themselves
+> differ, not only the reported number. The timings are still a useful scale, with
+> the caveat that `orthotransrate`/`transrate` are also the two steps pytransrate
+> 2.1.0's threading changed. A 4.0.0 baseline has to be measured, not adjusted.
+
+
 ## TIME2_SRR1789336_norm_py_parallel (ORP 3.0.0) -- 2026-08-17
 
 Assembly: `/mnt/gpfs01/home/macmaneslab/macmanes/assemblies/TIME2_SRR1789336_norm_py_parallel.ORP.fasta`

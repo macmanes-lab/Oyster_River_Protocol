@@ -5,7 +5,7 @@ These directions cover installing ORP 3.0+ (the `oyster.py` pipeline) on Linux. 
 ## Prerequisites
 
 - Linux (the installer's Anaconda bootstrap is Linux x86_64 specific)
-- `git`, `curl`, `bash`, and a system `python3` already available
+- `git`, `curl`, `bash`, and a system `python3` already available. **`oyster.py`/`chowder.py` run under that interpreter, not under a conda env**, so it sets the language floor: 3.6, which is what a cluster's `/usr/bin/python3` still commonly is. Everything they orchestrate runs inside the conda environments and is unaffected by it.
 - Internet access on the install machine — it pulls down Anaconda, the UniProt/Swiss-Prot diamond database, and the BUSCO lineage database
 - Several GB of free disk space (Swiss-Prot + Anaconda + 6 conda environments + BUSCO database adds up)
 

@@ -64,10 +64,13 @@ mkdir -p "$RUNS/logs" || die "cannot create $RUNS/logs"
 
 branch=$(git -C "$(dirname "$ORP")" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "?")
 version=$(cat "$(dirname "$ORP")/version.txt" 2>/dev/null || echo "?")
+# byo-assemblies merged to master at 4.0.0, so master is the expected branch
+# now; the two feature branches stay accepted because a checkout sitting on
+# either of them still has the pytransrate code these metrics are about.
 case "$branch" in
-    byo-assemblies|pytransrate) ;;
+    master|byo-assemblies|pytransrate) ;;
     *) echo "submit: WARNING ORP checkout is on '$branch' ($version); pytransrate" \
-            "metrics need byo-assemblies or pytransrate" >&2 ;;
+            "metrics need master (4.0.0+), byo-assemblies or pytransrate" >&2 ;;
 esac
 
 echo "submit: $n samples, $THROTTLE at a time, ORP $version on $branch"

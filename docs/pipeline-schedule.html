@@ -174,15 +174,15 @@
       concurrent stages &mdash; two always on regardless of the flag, two switched on by it.
     </p>
     <p class="provenance">
-      Reflects <code>oyster.py</code> on the <code>python_convert</code> branch, working tree as of 2026-08-19
-      (Stage A/Stage B assembler-pairing restructure, see NOTES.md 2026-08-19 &mdash; not yet committed)
-      &middot; ORP 3.1.0, pending release (<code>version.txt</code> still reads 3.0.0)
+      Reflects <code>oyster.py</code> on <code>master</code> at ORP 4.0.0. <code>chowder.py</code> runs this same
+      graph from <code>run_filtershort</code> down, with one <code>ingest</code> step in place of the assembler
+      stages &mdash; see <a href="pipeline-steps.md">pipeline-steps.md</a>.
     </p>
   </div>
 
   <div class="legend">
     <div class="legend-item"><span class="swatch sw-work"></span>step that does real work (timed)</div>
-    <div class="legend-item"><span class="swatch sw-book"></span>bookkeeping step, sub-second, untimed</div>
+    <div class="legend-item"><span class="swatch sw-book"></span>bookkeeping step, sub-second on a full run</div>
     <div class="legend-item"><span class="swatch sw-fixed"></span>two branches running concurrently</div>
   </div>
 

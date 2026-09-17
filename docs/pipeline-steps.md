@@ -2,7 +2,7 @@
 
 What every `self.step()` in `Pipeline.main()` actually reads and writes, and what it does functionally. (`main()` is three methods -- `prepare_reads`, `run_assemblers`, `merge_and_report` -- matching the three sections below.) For execution order and where concurrency kicks in, see [pipeline-schedule.html](pipeline-schedule.html) — this document is the companion piece: same steps, but focused on inputs/outputs/purpose rather than scheduling, so a reader can tell what each stage is *for* and where the pipeline's CPU/time actually goes.
 
-Reflects `oyster.py` as of ORP 4.0.0.
+Reflects `oyster.py` as of ORP 4.0.0. Every step below is timed and appears in `reports/<run>.timing.log`: the bookkeeping steps used to be exempt, which was fair when each was seconds against an assembler's tens of hours, but a `chowder.py` merge has no assemblers and the merge half is the whole run.
 
 All paths below are relative to the run directory (`--dir`) and use `<run>` for `--runout`. "Env" is the conda environment the step's tool runs in.
 
@@ -44,7 +44,7 @@ Two sequential stage-pairings, each a fixed `ThreadPoolExecutor(max_workers=2)`,
 |---|---|---|---|---|
 | `run_filtershort` | `orp` `scripts/long.seq.py` (×4, one per assembly) | the 4 raw assembly fastas | `orthofuse/<run>/working/<run>.<name>.short.fasta` ×4 | Drops contigs ≤200bp from each of the four assemblies. Short junk contigs would otherwise dominate the orthogroup clustering below. |
 | `run_orthofuser` | `orp_orthofinder` orthofinder, `-d` (DNA mode), `-og` (orthogroups only) | the 4 `*.short.fasta` | `Orthogroups.txt` under the OrthoFinder results tree; `orthofuser.done` sentinel | Clusters contigs from all four assemblers into orthogroups — the pipeline's "these are probably the same transcript, assembled four different ways" grouping. |
-| `merge` (untimed) | pure Python (file concat) | the 4 `*.short.fasta` | `orthofuse/<run>/merged.fasta` | Concatenates the four short-filtered assemblies into one pool — no dedup yet, just union. |
+| `merge` | pure Python (file concat) | the 4 `*.short.fasta` | `orthofuse/<run>/merged.fasta` | Concatenates the four short-filtered assemblies into one pool — no dedup yet, just union. |
 | `orthotransrate` | `orp` pytransrate | `merged.fasta`, `c1`, `c2` | `orthofuse/<run>/merged/contigs.csv` | Scores every contig in the pooled fasta for assembly quality (read-support based), by aligning `c1`/`c2` back to it. |
 | `makeorthout` | `orp` `scripts/pick_best_contigs.py` | `contigs.csv`, `Orthogroups.txt` | `orthofuse/<run>/good.<run>.list` | For each orthogroup, keeps the single highest-transrate-scoring member contig (score must be > 0); this is the actual "best isoform per gene, chosen across all four assemblers" selection. |
 | `orthofusing` | `orp` `scripts/filter.py` | `merged.fasta`, `good.<run>.list` | `assemblies/<run>.orthomerged.fasta` | Filters the pooled fasta down to just the winning contigs — the first cut of the merged, deduplicated assembly. |
@@ -57,13 +57,13 @@ This is the least obvious part of the pipeline: a set-algebra pass that finds ge
 |---|---|---|---|---|
 | `diamond_orthomerged` | `orp` diamond blastx | `<run>.orthomerged.fasta` | `diamond/<run>.orthomerged.diamond.txt` | Blastx of the merged assembly. |
 | `diamond_trinity` | `orp` diamond blastx | `<run>.trinity.Trinity.fasta` | `diamond/<run>.trinity.diamond.txt` | Blastx of the raw (un-filtered, un-merged) Trinity assembly — `diamond_{transabyss,spades55,spades75}` already ran earlier, in Stage A/Stage B above. |
-| `diamond_uniq` (untimed) | pure Python | all 5 diamond outputs | `diamond/<run>.unique.{trinity,sp55,sp75,transabyss}.txt` | Counts distinct swissprot gene IDs hit by each individual assembler — reporting metrics only, doesn't gate anything downstream. |
-| `make_list1` (untimed) | pure Python | `diamond_orthomerged` | `diamond/<run>.list1` | Gene IDs hit by the *merged* assembly. |
-| `make_list2` (untimed) | pure Python | the 4 individual-assembler diamond outputs | `diamond/<run>.list2` | Union of gene IDs hit by *any* of the four raw assemblies. |
-| `make_list3` (untimed) | pure Python | `list1`, `list2` | `diamond/<run>.list3` | `list2 − list1`: genes some individual assembler found that the merged assembly does **not** represent — i.e., genes OrthoFuser's selection accidentally dropped. |
+| `diamond_uniq` | pure Python | all 5 diamond outputs | `diamond/<run>.unique.{trinity,sp55,sp75,transabyss}.txt` | Counts distinct swissprot gene IDs hit by each individual assembler — reporting metrics only, doesn't gate anything downstream. |
+| `make_list1` | pure Python | `diamond_orthomerged` | `diamond/<run>.list1` | Gene IDs hit by the *merged* assembly. |
+| `make_list2` | pure Python | the 4 individual-assembler diamond outputs | `diamond/<run>.list2` | Union of gene IDs hit by *any* of the four raw assemblies. |
+| `make_list3` | pure Python | `list1`, `list2` | `diamond/<run>.list3` | `list2 − list1`: genes some individual assembler found that the merged assembly does **not** represent — i.e., genes OrthoFuser's selection accidentally dropped. |
 | `make_list5` | `orp` `scripts/build_list5.py` | `list3`, the 4 individual diamond outputs | `diamond/<run>.list5` | For each dropped gene in `list3`, picks a rescue contig ID — the first individual-assembly contig (checked transabyss → spades75 → spades55 → trinity) that hit it. |
-| `make_list6` (untimed) | pure Python | `<run>.orthomerged.fasta` | `diamond/<run>.list6` | Every sequence ID currently in the merged assembly. |
-| `make_list7` (untimed) | pure Python | `list5`, `list6` | `diamond/<run>.list7` | `list5 − list6`: rescue contig IDs not already present in the merged assembly (belt-and-suspenders — should already be disjoint, but confirms it). |
+| `make_list6` | pure Python | `<run>.orthomerged.fasta` | `diamond/<run>.list6` | Every sequence ID currently in the merged assembly. |
+| `make_list7` | pure Python | `list5`, `list6` | `diamond/<run>.list7` | `list5 − list6`: rescue contig IDs not already present in the merged assembly (belt-and-suspenders — should already be disjoint, but confirms it). |
 | `posthack` | `orp` `scripts/filter.py` via a `bash -c` process substitution | the 4 **raw** (not short-filtered) assembly fastas, `list7` | `diamond/<run>.newbies.fasta`; `assemblies/working/<run>.orthomerged.fasta` | Pulls the `list7` rescue contigs back out of the original, un-filtered assemblies (not the ≤200bp-trimmed ones from `run_filtershort` — a rescued contig may be short) as `newbies.fasta`, then appends them onto `orthomerged.fasta` to produce the true working assembly used from here on. |
 
 ## Dedup & quantify
@@ -72,10 +72,10 @@ This is the least obvious part of the pipeline: a set-algebra pass that finds ge
 |---|---|---|---|---|
 | `cdhit` | `orp` cd-hit-est | the rescued working assembly | `assemblies/<run>.ORP.intermediate.fasta` | Collapses near-duplicate contigs at 98% identity (`-c .98`) — the last dedup pass. |
 | `orp_diamond` | `orp` diamond blastx | `ORP.intermediate.fasta` | `assemblies/<run>.ORP.diamond.txt` | Blastx of the (nearly) final assembly — used both for the unique-gene count below and for the low-TPM rescue logic in `secondfilter`. |
-| `orp_uniq` (untimed) | pure Python | `ORP.diamond.txt` | `assemblies/working/<run>.unique.ORP.txt` | Counts distinct genes hit — the headline "unique genes (ORP)" metric in the final report. |
+| `orp_uniq` | pure Python | `ORP.diamond.txt` | `assemblies/working/<run>.unique.ORP.txt` | Counts distinct genes hit — the headline "unique genes (ORP)" metric in the final report. |
 | `salmon_index` | `orp` salmon | `ORP.intermediate.fasta` | `quants/<run>.ortho.idx` | Builds a salmon index (k=31) over the intermediate assembly. |
 | `salmon` | `orp` salmon quant | the index, `c1`, `c2` | `quants/salmon_orthomerged_<run>/quant.sf` | Quantifies expression (TPM) per contig by pseudo-aligning the corrected reads. |
-| `filter` (untimed) | pure Python | `quant.sf` | `assemblies/working/<run>.{HIGH,LOW}EXP.txt` | Splits contigs into above/below `--tpm-filt` TPM lists. |
+| `filter` | pure Python | `quant.sf` | `assemblies/working/<run>.{HIGH,LOW}EXP.txt` | Splits contigs into above/below `--tpm-filt` TPM lists. |
 | `secondfilter` | `orp` `scripts/filter.py` (×2) + pure Python | `ORP.intermediate.fasta`, `LOWEXP.txt`, `HIGHEXP.txt`, `ORP.diamond.txt` | `assemblies/<run>.ORP.fasta`; a `*_BEFORE_TPM_FILT.fasta` backup copy | If any contigs fell below the TPM threshold: keeps all high-TPM contigs outright, but rescues a low-TPM contig anyway if it's the *only* one with a diamond hit to its gene (`donotremove.list`) — so a real-but-lowly-expressed transcript with no redundant coverage isn't thrown away just for being quiet. If nothing was below threshold, `ORP.intermediate.fasta` is simply copied through unchanged. This is the file every later step (BUSCO, transrate, strandeval, `reportgen`) treats as "the assembly." |
 
 ## QC / report
@@ -87,8 +87,8 @@ This is the least obvious part of the pipeline: a set-algebra pass that finds ge
 | `busco` | `orp_busco` busco, `--offline`, `-m transcriptome` | `ORP.fasta` | `reports/run_<run>.ORP/` | Scores completeness against the `--lineage` ortholog set (default `eukaryota_odb12.2`). |
 | `transrate` | `orp` pytransrate | `ORP.fasta`, `c1`, `c2` | `reports/transrate_<run>/assemblies.csv` | Same read-support quality scoring as `orthotransrate` earlier, now on the final assembly rather than the mid-pipeline pool. |
 | `strandeval` | `orp_trinity` bwa + `orp` samtools + `scripts/examine_strand.pl` | `ORP.fasta`, a 400k-read subsample of `c1`/`c2` | `reports/<run>.strandeval_summary.txt` | Aligns a read subsample back to the assembly and checks read-orientation-vs-transcript-strand agreement — a sanity check on whether `--strand` was set correctly. |
-| `reportgen` (untimed) | pure Python | BUSCO/transrate/diamond/salmon/strandeval outputs above | `reports/qualreport.<run>` | Pulls one headline number from each prior report into a single human-readable summary (BUSCO score, transrate scores, unique-gene counts per assembler, proper-pair mapping rate, strand histogram). |
-| `cleanup` (untimed) | pure Python | `qualreport.<run>` | `reports/<run>.cleanup.done` (a manifest of what was kept and removed, with sizes) | Last, because it deletes files earlier steps declare as inputs. Keeps `reports/`, `.ORP.fasta`, and the four individual assemblies plus the corrected reads as the `.gz` that `compress_async` has been building in the background since each was written — so this only unlinks, and the compression cost was already paid in parallel with an assembler. Removes `orthofuse/`, `quants/`, `assemblies/diamond/`, `assemblies/working/`, and the working assemblies between `orthofusing` and `.ORP.fasta`; all of it is reproducible from what's kept, and every number it fed is already in `qualreport.<run>`. A file whose background gzip didn't finish is kept uncompressed instead of deleted. Skipped under `--keep-intermediates`. |
+| `reportgen` | pure Python | BUSCO/transrate/diamond/salmon/strandeval outputs above | `reports/qualreport.<run>` | Pulls one headline number from each prior report into a single human-readable summary (BUSCO score, transrate scores, unique-gene counts per assembler, proper-pair mapping rate, strand histogram). |
+| `cleanup` | pure Python | `qualreport.<run>` | `reports/<run>.cleanup.done` (a manifest of what was kept and removed, with sizes) | Last, because it deletes files earlier steps declare as inputs. Keeps `reports/`, `.ORP.fasta`, and the four individual assemblies plus the corrected reads as the `.gz` that `compress_async` has been building in the background since each was written — so this only unlinks, and the compression cost was already paid in parallel with an assembler. Removes `orthofuse/`, `quants/`, `assemblies/diamond/`, `assemblies/working/`, and the working assemblies between `orthofusing` and `.ORP.fasta`; all of it is reproducible from what's kept, and every number it fed is already in `qualreport.<run>`. A file whose background gzip didn't finish is kept uncompressed instead of deleted. Skipped under `--keep-intermediates`. |
 
 ## Observations: where the time goes and where to look for further gains
 
