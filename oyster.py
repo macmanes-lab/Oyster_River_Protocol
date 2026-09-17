@@ -294,6 +294,90 @@ def is_gzip(path: Path) -> bool:
         return fh.read(2) == b"\x1f\x8b"
 
 
+#: The 28-byte empty BGZF block that closes every complete BAM (SAM spec
+#: 4.1). A BAM not ending in it was still being written when whatever was
+#: writing it stopped.
+BGZF_EOF = bytes.fromhex("1f8b08040000000000ff0600424302001b0003" + "00" * 9)
+
+#: Columns in a salmon quant.sf: Name, Length, EffectiveLength, TPM,
+#: NumReads. pytransrate rejects any other count as a version mismatch.
+QUANT_COLUMNS = 5
+
+
+def bam_is_complete(path: Path) -> bool:
+    """Whether `path` is a BAM that was written all the way to the end.
+
+    The same check pytransrate 2.2.0 makes before reusing one, made here
+    because the decision to *keep* a BAM is ORP's: a truncated one is
+    hundreds of gigabytes that no attempt can use, and 2.1.0 -- which ORP
+    pinned until 4.0.0 -- would reuse it without asking.
+    """
+    try:
+        if path.stat().st_size < len(BGZF_EOF):
+            return False
+        with open(path, "rb") as fh:
+            fh.seek(-len(BGZF_EOF), os.SEEK_END)
+            return fh.read(len(BGZF_EOF)) == BGZF_EOF
+    except OSError:
+        return False
+
+
+def count_sequences(path: Path) -> int:
+    """Records in a fasta, counted in binary chunks.
+
+    Chunks rather than lines because this runs on merged.fasta, which is
+    four assemblies concatenated -- millions of records and gigabytes of
+    sequence -- and the answer is only wanted to compare against a row
+    count. The one-byte `tail` carries a chunk boundary that falls between
+    the newline and the ">"; seeding it with a newline is what makes the
+    header on the very first line count.
+    """
+    opener = gzip.open if is_gzip(path) else open
+    total = 0
+    tail = b"\n"
+    with opener(path, "rb") as fh:
+        while True:
+            chunk = fh.read(1 << 20)
+            if not chunk:
+                break
+            total += (tail + chunk).count(b"\n>")
+            tail = chunk[-1:]
+    return total
+
+
+def quant_sf_is_complete(path: Path, expected: int) -> bool:
+    """Whether a salmon quant.sf holds one whole row per contig.
+
+    salmon writes quant.sf in a single pass at the end of its run, so a run
+    killed during that pass leaves a short file -- and pytransrate reuses
+    quant.sf on existence alone, without counting rows, at every version to
+    date including the 2.2.0 that does check its BAM. That would not fail
+    loudly: it would quietly score the assembly off whichever contigs made
+    it into the file before the kill, and those scores are what
+    pick_best_contigs.py then selects on.
+
+    Both halves are needed. The row count catches a file cut at a line
+    boundary; the width of the last row catches the commoner case of a file
+    cut in the middle of one. A short count also catches a quant.sf left
+    over from a different assembly.
+    """
+    try:
+        rows = 0
+        last = ""
+        with open(path) as fh:
+            next(fh, None)  # header, skipped as load_expression skips it
+            for line in fh:
+                if line.strip():
+                    rows += 1
+                    last = line
+    except OSError:
+        return False
+    return (
+        rows == expected
+        and len(last.rstrip("\n").split("\t")) == QUANT_COLUMNS
+    )
+
+
 def average_read_length(path: Path, n_records: int = 100) -> int:
     opener = gzip.open if is_gzip(path) else open
     lengths = []
@@ -1150,41 +1234,108 @@ class Pipeline:
         return match
 
     @staticmethod
-    def clear_transrate_outdir(outdir):
-        """Empty pytransrate's -o, keeping any completed snap index.
+    def clear_transrate_outdir(outdir, assembly):
+        """Clear pytransrate's -o of what a retry must not reuse, and only that.
 
-        A retry has to start from a clear directory: pytransrate will not
-        overwrite an existing assemblies.csv, and it reuses whatever BAM it
-        finds already sitting in -o, so a step killed part-way leaves a BAM
-        with no BGZF EOF marker behind and every later attempt picks that
-        same truncated file back up and dies on it.
+        A retry has to start from a directory pytransrate can work in:
+        it will not overwrite an existing assemblies.csv, and it reuses the
+        BAM and the quant.sf it finds in -o on their existence alone, so a
+        step killed part-way leaves half-written copies of both behind and
+        every later attempt picks the same ones back up.
 
-        What a retry must not start from is a cold index. snap's index of
-        the merged assembly is the longest single piece of work in the run
-        -- the better part of an hour on a multi-million-contig merge, and
-        two builds rather than one whenever the -locationSize sweep steps up
-        -- and pytransrate reuses an index it finds, keyed on the
-        GenomeIndex marker snap writes when a build completes. rmtree'ing
-        the whole of -o threw that away every time, so three attempts at a
-        failing step meant three identical index builds and three identical
-        waits to reach the same failure.
+        The question to ask of each thing in -o is therefore not whether it
+        is there but whether whatever wrote it finished -- because in this
+        directory the expensive artifacts and the half-written ones are the
+        same files. rmtree'ing the lot answers that question by throwing
+        away the run, which is the wrong answer twice over: three attempts
+        at a failing step meant three identical index builds, three
+        identical mappings and three identical waits to reach the same
+        failure. What survives does so on evidence that it is whole, and
+        everything below is that evidence.
 
-        A partial index carries no marker and so is not kept, which is the
-        behaviour we want: trusting a build that died half way yields a
-        corrupt index.
+        **The snap index.** Building it is the longest single piece of work
+        in the run -- the better part of an hour on a multi-million-contig
+        merge, and two builds rather than one whenever the -locationSize
+        sweep steps up. pytransrate keys its own reuse on the GenomeIndex
+        marker snap writes when a build completes, and a build that died
+        half way leaves its directory behind without one, so that is the
+        marker checked here too: trusting a partial index yields a corrupt
+        one.
 
-        logs/ is kept for a different reason: it holds snap.log, the file
-        pytransrate points at when snap dies without explaining itself, so
-        deleting it is deleting the evidence the retry exists to gather.
-        pytransrate rewrites it per attempt, so what survives the last
-        retry is the last attempt's output, which is the one worth reading.
+        **A complete BAM.** Mapping is the other multi-hour step, and on a
+        large merged assembly the BAM runs to hundreds of gigabytes. A BAM
+        ending in the empty BGZF block of SAM spec 4.1 was closed by a
+        writer that got to the end; one that does not was still being
+        written when snap was OOM-killed, hit its wall clock, or died on
+        amplab/snap#171. pytransrate 2.2.0 makes that same check before
+        reusing one and remaps over a BAM that fails it, but the decision
+        to keep the file is this function's, and keeping a truncated one
+        would be keeping hundreds of gigabytes nothing can use. It is not
+        kept as evidence either -- logs/snap.log is the evidence. A BAM
+        that is kept keeps its .align.done marker beside it, which is what
+        pytransrate reads after 2.2.0 to decide the same question: drop the
+        marker and it would move a perfectly good BAM aside and map again.
+        The <index>.index.lock file is kept for the same reason -- it sits
+        beside the index rather than inside it precisely so an rmtree of a
+        partial index cannot pull it out from under its own holder, and it
+        belongs to the index either way.
+
+        **The read count** that goes with it, `*-read_count.txt`. It is
+        keyed on the read filenames and depends only on the reads, so it
+        cannot go stale while those names hold. Keeping it matters more
+        than its size suggests: it is what pytransrate reads when it reuses
+        a BAM, and without it that path falls back to counting lines in the
+        fastq itself.
+
+        **salmon/**, but only beside a BAM that was kept, and only when
+        quant.sf is whole. quant.sf is a completed quantification *of that
+        BAM*, so keeping it when the BAM it was computed from has gone
+        would score the assembly off numbers belonging to a file that no
+        longer exists; and see quant_sf_is_complete for why existence is
+        not enough on its own -- no pytransrate to date checks it.
+
+        **logs/**, which holds snap.log, the file pytransrate points at
+        when snap dies without explaining itself, so deleting it is
+        deleting the evidence the retry exists to gather. pytransrate
+        rewrites it per attempt, so what survives the last retry is the
+        last attempt's output, which is the one worth reading.
+
+        Everything else goes: assemblies.csv, contigs.csv and the score
+        optimisation csv are the outputs being recomputed, and anything a
+        future pytransrate leaves behind that this does not recognise is
+        cleared rather than assumed safe.
         """
         outdir = Path(outdir)
+        assembly = Path(assembly)
         if not outdir.is_dir():
             return
+
+        keep = {outdir / "logs"}
+        keep.update(outdir.glob("*.index.lock"))
+        kept_bam = False
+        for bam in outdir.glob("*.bam"):
+            if bam_is_complete(bam):
+                kept_bam = True
+                keep.add(bam)
+                keep.add(bam.with_name(bam.name + ".align.done"))
+
+        if kept_bam:
+            keep.update(outdir.glob("*read_count.txt"))
+            quant_sf = outdir / "salmon" / "quant.sf"
+            # Ordered so the assembly is only walked when there is a
+            # quant.sf whose fate depends on the answer.
+            if (quant_sf.is_file() and assembly.is_file()
+                    and quant_sf_is_complete(quant_sf, count_sequences(assembly))):
+                keep.add(outdir / "salmon")
+
+        survived = []
         for path in outdir.iterdir():
+            if path in keep:
+                survived.append(path)
+                continue
             if path.is_dir():
-                if path.name == "logs" or (path / "GenomeIndex").is_file():
+                if (path / "GenomeIndex").is_file():
+                    survived.append(path)
                     continue
                 shutil.rmtree(path, ignore_errors=True)
             else:
@@ -1199,22 +1350,32 @@ class Pipeline:
                 except OSError:
                     pass
 
+        # Said out loud because the decision is worth hours either way, and
+        # because the log is the only place anyone can check it after the
+        # fact: a retry that silently remapped and a retry that reused a
+        # good BAM look identical from outside until the wall time comes in.
+        print("[transrate] {}: kept from the last attempt: {}".format(
+            outdir.name,
+            ", ".join(p.name for p in sorted(survived)) or "nothing",
+        ))
+
     def orthotransrate(self, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
         outdir = self.orthofuse_dir / "merged"
+        merged = self.orthofuse_dir / "merged.fasta"
         # needs_run() re-runs this step whenever the corrected reads are
         # newer than merged/assemblies.csv -- not only when it is absent --
         # so a resumed run would abort on that csv unless it is cleared
         # first. retry_cleanup repeats the clear before each retry, because
         # the one below happens once, outside run()'s retry loop. See
         # clear_transrate_outdir for what survives it and why.
-        self.clear_transrate_outdir(outdir)
+        self.clear_transrate_outdir(outdir, merged)
         self.conda_run(
             "orp", "pytransrate",
-            "-o", outdir, "-t", cpu, "-a", self.orthofuse_dir / "merged.fasta",
+            "-o", outdir, "-t", cpu, "-a", merged,
             "--left", self.cor1(), "--right", self.cor2(),
             *self.pytransrate_args,
-            retry_cleanup=partial(self.clear_transrate_outdir, outdir),
+            retry_cleanup=partial(self.clear_transrate_outdir, outdir, merged),
         )
 
     def makeorthout(self):
@@ -1474,13 +1635,13 @@ class Pipeline:
         orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
         outdir = self.reports_dir / f"transrate_{self.runout}"
         # See orthotransrate() and clear_transrate_outdir.
-        self.clear_transrate_outdir(outdir)
+        self.clear_transrate_outdir(outdir, orp_fasta)
         self.conda_run(
             "orp", "pytransrate",
             "-o", outdir, "-a", orp_fasta,
             "--left", self.cor1(), "--right", self.cor2(), "-t", cpu,
             *self.pytransrate_args,
-            retry_cleanup=partial(self.clear_transrate_outdir, outdir),
+            retry_cleanup=partial(self.clear_transrate_outdir, outdir, orp_fasta),
         )
 
     def trinity_perllib_dir(self):
