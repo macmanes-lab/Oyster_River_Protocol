@@ -124,20 +124,35 @@ def derive_labels(paths, explicit=None):
     # listed. Every member of a colliding group is suffixed, including the
     # first -- a bare `trinity` beside a `trinity_2` reads as though the
     # bare one were somehow the real one.
-    counts = {}
-    for label in labels:
-        counts[label.lower()] = counts.get(label.lower(), 0) + 1
-
     groups = {}
     for i, label in enumerate(labels):
         groups.setdefault(label.lower(), []).append(i)
 
+    # The suffix has to dodge the labels that are already taken, not just
+    # number within its own group: `trinity.fasta`, `trinity.fa` and
+    # `trinity_1.fasta` collide two ways, and numbering the first pair
+    # blindly hands `trinity_1` to two different assemblies. That is worse
+    # than the collision it set out to fix -- a label names the file under
+    # assemblies/ and prefixes every contig in it, so the second assembly
+    # would overwrite the first and the merge would silently run on one
+    # fewer input, which is the exact failure the prefixing exists to
+    # prevent. Reserve every uncontested label first, then count past
+    # whatever is taken.
+    taken = {key for key, members in groups.items() if len(members) == 1}
+
     out = list(labels)
-    for key, members in groups.items():
-        if counts[key] == 1:
+    for members in groups.values():
+        if len(members) == 1:
             continue
-        for n, i in enumerate(sorted(members, key=lambda i: str(paths[i])), start=1):
-            out[i] = f"{labels[i]}_{n}"
+        n = 0
+        for i in sorted(members, key=lambda i: str(paths[i])):
+            while True:
+                n += 1
+                candidate = f"{labels[i]}_{n}"
+                if candidate.lower() not in taken:
+                    break
+            taken.add(candidate.lower())
+            out[i] = candidate
     return out
 
 
@@ -302,7 +317,17 @@ class Chowder(Pipeline):
                         out.write(line)
                         continue
                     n += 1
-                    name = line[1:].split(None, 1)[0] if line[1:].strip() else f"contig{n}"
+                    # Split rather than index by len(name): a header written
+                    # "> name desc" puts the name at a non-zero offset, and
+                    # slicing by length there would re-emit part of the name
+                    # as the head of the description.
+                    header = line[1:].rstrip("\n")
+                    parts = header.split(None, 1)
+                    if parts:
+                        name = parts[0]
+                        rest = " " + parts[1] if len(parts) > 1 else ""
+                    else:
+                        name, rest = f"contig{n}", ""
                     if name in seen:
                         sys.exit(
                             f"\n*** {src} contains the contig name {name!r} more than "
@@ -310,7 +335,6 @@ class Chowder(Pipeline):
                             "every stage from OrthoFinder on joins on them. ***"
                         )
                     seen.add(name)
-                    rest = line[1:][len(name):].rstrip("\n")
                     out.write(f">{prefix}{name}{rest}\n")
             if n == 0:
                 sys.exit(f"\n*** no sequences found in {src} -- is it FASTA? ***")
