@@ -105,13 +105,32 @@ Past that line the log names the sample, and ORP's own output follows.
 ## 2. Collect
 
 ```
-./collect_metrics.py --runs $RUNS --manifest $RUNS/manifest.tsv -o metrics.csv
+cd $HOME/Oyster_River_Protocol/experiments/compare108
+./collect_metrics.py -o metrics.csv
 ```
 
-One row per manifest line, in manifest order: every pytransrate column from
-`reports/transrate_<SRR>/assemblies.csv` (including `score` and `optimal_score`),
-BUSCO C/S/D/F/M/n from `reports/run_<SRR>.ORP/short*.txt`, unique SwissProt genes
+Paths default off `$COMPARE`, so there is usually nothing to pass. One row per
+manifest line, in manifest order, identified four ways:
+
+| column | example | what it is |
+| --- | --- | --- |
+| `run` | `SRR527277` | the run name: `--runout`, and the run directory |
+| `srr` | `SRR527277` | the accession, from the R1 filename |
+| `code` | `GADU` | the bare 4-letter code |
+| `tsa` | `tsa_GADU` | the directory under `pairs/` |
+
+`run` and `srr` differ only for the samples that shared an accession and were
+disambiguated: there `run` is `SRR807358_tsa_BBBA` while `srr` stays `SRR807358`.
+
+Then the metrics: every pytransrate column from
+`reports/transrate_<run>/assemblies.csv` (including `score` and `optimal_score`),
+BUSCO C/S/D/F/M/n from `reports/run_<run>.ORP/short*.txt`, unique SwissProt genes
 and proper-pair rate. Columns come from the csv header by name, not by position.
 
-Samples still running or failed get blank cells and a reason in `status`, and are
-listed on stderr, so it is safe to run this mid-array to see progress.
+Safe to run while the array is still going: samples that have not finished get
+blank cells and a reason in `status` -- `no run directory`, `no transrate csv` --
+and are listed on stderr, so the same command doubles as a progress check.
+
+```
+./collect_metrics.py -o metrics.csv && cut -d, -f1,3,5 metrics.csv | column -s, -t
+```

@@ -14,11 +14,12 @@ than by position, so this does not have to be touched when that csv changes.
 Runs that are missing a file get a blank cell and a note in `status`, so an
 incomplete sample shows up as a gap in the table instead of dropping out of it.
 
-    ./collect_metrics.py --runs /path/to/orp_runs -o metrics.csv
+    ./collect_metrics.py -o metrics.csv        # paths default off $COMPARE
 """
 
 import argparse
 import csv
+import os
 import re
 import sys
 from pathlib import Path
@@ -93,15 +94,18 @@ def read_proper_pairs(rundir, srr):
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--runs", required=True, type=Path,
-                    help="directory holding one subdirectory per run")
-    ap.add_argument("--manifest", type=Path, default=None,
-                    help="manifest.tsv, to carry the tsa code across and to "
-                         "report samples that produced no run directory at all")
+    compare = Path(os.environ.get("COMPARE", "/mnt/home/macmaneslab/macmanes/compare"))
+    ap.add_argument("--runs", type=Path, default=compare / "orp_runs",
+                    help="directory holding one subdirectory per run "
+                         "(default: $COMPARE/orp_runs)")
+    ap.add_argument("--manifest", type=Path, default=compare / "manifest.tsv",
+                    help="manifest.tsv, for the tsa code and accession of each "
+                         "run and to report samples that produced no run "
+                         "directory at all (default: $COMPARE/manifest.tsv)")
     ap.add_argument("-o", "--out", type=Path, default=Path("metrics.csv"))
     args = ap.parse_args()
 
-    tsa_of, order = {}, []
+    meta, order = {}, []
     if args.manifest and args.manifest.is_file():
         # Manifest columns: tsa_code, TSA assembly, R1, R2, run name. Column 5
         # is what the job passed to --runout and so what the run directory is
@@ -117,16 +121,30 @@ def main():
                       file=sys.stderr)
                 continue
             run = f[4].strip()
+            tsa = f[0].strip()
+            # The accession comes from the R1 filename rather than from the run
+            # name, which carries a _tsa_XXXX suffix when two samples shared an
+            # accession -- the SRR itself is what that suffix was added to.
+            m = re.search(r"[SED]RR\d{4,}", Path(f[2].strip()).name)
             order.append(run)
-            tsa_of[run] = f[0].strip()
+            meta[run] = {
+                "tsa": tsa,
+                "code": tsa[4:] if tsa.startswith("tsa_") else tsa,
+                "srr": m.group(0) if m else "",
+            }
     else:
         order = sorted(d.name for d in args.runs.iterdir()
                        if d.is_dir() and d.name != "logs")
+        for run in order:
+            m = re.search(r"[SED]RR\d{4,}", run)
+            meta[run] = {"tsa": "", "code": "", "srr": m.group(0) if m else ""}
 
     records, transrate_cols = [], []
     for srr in order:
         rundir = args.runs / srr
-        rec = {"run": srr, "tsa": tsa_of.get(srr, "")}
+        info = meta.get(srr, {})
+        rec = {"run": srr, "srr": info.get("srr", ""),
+               "code": info.get("code", ""), "tsa": info.get("tsa", "")}
         if not rundir.is_dir():
             rec["status"] = "no run directory"
             records.append(rec)
@@ -151,7 +169,7 @@ def main():
             rec["status"] = "; ".join(notes) or "incomplete"
         records.append(rec)
 
-    header = (["run", "tsa", "status"] + BUSCO_FIELDS
+    header = (["run", "srr", "code", "tsa", "status"] + BUSCO_FIELDS
               + ["unique_genes_ORP", "proper_pairs"] + transrate_cols)
     with args.out.open("w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=header, extrasaction="ignore")
