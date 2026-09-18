@@ -1021,6 +1021,7 @@ class Pipeline:
                 "    the BAM when a run fails -- so the failure costs a full\n"
                 "    remap on every retry. Update the orp environment:\n\n"
                 "      conda run -n orp pip install --upgrade --force-reinstall \\\n"
+                "        --no-deps \\\n"
                 "        'pytransrate @ git+https://github.com/macmanes-lab/"
                 f"pytransrate.git@v{PYTRANSRATE_MIN_VERSION}'\n"
             )
