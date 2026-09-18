@@ -1,5 +1,36 @@
 ### CHANGELOG
 
+ORP Version 4.0.1 <- 4.0.0
+
+**No change to the assembly or to any score.** Two fixes about the
+read-metrics step surviving a real merge, and one about knowing which
+pytransrate produced a log.
+
+- **`--mem` now reaches pytransrate.** `run_parallel` splits `--cpu` and
+  `--mem` across concurrent steps and hands both to every one of them, but
+  `orthotransrate` and `transrate` took the memory figure and dropped it on
+  the floor -- the two steps in the pipeline that are actually sized by it.
+  pytransrate's read-metrics step allocates per-base coverage accumulators
+  for the whole assembly *per worker*: on a 5.8 Gbp merge that is 23 GB
+  each, so `-t 40` asks for 928 GB. It caps the workers against a memory
+  budget, but with nothing passed it can only find the machine's own free
+  memory, so a run given `--mem 670` on a 1.5 TB node was allowed to ask for
+  all 928 GB and was OOM-killed after nine hours of mapping and quantifying
+  -- then again on each retry, since nothing about a retry made it cap. The
+  figure is now forwarded as `--max-memory <mem>G`, and a `--max-memory` or
+  `--mem` set in `--pytransrate-args` still wins.
+
+- **Preflight refuses a pytransrate older than 2.2.1** and prints the version
+  it found. `orp_env.yml` pins one, but a pin describes the environment as
+  built and says nothing about the environment as it is; an env still
+  carrying 2.1.0 has neither the memory cap nor the fix that stops a failed
+  run deleting its own BAM, and the only trace of that in sixteen hours of
+  log is a version number in a banner. It is now the first thing preflight
+  says, and being too old stops the run in seconds. A version that cannot be
+  read is not fatal -- this catches a stale install, it does not become a new
+  way to refuse to start.
+
+
 ORP Version 4.0.0 <- 3.1.0
 
 **The assembly this pipeline produces changes in this release.** The new scorer computes the four score components, the contig score and the assembly score from the same formulas as the Ruby, but its inputs changed, so contig scores move and -- more importantly -- reorder. `makeorthout` keeps the highest-scoring member of each orthogroup, so that reordering reaches the assembled `.ORP.fasta` itself, not just the reported number: 14.5-19% of contig pairs order oppositely across the boundary. The `TRANSRATE SCORE` lines in `reports/qualreport.<run>` are not comparable to any earlier ORP release's, and the `transrate` entry in `sampledata/benchmarks.md` needs a fresh baseline. pytransrate's `scripts/compare_orthogroup_picks.py` measures exactly which orthogroups change representative between two runs.

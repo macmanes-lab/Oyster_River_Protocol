@@ -85,6 +85,23 @@ TRINITY_TOOL = ("orp_trinity", "Trinity", "TRINITY")
 TRANSABYSS_TOOL = ("orp_transabyss", "transabyss", "TRANSABYSS")
 # The three an entry point that doesn't assemble has no use for.
 ASSEMBLER_TOOLS = (SPADES_TOOL, TRINITY_TOOL, TRANSABYSS_TOOL)
+#: The pytransrate this pipeline needs, checked at preflight rather than
+#: assumed from orp_env.yml. The pin in that file describes the environment
+#: as built; it says nothing about the environment as it actually is, and the
+#: two diverge the moment anyone installs by hand or reuses an older env. The
+#: gap is expensive in exactly one direction: 2.2.0 caps the read-metrics
+#: workers against a memory budget and 2.2.1 stops a failed run deleting the
+#: BAM, so an env still holding 2.1.0 runs for nine hours, is OOM-killed,
+#: throws away the BAM, and does it again on the retry -- with a log whose
+#: only sign of the problem is a version number in the banner. Checked in
+#: seconds instead.
+PYTRANSRATE_MIN_VERSION = "2.2.1"
+
+#: --max-memory's own spellings in pytransrate, both of which it accepts. A
+#: user who set one in --pytransrate-args means it, so pytransrate_memory_args
+#: stands aside rather than passing the flag twice.
+PYTRANSRATE_MEMORY_FLAGS = ("--max-memory", "--mem")
+
 CHECK_TOOLS = (
     ("orp", "salmon", "SALMON"),
     ("orp", "pytransrate", "PYTRANSRATE"),
@@ -302,6 +319,33 @@ BGZF_EOF = bytes.fromhex("1f8b08040000000000ff0600424302001b0003" + "00" * 9)
 #: Columns in a salmon quant.sf: Name, Length, EffectiveLength, TPM,
 #: NumReads. pytransrate rejects any other count as a version mismatch.
 QUANT_COLUMNS = 5
+
+
+def version_below(version: str, minimum: str) -> bool:
+    """Is ``version`` older than ``minimum``, comparing release numbers only?
+
+    Numeric components, left to right, shorter padded with zeros, so 2.10.0
+    beats 2.9.0 rather than losing to it as a string compare would have it.
+
+    A pre-release suffix is deliberately ignored: 2.2.2.dev1 compares equal to
+    2.2.2 rather than below it, because those builds are how a fix is tested
+    on the cluster before it is tagged, and a check that rejected them would
+    make the version gate an obstacle to the work it exists to support. The
+    exact string, suffix and all, is what gets printed -- the gate catches an
+    install that is plainly old, and the printed version answers everything
+    finer-grained than that.
+    """
+    def parts(text):
+        numbers = re.match(r"\d+(?:\.\d+)*", text)
+        return [int(n) for n in numbers.group(0).split(".")] if numbers else []
+
+    have, want = parts(version), parts(minimum)
+    if not have or not want:
+        return False
+    width = max(len(have), len(want))
+    have += [0] * (width - len(have))
+    want += [0] * (width - len(want))
+    return have < want
 
 
 def bam_is_complete(path: Path) -> bool:
@@ -779,6 +823,28 @@ class Pipeline:
         oldest_output = min(o.stat().st_mtime for o in outputs)
         return newest_input > oldest_output
 
+    def tool_version(self, env, binary):
+        """``<binary> --version`` in ``env``, as a bare version string or None.
+
+        Tools print anything from "2.2.1" to "pytransrate 2.2.1" to a banner,
+        so the first thing on the first line that looks like a version is what
+        comes back. None when the tool cannot be run or says nothing usable,
+        which every caller here treats as "cannot tell" rather than as bad
+        news -- see check_pytransrate_version.
+        """
+        try:
+            result = subprocess.run(
+                ["conda", "run", "-n", env, binary, "--version"],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True,
+            )
+        except OSError:
+            return None
+        text = (result.stdout.strip() or result.stderr.strip()).splitlines()
+        if not text:
+            return None
+        match = re.search(r"\d+(?:\.\d+)+(?:\.?(?:dev|a|b|rc)\d*)?", text[0])
+        return match.group(0) if match else None
+
     def stamp_tool_version(self, env, binary, stamp):
         """Record a tool's version beside its artifacts; return the stamp path.
 
@@ -921,6 +987,43 @@ class Pipeline:
         for env, binary, label in self.required_tools():
             if not self.which_in_env(env, binary):
                 sys.exit(f"*** {label} is not installed, must fix ***")
+        self.check_pytransrate_version()
+
+    def check_pytransrate_version(self):
+        """Refuse to start on a pytransrate older than the pipeline needs.
+
+        Present-and-runnable is the wrong question for this one tool: the
+        version that matters is the difference between a 16-hour failure and
+        a run that finishes, and nothing else in the pipeline notices which
+        one is installed. See PYTRANSRATE_MIN_VERSION.
+
+        The version is printed either way, because the second half of the
+        problem is a fix that was installed and did not work being
+        indistinguishable, in the log, from a fix that was never installed.
+        The log now carries the answer at the top, before the hours.
+
+        A version that cannot be read is not fatal. This check exists to
+        catch a known-old install, not to become a new way for the run to
+        refuse to start.
+        """
+        version = self.tool_version("orp", "pytransrate")
+        if version is None:
+            print("[preflight] could not read the pytransrate version; "
+                  f"carrying on (this pipeline needs >= {PYTRANSRATE_MIN_VERSION})")
+            return
+        print(f"[preflight] pytransrate {version}")
+        if version_below(version, PYTRANSRATE_MIN_VERSION):
+            sys.exit(
+                f"\n*** pytransrate {version} is installed and this pipeline "
+                f"needs at least {PYTRANSRATE_MIN_VERSION}. ***\n\n"
+                "    Older versions size the read-metrics step against the\n"
+                "    whole machine rather than the memory budget, and delete\n"
+                "    the BAM when a run fails -- so the failure costs a full\n"
+                "    remap on every retry. Update the orp environment:\n\n"
+                "      conda run -n orp pip install --upgrade --force-reinstall \\\n"
+                "        'pytransrate @ git+https://github.com/macmanes-lab/"
+                f"pytransrate.git@v{PYTRANSRATE_MIN_VERSION}'\n"
+            )
 
     def welcome(self):
         print(RED)
@@ -1359,6 +1462,32 @@ class Pipeline:
             ", ".join(p.name for p in sorted(survived)) or "nothing",
         ))
 
+    def pytransrate_memory_args(self, mem):
+        """``--max-memory`` for a pytransrate call, or nothing.
+
+        pytransrate sizes the read-metrics step's shared accumulators by the
+        assembly and multiplies them by ``--threads``: on a 5.8 Gbp merge
+        that is 23 GB per worker, so ``-t 40`` asks for 928 GB. It caps the
+        workers at what fits, but only against a budget it can find, and on
+        an unconstrained login or interactive node the only figure available
+        is the whole machine's free memory. A run given ``--mem 670`` on a
+        1.5 TB node therefore passed its own cap and was OOM-killed after
+        nine hours of mapping and quantifying -- twice, because the retry had
+        no more reason to cap than the first attempt did.
+
+        So --mem is forwarded. It is the number the user chose and the number
+        every step above already splits between concurrent jobs; leaving it
+        at this one boundary meant the most memory-hungry step in the run was
+        the only one that never heard it. Requires pytransrate >= 2.2.0,
+        which is what PYTRANSRATE_MIN_VERSION enforces at preflight.
+        """
+        if mem is None:
+            return []
+        if any(arg.split("=")[0] in PYTRANSRATE_MEMORY_FLAGS
+               for arg in self.pytransrate_args):
+            return []
+        return ["--max-memory", f"{mem}G"]
+
     def orthotransrate(self, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
         outdir = self.orthofuse_dir / "merged"
@@ -1374,6 +1503,7 @@ class Pipeline:
             "orp", "pytransrate",
             "-o", outdir, "-t", cpu, "-a", merged,
             "--left", self.cor1(), "--right", self.cor2(),
+            *self.pytransrate_memory_args(mem),
             *self.pytransrate_args,
             retry_cleanup=partial(self.clear_transrate_outdir, outdir, merged),
         )
@@ -1640,6 +1770,7 @@ class Pipeline:
             "orp", "pytransrate",
             "-o", outdir, "-a", orp_fasta,
             "--left", self.cor1(), "--right", self.cor2(), "-t", cpu,
+            *self.pytransrate_memory_args(mem),
             *self.pytransrate_args,
             retry_cleanup=partial(self.clear_transrate_outdir, outdir, orp_fasta),
         )
@@ -2027,7 +2158,8 @@ class Pipeline:
 
         def merge_branch(cpu=None, mem=None):
             self.step("merge", [merged_fasta], short_fastas, self.merge)
-            self.step("orthotransrate", [merged_csv], [merged_fasta, c1, c2], partial(self.orthotransrate, cpu=cpu))
+            self.step("orthotransrate", [merged_csv], [merged_fasta, c1, c2],
+                      partial(self.orthotransrate, cpu=cpu, mem=mem))
 
         # run_orthofuser and merge->orthotransrate are independent chains that
         # both only need short_fastas; they join at makeorthout below.
