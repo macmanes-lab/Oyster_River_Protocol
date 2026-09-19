@@ -14,6 +14,7 @@ import argparse
 import csv
 import gzip
 import io
+import json
 import math
 import os
 import re
@@ -259,12 +260,19 @@ ORTHOFINDER_GB_PER_SEARCH_FLOOR = 12
 # lowered -- the only way to make this run was to make it slow.
 #
 # It is not the only way. Concurrency and core count are separate knobs in
-# diamond and only OrthoFinder ties them together, so write_diamond_shim()
-# unties them: a `diamond` ahead of the real one on PATH that replaces the
-# `-p 1` OrthoFinder wrote with `cpu // searches`. Four diamonds at ten
-# threads each is the same forty cores as sixteen at one, at a quarter of
-# the peak memory. The shim is how a lowered -t costs memory and not speed.
-DIAMOND_SHIM_SUBCOMMANDS = ("blastp", "blastx", "blastn")
+# diamond and only OrthoFinder ties them together, so ensure_diamond_program()
+# unties them: a `diamond_orp_<threads>` entry in OrthoFinder's config.json,
+# a copy of its own diamond entry with `-p` set to `cpu // searches`, chosen
+# with `-S`. Four diamonds at ten threads each is the same forty cores as
+# sixteen at one, at a quarter of the peak memory.
+#
+# PATH was tried first and cannot work. A shim ahead of the real diamond is
+# overtaken by OrthoFinder itself, which prepends its environment's bin and
+# its own bundled bin at startup: measured on the node, the shim sat at
+# position 9 of a PATH whose first entry was the real diamond, and the
+# searches ran `-p 1` with the shim present and unused. There is no
+# `--config` flag either, so the install copy of config.json is the only
+# place this can be said from.
 
 # Floor for a self-comparison in check_orthofinder_searches: the fraction of
 # an assembly's sequences that must show up as queries in its own Blast{i}_i.
@@ -635,10 +643,11 @@ class Pipeline:
 
         The first parameter is `conda_env` and not `env` because `env` is
         subprocess's own name for the environment block, and a caller that
-        wants to set one -- run_orthofuser, to put the diamond shim on PATH
-        -- would otherwise be handing this method two values for the same
-        parameter. That is a TypeError raised at the call, hours into a run,
-        on the one step that needed it.
+        wants to set one would otherwise be handing this method two values
+        for the same parameter -- a TypeError raised at the call, hours into
+        a run. (The caller that wanted one, run_orthofuser, no longer does:
+        setting PATH from out here could not beat OrthoFinder's own
+        prepending. The name stays right regardless.)
         """
         self.run(["conda", "run", "--no-capture-output", "-n", conda_env,
                   *[str(c) for c in cmd]], **kwargs)
@@ -1429,120 +1438,109 @@ class Pipeline:
             searches = max(1, min(cpu, jobs, mem // per_search))
         return searches, max(1, cpu // searches), per_search
 
-    def write_diamond_shim(self, threads):
-        """A `diamond` for PATH that re-threads what OrthoFinder wrote.
+    def orthofinder_config(self):
+        """OrthoFinder's config.json, the only place its diamond line lives.
 
-        OrthoFinder builds its diamond command line itself and offers no
-        way in to it, so the only place left to stand is PATH. The shim
-        execs the real diamond with `-p threads` in place of the `-p 1`
-        OrthoFinder hard-codes, and with `--tmpdir` pointed somewhere
-        chosen rather than wherever the process happened to start. That
-        directory is deliberately not OrthoFinder's `-f`: OrthoFinder reads
-        that one to decide what the species are, and a temporary file
-        written into it is a species if it lands there at the wrong moment.
+        `-p 1` is written into the `search_cmd` template in that file.
+        Nothing outside the process can move it: PATH was tried and
+        OrthoFinder re-prepends its own two bin directories at startup, so
+        a shim put in front of them lands behind them by the time the
+        searches run. Measured, on the node, at position 9 of a PATH whose
+        first entry was the environment's real diamond.
 
-        It rewrites rather than appends because a duplicated option is
-        diamond's error to make, not ours to bet on: every form of the
-        flags it replaces is dropped from the line first, glued (`-p1`) as
-        well as separated (`-p 1`), and then its own are added.
-
-        Only the search subcommands are touched. `makedb` and anything else
-        OrthoFinder shells out to pass through untouched, so a shim on PATH
-        cannot change a step it was not written for.
+        There is no `--config` flag, so the install copy is the one that
+        counts. Located from the `orthofinder` on PATH in its own env
+        rather than by hard-coding a layout: it sits at
+        `<env>/bin/src/orthofinder/run/config.json` in this install, and
+        the globs below cover the other shapes a pip or conda install
+        leaves behind.
         """
-        real = self.which_in_env("orp_orthofinder", "diamond")
-        if real is None:
+        exe = self.which_in_env("orp_orthofinder", "orthofinder")
+        if exe is None:
             return None
-        shim_dir = self.orthofuse_dir / "shim"
-        shim_dir.mkdir(parents=True, exist_ok=True)
-        tmpdir = self.orthofuse_dir / "diamond-tmp"
-        tmpdir.mkdir(parents=True, exist_ok=True)
-        shim = shim_dir / "diamond"
-        shim.write_text(
-            "#!/usr/bin/env python3\n"
-            '"""Written by oyster.py: see write_diamond_shim(). Not hand-edited."""\n'
-            "import os, sys\n"
-            f"REAL = {str(real)!r}\n"
-            f"THREADS = {str(threads)!r}\n"
-            f"TMPDIR = {str(tmpdir)!r}\n"
-            f"SUBCOMMANDS = {DIAMOND_SHIM_SUBCOMMANDS!r}\n"
-            "DROP = ('-p', '--threads', '--tmpdir')\n"
-            "argv = sys.argv[1:]\n"
-            "if argv and argv[0] in SUBCOMMANDS:\n"
-            "    rest, keep, i = argv[1:], [], 0\n"
-            "    while i < len(rest):\n"
-            "        a = rest[i]\n"
-            "        if a in DROP:\n"
-            "            i += 2\n"
-            "            continue\n"
-            "        if any(a.startswith(d) and a != d for d in DROP if not d.startswith('--')):\n"
-            "            i += 1\n"
-            "            continue\n"
-            "        keep.append(a)\n"
-            "        i += 1\n"
-            "    argv = [argv[0], '-p', THREADS, '--tmpdir', TMPDIR] + keep\n"
-            "os.execv(REAL, [REAL] + argv)\n"
-        )
-        shim.chmod(0o755)
-        return shim_dir
+        bindir = Path(exe).resolve().parent
+        candidates = [bindir / "src" / "orthofinder" / "run" / "config.json"]
+        candidates += sorted(bindir.glob("src/*/run/config.json"))
+        candidates += sorted(bindir.parent.glob("lib/python*/site-packages/orthofinder/run/config.json"))
+        for c in candidates:
+            if c.is_file():
+                return c
+        return None
 
-    def orthofinder_command(self, shim_dir, searches, analysis):
-        """The `bash -c` OrthoFinder is launched through, shim on PATH.
+    def ensure_diamond_program(self, threads):
+        """Add a `diamond_orp_<threads>` search program, and return its name.
 
-        Passing `env=` to subprocess does not work here and the way it
-        fails is silent. `conda run -n X` activates the environment, and
-        activation *prepends* that environment's own bin to whatever PATH
-        it was handed -- so a shim directory put on PATH by the parent ends
-        up behind `orp_orthofinder/bin`, the real diamond wins the lookup,
-        and OrthoFinder's `-p 1` stands. Nothing reports this: the step
-        runs, the shim is written, the log says what it always says, and
-        the only evidence is `ps` showing NLWP 2 and %CPU 98 on four
-        processes that were supposed to have ten threads each -- four cores
-        of a forty-core node, measured two hours in.
+        A copy of OrthoFinder's own `diamond` entry with `-p` set, added
+        beside it rather than over it: the stock entry keeps working for
+        anything else using this environment, and `-S diamond` still means
+        exactly what it meant before.
 
-        So PATH is set *inside* the activated environment instead, which is
-        after conda has had its turn. `exec` is there so the bash is not a
-        second process sitting on the OrthoFinder run for its whole life.
+        The name carries the thread count because this file is shared by
+        every run on the cluster that uses this env. Two runs at different
+        `--cpu` want different `-p`, and one entry per thread count lets
+        them coexist instead of overwriting each other; a second run at the
+        same thread count finds its entry already there and writes nothing.
+        Nothing run-specific goes in -- no `--tmpdir`, no paths -- because a
+        shared file must not carry one run's directories into another's.
+
+        The write is temp-and-rename, then read back: two jobs adding
+        different entries at the same moment is a lost update, and the
+        read-back is what notices. One retry, because the loser of a race
+        is not likely to lose twice.
+
+        Returns None if the file cannot be read or written, which is a slow
+        all-vs-all and not a wrong one -- run_orthofuser falls back to the
+        stock program and says what that costs.
         """
-        argv = ["orthofinder", "-d", "-I", "12", "-f", str(self.orthofuse_search),
-                "-og", "-t", str(searches), "-a", str(analysis)]
-        cmd = " ".join(shlex.quote(a) for a in argv)
-        if shim_dir is None:
-            return f"exec {cmd}"
-        return f"export PATH={shlex.quote(str(shim_dir))}:$PATH; exec {cmd}"
-
-    def report_diamond_in_use(self, shim_dir):
-        """Print which diamond OrthoFinder will actually find, and say so.
-
-        The previous version of this step had no way to tell from its own
-        log whether the shim was in use. That is the whole reason it ran
-        for two hours on four cores without anyone noticing, so the
-        resolution is now resolved the same way OrthoFinder will resolve
-        it -- inside the activated environment, through the same PATH --
-        and printed before the run starts.
-
-        Not fatal on its own: a shim that cannot be confirmed is a slow
-        all-vs-all, not a wrong one, and failing the step here would turn a
-        performance problem into an outage.
-        """
-        if shim_dir is None:
-            return
-        script = f"export PATH={shlex.quote(str(shim_dir))}:$PATH; command -v diamond"
-        try:
-            result = subprocess.run(
-                ["conda", "run", "-n", "orp_orthofinder", "bash", "-c", script],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True,
-            )
-        except FileNotFoundError:
-            return
-        found = result.stdout.strip().splitlines()
-        found = found[-1] if found else ""
-        if found == str(shim_dir / "diamond"):
-            print(f"    diamond: {found} (shim -- OrthoFinder's `-p 1` will be rewritten)")
-        else:
-            print(f"    *** diamond resolves to {found or '?'}, not the shim in {shim_dir} -- "
-                  f"searches will run single-threaded on {self.orthofinder_searches or 'the planned'} "
-                  "cores. The step will still be correct, only slow. ***")
+        config = self.orthofinder_config()
+        if config is None:
+            return None
+        name = f"diamond_orp_{threads}"
+        for attempt in range(2):
+            try:
+                with open(config) as f:
+                    data = json.load(f)
+            except (OSError, ValueError) as e:
+                print(f"    cannot read {config}: {e}")
+                return None
+            stock = data.get("diamond")
+            if not isinstance(stock, dict) or "search_cmd" not in stock:
+                print(f"    no usable 'diamond' entry in {config}")
+                return None
+            if name in data:
+                return name
+            entry = dict(stock)
+            toks = entry["search_cmd"].split()
+            if "-p" in toks:
+                toks[toks.index("-p") + 1] = str(threads)
+            else:
+                toks += ["-p", str(threads)]
+            entry["search_cmd"] = " ".join(toks)
+            data[name] = entry
+            backup = config.with_suffix(".json.orp-backup")
+            first_backup = not backup.exists()
+            try:
+                if first_backup:
+                    shutil.copy2(str(config), str(backup))
+                tmp = config.with_suffix(f".json.orp-{os.getpid()}")
+                with open(tmp, "w") as f:
+                    json.dump(data, f, indent=4)
+                    f.write("\n")
+                os.replace(str(tmp), str(config))
+            except OSError as e:
+                print(f"    cannot write {config}: {e}")
+                return None
+            try:
+                with open(config) as f:
+                    if name in json.load(f):
+                        print(f"    added search program '{name}' to {config}"
+                              + (f" (original saved as {backup.name})" if first_backup else ""))
+                        return name
+            except (OSError, ValueError):
+                pass
+            print(f"    '{name}' did not survive the write -- another run writing "
+                  f"the same file? retrying ({attempt + 1}/2)")
+        return None
 
     def run_orthofuser(self, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
@@ -1561,11 +1559,12 @@ class Pipeline:
                else f"{mem}G / {per_search}G per search")
         print(f"    all-vs-all: {jobs} searches, {searches} at a time ({why}), "
               f"{threads} thread(s) each")
-        shim_dir = self.write_diamond_shim(threads)
-        if shim_dir is None:
-            print("    no diamond in orp_orthofinder -- leaving OrthoFinder's `-p 1` alone; "
-                  f"this step will use {searches} of {cpu} cores")
-        self.report_diamond_in_use(shim_dir)
+        program = self.ensure_diamond_program(threads)
+        if program is None:
+            program = "diamond"
+            print(f"    *** could not set diamond's thread count: OrthoFinder's own `-p 1` "
+                  f"stands, so this step gets {searches} of {cpu} cores. Correct, but slow. "
+                  "Raise --orthofinder-searches to trade memory for cores. ***")
         # OrthoFinder reports its own fatal errors and then exits 0. A run
         # whose diamonds were OOM-killed leaves truncated Blast*.txt behind,
         # prints "ERROR: Blast1_1.txt is corrupted" and "ERROR: An error
@@ -1580,8 +1579,11 @@ class Pipeline:
         marker = self.orthofuse_dir / "orthofuser.attempt"
         marker.parent.mkdir(parents=True, exist_ok=True)
         marker.touch()
-        self.conda_run("orp_orthofinder", "bash", "-c",
-                       self.orthofinder_command(shim_dir, searches, analysis))
+        self.conda_run(
+            "orp_orthofinder", "orthofinder",
+            "-d", "-I", "12", "-f", self.orthofuse_search,
+            "-og", "-t", searches, "-a", analysis, "-S", program,
+        )
         groups = self.newest_orthogroups_txt()
         if groups is None or groups.stat().st_mtime < marker.stat().st_mtime:
             sys.exit(

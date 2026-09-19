@@ -1,5 +1,29 @@
 ### CHANGELOG
 
+ORP Version 4.0.1-dev5
+
+- **diamond's thread count is set through OrthoFinder's config.json, because
+  PATH cannot reach it.** `-p 1` is written into the `search_cmd` template in
+  `<env>/bin/src/orthofinder/run/config.json`, and OrthoFinder prepends both
+  its environment's bin and its own bundled bin at startup -- so the dev4
+  shim sat at position 9 of the searches' PATH, behind the real diamond, and
+  the searches ran `-p 1` with the shim present and unused. There is no
+  `--config` flag, so the install copy is the only place this can be said
+  from. ORP now adds a `diamond_orp_<threads>` program beside the stock one
+  and selects it with `-S`.
+
+- The stock `diamond` entry is never modified, the original file is backed up
+  once as `config.json.orp-backup`, and the entry name carries the thread
+  count so runs at different `--cpu` coexist in a file the whole cluster
+  shares. Nothing run-specific is written into it. The write is
+  temp-and-rename with a read-back and one retry, since two jobs adding
+  different entries at once is a lost update.
+
+- If the config cannot be read or written the step falls back to the stock
+  program and says what that costs in cores, rather than failing. Verified
+  against a missing orthofinder, corrupt JSON, and a config with no diamond
+  entry.
+
 ORP Version 4.0.1-dev4
 
 - **The diamond shim was never actually used, and nothing said so.** dev2 put

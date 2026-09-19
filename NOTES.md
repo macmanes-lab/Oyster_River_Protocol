@@ -7,6 +7,35 @@ stale.
 
 ## 2026-09-19
 
+- **PATH cannot reach OrthoFinder's diamond. config.json can.** The dev4
+  shim resolved correctly in the parent (`command -v diamond` -> the shim)
+  and was still never called: `/proc/<pid>/environ` on a running search
+  showed
+  `PATH=<env>/bin:<env>/bin/src/orthofinder/bin:...:<run>/shim:...`
+  -- OrthoFinder prepends its environment's bin and its own bundled bin at
+  startup, so anything put in front from outside ends up behind them.
+  Observed `-p 1` and no `--tmpdir` on all four searches with the shim
+  sitting at position 9.
+  - `-p 1` is a literal in the `search_cmd` template in
+    `<env>/bin/src/orthofinder/run/config.json`. `orthofinder --help` has
+    no `--config`, only `-S <txt>` to pick a program by name, so the
+    install copy is the only lever.
+  - ORP adds `diamond_orp_<threads>` -- the stock entry with `-p` set --
+    and runs `-S diamond_orp_<threads>`. Stock entry untouched; original
+    backed up once; thread count in the name so concurrent runs at
+    different `--cpu` do not fight over one key; nothing run-specific in
+    the file, since the cluster shares it.
+  - **Three approaches, one lesson:** `env=` lost to conda's activation,
+    an exported PATH lost to OrthoFinder's own prepending, and neither
+    failure said anything in the log. Each was only caught by `ps` on the
+    node. Whatever the mechanism, the step has to print what it actually
+    resolved -- that is worth more than the mechanism being clever.
+  - Memory, meanwhile, is still unmeasured at the peak: RSS held flat at
+    ~1.5 GB per search (the loaded .dmnd) for the first three minutes of
+    the 4-way run, ~6 GB against a 670 GB budget. Run 2's kills came at
+    2h40m. Sample to the end before touching
+    ORTHOFINDER_GB_PER_QUERY_GB.
+
 - **`env=` cannot put anything ahead of a conda environment's own bin.**
   The dev2 diamond shim was written, PATH was set, the step ran -- and the
   shim was never called. `conda run -n X` activates X, and activation
