@@ -1,5 +1,20 @@
 ### CHANGELOG
 
+ORP Version 4.0.1-dev7
+
+- **The per-search memory figure is now measured, not inferred.** A single
+  diamond search of this input class, run alone on the node with 40 threads,
+  peaks at **143.0 GiB** (exit 0, 36m35s, 14.8 core-hours). 670 GiB holds
+  four of them and not five. `ORTHOFINDER_GB_PER_QUERY_GB = 96` predicted
+  159 GiB and chose 4 -- 11% conservative, and right. No behaviour changes;
+  the constant's justification stops being one kernel log line.
+
+- Documented what actually drives the cost: the long-contig tail, not file
+  size and not sequence count. The two species that lost searches carry
+  9-47x more contigs over 10 kb; the species with the most sequences lost
+  none. Recorded with the caveat that bytes remain the proxy the sizing
+  uses, and what would be needed to replace it.
+
 ORP Version 4.0.1-dev6
 
 - **Preflight writes down the Slurm job ID, the host, and the diamond

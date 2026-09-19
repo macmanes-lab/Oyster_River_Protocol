@@ -7,6 +7,44 @@ stale.
 
 ## 2026-09-19
 
+- **Measured: one diamond search is 143.0 GiB. The memory story was right.**
+  Species0 against its own database, alone on the node, 40 threads,
+  `/usr/bin/time -v`: exit 0, 36m35s wall, 52,880s user (2421% CPU, 14.8
+  core-hours), **MaxRSS 149,977,104 KiB = 143.0 GiB**. No OrthoFinder, no
+  concurrency, nothing else running. This is the number the whole argument
+  needed and nobody had.
+  - 670 GiB / 143 GiB = 4.7 -> four fit (572 GiB), five do not (715 GiB).
+    The model predicted 159 GiB and chose 4: 11% conservative, correct
+    answer.
+  - It also settles the 16-way runs: eight of the sixteen searches have
+    Species0 or Species1 as query, and eight x 143 GiB is 1.1 TiB against a
+    670 GiB cgroup. They could not have survived.
+  - **The driver is the long-contig tail, not size and not count:**
+
+        Species0  n=1,072,398  mean=1439  max= 83,028  >10kb=19,387  FAILED
+        Species1  n=1,054,411  mean=1406  max=105,775  >10kb=21,902  FAILED
+        Species2  n=1,325,909  mean= 853  max= 25,753  >10kb=   471  ok
+        Species3  n=1,902,240  mean= 793  max= 32,042  >10kb= 2,139  ok
+
+    Species3 has 77% more sequences than Species0 at the same file size and
+    lost nothing, so count is anti-correlated. Contigs over 10 kb are 9-47x
+    more common in the two that failed, and the self-comparisons failed
+    first -- every long contig aligning against itself full length. diamond
+    2.0.1's ChangeLog: "increased memory usage and runtimes for very long
+    queries".
+  - **Sizing still keys on bytes**, which is a proxy that happened to be
+    right here. A small assembly with a heavy tail would be sized cheap and
+    is not. One calibration point is not enough to fit a tail-based model;
+    take a second measurement before changing it.
+  - **The threading is load-bearing, not polish.** 14.8 core-hours per
+    search means `-p 1` is 14.8 hours of wall each, 59 hours for four waves.
+    With `cpu // searches` threads it is the same forty cores throughout and
+    the step is hours. Memory-safe concurrency is only affordable because -p
+    was untied from -t.
+  - Two own-goals worth remembering: `-o /dev/null` makes diamond put its
+    temp files in `/dev` (Permission denied), and `ps -o args= | cut -c1-40`
+    truncates before `-p`.
+
 - **PATH cannot reach OrthoFinder's diamond. config.json can.** The dev4
   shim resolved correctly in the parent (`command -v diamond` -> the shim)
   and was still never called: `/proc/<pid>/environ` on a running search

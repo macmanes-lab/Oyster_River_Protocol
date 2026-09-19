@@ -240,12 +240,40 @@ STEP_RETRY_DELAY = 60
 # 42 GB before the cap changes a single thing. 12 was not a cautious estimate
 # that turned out low; it was an estimate that was never consulted.
 #
-# The figure below is the measured one -- ~145 GB peak RSS for a ~1.5 GB
-# query -- expressed per GB of query, because that is the only term in it a
-# run can know before it starts. It is deliberately the worst observed
-# search and not the mean of the five: the cost of overestimating is wall
-# time on a step that already takes hours, and the cost of underestimating
-# is losing the step after those hours and every step after it.
+# Measured directly, 2026-09-19, rather than inferred from a kill: one
+# search run alone on the node, Species0 against its own database, 40
+# threads, `/usr/bin/time -v`. It completed -- exit 0, 36m35s wall, 14.8
+# core-hours -- at **143.0 GiB peak RSS**. So a single `diamond blastp` of
+# this input class really does want ~143 GiB, which is what the five
+# OOM-killed searches (92-145 GB resident) had been saying all along.
+#
+# 670 GiB / 143 GiB = 4.7, so four concurrent searches fit (572 GiB) and
+# five do not (715 GiB). The figure below predicted 159 GiB for that query,
+# 11% conservative against the measurement, and picked 4. Calibrated, and
+# for once not by luck.
+#
+# It is expressed per GB of query because that is the only term a run can
+# know before it starts. It is probably not the true driver. The four
+# species here are 1.1-1.5 GB apiece and only two of them ever failed, and
+# what separates them is the long-contig tail, not size and not count:
+#
+#     Species0  n=1,072,398  mean=1439  max= 83,028  >10kb=19,387  FAILED
+#     Species1  n=1,054,411  mean=1406  max=105,775  >10kb=21,902  FAILED
+#     Species2  n=1,325,909  mean= 853  max= 25,753  >10kb=   471  ok
+#     Species3  n=1,902,240  mean= 793  max= 32,042  >10kb= 2,139  ok
+#
+# Species3 has 77% more sequences than Species0 at the same file size and
+# never lost a search, so sequence count is anti-correlated with failure.
+# Contigs over 10 kb are 9-47x more common in the two that failed. diamond's
+# own ChangeLog fixed "increased memory usage and runtimes for very long
+# queries" in 2.0.1, and a self-comparison aligns every long contig against
+# itself at full length -- which is why the self-comparisons went first.
+#
+# Known weakness of using bytes as the proxy: a small assembly with a heavy
+# long-contig tail would be sized cheap and is not. Sizing on the tail
+# directly would be better, and there is exactly one calibration point for
+# it, which is not enough to fit a second model on. Revisit with a second
+# measurement, not before.
 ORTHOFINDER_GB_PER_QUERY_GB = 96
 
 # Floor under the above, for inputs small enough that the linear term says
@@ -265,6 +293,12 @@ ORTHOFINDER_GB_PER_SEARCH_FLOOR = 12
 # a copy of its own diamond entry with `-p` set to `cpu // searches`, chosen
 # with `-S`. Four diamonds at ten threads each is the same forty cores as
 # sixteen at one, at a quarter of the peak memory.
+#
+# This is not a nicety. The measured search is 14.8 core-hours, so at `-p 1`
+# it is 14.8 hours of wall time on one core; four waves of that is 59 hours
+# before the cheap searches are counted. With the threads it is the same
+# forty cores throughout and the step is hours, not days. Untying -p from -t
+# is what makes a memory-safe concurrency affordable at all.
 #
 # PATH was tried first and cannot work. A shim ahead of the real diamond is
 # overtaken by OrthoFinder itself, which prepends its environment's bin and
