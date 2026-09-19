@@ -1,5 +1,14 @@
 ### CHANGELOG
 
+ORP Version 4.0.1-dev3
+
+- **Fixes the `TypeError` dev2 introduced in `run_orthofuser`.** `conda_run`'s
+  first parameter was named `env`, which is also subprocess's name for the
+  environment block, so passing the diamond shim's PATH as `env=` handed the
+  method two values for one parameter and the step died at its own call site.
+  The parameter is `conda_env` now. Every caller passes it positionally, so
+  nothing else changes.
+
 ORP Version 4.0.1-dev2
 
 **Fixes the OrthoFinder all-vs-all losing searches to the OOM killer.**

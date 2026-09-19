@@ -630,8 +630,18 @@ class Pipeline:
                         shutil.rmtree(path, ignore_errors=True)
                 time.sleep(retry_delay)
 
-    def conda_run(self, env, *cmd, **kwargs):
-        self.run(["conda", "run", "--no-capture-output", "-n", env, *[str(c) for c in cmd]], **kwargs)
+    def conda_run(self, conda_env, *cmd, **kwargs):
+        """`conda run -n conda_env -- cmd`, with kwargs going on to subprocess.
+
+        The first parameter is `conda_env` and not `env` because `env` is
+        subprocess's own name for the environment block, and a caller that
+        wants to set one -- run_orthofuser, to put the diamond shim on PATH
+        -- would otherwise be handing this method two values for the same
+        parameter. That is a TypeError raised at the call, hours into a run,
+        on the one step that needed it.
+        """
+        self.run(["conda", "run", "--no-capture-output", "-n", conda_env,
+                  *[str(c) for c in cmd]], **kwargs)
 
     # -- background compression / reclaim -----------------------------------
 
