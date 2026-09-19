@@ -7,6 +7,53 @@ stale.
 
 ## 2026-09-19
 
+- **The masking was necessary and not sufficient: the same run failed the
+  same way, and the reason is that the concurrency cap could never bind.**
+  Second attempt at 380C_0C5D_001Fv3_955, same node, `--cpu 40 --mem 670`,
+  with `mask_search_input` doing its job (2,885,497 and 2,538,640 N->X for
+  spades75/spades55, 0 and 0 for transabyss/trinity). Still 7 of 16
+  searches lost, still every failure a SPAdes query: Species0 lost all four
+  of its searches, Species1 three of four, Species2 and Species3 none.
+  - **Four died on -9, three on exit 1 having written a 20-byte gzip** (an
+    empty `Blast*.txt.gz`). All seven between 09:42 and 10:03, after the
+    step started at 07:01 -- i.e. two and a half hours in, all at once --
+    and the nine survivors finished between 13:05 and 16:08, once there was
+    room. That is a node running out of memory collectively, not seven
+    inputs each being individually poisonous.
+  - **`ORTHOFINDER_GB_PER_SEARCH = 12` had no effect and never could.**
+    `searches = min(cpu, mem // 12)` = `min(40, 55)` = 40; OrthoFinder runs
+    `n_assemblies^2` = 16 diamonds and no more, so the cap sat above the
+    real job count and 16 ran at once regardless. On a 670 GB node the
+    constant has to exceed 670/16 = 42 GB before it changes anything at
+    all. Every piece of advice the error messages gave -- raise it, lower
+    `--cpu`, lower `--max-parallel` -- was advice about a knob that was not
+    connected. (`--max-parallel` governs ORP's own step lanes and has never
+    had anything to say about OrthoFinder's internal fan-out.)
+  - **Sizing is now per GB of the largest search input**, at 96 GB per GB,
+    which is the worst measured search (~145 GB peak RSS on a ~1.5 GB
+    query) rather than the mean of the five. On this run that is 144 GB
+    apiece, so 4 concurrent against 670 GB instead of 16.
+  - **Lowering `-t` no longer costs cores.** OrthoFinder hands every
+    diamond `-p 1` whatever `-t` says, so `-t 4` on a 40-core node would
+    have run four diamonds on four cores -- which is why `-t` was never the
+    knob anyone reached for. `write_diamond_shim()` puts a `diamond` ahead
+    of the real one on PATH that rewrites `-p 1` to `cpu // searches`, so
+    this run is 4 x 10 threads = the same 40 cores at a quarter of the peak
+    memory. Only `blastp`/`blastx`/`blastn` are touched; `makedb` passes
+    through.
+  - **`--orthofinder-searches N`** pins concurrency when the model is wrong
+    for a node. The thread count still follows from it.
+  - Still unexplained: *why* a SPAdes query is expensive once its N runs
+    are gone. Masking removed the poly-asparagine and the ranking did not
+    change, so something else in those assemblies -- homopolymer runs read
+    as poly-Ala/Gly/Thr is the obvious candidate -- is still making far
+    more seed hits than Trinity's or TransAByss's contigs do. The fix above
+    bounds the blast radius without knowing the answer; if it matters
+    later, `diamond blastp --masking` is where to look.
+  - **Recovering a part-done all-vs-all:** OrthoFinder will not recompute a
+    search it can see an output file for, so the 20-byte and truncated
+    `Blast*.txt.gz` must be deleted, not left in place, before a resume.
+
 - **OrthoFinder searches DNA with `diamond blastp`, so SPAdes' N-gaps arrive
   as poly-asparagine and the searches that carry them OOM.** A chowder run
   (380C_0C5D_001Fv3_955, 4 assemblies, 5,354,958 contigs merged, `--cpu 40

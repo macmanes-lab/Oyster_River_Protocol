@@ -435,6 +435,14 @@ def parse_args():
     p.add_argument("--lineage", default="eukaryota_odb12.2", help="BUSCO lineage (default: eukaryota_odb12.2)")
     p.add_argument("--tpm-filt", type=float, default=0, help="TPM filter threshold (default: 0)")
     p.add_argument(
+        "--orthofinder-searches", type=int, default=None, metavar="N",
+        help="how many of OrthoFinder's n_assemblies^2 diamond searches may run "
+             "at once. Default: as many as --mem allows, sized off the largest "
+             "search input. --cpu is split across them, so lowering this costs "
+             "memory rather than cores. Lower it if diamonds are OOM-killed "
+             "(returncode -9 in the log)",
+    )
+    p.add_argument(
         "--max-parallel", type=int, default=2,
         help="max concurrent jobs within each independent stage that benefits "
              "from it (orthofuser vs. merge/orthotransrate; transrate vs. "

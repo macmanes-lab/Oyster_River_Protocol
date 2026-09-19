@@ -14,6 +14,7 @@ import argparse
 import csv
 import gzip
 import io
+import math
 import os
 import re
 import shlex
@@ -214,7 +215,56 @@ STEP_RETRY_DELAY = 60
 # still a guess about a cost it cannot measure, so treat it as a floor and not
 # a guarantee: check_orthofinder_searches is what actually catches an
 # all-vs-all that lost searches, whatever the reason.
-ORTHOFINDER_GB_PER_SEARCH = 12
+#
+# 2026-09-19: the masking landed and the run failed again, identically. Same
+# four assemblies, same node, 670 GB, `--cpu 40`: seven of sixteen searches
+# lost, every one of them with a SPAdes assembly as its query. Species0 lost
+# all four of its searches and Species1 three of four; Species2 and Species3
+# lost none. Four died on returncode -9 and three on returncode 1 having
+# written an empty file, all seven between 09:42 and 10:03 after two and a
+# half hours of running, and the nine survivors then finished between 13:05
+# and 16:08 -- the shape of a node that ran out of memory all at once and of
+# survivors that only had room once the kernel had made some.
+#
+# So masking the N runs was necessary and was not sufficient. What it did not
+# do is bound anything: it removed one known source of seed hits from one
+# input class, and the cost of a search is still set by how many seed hits
+# the query actually makes, which nothing here can see in advance.
+#
+# The bug this constant had all along is that it could never bind. `searches`
+# is min(cpu, mem // this), OrthoFinder runs n_assemblies^2 diamonds and no
+# more, and 16 is below min(40, 670//12 = 55) -- so the cap was computed,
+# logged, and then had no effect on a four-assembly run, which is every
+# chowder run and every ORP run. At 670 GB it takes a figure above 670/16 =
+# 42 GB before the cap changes a single thing. 12 was not a cautious estimate
+# that turned out low; it was an estimate that was never consulted.
+#
+# The figure below is the measured one -- ~145 GB peak RSS for a ~1.5 GB
+# query -- expressed per GB of query, because that is the only term in it a
+# run can know before it starts. It is deliberately the worst observed
+# search and not the mean of the five: the cost of overestimating is wall
+# time on a step that already takes hours, and the cost of underestimating
+# is losing the step after those hours and every step after it.
+ORTHOFINDER_GB_PER_QUERY_GB = 96
+
+# Floor under the above, for inputs small enough that the linear term says
+# less than one diamond's fixed cost. diamond's default block size is -b2.0
+# and it "can be expected to use roughly six times this number of memory (in
+# GB)", so ~12 GB before a single seed hit is stored.
+ORTHOFINDER_GB_PER_SEARCH_FLOOR = 12
+
+# Lowering OrthoFinder's -t lowers the core count with it: OrthoFinder hands
+# every diamond `-p 1` whatever -t says, so -t 4 on a 40-core node runs four
+# diamonds on four cores and leaves thirty-six idle. That is why -t was never
+# lowered -- the only way to make this run was to make it slow.
+#
+# It is not the only way. Concurrency and core count are separate knobs in
+# diamond and only OrthoFinder ties them together, so write_diamond_shim()
+# unties them: a `diamond` ahead of the real one on PATH that replaces the
+# `-p 1` OrthoFinder wrote with `cpu // searches`. Four diamonds at ten
+# threads each is the same forty cores as sixteen at one, at a quarter of
+# the peak memory. The shim is how a lowered -t costs memory and not speed.
+DIAMOND_SHIM_SUBCOMMANDS = ("blastp", "blastx", "blastn")
 
 # Floor for a self-comparison in check_orthofinder_searches: the fraction of
 # an assembly's sequences that must show up as queries in its own Blast{i}_i.
@@ -490,6 +540,7 @@ class Pipeline:
         # quoted, and so the flags arrive as separate argv entries rather
         # than one string pytransrate would reject.
         self.pytransrate_args = shlex.split(getattr(args, "pytransrate_args", "") or "")
+        self.orthofinder_searches = getattr(args, "orthofinder_searches", None) or 0
 
         # Everything from run_filtershort onwards works on "the assemblies"
         # rather than on four named assemblers, so a caller that brings its
@@ -1305,7 +1356,7 @@ class Pipeline:
         a poly-asparagine tract seeds against every other one in the
         database. diamond's memory went with it: the kernel killed five
         searches at 92-145 GB resident apiece, against the ~12 GB per
-        process that ORTHOFINDER_GB_PER_SEARCH models. Every one of the
+        process that the sizing model then assumed. Every one of the
         seven failed searches had a SPAdes assembly as its query; not one
         transabyss or trinity search failed.
 
@@ -1340,17 +1391,115 @@ class Pipeline:
             tmp.replace(dst)
             print(f"    {dst.name}: {masked} N -> X")
 
+    def orthofinder_search_plan(self, cpu, mem):
+        """(concurrent diamonds, threads each, GB apiece) for the all-vs-all.
+
+        Sized off the largest search input, because the searches run
+        together and it is the biggest of them that decides when the node
+        runs out: a plan that fits the mean fits nothing on the run where
+        one assembly is twice its neighbours. See
+        ORTHOFINDER_GB_PER_QUERY_GB for where the per-GB figure comes from
+        and why the cap it feeds had no effect before this.
+
+        `--orthofinder-searches` overrides the memory term and nothing else.
+        The thread count still follows from it, so pinning concurrency on a
+        node whose memory this model has wrong does not also mean giving up
+        the cores.
+        """
+        inputs = self.search_fasta_paths()
+        jobs = max(1, len(inputs) ** 2)
+        biggest = max((p.stat().st_size for p in inputs if p.is_file()), default=0)
+        per_search = max(
+            ORTHOFINDER_GB_PER_SEARCH_FLOOR,
+            math.ceil(ORTHOFINDER_GB_PER_QUERY_GB * biggest / 1e9),
+        )
+        if self.orthofinder_searches:
+            searches = max(1, min(cpu, jobs, self.orthofinder_searches))
+        else:
+            searches = max(1, min(cpu, jobs, mem // per_search))
+        return searches, max(1, cpu // searches), per_search
+
+    def write_diamond_shim(self, threads):
+        """A `diamond` for PATH that re-threads what OrthoFinder wrote.
+
+        OrthoFinder builds its diamond command line itself and offers no
+        way in to it, so the only place left to stand is PATH. The shim
+        execs the real diamond with `-p threads` in place of the `-p 1`
+        OrthoFinder hard-codes, and with `--tmpdir` pointed somewhere
+        chosen rather than wherever the process happened to start. That
+        directory is deliberately not OrthoFinder's `-f`: OrthoFinder reads
+        that one to decide what the species are, and a temporary file
+        written into it is a species if it lands there at the wrong moment.
+
+        It rewrites rather than appends because a duplicated option is
+        diamond's error to make, not ours to bet on: every form of the
+        flags it replaces is dropped from the line first, glued (`-p1`) as
+        well as separated (`-p 1`), and then its own are added.
+
+        Only the search subcommands are touched. `makedb` and anything else
+        OrthoFinder shells out to pass through untouched, so a shim on PATH
+        cannot change a step it was not written for.
+        """
+        real = self.which_in_env("orp_orthofinder", "diamond")
+        if real is None:
+            return None
+        shim_dir = self.orthofuse_dir / "shim"
+        shim_dir.mkdir(parents=True, exist_ok=True)
+        tmpdir = self.orthofuse_dir / "diamond-tmp"
+        tmpdir.mkdir(parents=True, exist_ok=True)
+        shim = shim_dir / "diamond"
+        shim.write_text(
+            "#!/usr/bin/env python3\n"
+            '"""Written by oyster.py: see write_diamond_shim(). Not hand-edited."""\n'
+            "import os, sys\n"
+            f"REAL = {str(real)!r}\n"
+            f"THREADS = {str(threads)!r}\n"
+            f"TMPDIR = {str(tmpdir)!r}\n"
+            f"SUBCOMMANDS = {DIAMOND_SHIM_SUBCOMMANDS!r}\n"
+            "DROP = ('-p', '--threads', '--tmpdir')\n"
+            "argv = sys.argv[1:]\n"
+            "if argv and argv[0] in SUBCOMMANDS:\n"
+            "    rest, keep, i = argv[1:], [], 0\n"
+            "    while i < len(rest):\n"
+            "        a = rest[i]\n"
+            "        if a in DROP:\n"
+            "            i += 2\n"
+            "            continue\n"
+            "        if any(a.startswith(d) and a != d for d in DROP if not d.startswith('--')):\n"
+            "            i += 1\n"
+            "            continue\n"
+            "        keep.append(a)\n"
+            "        i += 1\n"
+            "    argv = [argv[0], '-p', THREADS, '--tmpdir', TMPDIR] + keep\n"
+            "os.execv(REAL, [REAL] + argv)\n"
+        )
+        shim.chmod(0o755)
+        return shim_dir
+
     def run_orthofuser(self, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
         mem = self.mem if mem is None else mem
-        # -t is a memory knob and not only a core count -- see
-        # ORTHOFINDER_GB_PER_SEARCH. -a, the analysis threads, is RAM-hungry
-        # in its own right and OrthoFinder's own default is t/8; it used to be
-        # handed the whole core count here, which under -og buys nothing at
-        # all, since that run stops at orthogroups and never reaches the
-        # MSA/tree work -a exists to parallelise.
-        searches = max(1, min(cpu, mem // ORTHOFINDER_GB_PER_SEARCH))
+        # -t is the count of concurrent diamonds and so a memory knob before
+        # it is a core count -- see ORTHOFINDER_GB_PER_QUERY_GB. -a, the
+        # analysis threads, is RAM-hungry in its own right and OrthoFinder's
+        # own default is t/8; it used to be handed the whole core count here,
+        # which under -og buys nothing at all, since that run stops at
+        # orthogroups and never reaches the MSA/tree work -a exists to
+        # parallelise.
+        searches, threads, per_search = self.orthofinder_search_plan(cpu, mem)
         analysis = max(1, searches // 8)
+        jobs = max(1, len(self.search_fasta_paths()) ** 2)
+        why = ("--orthofinder-searches" if self.orthofinder_searches
+               else f"{mem}G / {per_search}G per search")
+        print(f"    all-vs-all: {jobs} searches, {searches} at a time ({why}), "
+              f"{threads} thread(s) each")
+        env = None
+        shim_dir = self.write_diamond_shim(threads)
+        if shim_dir is None:
+            print("    no diamond in orp_orthofinder -- leaving OrthoFinder's `-p 1` alone; "
+                  f"this step will use {searches} of {cpu} cores")
+        else:
+            env = dict(os.environ, PATH=f"{shim_dir}{os.pathsep}{os.environ['PATH']}")
         # OrthoFinder reports its own fatal errors and then exits 0. A run
         # whose diamonds were OOM-killed leaves truncated Blast*.txt behind,
         # prints "ERROR: Blast1_1.txt is corrupted" and "ERROR: An error
@@ -1369,6 +1518,7 @@ class Pipeline:
             "orp_orthofinder", "orthofinder",
             "-d", "-I", "12", "-f", self.orthofuse_search,
             "-og", "-t", searches, "-a", analysis,
+            env=env,
         )
         groups = self.newest_orthogroups_txt()
         if groups is None or groups.stat().st_mtime < marker.stat().st_mtime:
@@ -1377,9 +1527,12 @@ class Pipeline:
                 "attempt -- read its ERROR lines above. Its usual cause is "
                 "diamond being OOM-killed mid-search (returncode -9), which "
                 "leaves truncated Blast*.txt that OrthoFinder then reports as "
-                "corrupted. Lower --cpu or --max-parallel, or raise "
-                f"ORTHOFINDER_GB_PER_SEARCH (currently {ORTHOFINDER_GB_PER_SEARCH}), "
-                "and delete the failed Results_* directory before resuming."
+                "corrupted. Run it again with a lower --orthofinder-searches "
+                "(this attempt used "
+                f"{self.orthofinder_search_plan(cpu, mem)[0]}), and delete the "
+                "failed Results_* directory before resuming -- OrthoFinder will "
+                "not recompute a search it can see an output file for, so a "
+                "truncated one left in place is a truncated one reused."
             )
         if groups.stat().st_size == 0:
             sys.exit(f"orthofinder produced an empty {groups}")
@@ -1547,11 +1700,10 @@ class Pipeline:
                 "so the merge would silently drop whatever those searches would have "
                 "found. Read the diamond errors in this run's log -- OrthoFinder does "
                 "not capture its children's stderr, so their own message is there and "
-                "not in OrthoFinder's output. Fix what they report (disk or memory "
-                f"pressure from running {len(species) ** 2} diamonds at once is the "
-                "usual cause; lower --cpu or --max-parallel, or raise "
-                f"ORTHOFINDER_GB_PER_SEARCH, currently {ORTHOFINDER_GB_PER_SEARCH}), "
-                f"then delete {workdir.parent} before resuming."
+                "not in OrthoFinder's output. Fix what they report (memory "
+                f"pressure from running too many of the {len(species) ** 2} diamonds "
+                "at once is the usual cause, and --orthofinder-searches is the knob "
+                f"for it), then delete {workdir.parent} before resuming."
             )
 
     @staticmethod
@@ -2475,6 +2627,14 @@ def parse_args():
     p.add_argument("--spades1-kmer", type=int, default=55, help="rnaSPAdes k-mer for spades55 (default: 55)")
     p.add_argument("--spades2-kmer", type=int, default=75, help="rnaSPAdes k-mer for spades75 (default: 75)")
     p.add_argument("--transabyss-kmer", type=int, default=32, help="Trans-ABySS k-mer (default: 32)")
+    p.add_argument(
+        "--orthofinder-searches", type=int, default=None, metavar="N",
+        help="how many of OrthoFinder's n_assemblies^2 diamond searches may run "
+             "at once. Default: as many as --mem allows, sized off the largest "
+             "search input. --cpu is split across them, so lowering this costs "
+             "memory rather than cores. Lower it if diamonds are OOM-killed "
+             "(returncode -9 in the log)",
+    )
     p.add_argument(
         "--max-parallel", type=int, default=2,
         help="max concurrent jobs within each independent stage that benefits from "

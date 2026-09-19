@@ -1,5 +1,34 @@
 ### CHANGELOG
 
+ORP Version 4.0.1-dev2
+
+**Fixes the OrthoFinder all-vs-all losing searches to the OOM killer.**
+
+- **The diamond concurrency cap now binds.** `searches = min(cpu, mem //
+  ORTHOFINDER_GB_PER_SEARCH)` was compared against a job count of
+  `n_assemblies^2` = 16, and at `--cpu 40 --mem 670` it evaluated to 40 --
+  so all sixteen `--more-sensitive` diamonds ran at once and the cap, the
+  error messages that pointed at it, and the advice to lower `--cpu` or
+  `--max-parallel` were all describing a knob that was not connected. Per-
+  search memory is now sized from the largest search input at
+  `ORTHOFINDER_GB_PER_QUERY_GB` (96 GB per GB of query, the worst measured
+  search), with a 12 GB floor.
+
+- **Lowering concurrency no longer idles the node.** OrthoFinder hands every
+  diamond `-p 1` regardless of `-t`, so fewer concurrent searches used to
+  mean fewer cores. A generated `diamond` ahead of the real one on PATH
+  rewrites `-p` to `--cpu // searches` and points `--tmpdir` somewhere that
+  is not OrthoFinder's input directory. Four searches at ten threads is the
+  same forty cores as sixteen at one, at a quarter of the peak memory. Only
+  the search subcommands are rewritten; `makedb` is untouched.
+
+- **`--orthofinder-searches N`** pins the number of concurrent searches when
+  the memory model is wrong for a node.
+
+- The failure messages now name `--orthofinder-searches`, and say that a
+  truncated `Blast*.txt.gz` has to be deleted before a resume rather than
+  left for OrthoFinder to reuse.
+
 ORP Version 4.0.1 <- 4.0.0
 
 **No change to the assembly or to any score.** Two fixes about the
