@@ -1,5 +1,16 @@
 ### CHANGELOG
 
+ORP Version 4.0.1-dev6
+
+- **Preflight writes down the Slurm job ID, the host, and the diamond
+  version.** `sacct` is the only place a finished job's peak memory exists
+  and it is keyed on an ID the log never carried, so the run that raised the
+  memory question could not afterwards be asked about memory. The log now
+  carries the ID and the exact `sacct` line to run. The diamond doing the
+  all-vs-all is an unpinned orthofinder dependency rather than the
+  `diamond=2.2.5` in orp_env.yml, and several memory fixes in diamond's own
+  ChangeLog land in specific versions, so its version is printed too.
+
 ORP Version 4.0.1-dev5
 
 - **diamond's thread count is set through OrthoFinder's config.json, because

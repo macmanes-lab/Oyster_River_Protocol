@@ -1081,6 +1081,43 @@ class Pipeline:
             if not self.which_in_env(env, binary):
                 sys.exit(f"*** {label} is not installed, must fix ***")
         self.check_pytransrate_version()
+        self.log_provenance()
+
+    def log_provenance(self):
+        """Print what a later post-mortem needs and cannot recover.
+
+        `sacct` is the only place a peak memory figure for a finished job
+        exists, and it is keyed on a job ID that the log never carried --
+        so the run that raised the memory question could not be asked about
+        memory afterwards. The scheduler puts the ID in the environment;
+        writing it down costs a line and is the difference between
+        measuring a failure and arguing about it.
+
+        The diamond version goes here for the same reason it matters: the
+        one that runs OrthoFinder's all-vs-all comes in as an unpinned
+        dependency of the orthofinder package, not from orp_env.yml, and
+        several of the memory fixes in diamond's own ChangeLog land in
+        specific versions (the hash join stage in 2.1.11, very long
+        queries in 2.0.1). Which one is installed is not knowable from
+        this repository.
+        """
+        host = socket.gethostname()
+        job = os.environ.get("SLURM_JOB_ID") or os.environ.get("SLURM_JOBID")
+        array = os.environ.get("SLURM_ARRAY_JOB_ID")
+        task = os.environ.get("SLURM_ARRAY_TASK_ID")
+        print(f"[provenance] host {host}, pid {os.getpid()}")
+        if job:
+            label = f"{array}_{task}" if array and task else job
+            print(f"[provenance] slurm job {label}")
+            print(f"[provenance] after this run, peak memory is: "
+                  f"sacct -j {job} --units=G "
+                  f"--format=JobID,JobName%20,State,ExitCode,ReqMem,MaxRSS,MaxDiskWrite,Elapsed")
+        else:
+            print("[provenance] no SLURM_JOB_ID in the environment -- if this is a "
+                  "batch job, peak memory will not be recoverable afterwards")
+        diamond = self.tool_version("orp_orthofinder", "diamond")
+        print(f"[provenance] diamond in orp_orthofinder: {diamond or 'unknown'} "
+              "(unpinned -- it arrives as an orthofinder dependency)")
 
     def check_pytransrate_version(self):
         """Refuse to start on a pytransrate older than the pipeline needs.
