@@ -1,5 +1,21 @@
 ### CHANGELOG
 
+ORP Version 4.0.1-dev4
+
+- **The diamond shim was never actually used, and nothing said so.** dev2 put
+  the shim on PATH by handing `env=` to subprocess, but `conda run -n X`
+  activates the environment and activation *prepends* that environment's own
+  bin -- so the shim sat behind `orp_orthofinder/bin`, the real diamond won
+  the lookup, and OrthoFinder's `-p 1` stood. Confirmed on the node: four
+  diamonds at `NLWP 2`, `%CPU 98`, `-p 1` and no `--tmpdir`, i.e. four cores
+  of forty. PATH is now exported *inside* the activated environment, which is
+  after conda has had its turn.
+
+- **The step now prints which diamond it resolved**, the same way OrthoFinder
+  will resolve it, before the run starts. The failure above was invisible in
+  the log for two hours; it is one line now, and a loud one if the shim is
+  not what comes back.
+
 ORP Version 4.0.1-dev3
 
 - **Fixes the `TypeError` dev2 introduced in `run_orthofuser`.** `conda_run`'s

@@ -7,6 +7,31 @@ stale.
 
 ## 2026-09-19
 
+- **`env=` cannot put anything ahead of a conda environment's own bin.**
+  The dev2 diamond shim was written, PATH was set, the step ran -- and the
+  shim was never called. `conda run -n X` activates X, and activation
+  prepends `$CONDA_PREFIX/bin` to whatever PATH it inherited, so the shim
+  ended up *behind* the real diamond. Measured on the node two hours in:
+  `ps -o pid,nlwp,pcpu,rss -C diamond` gave `NLWP 2`, `%CPU 98` on all four
+  processes, and `-p 1` with no `--tmpdir` on the command line -- four cores
+  of forty, on a step that had been told to use ten threads each.
+  - Fixed by exporting PATH inside the activated environment
+    (`conda run -n X bash -c 'export PATH=shim:$PATH; exec orthofinder ...'`)
+    rather than from the parent process.
+  - Reproduced both directions before pushing: with the env bin prepended
+    afterwards the shim loses, with the export inside it wins.
+  - **The real lesson is that it was silent.** Nothing in the log
+    distinguished a working shim from a bypassed one, which is why it ran
+    for two hours before `ps` was the thing that caught it.
+    `report_diamond_in_use()` now resolves `diamond` through the same PATH
+    OrthoFinder will use and prints the answer before the searches start.
+  - First real memory numbers, 5 minutes into the 4-way run: RSS 3.1, 3.1,
+    2.7, 2.7 GB, ~11.6 GB total. Far under the 159 GB/search the model
+    budgets -- but the run-2 kills came at 2h40m, not at 5 minutes, so this
+    says nothing about the peak yet. Sample it to the end before re-fitting
+    ORTHOFINDER_GB_PER_QUERY_GB; 96 GB/GB is still one dmesg line from a
+    pre-masking run, and it is the number most likely to be wrong here.
+
 - **The masking was necessary and not sufficient: the same run failed the
   same way, and the reason is that the concurrency cap could never bind.**
   Second attempt at 380C_0C5D_001Fv3_955, same node, `--cpu 40 --mem 670`,

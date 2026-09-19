@@ -1486,6 +1486,64 @@ class Pipeline:
         shim.chmod(0o755)
         return shim_dir
 
+    def orthofinder_command(self, shim_dir, searches, analysis):
+        """The `bash -c` OrthoFinder is launched through, shim on PATH.
+
+        Passing `env=` to subprocess does not work here and the way it
+        fails is silent. `conda run -n X` activates the environment, and
+        activation *prepends* that environment's own bin to whatever PATH
+        it was handed -- so a shim directory put on PATH by the parent ends
+        up behind `orp_orthofinder/bin`, the real diamond wins the lookup,
+        and OrthoFinder's `-p 1` stands. Nothing reports this: the step
+        runs, the shim is written, the log says what it always says, and
+        the only evidence is `ps` showing NLWP 2 and %CPU 98 on four
+        processes that were supposed to have ten threads each -- four cores
+        of a forty-core node, measured two hours in.
+
+        So PATH is set *inside* the activated environment instead, which is
+        after conda has had its turn. `exec` is there so the bash is not a
+        second process sitting on the OrthoFinder run for its whole life.
+        """
+        argv = ["orthofinder", "-d", "-I", "12", "-f", str(self.orthofuse_search),
+                "-og", "-t", str(searches), "-a", str(analysis)]
+        cmd = " ".join(shlex.quote(a) for a in argv)
+        if shim_dir is None:
+            return f"exec {cmd}"
+        return f"export PATH={shlex.quote(str(shim_dir))}:$PATH; exec {cmd}"
+
+    def report_diamond_in_use(self, shim_dir):
+        """Print which diamond OrthoFinder will actually find, and say so.
+
+        The previous version of this step had no way to tell from its own
+        log whether the shim was in use. That is the whole reason it ran
+        for two hours on four cores without anyone noticing, so the
+        resolution is now resolved the same way OrthoFinder will resolve
+        it -- inside the activated environment, through the same PATH --
+        and printed before the run starts.
+
+        Not fatal on its own: a shim that cannot be confirmed is a slow
+        all-vs-all, not a wrong one, and failing the step here would turn a
+        performance problem into an outage.
+        """
+        if shim_dir is None:
+            return
+        script = f"export PATH={shlex.quote(str(shim_dir))}:$PATH; command -v diamond"
+        try:
+            result = subprocess.run(
+                ["conda", "run", "-n", "orp_orthofinder", "bash", "-c", script],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True,
+            )
+        except FileNotFoundError:
+            return
+        found = result.stdout.strip().splitlines()
+        found = found[-1] if found else ""
+        if found == str(shim_dir / "diamond"):
+            print(f"    diamond: {found} (shim -- OrthoFinder's `-p 1` will be rewritten)")
+        else:
+            print(f"    *** diamond resolves to {found or '?'}, not the shim in {shim_dir} -- "
+                  f"searches will run single-threaded on {self.orthofinder_searches or 'the planned'} "
+                  "cores. The step will still be correct, only slow. ***")
+
     def run_orthofuser(self, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
         mem = self.mem if mem is None else mem
@@ -1503,13 +1561,11 @@ class Pipeline:
                else f"{mem}G / {per_search}G per search")
         print(f"    all-vs-all: {jobs} searches, {searches} at a time ({why}), "
               f"{threads} thread(s) each")
-        env = None
         shim_dir = self.write_diamond_shim(threads)
         if shim_dir is None:
             print("    no diamond in orp_orthofinder -- leaving OrthoFinder's `-p 1` alone; "
                   f"this step will use {searches} of {cpu} cores")
-        else:
-            env = dict(os.environ, PATH=f"{shim_dir}{os.pathsep}{os.environ['PATH']}")
+        self.report_diamond_in_use(shim_dir)
         # OrthoFinder reports its own fatal errors and then exits 0. A run
         # whose diamonds were OOM-killed leaves truncated Blast*.txt behind,
         # prints "ERROR: Blast1_1.txt is corrupted" and "ERROR: An error
@@ -1524,12 +1580,8 @@ class Pipeline:
         marker = self.orthofuse_dir / "orthofuser.attempt"
         marker.parent.mkdir(parents=True, exist_ok=True)
         marker.touch()
-        self.conda_run(
-            "orp_orthofinder", "orthofinder",
-            "-d", "-I", "12", "-f", self.orthofuse_search,
-            "-og", "-t", searches, "-a", analysis,
-            env=env,
-        )
+        self.conda_run("orp_orthofinder", "bash", "-c",
+                       self.orthofinder_command(shim_dir, searches, analysis))
         groups = self.newest_orthogroups_txt()
         if groups is None or groups.stat().st_mtime < marker.stat().st_mtime:
             sys.exit(
