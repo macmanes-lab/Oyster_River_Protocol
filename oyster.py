@@ -192,16 +192,36 @@ STEP_RETRY_DELAY = 60
 # and it is worth being precise about: a fixed per-process cost is one this
 # cap can actually model.
 #
-# Modelling it shows how little headroom this knob has. Concurrency is capped
-# by the searches that exist, n_assemblies^2, before it is capped by anything
-# here -- so a four-assembly run cannot put more than 16 diamonds on a node
-# whatever -t says, and its search memory cannot exceed ~16 * 12 = 192 GB. On
-# anything bigger than a ~200 GB node this cap is structurally incapable of
-# being what OOMs the job. When one does OOM anyway, the memory went somewhere
-# other than the searches -- on the run that prompted this, to snap's index of
-# the merged assembly on the pipeline's other branch, which no budget here or
-# anywhere else bounds.
+# Concurrency is capped by the searches that exist, n_assemblies^2, before it
+# is capped by anything here: a four-assembly run cannot put more than 16
+# diamonds on a node whatever -t says.
+#
+# This comment used to conclude from that that search memory "cannot exceed
+# ~16 * 12 = 192 GB", and so that on anything bigger than a ~200 GB node the
+# cap was structurally incapable of being what OOMs the job. The arithmetic
+# was right and the premise was wrong. A four-assembly chowder run on a 720 GB
+# cgroup was killed five times over by the memory cgroup's OOM killer, every
+# victim a diamond, at 92, 129, 133, 138 and 145 GB resident -- eleven times
+# the figure below, and 638 GB between the five of them. Per-process cost is
+# not fixed. It is set by what is in the query, and nothing here can see that.
+#
+# What made those five expensive was poly-asparagine: OrthoFinder searches DNA
+# with `diamond blastp`, SPAdes gap-fills with N, and N is asparagine. That
+# particular cause is dealt with upstream now, in write_search_inputs, which
+# is the reason this constant was left at 12 rather than raised to fit the
+# measurements above -- fitting it to them would cost every run wall time to
+# insure against an input class that no longer reaches diamond. The number is
+# still a guess about a cost it cannot measure, so treat it as a floor and not
+# a guarantee: check_orthofinder_searches is what actually catches an
+# all-vs-all that lost searches, whatever the reason.
 ORTHOFINDER_GB_PER_SEARCH = 12
+
+# Floor for a self-comparison in check_orthofinder_searches: the fraction of
+# an assembly's sequences that must show up as queries in its own Blast{i}_i.
+# Every sequence aligns to itself, so the honest value is ~1.0 less whatever
+# diamond's low-complexity masking removes from seeding entirely. See that
+# method for why 0.5 is both far above a dead search and far below a real one.
+BLAST_SELF_HIT_FLOOR = 0.5
 
 
 def line_buffer_stdio():
@@ -499,6 +519,9 @@ class Pipeline:
         self.reports_dir = self.dir / "reports"
         self.orthofuse_dir = self.dir / "orthofuse" / self.runout
         self.orthofuse_working = self.orthofuse_dir / "working"
+        # OrthoFinder gets its own copies of the filtered assemblies rather
+        # than the originals -- see write_search_inputs.
+        self.orthofuse_search = self.orthofuse_dir / "search"
         self.quants_dir = self.dir / "quants"
 
         self.timing_log = self.reports_dir / f"{self.runout}.timing.log"
@@ -1263,6 +1286,60 @@ class Pipeline:
             outp = self.orthofuse_working / f"{fasta.name}.short.fasta"
             self.conda_run("orp", "python", self.makedir / "scripts" / "long.seq.py", fasta, outp, "200")
 
+    def search_fasta_paths(self):
+        return [self.orthofuse_search / p.name for p in self.short_fasta_paths()]
+
+    def write_search_inputs(self):
+        """Copy the filtered assemblies for OrthoFinder, with N runs neutered.
+
+        OrthoFinder's `-d` does not switch it to a nucleotide searcher: it
+        runs `diamond blastp` over the DNA, which is why the command it
+        builds carries `--ignore-warnings` -- that is what lets `makedb`
+        accept ACGT as protein. Every base is therefore read as an amino
+        acid, and `N` is asparagine.
+
+        rnaSPAdes gap-fills scaffolds with runs of N; Trinity and TransAByss
+        emit none. In the run this was written for that was 160,372 and
+        189,448 contigs carrying a >=10bp N run, against zero and zero -- so
+        each SPAdes assembly arrived with ~175K poly-asparagine tracts, and
+        a poly-asparagine tract seeds against every other one in the
+        database. diamond's memory went with it: the kernel killed five
+        searches at 92-145 GB resident apiece, against the ~12 GB per
+        process that ORTHOFINDER_GB_PER_SEARCH models. Every one of the
+        seven failed searches had a SPAdes assembly as its query; not one
+        transabyss or trinity search failed.
+
+        N becomes X, the unknown residue, which diamond will not seed on.
+        That removes the tracts from the search without shortening a contig
+        or renaming one, so the orthogroups still refer to the same IDs.
+        Isolated Ns go with them: an ambiguous base carries no information
+        to match on either, and translating the lot is both simpler and
+        safer than deciding what counts as a run.
+
+        These are written to their own directory and are not the assemblies
+        that go on to be merged. merge() concatenates short_fasta_paths()
+        into merged.fasta, which is what pytransrate scores and what
+        orthofusing pulls the final sequence out of -- masking in place
+        would edit the output assembly and invalidate a scoring run that
+        takes twelve hours. Only the clustering sees an X.
+        """
+        self.orthofuse_search.mkdir(parents=True, exist_ok=True)
+        table = bytes.maketrans(b"Nn", b"XX")
+        for src, dst in zip(self.short_fasta_paths(), self.search_fasta_paths()):
+            masked = 0
+            tmp = dst.with_suffix(dst.suffix + ".partial")
+            with open(src, "rb") as inf, open(tmp, "wb") as outf:
+                for line in inf:
+                    # Deflines are copied byte for byte: a contig whose name
+                    # contains an N still has to answer to that name in
+                    # Orthogroups.txt.
+                    if not line.startswith(b">"):
+                        masked += line.count(b"N") + line.count(b"n")
+                        line = line.translate(table)
+                    outf.write(line)
+            tmp.replace(dst)
+            print(f"    {dst.name}: {masked} N -> X")
+
     def run_orthofuser(self, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
         mem = self.mem if mem is None else mem
@@ -1290,7 +1367,7 @@ class Pipeline:
         marker.touch()
         self.conda_run(
             "orp_orthofinder", "orthofinder",
-            "-d", "-I", "12", "-f", self.orthofuse_working,
+            "-d", "-I", "12", "-f", self.orthofuse_search,
             "-og", "-t", searches, "-a", analysis,
         )
         groups = self.newest_orthogroups_txt()
@@ -1306,6 +1383,14 @@ class Pipeline:
             )
         if groups.stat().st_size == 0:
             sys.exit(f"orthofinder produced an empty {groups}")
+        # The checks above catch an attempt that produced no orthogroups at
+        # all. They cannot see an attempt that produced them from a partial
+        # all-vs-all, which is the more dangerous failure because everything
+        # downstream accepts it -- see check_orthofinder_searches.
+        workdir = self.orthofinder_working_dir(groups)
+        if workdir is None:
+            sys.exit(f"no WorkingDirectory above {groups} -- cannot check orthofinder's all-vs-all")
+        self.check_orthofinder_searches(workdir)
         (self.orthofuse_dir / "orthofuser.done").touch()
 
     def merge(self):
@@ -1326,7 +1411,7 @@ class Pipeline:
         the one that succeeded -- and makeorthout would pick contigs from it
         without complaint.
         """
-        matches = list(self.orthofuse_working.rglob("Orthogroups.txt"))
+        matches = list(self.orthofuse_search.rglob("Orthogroups.txt"))
         if not matches:
             return None
         return max(matches, key=lambda p: p.stat().st_mtime)
@@ -1336,6 +1421,138 @@ class Pipeline:
         if match is None:
             sys.exit("Orthogroups.txt not found under orthofuse working directory")
         return match
+
+    # -- all-vs-all validation ---------------------------------------------
+
+    @staticmethod
+    def _count_fasta_records(path):
+        """Deflines in a FASTA, counted without decoding the sequence."""
+        n = 0
+        tail = b"\n"
+        with open(path, "rb") as fh:
+            while True:
+                chunk = fh.read(8 << 20)
+                if not chunk:
+                    return n
+                n += (tail[-1:] + chunk).count(b"\n>")
+                tail = chunk
+
+    @staticmethod
+    def _count_lines(path, stop_at):
+        """Lines in a plain or gzipped file, giving up once stop_at is reached.
+
+        The healthy self-comparisons in a four-assembly merge run to tens of
+        megabytes compressed, and nothing here needs their exact size -- only
+        whether they cleared the floor. Short-circuiting keeps this check a
+        few seconds on a directory that took ten hours to produce.
+        """
+        opener = gzip.open if path.suffix == ".gz" else open
+        n = 0
+        with opener(path, "rb") as fh:
+            while n < stop_at:
+                chunk = fh.read(8 << 20)
+                if not chunk:
+                    break
+                n += chunk.count(b"\n")
+        return n
+
+    def orthofinder_working_dir(self, groups):
+        """The WorkingDirectory holding the searches behind `groups`.
+
+        Walked up from Orthogroups.txt rather than globbed for the newest
+        Results_<Mon><Day>: a working directory that has seen a failed
+        attempt holds several of those trees, and the searches that need
+        checking are the ones belonging to *this* Orthogroups.txt.
+        """
+        for parent in groups.parents:
+            candidate = parent / "WorkingDirectory"
+            if candidate.is_dir():
+                return candidate
+            if parent == self.orthofuse_search:
+                break
+        return None
+
+    def check_orthofinder_searches(self, workdir):
+        """Fail on an all-vs-all whose searches died without saying so.
+
+        OrthoFinder runs n_assemblies^2 diamonds and reports a child that
+        failed by printing `ERROR: external program returned code` and then
+        exiting 0 anyway. The run that prompted this lost six of sixteen
+        searches -- two killed before they wrote a byte, two that wrote a
+        zero-hit file, two that stopped a fraction of the way in -- and
+        every one of the sixteen was still a valid gzip stream, so nothing
+        downstream had any reason to object. `printf '' | gzip -c` is 20
+        bytes and passes `gzip -t`: an empty result is indistinguishable
+        from an honest one by any check that does not look inside.
+
+        OrthoFinder then built orthogroups from what survived and wrote a
+        perfectly well-formed Orthogroups.txt. Both SPAdes assemblies had
+        lost their self-comparison and their comparison with each other, so
+        they were present in the clustering only through hits found by the
+        two assemblies that still worked -- a merge silently missing half
+        its inputs, which makeorthout would have picked contigs from
+        without complaint.
+
+        Two rules, both on the artifacts rather than on an exit status:
+
+        **Every search produced at least one hit.** No pair of assemblies
+        from the same library has nothing whatsoever in common, so an empty
+        Blast{i}_{j} is a dead search, whatever returncode it reported.
+
+        **Each self-comparison found most of its own sequences.** Blast{i}_i
+        aligns Species{i} against itself, so every sequence hits itself and
+        the file should carry at least one line per record in the input.
+        The floor is well under 1.0 because that is not quite guaranteed:
+        diamond masks low-complexity before seeding, and a sequence masked
+        end to end cannot seed, so it reports no self-hit. SPAdes N-gaps
+        are exactly that case -- N is asparagine to `diamond blastp`, and
+        ~13% of the contigs in each SPAdes assembly here carry a run of
+        them. A floor of 0.5 sits far below that legitimate shortfall and
+        far above a failure: the worst surviving self-comparison in the run
+        this was written for held about 0.2% of its input.
+        """
+        species = {}
+        for fa in workdir.glob("Species*.fa"):
+            m = re.fullmatch(r"Species(\d+)\.fa", fa.name)
+            if m:
+                species[int(m.group(1))] = fa
+        if not species:
+            sys.exit(f"orthofinder left no Species*.fa in {workdir} -- cannot check its all-vs-all")
+
+        counts = {i: self._count_fasta_records(fa) for i, fa in species.items()}
+        failures = []
+        for i in sorted(species):
+            for j in sorted(species):
+                stem = workdir / f"Blast{i}_{j}.txt"
+                blast = next((p for p in (stem.with_suffix(".txt.gz"), stem) if p.is_file()), None)
+                if blast is None:
+                    failures.append(f"  Blast{i}_{j}: no output file")
+                    continue
+                floor = int(counts[i] * BLAST_SELF_HIT_FLOOR) if i == j else 1
+                got = self._count_lines(blast, floor)
+                if got < floor:
+                    why = (f"{got} hits, expected at least {floor} "
+                           f"({BLAST_SELF_HIT_FLOOR:.0%} of {counts[i]} sequences in {species[i].name})"
+                           if i == j else "no hits at all")
+                    failures.append(f"  Blast{i}_{j} ({blast.stat().st_size} bytes): {why}")
+
+        if failures:
+            names = "\n".join(f"  {i}: {fa.name}" for i, fa in sorted(species.items()))
+            sys.exit(
+                "orthofinder exited 0 but its all-vs-all is incomplete -- "
+                f"{len(failures)} of {len(species) ** 2} searches failed:\n"
+                + "\n".join(failures)
+                + "\n\nspecies:\n" + names
+                + "\n\nOrthogroups.txt built on this is missing real relationships, "
+                "so the merge would silently drop whatever those searches would have "
+                "found. Read the diamond errors in this run's log -- OrthoFinder does "
+                "not capture its children's stderr, so their own message is there and "
+                "not in OrthoFinder's output. Fix what they report (disk or memory "
+                f"pressure from running {len(species) ** 2} diamonds at once is the "
+                "usual cause; lower --cpu or --max-parallel, or raise "
+                f"ORTHOFINDER_GB_PER_SEARCH, currently {ORTHOFINDER_GB_PER_SEARCH}), "
+                f"then delete {workdir.parent} before resuming."
+            )
 
     @staticmethod
     def clear_transrate_outdir(outdir, assembly):
@@ -2151,10 +2368,12 @@ class Pipeline:
         self.step("run_filtershort", short_fastas, assembly_fastas, self.run_filtershort)
 
         def orthofuser_branch(cpu=None, mem=None):
+            self.step("mask_search_input", self.search_fasta_paths(), short_fastas,
+                      self.write_search_inputs)
             # mem reaches run_orthofuser because OrthoFinder's search
             # concurrency is now capped against it; left unforwarded it would
             # cap against the whole machine while holding half of it.
-            self.step("run_orthofuser", [orthofuser_done], short_fastas,
+            self.step("run_orthofuser", [orthofuser_done], self.search_fasta_paths(),
                       partial(self.run_orthofuser, cpu=cpu, mem=mem))
 
         def merge_branch(cpu=None, mem=None):

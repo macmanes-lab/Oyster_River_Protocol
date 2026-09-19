@@ -5,6 +5,92 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-09-19
+
+- **OrthoFinder searches DNA with `diamond blastp`, so SPAdes' N-gaps arrive
+  as poly-asparagine and the searches that carry them OOM.** A chowder run
+  (380C_0C5D_001Fv3_955, 4 assemblies, 5,354,958 contigs merged, `--cpu 40
+  --mem 670` in a 720 GB cgroup) lost 7 of its 16 all-vs-all searches.
+  Every one had a SPAdes assembly as its query; not one transabyss or
+  trinity search failed.
+  - **`-d` does not switch OrthoFinder to a nucleotide searcher.**
+    `Log.txt` says `Search program: diamond` and the command it builds is
+    `diamond blastp --ignore-warnings ...` -- the flag exists precisely so
+    `makedb` will accept ACGT as protein. Every base is read as an amino
+    acid, and **N is asparagine**. rnaSPAdes gap-fills scaffolds with N;
+    Trinity and TransAByss emit none: 160,372 and 189,448 contigs with a
+    >=10bp N run against 0 and 0. So each SPAdes assembly arrived with
+    ~175K poly-asparagine tracts, and each one seeds against every other
+    tract in the database.
+  - **The kernel settled it.** `dmesg` on the batch host: five
+    `constraint=CONSTRAINT_MEMCG, oom_memcg=/slurm/uid_46343/job_1314755,
+    task=diamond` kills, at 92, 129, 133, 138 and 145 GB resident -- 638 GB
+    between the five, against `ORTHOFINDER_GB_PER_SEARCH`'s 12 GB per
+    process. Eleven times the model. The five kills match the five `-9`
+    errors in the log exactly; the two `code 1` errors are the same
+    pressure by another route.
+  - **What the failure looks like from downstream is nothing at all.** All
+    16 `Blast*.txt.gz` were valid gzip -- `printf "" | gzip -c` is 20 bytes
+    and passes `gzip -t`, so an empty result is indistinguishable from an
+    honest one to anything that does not look inside. OrthoFinder printed
+    its `ERROR: external program returned code` lines, **exited 0**, and
+    built orthogroups from the 9 searches that lived. Both SPAdes
+    assemblies had lost their self-comparison *and* their comparison with
+    each other, so they survived in the clustering only through hits found
+    by the two assemblies that still worked. `run_orthofuser`'s existing
+    guard checks that Orthogroups.txt exists, postdates the marker and is
+    non-empty, and cannot see any of this.
+  - **Four things were ruled out before the cause was found**, all worth
+    not re-checking: the filesystem (345 TB free, no quota -- diamond's
+    `--tmpdir` defaults to the output directory and OrthoFinder never
+    passes `-t`); `MaxRSS 692.6 GiB` as evidence about diamond (it is a
+    job-lifetime peak and `orthotransrate`'s 487 GB accumulator phase is an
+    equally good candidate); OrthoFinder tearing down siblings after the
+    first failure (the kills are spread 23:17-23:48 and the healthy
+    searches ran on to 06:31 -- a teardown kills at once); and a first
+    `dmesg` that showed nothing, which had been run on a login node rather
+    than `BatchHost=node142`. Its one hit, a `global_oom` on `conda` at 494
+    GB on Sep 14, is uid 46427 -- a different user, a different node.
+  - **`write_search_inputs` is the fix**: OrthoFinder now reads N->X copies
+    from `orthofuse/search/`. X is the unknown residue and diamond will not
+    seed on it, so the tracts leave the search without a contig being
+    shortened or renamed. **Deflines are copied byte for byte** -- a contig
+    named `NODE_1_..._NNN` still has to answer to that name in
+    Orthogroups.txt. Isolated Ns are translated too: an ambiguous base
+    carries nothing to match on, and translating the lot beats deciding
+    what counts as a run.
+  - **The masked copies are deliberately not the merged ones.** `merge()`
+    concatenates `short_fasta_paths()` into merged.fasta, which is what
+    pytransrate scores and what `orthofusing` pulls final sequence out of
+    via filter.py. Masking in place would edit the output assembly and
+    invalidate a scoring run that takes twelve hours. Only the clustering
+    sees an X.
+  - **`check_orthofinder_searches` catches it next time, whatever the
+    cause.** Two rules on the artifacts rather than on an exit status:
+    every search produced at least one hit, and each `Blast{i}_i` found at
+    least `BLAST_SELF_HIT_FLOOR` (0.5) of its own sequences, since every
+    sequence aligns to itself. The floor is not 1.0 because diamond masks
+    low-complexity before seeding and a fully masked sequence reports no
+    self-hit -- ~13% of each SPAdes assembly here. 0.5 sits far below that
+    legitimate shortfall and far above a failure: the worst surviving
+    self-comparison in this run held about 0.2% of its input. Off-diagonal
+    cells get no floor beyond one hit, because two assemblies can
+    legitimately share very little; that misses `Blast1_3` and does not
+    matter, since the diagonal already condemns both SPAdes species.
+  - **`ORTHOFINDER_GB_PER_SEARCH` was left at 12** rather than fitted to
+    the 145 GB measured. Fitting it would drop every run to 4 concurrent
+    searches to insure against an input class that no longer reaches
+    diamond. Its comment did have to go: it claimed the cap was
+    "structurally incapable" of OOMing a node this size, which this run
+    disproves, and it blamed an earlier OOM on snap's index on the other
+    branch. Per-process cost is set by what is in the query and nothing
+    there can see it.
+  - **This probably also explains the 6x `run_orthofuser` regression**
+    pinned on the OrthoFinder 2.5.2 -> 3.1.5 bump in the 2026-08-16 entry
+    below. Same step, same poly-N seeding, not yet severe enough to cross
+    the ceiling. Still not confirmed -- it would need a run of that sample
+    with and without the masking.
+
 ## 2026-09-17
 
 - **`clear_transrate_outdir` was deleting the two most expensive things in
