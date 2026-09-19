@@ -7,144 +7,119 @@ stale.
 
 ## 2026-09-19
 
-- **Measured: one diamond search is 143.0 GiB. The memory story was right.**
-  Species0 against its own database, alone on the node, 40 threads,
-  `/usr/bin/time -v`: exit 0, 36m35s wall, 52,880s user (2421% CPU, 14.8
-  core-hours), **MaxRSS 149,977,104 KiB = 143.0 GiB**. No OrthoFinder, no
-  concurrency, nothing else running. This is the number the whole argument
-  needed and nobody had.
-  - 670 GiB / 143 GiB = 4.7 -> four fit (572 GiB), five do not (715 GiB).
-    The model predicted 159 GiB and chose 4: 11% conservative, correct
-    answer.
-  - It also settles the 16-way runs: eight of the sixteen searches have
-    Species0 or Species1 as query, and eight x 143 GiB is 1.1 TiB against a
-    670 GiB cgroup. They could not have survived.
-  - **The driver is the long-contig tail, not size and not count:**
+Four attempts at one chowder run (380C_0C5D_001Fv3_955, 4 assemblies,
+5,354,958 contigs, `--cpu 40 --mem 670`). Written as one entry because the
+intermediate conclusions were mostly wrong and only the last one matters.
+
+- **Resolved: one `diamond blastp` of this input class wants 143.0 GiB, and
+  the all-vs-all was running sixteen of them at once.** Measured directly,
+  not inferred from a kill: Species0 against its own database, alone on the
+  node, 40 threads, `/usr/bin/time -v`. Exit 0, 36m35s wall, 52,880s user
+  (2421% CPU, 14.8 core-hours), **MaxRSS 149,977,104 KiB = 143.0 GiB**.
+  - That settles it arithmetically. Eight of the sixteen searches have
+    Species0 or Species1 as query; eight x 143 GiB is 1.1 TiB against a 670
+    GiB cgroup. The 16-way runs could not have survived, and the seven
+    losses were not seven poisonous inputs but one node running out of
+    memory at once (all seven died 09:42-10:03 after a 07:01 start; the
+    nine survivors finished 13:05-16:08, once there was room).
+  - It also vindicates the `dmesg` evidence that had been doubted -- five
+    kills at 92-145 GB resident -- and answers the reasonable objection
+    that diamond cannot possibly want that much. It can. The documented
+    "roughly six times `-b` in GB" (~12 GB at `-b2.0`) does not hold for
+    billion-letter queries; see bbuchfink/diamond#44, which reports 80 GB
+    against the same expectation and is unanswered.
+
+- **The cap that should have prevented this could never fire.**
+  `searches = min(cpu, mem // ORTHOFINDER_GB_PER_SEARCH)` = `min(40, 670//12
+  = 55)` = 40, and OrthoFinder runs `n_assemblies^2` = 16 diamonds and no
+  more. The cap sat above the real job count, so all 16 ran regardless. On a
+  670 GiB node the constant has to exceed 670/16 = 42 GB before it changes
+  anything at all. Every remedy the error messages suggested -- raise it,
+  lower `--cpu`, lower `--max-parallel` -- was about a knob with nothing on
+  the other end. (`--max-parallel` governs ORP's own step lanes and has
+  never had anything to say about OrthoFinder's internal fan-out.)
+
+- **The driver is the long-contig tail -- not file size, not sequence
+  count.** All four species are 1.1-1.5 GB and only two ever failed:
 
         Species0  n=1,072,398  mean=1439  max= 83,028  >10kb=19,387  FAILED
         Species1  n=1,054,411  mean=1406  max=105,775  >10kb=21,902  FAILED
         Species2  n=1,325,909  mean= 853  max= 25,753  >10kb=   471  ok
         Species3  n=1,902,240  mean= 793  max= 32,042  >10kb= 2,139  ok
 
-    Species3 has 77% more sequences than Species0 at the same file size and
-    lost nothing, so count is anti-correlated. Contigs over 10 kb are 9-47x
-    more common in the two that failed, and the self-comparisons failed
-    first -- every long contig aligning against itself full length. diamond
-    2.0.1's ChangeLog: "increased memory usage and runtimes for very long
-    queries".
-  - **Sizing still keys on bytes**, which is a proxy that happened to be
-    right here. A small assembly with a heavy tail would be sized cheap and
-    is not. One calibration point is not enough to fit a tail-based model;
-    take a second measurement before changing it.
-  - **The threading is load-bearing, not polish.** 14.8 core-hours per
-    search means `-p 1` is 14.8 hours of wall each, 59 hours for four waves.
-    With `cpu // searches` threads it is the same forty cores throughout and
-    the step is hours. Memory-safe concurrency is only affordable because -p
-    was untied from -t.
-  - Two own-goals worth remembering: `-o /dev/null` makes diamond put its
-    temp files in `/dev` (Permission denied), and `ps -o args= | cut -c1-40`
-    truncates before `-p`.
+  Species3 has 77% more sequences than Species0 at the same file size and
+  lost nothing, so count is *anti*-correlated with failure. Contigs over
+  10 kb are 9-47x more common in the two that failed, with maxima 3-4x
+  larger. diamond 2.0.1's ChangeLog fixed "increased memory usage and
+  runtimes for very long queries", and a self-comparison aligns every long
+  contig against itself at full length -- which is why `Blast0_0` and
+  `Blast1_1` went first, matching davidemms/OrthoFinder#639.
+  - **This supersedes the poly-asparagine explanation below.** Masking N->X
+    was necessary and not sufficient: the second run masked correctly
+    (2,885,497 and 2,538,640 N->X) and failed identically, same seven
+    searches, same ranking. The N runs were real and are gone; the length
+    tail is what is left.
+  - **Sizing still keys on bytes**, at `ORTHOFINDER_GB_PER_QUERY_GB = 96`,
+    which predicted 159 GiB against the measured 143 -- 11% conservative,
+    and it chose 4, which is right (670/143 = 4.7; four fit at 572 GiB,
+    five do not at 715 GiB). Bytes are a proxy that happened to work here.
+    A *small* assembly with a heavy tail would be sized cheap and is not.
+    One calibration point is not enough to fit a tail-based model on;
+    take a second measurement before replacing it.
 
-- **PATH cannot reach OrthoFinder's diamond. config.json can.** The dev4
-  shim resolved correctly in the parent (`command -v diamond` -> the shim)
-  and was still never called: `/proc/<pid>/environ` on a running search
-  showed
-  `PATH=<env>/bin:<env>/bin/src/orthofinder/bin:...:<run>/shim:...`
-  -- OrthoFinder prepends its environment's bin and its own bundled bin at
-  startup, so anything put in front from outside ends up behind them.
-  Observed `-p 1` and no `--tmpdir` on all four searches with the shim
-  sitting at position 9.
-  - `-p 1` is a literal in the `search_cmd` template in
-    `<env>/bin/src/orthofinder/run/config.json`. `orthofinder --help` has
-    no `--config`, only `-S <txt>` to pick a program by name, so the
-    install copy is the only lever.
-  - ORP adds `diamond_orp_<threads>` -- the stock entry with `-p` set --
-    and runs `-S diamond_orp_<threads>`. Stock entry untouched; original
-    backed up once; thread count in the name so concurrent runs at
-    different `--cpu` do not fight over one key; nothing run-specific in
-    the file, since the cluster shares it.
-  - **Three approaches, one lesson:** `env=` lost to conda's activation,
-    an exported PATH lost to OrthoFinder's own prepending, and neither
-    failure said anything in the log. Each was only caught by `ps` on the
-    node. Whatever the mechanism, the step has to print what it actually
-    resolved -- that is worth more than the mechanism being clever.
-  - Memory, meanwhile, is still unmeasured at the peak: RSS held flat at
-    ~1.5 GB per search (the loaded .dmnd) for the first three minutes of
-    the 4-way run, ~6 GB against a 670 GB budget. Run 2's kills came at
-    2h40m. Sample to the end before touching
-    ORTHOFINDER_GB_PER_QUERY_GB.
+- **Two knobs, and both are load-bearing.**
+  - *Concurrency* (`-t`, and `--orthofinder-searches` to pin it): the only
+    lever with evidence behind it. bbuchfink/diamond#597 reports `-b0.4`
+    making no difference to the alignment stage, so diamond's documented
+    memory parameter does not bound this and cannot be used instead.
+  - *Threads per search*: not polish. At 14.8 core-hours a search, `-p 1`
+    is 14.8 hours of wall each and four waves is 59 hours. Untying `-p`
+    from `-t` is what makes a memory-safe concurrency affordable at all.
+    Measured in flight: 4 x `-p 10` delivers 31.4 of 40 cores, against 24.2
+    for a single `-p 40` process -- so splitting is also 1.3x *faster* than
+    giving one diamond the whole node, because diamond scales poorly past
+    ~10 threads.
 
-- **`env=` cannot put anything ahead of a conda environment's own bin.**
-  The dev2 diamond shim was written, PATH was set, the step ran -- and the
-  shim was never called. `conda run -n X` activates X, and activation
-  prepends `$CONDA_PREFIX/bin` to whatever PATH it inherited, so the shim
-  ended up *behind* the real diamond. Measured on the node two hours in:
-  `ps -o pid,nlwp,pcpu,rss -C diamond` gave `NLWP 2`, `%CPU 98` on all four
-  processes, and `-p 1` with no `--tmpdir` on the command line -- four cores
-  of forty, on a step that had been told to use ten threads each.
-  - Fixed by exporting PATH inside the activated environment
-    (`conda run -n X bash -c 'export PATH=shim:$PATH; exec orthofinder ...'`)
-    rather than from the parent process.
-  - Reproduced both directions before pushing: with the env bin prepended
-    afterwards the shim loses, with the export inside it wins.
-  - **The real lesson is that it was silent.** Nothing in the log
-    distinguished a working shim from a bypassed one, which is why it ran
-    for two hours before `ps` was the thing that caught it.
-    `report_diamond_in_use()` now resolves `diamond` through the same PATH
-    OrthoFinder will use and prints the answer before the searches start.
-  - First real memory numbers, 5 minutes into the 4-way run: RSS 3.1, 3.1,
-    2.7, 2.7 GB, ~11.6 GB total. Far under the 159 GB/search the model
-    budgets -- but the run-2 kills came at 2h40m, not at 5 minutes, so this
-    says nothing about the peak yet. Sample it to the end before re-fitting
-    ORTHOFINDER_GB_PER_QUERY_GB; 96 GB/GB is still one dmesg line from a
-    pre-masking run, and it is the number most likely to be wrong here.
+- **Getting `-p` set took three tries, and the first two failed silently.**
+  `-p 1` is a literal in the `search_cmd` template in
+  `<env>/bin/src/orthofinder/run/config.json`, and `orthofinder --help` has
+  no `--config` -- only `-S <txt>` to pick a program by name.
+  - `env=` from the parent lost to conda's activation, which prepends
+    `$CONDA_PREFIX/bin` to whatever PATH it inherited.
+  - An exported PATH inside the activated env lost to OrthoFinder, which
+    prepends its environment's bin *and* its own bundled bin at startup.
+    `/proc/<pid>/environ` on a running search put the shim at position 9.
+  - What works: add `diamond_orp_<threads>` to config.json -- the stock
+    entry with `-p` set -- and run `-S diamond_orp_<threads>`. Stock entry
+    untouched, original backed up once, thread count in the key so runs at
+    different `--cpu` coexist in a file the cluster shares, nothing
+    run-specific written into it.
+  - **The lesson is not about PATH.** Both failures were invisible: the log
+    read identically whether the mechanism worked or not, and `ps` on the
+    node was what caught them, twice, hours in. The step now prints what it
+    actually resolved before the searches start. That is worth more than
+    any of the mechanisms.
 
-- **The masking was necessary and not sufficient: the same run failed the
-  same way, and the reason is that the concurrency cap could never bind.**
-  Second attempt at 380C_0C5D_001Fv3_955, same node, `--cpu 40 --mem 670`,
-  with `mask_search_input` doing its job (2,885,497 and 2,538,640 N->X for
-  spades75/spades55, 0 and 0 for transabyss/trinity). Still 7 of 16
-  searches lost, still every failure a SPAdes query: Species0 lost all four
-  of its searches, Species1 three of four, Species2 and Species3 none.
-  - **Four died on -9, three on exit 1 having written a 20-byte gzip** (an
-    empty `Blast*.txt.gz`). All seven between 09:42 and 10:03, after the
-    step started at 07:01 -- i.e. two and a half hours in, all at once --
-    and the nine survivors finished between 13:05 and 16:08, once there was
-    room. That is a node running out of memory collectively, not seven
-    inputs each being individually poisonous.
-  - **`ORTHOFINDER_GB_PER_SEARCH = 12` had no effect and never could.**
-    `searches = min(cpu, mem // 12)` = `min(40, 55)` = 40; OrthoFinder runs
-    `n_assemblies^2` = 16 diamonds and no more, so the cap sat above the
-    real job count and 16 ran at once regardless. On a 670 GB node the
-    constant has to exceed 670/16 = 42 GB before it changes anything at
-    all. Every piece of advice the error messages gave -- raise it, lower
-    `--cpu`, lower `--max-parallel` -- was advice about a knob that was not
-    connected. (`--max-parallel` governs ORP's own step lanes and has never
-    had anything to say about OrthoFinder's internal fan-out.)
-  - **Sizing is now per GB of the largest search input**, at 96 GB per GB,
-    which is the worst measured search (~145 GB peak RSS on a ~1.5 GB
-    query) rather than the mean of the five. On this run that is 144 GB
-    apiece, so 4 concurrent against 670 GB instead of 16.
-  - **Lowering `-t` no longer costs cores.** OrthoFinder hands every
-    diamond `-p 1` whatever `-t` says, so `-t 4` on a 40-core node would
-    have run four diamonds on four cores -- which is why `-t` was never the
-    knob anyone reached for. `write_diamond_shim()` puts a `diamond` ahead
-    of the real one on PATH that rewrites `-p 1` to `cpu // searches`, so
-    this run is 4 x 10 threads = the same 40 cores at a quarter of the peak
-    memory. Only `blastp`/`blastx`/`blastn` are touched; `makedb` passes
-    through.
-  - **`--orthofinder-searches N`** pins concurrency when the model is wrong
-    for a node. The thread count still follows from it.
-  - Still unexplained: *why* a SPAdes query is expensive once its N runs
-    are gone. Masking removed the poly-asparagine and the ranking did not
-    change, so something else in those assemblies -- homopolymer runs read
-    as poly-Ala/Gly/Thr is the obvious candidate -- is still making far
-    more seed hits than Trinity's or TransAByss's contigs do. The fix above
-    bounds the blast radius without knowing the answer; if it matters
-    later, `diamond blastp --masking` is where to look.
-  - **Recovering a part-done all-vs-all:** OrthoFinder will not recompute a
-    search it can see an output file for, so the 20-byte and truncated
-    `Blast*.txt.gz` must be deleted, not left in place, before a resume.
+- **Operational facts worth not rediscovering.**
+  - OrthoFinder will not recompute a search it can see an output file for,
+    so truncated and 20-byte `Blast*.txt.gz` must be *deleted*, not left in
+    place, before a resume.
+  - `sacct` is the only place a finished job's peak memory lives and it is
+    keyed on a job ID the log never carried, which is why the run that
+    raised this question could not be asked about it. Preflight now prints
+    the ID, the `sacct` line, and the diamond version (2.2.5 here -- it
+    arrives unpinned as an orthofinder dependency, not from orp_env.yml).
+  - `-o /dev/null` makes diamond put its temp files in `/dev`; it fails
+    with "Permission denied" on a temporary file.
+  - `ps -o args= -C diamond | cut -c1-40` truncates before `-p`. Use
+    `nlwp`/`pcpu`, or grep the flag out of the full argv.
+
+- **Still open.** Whether cost tracks the tail well enough to size on it
+  directly; a second measurement (a cheap species, Species3 self-search)
+  would say how far the per-search figure actually spreads. If it does,
+  capping or splitting the longest contigs into the search would beat
+  throttling the whole step -- 19,387 contigs of 1,072,398 are over 10 kb,
+  so the expensive part is ~2% of the input.
 
 - **OrthoFinder searches DNA with `diamond blastp`, so SPAdes' N-gaps arrive
   as poly-asparagine and the searches that carry them OOM.** A chowder run
