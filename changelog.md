@@ -1,5 +1,24 @@
 ### CHANGELOG
 
+ORP Version 4.0.1-dev9
+
+- **Fixes a regression dev2 introduced into OrthoFinder's algorithm phase.**
+  `-a` was computed as `searches // 8`, which was harmless only while the
+  memory cap could never bind and `searches` was therefore the whole core
+  count: `-a` came out 5. Making the cap bind dropped `searches` to 4 and
+  took `-a` down to 1 with it. That is a change to a different phase of
+  OrthoFinder entirely, it was never intended, and nothing in the log
+  mentioned it.
+
+  `-a` is now sized from `--cpu` (`cpu // 8`, OrthoFinder's own default
+  shape) and is independent of the search concurrency. The two govern
+  different phases: `-t` is concurrent diamonds during the all-vs-all, `-a`
+  is OrthoFinder's own workers afterwards, by which time the searches have
+  exited and their memory with them.
+
+- The plan line now prints `-a` alongside the search concurrency, so a
+  change to one is visible rather than implied.
+
 ORP Version 4.0.1-dev8
 
 - **"No Orthogroups.txt" no longer blames diamond before looking.** The

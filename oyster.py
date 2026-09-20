@@ -1624,12 +1624,22 @@ class Pipeline:
         # orthogroups and never reaches the MSA/tree work -a exists to
         # parallelise.
         searches, threads, per_search = self.orthofinder_search_plan(cpu, mem)
-        analysis = max(1, searches // 8)
+        # -a is sized from the machine and NOT from `searches`. It used to be
+        # `searches // 8`, which was harmless only while `searches` was the
+        # whole core count: the memory cap could never bind (see
+        # ORTHOFINDER_GB_PER_QUERY_GB), so `searches` was 40 and -a was 5.
+        # Making the cap bind dropped `searches` to 4 and took -a down to 1
+        # with it -- a change to the algorithm phase that was never intended,
+        # never mentioned in the log, and not noticed until that phase failed.
+        # The two are independent: -t is concurrent diamonds during the
+        # all-vs-all, -a is OrthoFinder's own workers afterwards, and by then
+        # the searches have exited and their memory with them.
+        analysis = max(1, cpu // 8)
         jobs = max(1, len(self.search_fasta_paths()) ** 2)
         why = ("--orthofinder-searches" if self.orthofinder_searches
                else f"{mem}G / {per_search}G per search")
         print(f"    all-vs-all: {jobs} searches, {searches} at a time ({why}), "
-              f"{threads} thread(s) each")
+              f"{threads} thread(s) each; -a {analysis} for the algorithm phase")
         program = self.ensure_diamond_program(threads)
         if program is None:
             program = "diamond"
