@@ -1657,18 +1657,7 @@ class Pipeline:
         )
         groups = self.newest_orthogroups_txt()
         if groups is None or groups.stat().st_mtime < marker.stat().st_mtime:
-            sys.exit(
-                "orthofinder exited 0 but produced no Orthogroups.txt for this "
-                "attempt -- read its ERROR lines above. Its usual cause is "
-                "diamond being OOM-killed mid-search (returncode -9), which "
-                "leaves truncated Blast*.txt that OrthoFinder then reports as "
-                "corrupted. Run it again with a lower --orthofinder-searches "
-                "(this attempt used "
-                f"{self.orthofinder_search_plan(cpu, mem)[0]}), and delete the "
-                "failed Results_* directory before resuming -- OrthoFinder will "
-                "not recompute a search it can see an output file for, so a "
-                "truncated one left in place is a truncated one reused."
-            )
+            sys.exit(self.no_orthogroups_message(cpu, mem))
         if groups.stat().st_size == 0:
             sys.exit(f"orthofinder produced an empty {groups}")
         # The checks above catch an attempt that produced no orthogroups at
@@ -1760,6 +1749,102 @@ class Pipeline:
                 break
         return None
 
+    def newest_working_dir(self):
+        """The newest Results_*/WorkingDirectory, with or without orthogroups.
+
+        check_orthofinder_searches reaches its working directory by walking
+        up from an Orthogroups.txt. That is the right anchor when there is
+        one and no help at all when there is not -- which is exactly the
+        case where the searches most need looking at, because an attempt
+        that produced no orthogroups may still have produced sixteen
+        perfectly good Blast files that cost four and a half hours.
+        """
+        matches = [d for d in self.orthofuse_search.rglob("WorkingDirectory") if d.is_dir()]
+        if not matches:
+            return None
+        return max(matches, key=lambda d: d.stat().st_mtime)
+
+    def audit_orthofinder_searches(self, workdir):
+        """(species, failures) for the all-vs-all in `workdir`, judging nothing.
+
+        Split out of check_orthofinder_searches so the same audit can be run
+        where a failure must not be fatal: when there is no Orthogroups.txt
+        at all, the question "are the searches good?" decides whether the
+        right advice is to delete this directory or to guard it with your
+        life. Returns (None, []) when there are no Species*.fa to judge.
+        """
+        species = {}
+        for fa in workdir.glob("Species*.fa"):
+            m = re.fullmatch(r"Species(\d+)\.fa", fa.name)
+            if m:
+                species[int(m.group(1))] = fa
+        if not species:
+            return None, []
+        counts = {i: self._count_fasta_records(fa) for i, fa in species.items()}
+        failures = []
+        for i in sorted(species):
+            for j in sorted(species):
+                stem = workdir / f"Blast{i}_{j}.txt"
+                blast = next((p for p in (stem.with_suffix(".txt.gz"), stem) if p.is_file()), None)
+                if blast is None:
+                    failures.append(f"  Blast{i}_{j}: no output file")
+                    continue
+                floor = int(counts[i] * BLAST_SELF_HIT_FLOOR) if i == j else 1
+                got = self._count_lines(blast, floor)
+                if got < floor:
+                    why = (f"{got} hits, expected at least {floor} "
+                           f"({BLAST_SELF_HIT_FLOOR:.0%} of {counts[i]} sequences in {species[i].name})"
+                           if i == j else "no hits at all")
+                    failures.append(f"  Blast{i}_{j} ({blast.stat().st_size} bytes): {why}")
+        return species, failures
+
+    def no_orthogroups_message(self, cpu, mem):
+        """What to say when an attempt produced no Orthogroups.txt.
+
+        This used to say one thing: diamond was OOM-killed, lower the
+        concurrency, delete the Results_* directory and start again. That is
+        right when the searches died and catastrophic when they did not --
+        the run this was rewritten for completed all sixteen searches in 4h36m
+        and then failed in OrthoFinder's own algorithm phase ("Initial
+        processing of each species", stalled at 3/4). Deleting on that advice
+        throws away four and a half hours of good alignments to fix something
+        that was never wrong.
+
+        So audit the searches first and let them decide which advice this is.
+        """
+        planned = self.orthofinder_search_plan(cpu, mem)[0]
+        head = ("orthofinder exited 0 but produced no Orthogroups.txt for this "
+                "attempt -- read its ERROR lines above.\n")
+        workdir = self.newest_working_dir()
+        if workdir is None:
+            return head + "\nNo WorkingDirectory to inspect, so the searches cannot be judged."
+        species, failures = self.audit_orthofinder_searches(workdir)
+        if species is None:
+            return head + f"\nNo Species*.fa in {workdir}, so the searches cannot be judged."
+        if failures:
+            return (
+                head
+                + f"\n{len(failures)} of {len(species) ** 2} searches in {workdir} are bad:\n"
+                + "\n".join(failures)
+                + "\n\nThat is the usual cause: diamond OOM-killed mid-search (returncode -9) "
+                  "leaves truncated Blast*.txt that OrthoFinder reports as corrupted. Run again "
+                  f"with a lower --orthofinder-searches (this attempt used {planned}), and delete\n"
+                  f"  {workdir.parent}\n"
+                  "before resuming -- OrthoFinder will not recompute a search it can see an "
+                  "output file for, so a truncated one left in place is a truncated one reused."
+            )
+        return (
+            head
+            + f"\nAll {len(species) ** 2} searches in\n  {workdir}\nare complete and non-empty, "
+              "so the all-vs-all is not what failed and diamond is not what to fix.\n\n"
+              "*** Do NOT delete that directory. *** It holds the finished alignments, which are "
+              "the expensive part of this step; OrthoFinder will reuse them rather than recompute "
+              "them. Lowering --orthofinder-searches would cost hours and change nothing.\n\n"
+              "The failure is in OrthoFinder's own algorithm phase, after the searches. Look for "
+              "its 'Initial processing of each species' or 'Stalled for' lines above, and check "
+              f"{workdir.parent}/Log.txt."
+        )
+
     def check_orthofinder_searches(self, workdir):
         """Fail on an all-vs-all whose searches died without saying so.
 
@@ -1799,31 +1884,9 @@ class Pipeline:
         far above a failure: the worst surviving self-comparison in the run
         this was written for held about 0.2% of its input.
         """
-        species = {}
-        for fa in workdir.glob("Species*.fa"):
-            m = re.fullmatch(r"Species(\d+)\.fa", fa.name)
-            if m:
-                species[int(m.group(1))] = fa
-        if not species:
+        species, failures = self.audit_orthofinder_searches(workdir)
+        if species is None:
             sys.exit(f"orthofinder left no Species*.fa in {workdir} -- cannot check its all-vs-all")
-
-        counts = {i: self._count_fasta_records(fa) for i, fa in species.items()}
-        failures = []
-        for i in sorted(species):
-            for j in sorted(species):
-                stem = workdir / f"Blast{i}_{j}.txt"
-                blast = next((p for p in (stem.with_suffix(".txt.gz"), stem) if p.is_file()), None)
-                if blast is None:
-                    failures.append(f"  Blast{i}_{j}: no output file")
-                    continue
-                floor = int(counts[i] * BLAST_SELF_HIT_FLOOR) if i == j else 1
-                got = self._count_lines(blast, floor)
-                if got < floor:
-                    why = (f"{got} hits, expected at least {floor} "
-                           f"({BLAST_SELF_HIT_FLOOR:.0%} of {counts[i]} sequences in {species[i].name})"
-                           if i == j else "no hits at all")
-                    failures.append(f"  Blast{i}_{j} ({blast.stat().st_size} bytes): {why}")
-
         if failures:
             names = "\n".join(f"  {i}: {fa.name}" for i, fa in sorted(species.items()))
             sys.exit(

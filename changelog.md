@@ -1,5 +1,26 @@
 ### CHANGELOG
 
+ORP Version 4.0.1-dev8
+
+- **"No Orthogroups.txt" no longer blames diamond before looking.** The
+  message said one thing -- diamond was OOM-killed, lower the concurrency,
+  delete the Results_* directory -- which is right when the searches died
+  and destructive when they did not. A run completed all sixteen searches in
+  4h36m and then failed in OrthoFinder's own algorithm phase; following that
+  advice would have deleted four and a half hours of good alignments to fix
+  something that was never wrong.
+
+- The searches are now audited first and decide which advice is given. When
+  they are complete the message says so, says explicitly not to delete the
+  directory, and points at the algorithm phase and Log.txt instead. When
+  they are bad it names each one, as before.
+
+- `audit_orthofinder_searches` (judges nothing, returns findings) split out
+  of `check_orthofinder_searches` (fatal), so the same audit can run where a
+  failure must not be fatal. `newest_working_dir` finds the searches without
+  needing an Orthogroups.txt to walk up from -- which is the case where they
+  most need looking at.
+
 ORP Version 4.0.1-dev7
 
 - **The per-search memory figure is now measured, not inferred.** A single
