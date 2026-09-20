@@ -5,6 +5,64 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-09-20
+
+- **The all-vs-all works, and the memory model is validated a second time.**
+  16/16 searches in 4h36m at 4-way concurrency with `-p 10`, no `-9`, no
+  truncation. `Blast0_0` went from 20 bytes to 41 MB and `Blast1_1` from
+  24 KB to 35 MB; every file is 19-63 MB.
+  - `sacct`: **MaxRSS 547.49 GiB**, MaxVMSize 580.10 GiB, against a 720 GiB
+    request and a 670 GiB budget. Predicted 4 x 143.0 = 572 GiB, so the
+    model is 4.5% conservative and the implied per-search figure is 136.9
+    GiB. Two independent measurements now agree with it.
+  - Five to six concurrent would need 685-822 GiB. Four is the right answer
+    on this node, not a timid one.
+
+- **Species IDs confirmed from Log.txt** -- previously inferred from the
+  N-masking counts, now stated by OrthoFinder itself, and the inference was
+  right:
+
+        Species0 = spades55    mean=1439  max= 83,028  >10kb=19,387  FAILED
+        Species1 = spades75    mean=1406  max=105,775  >10kb=21,902  FAILED
+        Species2 = transabyss  mean= 853  max= 25,753  >10kb=   471  ok
+        Species3 = trinity     mean= 793  max= 32,042  >10kb= 2,139  ok
+
+  So it is exactly the two rnaSPAdes assemblies that are expensive, they are
+  the ones with the long-contig tail, and they are the ones that gap-fill
+  with N. One assembler, three symptoms.
+
+- **New failure, and it was ours: `-a` had been coupled to the search
+  concurrency.** After the searches finished, OrthoFinder's own algorithm
+  phase died -- "Initial processing of each species", `ERROR: Stalled for
+  200.0s (completed 3/4)` after 11 minutes.
+  - **Not memory.** ExitCode 1:0 is ORP's own `sys.exit`, and 547 GiB sat
+    123 GiB under the budget. A slow worker, not a dead one.
+  - `analysis = max(1, searches // 8)` was harmless only while the memory
+    cap could not bind: `searches` was 40 and `-a` was 5. Making the cap
+    bind dropped `searches` to 4 and took `-a` to 1 with it -- a silent
+    reconfiguration of a different phase. It also met roughly ten times the
+    data, since every earlier run reached that phase with seven of sixteen
+    Blast files empty.
+  - `-a` is now `cpu // 8`, independent of `-t`, and printed on the plan
+    line. The general lesson: one knob deriving from another is a trap when
+    the first is set by a constraint that has nothing to do with the second.
+  - The upstream report of this error (davidemms/OrthoFinder#1024, April
+    2026, 382 species, stalled at 0/382) has no reply, so there is no
+    confirmation that `-a` is the whole cause.
+
+- **`orthofinder -b <dir>` exists and is the way back in.** "Start
+  OrthoFinder from pre-computed BLAST results in <dir>". Re-running the step
+  normally makes a new Results_* and recomputes all sixteen searches --
+  4.6 hours to retry a phase that comes after them. ORP does not use `-b`
+  yet; it should, whenever the newest WorkingDirectory holds a complete
+  all-vs-all.
+
+- **Side effect of naming the config entry after the thread count:** the
+  databases are `diamond_orp_10DBSpecies*.dmnd`, so changing `--cpu` renames
+  the search program, and OrthoFinder rebuilds the databases under the new
+  name. Cheap in time (~47s for four) but it duplicates 5.6 GB of database
+  per distinct thread count.
+
 ## 2026-09-19
 
 Four attempts at one chowder run (380C_0C5D_001Fv3_955, 4 assemblies,
