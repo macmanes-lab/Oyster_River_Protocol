@@ -1,5 +1,27 @@
 ### CHANGELOG
 
+ORP Version 4.0.1-dev10
+
+- **`-a` is capped at the number of assemblies, and `--orthofinder-analysis`
+  can pin it.** "Initial processing of each species" has one task per
+  species, so a fifth worker on a four-assembly run has nothing to do. The
+  rule is now `min(--cpu/8, 16, n_assemblies)` -- upstream's shape and its
+  documented ceiling, computed from the machine rather than from the
+  throttled `-t`.
+
+- **Deliberately no memory term on `-a`.** Sizing it by memory needs a
+  per-worker figure and there is not one: upstream documents no RAM guidance
+  for `-a`, and this phase has never been measured here. Its entire input is
+  the search output -- 523 MB gzipped, ~4 GiB of text, against 143 GiB for a
+  single search -- so it is unlikely to be what exhausts a node. That is an
+  expectation, not a measurement, which is why the override exists. A memory
+  term goes in when there is a number to fit it to.
+
+- Note the asymmetry, recorded in the code: too few searches costs wall time
+  and too many loses the step to the OOM killer, so search sizing errs low.
+  Too few analysis workers trips OrthoFinder's 200s stall watchdog and too
+  many appears to cost nothing, so `-a` errs high.
+
 ORP Version 4.0.1-dev9
 
 - **Fixes a regression dev2 introduced into OrthoFinder's algorithm phase.**

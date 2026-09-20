@@ -282,6 +282,11 @@ ORTHOFINDER_GB_PER_QUERY_GB = 96
 # GB)", so ~12 GB before a single seed hit is stored.
 ORTHOFINDER_GB_PER_SEARCH_FLOOR = 12
 
+# OrthoFinder's own ceiling on -a: its documented default is "16 or t/8
+# (whichever lower)". Worth keeping, because the rest of that default is not
+# usable here -- see orthofinder_analysis_threads.
+ORTHOFINDER_MAX_ANALYSIS = 16
+
 # Lowering OrthoFinder's -t lowers the core count with it: OrthoFinder hands
 # every diamond `-p 1` whatever -t says, so -t 4 on a 40-core node runs four
 # diamonds on four cores and leaves thirty-six idle. That is why -t was never
@@ -583,6 +588,7 @@ class Pipeline:
         # than one string pytransrate would reject.
         self.pytransrate_args = shlex.split(getattr(args, "pytransrate_args", "") or "")
         self.orthofinder_searches = getattr(args, "orthofinder_searches", None) or 0
+        self.orthofinder_analysis = getattr(args, "orthofinder_analysis", None) or 0
 
         # Everything from run_filtershort onwards works on "the assemblies"
         # rather than on four named assemblers, so a caller that brings its
@@ -1613,6 +1619,44 @@ class Pipeline:
                   f"the same file? retrying ({attempt + 1}/2)")
         return None
 
+    def orthofinder_analysis_threads(self, cpu):
+        """`-a`: OrthoFinder's workers for the algorithm phase after the searches.
+
+        Upstream's default is "16 or t/8 (whichever lower)", deriving -a from
+        -t. That is reasonable where -t means "cores you have" and wrong here,
+        because this pipeline lowers -t to fit diamond's memory -- a
+        constraint the algorithm phase does not share, since by the time it
+        runs the searches have exited and their 500-odd GB with them. Deriving
+        -a from the throttled -t is how a 40-core node ended up running that
+        phase on one worker; it stalled and took the run with it.
+
+        So: upstream's shape and ceiling, but computed from `cpu`, and capped
+        at the number of species. That last cap is free and exact -- "Initial
+        processing of each species" has one task per species, so a fifth
+        worker on a four-assembly run has nothing to do.
+
+        **There is deliberately no memory term.** Sizing this by memory needs
+        a per-worker figure, and there is not one: upstream documents no RAM
+        guidance for -a, and this phase has never been measured here. Its
+        whole input is the Blast files -- 523 MB gzipped, ~4 GiB of text, on
+        the run this was written for, against 143 GiB for a single search --
+        so it is very unlikely to be what runs a node out of memory. That is
+        an expectation, not a measurement, and it is the reason
+        `--orthofinder-analysis` exists. Fit a memory term when there is a
+        number to fit it to, the way ORTHOFINDER_GB_PER_QUERY_GB was fitted
+        and then validated; not before.
+
+        Note the asymmetry with the searches, which is why this errs high
+        where that errs low: too few searches costs wall time, too many loses
+        the step to the OOM killer. Too few analysis workers is what trips
+        OrthoFinder's 200s stall watchdog; too many, on present evidence,
+        costs nothing.
+        """
+        if self.orthofinder_analysis:
+            return max(1, self.orthofinder_analysis)
+        species = max(1, len(self.search_fasta_paths()))
+        return max(1, min(cpu // 8, ORTHOFINDER_MAX_ANALYSIS, species))
+
     def run_orthofuser(self, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
         mem = self.mem if mem is None else mem
@@ -1624,17 +1668,7 @@ class Pipeline:
         # orthogroups and never reaches the MSA/tree work -a exists to
         # parallelise.
         searches, threads, per_search = self.orthofinder_search_plan(cpu, mem)
-        # -a is sized from the machine and NOT from `searches`. It used to be
-        # `searches // 8`, which was harmless only while `searches` was the
-        # whole core count: the memory cap could never bind (see
-        # ORTHOFINDER_GB_PER_QUERY_GB), so `searches` was 40 and -a was 5.
-        # Making the cap bind dropped `searches` to 4 and took -a down to 1
-        # with it -- a change to the algorithm phase that was never intended,
-        # never mentioned in the log, and not noticed until that phase failed.
-        # The two are independent: -t is concurrent diamonds during the
-        # all-vs-all, -a is OrthoFinder's own workers afterwards, and by then
-        # the searches have exited and their memory with them.
-        analysis = max(1, cpu // 8)
+        analysis = self.orthofinder_analysis_threads(cpu)
         jobs = max(1, len(self.search_fasta_paths()) ** 2)
         why = ("--orthofinder-searches" if self.orthofinder_searches
                else f"{mem}G / {per_search}G per search")
@@ -2842,6 +2876,14 @@ def parse_args():
              "search input. --cpu is split across them, so lowering this costs "
              "memory rather than cores. Lower it if diamonds are OOM-killed "
              "(returncode -9 in the log)",
+    )
+    p.add_argument(
+        "--orthofinder-analysis", type=int, default=None, metavar="N",
+        help="OrthoFinder's -a, the workers for its algorithm phase after the "
+             "searches. Default: min(--cpu/8, 16, number of assemblies). Not "
+             "sized by memory -- that phase reads only the search output and has "
+             "not been measured; raise it if it stalls, lower it if it runs a "
+             "node out of memory",
     )
     p.add_argument(
         "--max-parallel", type=int, default=2,

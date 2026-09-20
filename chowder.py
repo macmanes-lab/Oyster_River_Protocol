@@ -443,6 +443,14 @@ def parse_args():
              "(returncode -9 in the log)",
     )
     p.add_argument(
+        "--orthofinder-analysis", type=int, default=None, metavar="N",
+        help="OrthoFinder's -a, the workers for its algorithm phase after the "
+             "searches. Default: min(--cpu/8, 16, number of assemblies). Not "
+             "sized by memory -- that phase reads only the search output and has "
+             "not been measured; raise it if it stalls, lower it if it runs a "
+             "node out of memory",
+    )
+    p.add_argument(
         "--max-parallel", type=int, default=2,
         help="max concurrent jobs within each independent stage that benefits "
              "from it (orthofuser vs. merge/orthotransrate; transrate vs. "
