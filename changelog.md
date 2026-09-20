@@ -1,5 +1,37 @@
 ### CHANGELOG
 
+ORP Version 4.0.1-dev12
+
+- **Per-search memory is now quadratic in query size, not linear.** Three
+  self-searches measured alone on the node with `/usr/bin/time -v`:
+
+        Species0 spades55    1.61 GB  >10kb=19,387  143.0 GiB
+        Species3 trinity     1.61 GB  >10kb= 2,139  101.9 GiB
+        Species2 transabyss  1.18 GB  >10kb=   471   51.2 GiB
+
+  1.36x the bytes costs 1.99x the memory -- an exponent of 2.22, which is
+  what diamond's query x database work implies for a self-comparison. The
+  constant is `ORTHOFINDER_GB_PER_SEARCH_GB2 = 58`, GiB per GB-of-query
+  squared, and it predicts +6%, +48% and +58% against the three: always
+  conservative, tightest on the expensive one.
+
+- **The linear model it replaces was accurate only where it was fitted.**
+  +8% at 1.6 GB, +121% at 1.18 GB, and falling the dangerous way as inputs
+  grow: at 3 GB it read 288 GiB and would have planned two concurrent
+  searches wanting 522 GiB apiece.
+
+- Consequences: assemblies around 1 GB go from 6 concurrent to 11, 1.18 GB
+  from 4 to 8, and 2.5 GB and up drop to 1 concurrent with every core.
+  Nothing changes below ~0.8 GB, where `n_assemblies^2` caps concurrency
+  first, or at 1.6 GB, where both forms say 4.
+
+- **Sequence count is ruled out** as a driver: Species3 carries 77% more
+  sequences than Species0 at the same file size and costs 29% less. **The
+  long-contig tail is a real modifier** -- same bytes, 9.1x the contigs over
+  10 kb, 29% more memory -- but it is deliberately not in the formula, since
+  counting it needs a pass over the assemblies and two parameters on three
+  points is how the previous two figures here went wrong.
+
 ORP Version 4.0.1-dev11
 
 - **Says so when a single search does not fit the memory budget.**

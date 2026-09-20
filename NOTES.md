@@ -7,6 +7,37 @@ stale.
 
 ## 2026-09-20
 
+- **Three self-searches measured; the model is quadratic, and count is
+  dead.** Each run alone on the node, 40 threads, `/usr/bin/time -v`:
+
+        Species0 spades55    1.61 GB  1,072,398 seqs  >10kb=19,387  143.0 GiB  14.7 core-h
+        Species3 trinity     1.61 GB  1,902,240 seqs  >10kb= 2,139  101.9 GiB  13.9 core-h
+        Species2 transabyss  1.18 GB  1,325,909 seqs  >10kb=   471   51.2 GiB   8.0 core-h
+
+  - **Quadratic in query size.** Species2 -> Species3 is 1.36x bytes for
+    1.99x memory, exponent 2.22 (2.19 after correcting for their different
+    tails). diamond's work is query x database and a self-search is q^2, so
+    the mechanism predicts the exponent independently -- the first figure
+    here supported by something other than a fit.
+  - **Sequence count is ruled out.** Species3 has 77% more sequences than
+    Species0 at the same file size and costs 29% less.
+  - **The tail is a modifier, not the driver.** Same bytes, 9.1x the
+    contigs over 10 kb, 29% more memory. `40*GB^2 + 0.0025*(>10kb)` fits
+    all three within 5-11%, but that is two parameters on three points, and
+    counting the tail needs a pass over the assemblies. Left out on
+    purpose; revisit at five measurements. If it goes in,
+    `mask_search_input` already reads every byte and could tally lengths
+    for free.
+  - **Time and memory are different curves**: 14.7 vs 13.9 core-hours for
+    Species0 and Species3, nearly equal, against a 40% memory gap. Time
+    goes as ~bytes^1.8, memory as ~bytes^2.2 plus the tail. Wall-time
+    intuition was never going to predict these OOMs.
+  - The linear 96 GB/GB it replaces was right only at its fitting point
+    (+8% at 1.61 GB, +121% at 1.18 GB) and fell the dangerous way with
+    size: at 3 GB it read 288 GiB against a quadratic 522, i.e. it would
+    have planned two concurrent searches that each wanted more than the
+    pair could have.
+
 - **The sizing model, stated plainly.** Memory and assembly size are the
   terms that matter; CPU is the lever:
 

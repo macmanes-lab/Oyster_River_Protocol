@@ -240,41 +240,46 @@ STEP_RETRY_DELAY = 60
 # 42 GB before the cap changes a single thing. 12 was not a cautious estimate
 # that turned out low; it was an estimate that was never consulted.
 #
-# Measured directly, 2026-09-19, rather than inferred from a kill: one
-# search run alone on the node, Species0 against its own database, 40
-# threads, `/usr/bin/time -v`. It completed -- exit 0, 36m35s wall, 14.8
-# core-hours -- at **143.0 GiB peak RSS**. So a single `diamond blastp` of
-# this input class really does want ~143 GiB, which is what the five
-# OOM-killed searches (92-145 GB resident) had been saying all along.
+# Measured, not inferred. Three searches run alone on the node, 40 threads,
+# `/usr/bin/time -v`, each a self-comparison (the worst case: every long
+# contig aligns against itself at full length):
 #
-# 670 GiB / 143 GiB = 4.7, so four concurrent searches fit (572 GiB) and
-# five do not (715 GiB). The figure below predicted 159 GiB for that query,
-# 11% conservative against the measurement, and picked 4. Calibrated, and
-# for once not by luck.
+#     Species0 spades55    1.61 GB  1,072,398 seqs  >10kb=19,387  143.0 GiB
+#     Species3 trinity     1.61 GB  1,902,240 seqs  >10kb= 2,139  101.9 GiB
+#     Species2 transabyss  1.18 GB  1,325,909 seqs  >10kb=   471   51.2 GiB
 #
-# It is expressed per GB of query because that is the only term a run can
-# know before it starts. It is probably not the true driver. The four
-# species here are 1.1-1.5 GB apiece and only two of them ever failed, and
-# what separates them is the long-contig tail, not size and not count:
+# Three things fall out, in order of how much they matter.
 #
-#     Species0  n=1,072,398  mean=1439  max= 83,028  >10kb=19,387  FAILED
-#     Species1  n=1,054,411  mean=1406  max=105,775  >10kb=21,902  FAILED
-#     Species2  n=1,325,909  mean= 853  max= 25,753  >10kb=   471  ok
-#     Species3  n=1,902,240  mean= 793  max= 32,042  >10kb= 2,139  ok
+# **Cost is quadratic in query size.** Species2 to Species3 is 1.36x the
+# bytes for 1.99x the memory -- an exponent of 2.22, and 2.19 after
+# correcting for their different tails. That is not a curve fit looking for
+# a shape: diamond's work goes as query x database, so a self-comparison is
+# q^2, and the measured exponent agrees with the mechanism. It is the only
+# figure here with support from something other than three points.
 #
-# Species3 has 77% more sequences than Species0 at the same file size and
-# never lost a search, so sequence count is anti-correlated with failure.
-# Contigs over 10 kb are 9-47x more common in the two that failed. diamond's
-# own ChangeLog fixed "increased memory usage and runtimes for very long
-# queries" in 2.0.1, and a self-comparison aligns every long contig against
-# itself at full length -- which is why the self-comparisons went first.
+# **Sequence count is not it.** Species3 carries 77% more sequences than
+# Species0 at the same file size and costs 29% less. Count was the obvious
+# candidate and it is dead.
 #
-# Known weakness of using bytes as the proxy: a small assembly with a heavy
-# long-contig tail would be sized cheap and is not. Sizing on the tail
-# directly would be better, and there is exactly one calibration point for
-# it, which is not enough to fit a second model on. Revisit with a second
-# measurement, not before.
-ORTHOFINDER_GB_PER_QUERY_GB = 96
+# **The long-contig tail is a real modifier, and only a modifier.** Same
+# bytes, 9.1x the contigs over 10 kb, 29% more memory. It is not in the
+# formula below: `40 * GB^2 + 0.0025 * (contigs > 10kb)` fits all three
+# within 5-11%, but the tail needs a pass over the assemblies to count, and
+# two parameters on three points is how the last two guesses here went
+# wrong. It goes in when there is a fourth and fifth measurement, not
+# before.
+#
+# So: GiB per GB-of-query squared, sized off the largest search input.
+# Against the three measurements it predicts +5%, +48% and +58% -- always
+# conservative, tightest on the expensive one, which is the right way round.
+#
+# What this replaced was a linear 96 GB per GB, fitted at ~1.5 GB and
+# accurate only there: +8% on Species0, +121% on Species2. Worse, it fell
+# the dangerous way as inputs grew. At 3 GB assemblies linear reads 288 GiB
+# and would have planned two concurrent searches that each want 522 -- the
+# same OOM this whole constant exists to prevent, arrived at by trusting a
+# straight line outside the range it was fitted in.
+ORTHOFINDER_GB_PER_SEARCH_GB2 = 58
 
 # Floor under the above, for inputs small enough that the linear term says
 # less than one diamond's fixed cost. diamond's default block size is -b2.0
@@ -1494,7 +1499,7 @@ class Pipeline:
         together and it is the biggest of them that decides when the node
         runs out: a plan that fits the mean fits nothing on the run where
         one assembly is twice its neighbours. See
-        ORTHOFINDER_GB_PER_QUERY_GB for where the per-GB figure comes from
+        ORTHOFINDER_GB_PER_SEARCH_GB2 for where the figure comes from
         and why the cap it feeds had no effect before this.
 
         `--orthofinder-searches` overrides the memory term and nothing else.
@@ -1507,7 +1512,7 @@ class Pipeline:
         biggest = max((p.stat().st_size for p in inputs if p.is_file()), default=0)
         per_search = max(
             ORTHOFINDER_GB_PER_SEARCH_FLOOR,
-            math.ceil(ORTHOFINDER_GB_PER_QUERY_GB * biggest / 1e9),
+            math.ceil(ORTHOFINDER_GB_PER_SEARCH_GB2 * (biggest / 1e9) ** 2),
         )
         if self.orthofinder_searches:
             searches = max(1, min(cpu, jobs, self.orthofinder_searches))
@@ -1643,7 +1648,7 @@ class Pipeline:
         so it is very unlikely to be what runs a node out of memory. That is
         an expectation, not a measurement, and it is the reason
         `--orthofinder-analysis` exists. Fit a memory term when there is a
-        number to fit it to, the way ORTHOFINDER_GB_PER_QUERY_GB was fitted
+        number to fit it to, the way ORTHOFINDER_GB_PER_SEARCH_GB2 was fitted
         and then validated; not before.
 
         Note the asymmetry with the searches, which is why this errs high
@@ -1661,7 +1666,7 @@ class Pipeline:
         cpu = self.cpu if cpu is None else cpu
         mem = self.mem if mem is None else mem
         # -t is the count of concurrent diamonds and so a memory knob before
-        # it is a core count -- see ORTHOFINDER_GB_PER_QUERY_GB. -a, the
+        # it is a core count -- see ORTHOFINDER_GB_PER_SEARCH_GB2. -a, the
         # analysis threads, is RAM-hungry in its own right and OrthoFinder's
         # own default is t/8; it used to be handed the whole core count here,
         # which under -og buys nothing at all, since that run stops at
