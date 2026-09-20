@@ -7,6 +7,23 @@ stale.
 
 ## 2026-09-20
 
+- **The sizing model, stated plainly.** Memory and assembly size are the
+  terms that matter; CPU is the lever:
+
+        assembly size  ->  per-search memory      (given, not ours to set)
+        memory budget  ->  how many run at once   (forced: mem / per_search)
+        CPU            ->  divided among however many that turns out to be
+
+  CPU never enters the memory decision. It is spent after memory has decided
+  the shape, which is why `-t` is sized from memory and `-p` is `cpu //
+  searches`. Threads are not quite free: 143.0 GiB at `-p 40` against ~136.9
+  implied at `-p 10` is about 0.2 GiB per thread, second-order against a ~137
+  GiB base and only two points, but not zero.
+  - Corollary the code was missing: when `per_search > mem` the floor of
+    `max(1, ...)` runs a search already known not to fit. Both terms are
+    known before the run starts, so that is now said at the start rather
+    than discovered as an OOM.
+
 - **The all-vs-all works, and the memory model is validated a second time.**
   16/16 searches in 4h36m at 4-way concurrency with `-p 10`, no `-9`, no
   truncation. `Blast0_0` went from 20 bytes to 41 MB and `Blast1_1` from

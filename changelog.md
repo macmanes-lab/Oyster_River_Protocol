@@ -1,5 +1,20 @@
 ### CHANGELOG
 
+ORP Version 4.0.1-dev11
+
+- **Says so when a single search does not fit the memory budget.**
+  `searches = max(1, min(cpu, jobs, mem // per_search))` floors to one when
+  `per_search > mem`, so the run proceeded having already computed that the
+  search would not fit, and found out hours later as an OOM. Assembly size
+  and memory are both known before anything starts, so the step now says it
+  in the first second and names the right remedy -- more memory or smaller
+  assemblies, not `--orthofinder-searches`, which is already at its floor.
+
+- Not fatal, and silent when `--orthofinder-searches` was set by hand. The
+  estimate is a conservative proxy (159 GiB predicted against 143.0
+  measured), so a budget just under it may still survive, and refusing would
+  turn a warning into a new way for a run not to start.
+
 ORP Version 4.0.1-dev10
 
 - **`-a` is capped at the number of assemblies, and `--orthofinder-analysis`

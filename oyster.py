@@ -1674,6 +1674,23 @@ class Pipeline:
                else f"{mem}G / {per_search}G per search")
         print(f"    all-vs-all: {jobs} searches, {searches} at a time ({why}), "
               f"{threads} thread(s) each; -a {analysis} for the algorithm phase")
+        if not self.orthofinder_searches and per_search > mem:
+            # mem // per_search is 0 here and max(1, ...) floors it to one
+            # search, so the run proceeds having already computed that the
+            # search does not fit. Memory and assembly size are both known
+            # before anything starts; this is answerable now rather than as
+            # an OOM four hours in. Not fatal: the estimate is a conservative
+            # proxy (it predicted 159 GiB where 143.0 was measured), so a
+            # budget just under it may still be survivable, and refusing
+            # would turn a warning into a new way for the run not to start.
+            biggest = max((q.stat().st_size for q in self.search_fasta_paths()
+                           if q.is_file()), default=0)
+            print(f"    *** one search is estimated at {per_search}G and the budget is "
+                  f"{mem}G, so even a single search may not fit. The estimate is sized "
+                  f"off the largest input ({biggest / 1e9:.1f} GB) and is deliberately "
+                  "conservative, so this may still run -- but if diamond is OOM-killed "
+                  "(returncode -9), the fix is more memory or smaller assemblies, not "
+                  "--orthofinder-searches, which is already at its floor of 1. ***")
         program = self.ensure_diamond_program(threads)
         if program is None:
             program = "diamond"
