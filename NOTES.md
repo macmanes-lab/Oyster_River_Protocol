@@ -5,6 +5,100 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-09-21
+
+**Handoff state.** Chowder run 380C_0C5D_001Fv3_955 under 4.0.1-dev9, Slurm
+job 1316072 on node140, `--cpu 40 --mem 670`, started 2026-09-20 08:54:37.
+Repo is at 4.0.1-dev12; the running job predates dev10-dev12, so its `-a` is
+5 rather than the 4 dev10 would pick.
+
+Paths (all under `~/tuco/assembly`):
+
+    orthofuse/380C_0C5D_001Fv3_955_chowder_v1/search/OrthoFinder/
+      Results_Sep19_2/WorkingDirectory/   complete 16-file all-vs-all, KEEP (insurance)
+      Results_Sep20/WorkingDirectory/     this run; OrthoFinder_graph.txt, Orthogroups.txt
+
+- **The search problem is solved and stayed solved.** 16/16 searches in
+  4:34:51, peak 547.8 GiB live (`sstat`), against 547.5 the day before --
+  reproduced to 0.1%, and the quadratic model budgets 604, i.e. 10%
+  conservative. Three independent confirmations now.
+
+- **Phase timings, the first complete set:**
+
+        all-vs-all (4 x -p 10)        4:34:51
+        initial processing (-a 5)     0:04:42
+        connected homologues          0:00:40
+        MCL (-te 5)                  12:51:29   <- now the dominant cost
+        writing orthogroups           2:39:57
+        MSA/trees                    ongoing, and should not be happening
+
+  MCL is nearly three times the searches. Everything upstream of it is
+  fixed; it is the next thing worth attention.
+
+- **CORRECTION: OrthoFinder passes `-te` to MCL, derived from `-a`.** An
+  earlier note here said MCL ran single-threaded because nothing asked it
+  not to. Wrong -- the command was `mcl ... -I 12.0 -o ... -te 5 -V all`,
+  and `ps -o args= | cut -c1-150` had truncated before the flag. `-a 5`
+  became `-te 5`.
+  - Consequence: **`-a` is overloaded.** It sets OrthoFinder's per-species
+    Python workers *and* mcl's thread count. dev10 caps `-a` at the number
+    of assemblies on the reasoning that per-species tasks cannot use more,
+    which is right for that phase and probably wrong for MCL, whose
+    threading has nothing to do with species count. Do not change it again
+    until the benchmark below reports.
+  - Observed at 7h27m into the real MCL: `NLWP 1, %CPU 100` with `-te 5`
+    available. A separate `mcl -te 8` on the same graph showed `NLWP 9,
+    %CPU 487` at 53 seconds in. So MCL threads its early expansion and
+    then spends most of its time somewhere serial. Whether `-te` helps
+    overall is still unanswered.
+
+- **Benchmark in flight:** `mcl $G -I 12.0 -te 8 -o mcl_te8_test.out`,
+  logging to `~/tuco/assembly/mcl_te8.log`. Note `conda run` buffers unless
+  given `--no-capture-output`, so that log stays empty until it exits;
+  `/usr/bin/time -v` then prints wall clock and peak RSS. Compare against
+  MCL's 12:51:29 at `-te 5`. If it is not much faster, drop the whole idea:
+  the cost is serial and threading is a mirage.
+
+- **The graph is sparse, and the hub hypothesis is dead.**
+  `OrthoFinder_graph.txt` is 172 MB: 5,354,958 x 5,354,958, one line per
+  row, **mean degree 1.5, max degree 74**, top ten degrees 74 down to 64.
+  No hubs, no long tail, nothing for MCL's `-P`/`-S` pruning to prune. So
+  the cost is node count (5.35M, several times past MCL's usual range),
+  not density -- and 12h51m on a graph this sparse still looks anomalous.
+  No mechanism yet.
+  - **Open question worth a sceptical look:** mean degree 1.5 is lower
+    than four assemblies of one organism ought to give, where a contig
+    should hit its counterparts in the other three. May be normal after
+    OrthoFinder's score normalisation and its 1e-3 cutoff; the Blast files
+    themselves were healthy (19-63 MB, self-comparisons intact). Check the
+    orthogroup count and size distribution when convenient rather than
+    assuming it is fine because the step exited zero.
+
+- **`-og` is not being honoured.** It is documented to stop after
+  orthogroups and ORP passes it for exactly that reason, but the log goes
+  `Done orthogroups` -> `Starting MSA/Trees` -> "Using 57774 orthogroups
+  ... Inferring multiple sequence alignments for species tree". That work
+  is useless to ORP, which needs only Orthogroups.txt.
+  - **Do not kill OrthoFinder to stop it.** ORP's `run()` retries on
+    non-zero exit (`STEP_RETRIES = 2`), so killing it re-runs the whole
+    step including 4h35m of searches.
+  - To investigate: `orthofinder --help | grep -A2 "WORKFLOW STOPPING"` on
+    3.1.5, and whether the fix is a different flag or having ORP stop
+    waiting once Orthogroups.txt appears.
+
+- **Still open, in rough priority order:**
+  1. `mcl_te8.log` result -> decides whether MCL's 12h51m is addressable,
+     and whether dev10's `-a` cap needs reverting.
+  2. `-og` workaround, so runs stop at orthogroups as intended.
+  3. `-b` resume in `run_orthofuser`: OrthoFinder's `-b <WorkingDirectory>`
+     reuses a completed all-vs-all. Offered three times, never built;
+     would have saved hours on each of the last three attempts.
+     `audit_orthofinder_searches` (dev8) already answers "is it complete".
+  4. Orthogroup sanity check, per the mean-degree note above.
+  5. Memory term on `-a`, still deliberately absent (see
+     `orthofinder_analysis_threads`). Needs a measurement of the algorithm
+     phase, which this run could supply.
+
 ## 2026-09-20
 
 - **Three self-searches measured; the model is quadratic, and count is
