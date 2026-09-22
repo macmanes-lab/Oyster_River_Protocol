@@ -41,18 +41,18 @@ class Assembly(NamedTuple):
     ones every existing run directory on disk already carries: the file is
     `<runout>.trinity.Trinity.fasta` but its diamond output is
     `<runout>.trinity.diamond.txt`, while SPAdes' unique-gene count lands in
-    `<runout>.unique.sp75.txt` and not `...spades75...`. Renaming any of
+    `<runout>.unique.sphigh.txt` and not `...spadeshigh...`. Renaming any of
     them would silently invalidate every resumable run directory that
     exists, so they are carried as data instead of being derived.
 
     The SPAdes assemblies are a deliberate exception. They changed which k
-    values they run at, so a directory holding the old `spades55.fasta` no
-    longer describes what this code would produce from the same reads.
-    Keeping the old name would let step() find that stale file and skip the
-    assembly, reporting an auto-k run while serving k=55 output -- the same
-    silent wrongness the paragraph above is guarding against, arriving from
-    the other direction. Renaming costs a re-assembly; not renaming costs a
-    wrong answer that looks right.
+    values they run at, so a directory holding the old `spades55.fasta` or
+    `spades75.fasta` no longer describes what this code would produce from
+    the same reads. Keeping the old names would let step() find those stale
+    files and skip the assemblies, reporting an auto-k run while serving k=55
+    output -- the same silent wrongness the paragraph above is guarding
+    against, arriving from the other direction. Renaming costs a
+    re-assembly; not renaming costs a wrong answer that looks right.
     """
 
     fasta_name: str      # assemblies/<runout>.<fasta_name>
@@ -62,7 +62,7 @@ class Assembly(NamedTuple):
 
 
 SPADES_AUTO = Assembly("spadesauto.fasta", "spadesauto", "spauto", "SPADESAUTO")
-SPADES75 = Assembly("spades75.fasta", "spades75", "sp75", "SPADES75")
+SPADES_HIGH = Assembly("spadeshigh.fasta", "spadeshigh", "sphigh", "SPADESHIGH")
 TRANSABYSS = Assembly("transabyss.fasta", "transabyss", "transabyss", "TRANSABYSS")
 TRINITY = Assembly("trinity.Trinity.fasta", "trinity", "trinity", "TRINITY")
 
@@ -82,9 +82,9 @@ TRINITY = Assembly("trinity.Trinity.fasta", "trinity", "trinity", "TRINITY")
 #   REPORT_ORDER      the order the UNIQUE GENES lines appear in
 #                     reports/qualreport.<run>. Cosmetic, but people diff
 #                     those reports across runs.
-ASSEMBLY_ORDER = (SPADES_AUTO, SPADES75, TRANSABYSS, TRINITY)
-DIAMOND_PRIORITY = (TRANSABYSS, SPADES75, SPADES_AUTO, TRINITY)
-REPORT_ORDER = (TRINITY, SPADES_AUTO, SPADES75, TRANSABYSS)
+ASSEMBLY_ORDER = (SPADES_AUTO, SPADES_HIGH, TRANSABYSS, TRINITY)
+DIAMOND_PRIORITY = (TRANSABYSS, SPADES_HIGH, SPADES_AUTO, TRINITY)
+REPORT_ORDER = (TRINITY, SPADES_AUTO, SPADES_HIGH, TRANSABYSS)
 
 # Preflight, in the order it prints. Everything here is shelled out to at
 # some point in a full run, and finding it missing hours in -- at
@@ -573,29 +573,72 @@ def average_read_length(path: Path, n_records: int = 100) -> int:
 
 
 MAX_SPADES_K = 127  # rnaSPAdes requires every k to be odd and strictly below 128
+MIN_SPADES_K = 15
 
 
 def parse_kmer_spec(value):
-    """Parse a --spadesN-kmer value into None ("auto") or a list of k-mer sizes.
+    """Parse a --spadesN-kmer value into one of three forms:
 
-    None makes run_spades() omit -k entirely, so rnaSPAdes picks its own two
-    k values from the observed read length -- approximately 1/3 and 1/2 of the
-    maximum. That is the documented default and the configuration the
-    rnaSPAdes authors recommend: they warn that smaller k-mer sizes typically
-    produce chimeric transcripts, and ORP forcing a single k per run has
-    always deviated from it. Two single-k runs are not one two-k run.
+    - None                -- "auto": run_spades() omits -k entirely so
+      rnaSPAdes picks its own two k values from the observed read length
+      (approximately 1/3 and 1/2 of the maximum). This is the documented
+      default and the configuration the rnaSPAdes authors recommend: they
+      warn that smaller k-mer sizes typically produce chimeric transcripts,
+      and ORP forcing a single k per run has always deviated from it. Two
+      single-k runs are not one two-k run.
+    - a list of ints      -- absolute k values, used as given.
+    - a list of floats    -- fractions of maximum read length ("60%,75%"),
+      resolved per-dataset by resolve_kmers() once the reads have been read.
 
-    rnaSPAdes requires every k to be odd, below 128, and in ascending order,
-    so reject violations here rather than after the reads have already been
-    trimmed and corrected.
+    Fractions exist because an absolute k means completely different things at
+    different read lengths: k=75 is half the read length at 150bp but 74% of
+    it at 101bp, which is why ORP's historical fixed k values behaved so
+    differently across datasets.
+
+    Absolute and fractional entries cannot be mixed in one spec -- the two
+    can't be ordered against each other until read length is known, and a spec
+    that silently reorders itself per dataset would be worse than an error.
+    rnaSPAdes' own constraints (odd, below 128, ascending, distinct) are
+    enforced here for absolute values and in resolve_kmers() for fractions,
+    rather than after the reads have already been trimmed and corrected.
     """
-    if value.strip().lower() == "auto":
+    text = value.strip()
+    if text.lower() == "auto":
         return None
+    parts = [x.strip() for x in text.split(",")]
+    if not parts or any(not x for x in parts):
+        raise argparse.ArgumentTypeError(f"{value!r}: empty k-mer entry")
+
+    if all(x.endswith("%") for x in parts):
+        try:
+            fracs = [float(x[:-1]) / 100.0 for x in parts]
+        except ValueError:
+            raise argparse.ArgumentTypeError(
+                f"{value!r}: expected percentages like '60%,75%'"
+            )
+        for f in fracs:
+            if not 0.0 < f < 1.0:
+                raise argparse.ArgumentTypeError(
+                    f"{value!r}: k-mer percentages must be above 0% and below 100% "
+                    f"(got {f * 100:g}%)"
+                )
+        if fracs != sorted(fracs) or len(set(fracs)) != len(fracs):
+            raise argparse.ArgumentTypeError(
+                f"{value!r}: k-mer percentages must be distinct and in ascending order"
+            )
+        return fracs
+
+    if any(x.endswith("%") for x in parts):
+        raise argparse.ArgumentTypeError(
+            f"{value!r}: cannot mix absolute k values and percentages in one spec"
+        )
+
     try:
-        kmers = [int(x) for x in value.split(",")]
+        kmers = [int(x) for x in parts]
     except ValueError:
         raise argparse.ArgumentTypeError(
-            f"{value!r}: expected 'auto' or a comma-separated list of integers"
+            f"{value!r}: expected 'auto', a comma-separated list of integers, "
+            "or a comma-separated list of percentages like '60%,75%'"
         )
     for k in kmers:
         if k % 2 == 0 or not 0 < k <= MAX_SPADES_K:
@@ -606,6 +649,46 @@ def parse_kmer_spec(value):
         raise argparse.ArgumentTypeError(
             f"{value!r}: rnaSPAdes k-mer sizes must be distinct and in ascending order"
         )
+    return kmers
+
+
+def resolve_kmers(spec, max_read_len, label=""):
+    """Turn a parsed spec into the concrete k list to hand rnaSPAdes.
+
+    None and absolute lists pass straight through. Fractions are multiplied by
+    max_read_len and rounded *down* to the nearest odd number -- down rather
+    than nearest, so a fraction can never round up into the read-length wall,
+    where a read yields too few k-mers to be worth anything (at k=L a read
+    yields one k-mer, and rnaSPAdes errors outright).
+
+    Results are clamped to rnaSPAdes' 127 ceiling, which long reads hit
+    easily: 75% of a 250bp read is 187. Clamping can collapse two fractions
+    onto the same k, so duplicates are dropped and the collapse is reported
+    rather than passed to rnaSPAdes as an invalid repeated -k.
+    """
+    if spec is None or not spec or isinstance(spec[0], int):
+        return spec
+
+    kmers, notes = [], []
+    for f in spec:
+        k = int(f * max_read_len + 0.5)
+        if k % 2 == 0:
+            k -= 1
+        if k > MAX_SPADES_K:
+            notes.append(f"{f * 100:g}% of {max_read_len} = {k}, clamped to {MAX_SPADES_K}")
+            k = MAX_SPADES_K
+        if k < MIN_SPADES_K:
+            sys.exit(
+                f"\n\n\n\n ERROR: {label}{f * 100:g}% OF A {max_read_len} BP READ IS K={k},\n"
+                " WHICH IS TOO SMALL TO ASSEMBLE WITH. USE A LARGER PERCENTAGE OR AN\n"
+                " EXPLICIT ODD K VALUE. \n\n\n\n"
+            )
+        if k not in kmers:
+            kmers.append(k)
+        else:
+            notes.append(f"{f * 100:g}% of {max_read_len} also resolves to {k}, dropped as a duplicate")
+    for n in notes:
+        print(f"[kmer] {label}{n}")
     return kmers
 
 
@@ -630,7 +713,7 @@ class Pipeline:
         # Assembler-only settings. An entry point that doesn't assemble
         # (chowder.py) has no flags for these and never reads them back.
         self.spades1_kmer = getattr(args, "spades1_kmer", None)
-        self.spades2_kmer = getattr(args, "spades2_kmer", [75])
+        self.spades2_kmer = getattr(args, "spades2_kmer", [0.60, 0.75])
         self.transabyss_kmer = getattr(args, "transabyss_kmer", 32)
         self.read1 = Path(args.read1)
         self.read2 = Path(args.read2)
@@ -1269,21 +1352,51 @@ class Pipeline:
             sys.exit("\n\n\n\n ERROR: YOUR READ1 FILE DOES NOT EXIST AT THE LOCATION YOU SPECIFIED\n\n\n\n ")
         if not self.read2.exists():
             sys.exit("\n\n\n\n ERROR: YOUR READ2 FILE DOES NOT EXIST AT THE LOCATION YOU SPECIFIED\n\n\n\n ")
-        len1 = average_read_length(self.read1)
-        len2 = average_read_length(self.read2)
-        # Only k values we picked need checking against read length. An "auto"
-        # assembly derives its k from the reads themselves, so it cannot be
-        # too large by construction.
-        explicit = [k for spec in (self.spades1_kmer, self.spades2_kmer) if spec for k in spec]
-        if not explicit:
-            return
-        max_k = max(explicit)
-        if not (len1 > max_k and len2 > max_k):
+        avg1, max1 = read_length_stats(self.read1)
+        avg2, max2 = read_length_stats(self.read2)
+        max_read_len = max(max1, max2)
+
+        def is_fractional(spec):
+            return bool(spec) and isinstance(spec[0], float)
+
+        frac1, frac2 = is_fractional(self.spades1_kmer), is_fractional(self.spades2_kmer)
+
+        # Resolve percentage specs here, the one place read length is already
+        # in hand, so the concrete k values are fixed and printed before any
+        # of the assembly work starts rather than discovered mid-run.
+        self.spades1_kmer = resolve_kmers(self.spades1_kmer, max_read_len, "spadesauto: ")
+        self.spades2_kmer = resolve_kmers(self.spades2_kmer, max_read_len, "spadeshigh: ")
+        mean_shown = str(avg1) if avg1 == avg2 else f"{min(avg1, avg2)}-{max(avg1, avg2)}"
+        for name, spec in (("spadesauto", self.spades1_kmer), ("spadeshigh", self.spades2_kmer)):
+            shown = "auto (rnaSPAdes picks from read length)" if spec is None else ",".join(str(k) for k in spec)
+            print(f"[kmer] {name}: k = {shown}   (reads: mean {mean_shown} bp, max {max_read_len} bp)")
+
+        # A k at or above read length is fatal -- rnaSPAdes extracts no k-mers
+        # at all (ablab/spades#237). Split by where the k came from: an
+        # absolute k that doesn't fit the data is a mistake in the command
+        # line and should stop the run, while a resolved percentage was
+        # derived from these very reads and is only worth warning about. The
+        # warning still matters, because percentages resolve against *max*
+        # read length: on variable-length input a k below the max can still
+        # sit above the mean, where most reads contribute nothing.
+        absolute = [k for spec, frac in ((self.spades1_kmer, frac1), (self.spades2_kmer, frac2))
+                    if spec and not frac for k in spec]
+        if absolute and not (avg1 > max(absolute) and avg2 > max(absolute)):
             sys.exit(
-                f"\n\n\n\n IT LOOKS LIKE YOUR READS ARE NOT AT LEAST {max_k} BP LONG,\n "
+                f"\n\n\n\n IT LOOKS LIKE YOUR READS ARE NOT AT LEAST {max(absolute)} BP LONG,\n "
                 'PLEASE EDIT YOUR COMMAND USING THE "--spades1-kmer"/"--spades2-kmer" FLAGS,\n'
                 " SETTING EACH ASSEMBLY KMER LENGTH TO AN ODD NUMBER LESS THAN YOUR READ LENGTH,\n"
                 ' OR TO "auto" TO LET rnaSPAdes PICK FROM THE READS \n\n\n\n'
+            )
+
+        resolved = [k for spec, frac in ((self.spades1_kmer, frac1), (self.spades2_kmer, frac2))
+                    if spec and frac for k in spec]
+        if resolved and not (avg1 > max(resolved) and avg2 > max(resolved)):
+            print(
+                f"\n{RED} WARNING: k={max(resolved)} was derived from a maximum read length of "
+                f"{max_read_len} bp, but the mean read length is only {min(avg1, avg2)} bp.\n"
+                " Reads shorter than k contribute no k-mers at all, so this assembly may "
+                f"recover very little.{RESET}\n"
             )
 
     # -- trimming / correction ----------------------------------------------
@@ -1457,8 +1570,8 @@ class Pipeline:
     def run_spadesauto(self, cpu=None, mem=None):
         self.run_spades(self.spades1_kmer, "spadesauto", "auto", cpu=cpu, mem=mem)
 
-    def run_spades75(self, cpu=None, mem=None):
-        self.run_spades(self.spades2_kmer, "spades75", "75", cpu=cpu, mem=mem)
+    def run_spadeshigh(self, cpu=None, mem=None):
+        self.run_spades(self.spades2_kmer, "spadeshigh", "high", cpu=cpu, mem=mem)
 
     def run_transabyss(self, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
@@ -2697,11 +2810,11 @@ class Pipeline:
         c1, c2 = self.cor1(), self.cor2()
         trinity_fa = self.assembly_fasta(TRINITY)
         phase1_done = self.trinity_phase1_done()
-        sp75 = self.assembly_fasta(SPADES75)
+        sphigh = self.assembly_fasta(SPADES_HIGH)
         spauto = self.assembly_fasta(SPADES_AUTO)
         ta = self.assembly_fasta(TRANSABYSS)
         diamond_ta = self.diamond_txt(TRANSABYSS)
-        diamond_sp75 = self.diamond_txt(SPADES75)
+        diamond_sphigh = self.diamond_txt(SPADES_HIGH)
         diamond_spauto = self.diamond_txt(SPADES_AUTO)
 
         # Two sequential stage-pairings rather than one lane split across all
@@ -2751,13 +2864,13 @@ class Pipeline:
             # spadesauto (the lower-k assembly, whose smaller k dominates its
             # cost) first, since it has been the slower of the two --
             # historically the fixed k=55 run against the fixed k=75 one.
-            # diamond_{spadesauto, spades75} depend only on their own assembly
+            # diamond_{spadesauto, spadeshigh} depend only on their own assembly
             # (not on Trinity or the orthofuser merge below), so each fires as
             # soon as its assembly is done instead of waiting for the merge.
             try:
                 for step_name, outputs, inputs, assemble, diamond_name, diamond_out in (
                     ("run_spadesauto", [spauto], [c1, c2], self.run_spadesauto, "spadesauto", diamond_spauto),
-                    ("run_spades75", [sp75], [c1, c2], self.run_spades75, "spades75", diamond_sp75),
+                    ("run_spadeshigh", [sphigh], [c1, c2], self.run_spadeshigh, "spadeshigh", diamond_sphigh),
                 ):
                     self.step(step_name, outputs, inputs, partial(assemble, cpu=spades_cpu, mem=spades_mem))
                     query = outputs[0]
@@ -2770,7 +2883,7 @@ class Pipeline:
                 _lane_failed("spades", e)
                 raise
 
-        print(f"\n=== Stage A: run_trinity_phase1 ({phase1_cpu} cpu) || spadesauto/spades75 ({spades_cpu} cpu) -- start {self._ts()} ===")
+        print(f"\n=== Stage A: run_trinity_phase1 ({phase1_cpu} cpu) || spadesauto/spadeshigh ({spades_cpu} cpu) -- start {self._ts()} ===")
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
             for f in concurrent.futures.as_completed([ex.submit(trinity_phase1_lane), ex.submit(spades_lane)]):
                 f.result()
@@ -2959,9 +3072,10 @@ def parse_args():
                    help="rnaSPAdes k-mer(s) for the spadesauto assembly: 'auto' to let "
                         "rnaSPAdes pick its documented default pair from read length, or a "
                         "comma-separated list of odd sizes under 128 (default: auto)")
-    p.add_argument("--spades2-kmer", type=parse_kmer_spec, default="75",
-                   help="rnaSPAdes k-mer(s) for the spades75 assembly: 'auto' or a "
-                        "comma-separated list of odd sizes under 128 (default: 75)")
+    p.add_argument("--spades2-kmer", type=parse_kmer_spec, default="60%,75%",
+                   help="rnaSPAdes k-mer(s) for the spadeshigh assembly: percentages of "
+                        "max read length ('60%%,75%%'), an explicit comma-separated list of "
+                        "odd sizes under 128, or 'auto' (default: 60%%,75%%)")
     p.add_argument("--transabyss-kmer", type=int, default=32, help="Trans-ABySS k-mer (default: 32)")
     p.add_argument(
         "--orthofinder-searches", type=int, default=None, metavar="N",
