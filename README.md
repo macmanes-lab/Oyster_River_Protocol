@@ -91,7 +91,7 @@ A completed run keeps five things and reclaims the rest:
 | Kept | |
 |---|---|
 | `assemblies/<run>.ORP.fasta` | the assembly — the point of the run, left uncompressed |
-| `assemblies/<run>.{spadesauto,spades75,transabyss,trinity.Trinity}.fasta.gz` | the four individual assemblies, gzipped |
+| `assemblies/<run>.{spadesauto,spadeshigh,transabyss,trinity.Trinity}.fasta.gz` | the four individual assemblies, gzipped |
 | `rcorr/<run>.TRIM_{1,2}P.cor.fq.gz` | the trimmed **and error-corrected** reads, gzipped — the pair every assembler actually read |
 | `reports/` | BUSCO, transrate, strand evaluation, `qualreport.<run>`, timings |
 | `reports/<run>.cleanup.done` | what was reclaimed and what was kept, with sizes |
@@ -133,8 +133,8 @@ Because it appends, a value given here overrides the same flag ORP passes above 
 | `--normalize-reads` | off | Let Trinity normalize reads (default is `--no_normalize_reads`) |
 | `--tpm-filt` | `0` | TPM filter threshold |
 | `--trimmed-corrected-reads` | off | Treat `--read1`/`--read2` as already trimmed and error-corrected, and skip trimmomatic and rcorrector (see [Reads you have already corrected](#reads-you-have-already-corrected) above) |
-| `--spades1-kmer` | `auto` | rnaSPAdes k-mer(s) for the spadesauto assembly — `auto` lets rnaSPAdes pick its documented default pair (~1/3 and ~1/2 of maximum read length), or give a comma-separated list of odd sizes under 128 |
-| `--spades2-kmer` | `75` | rnaSPAdes k-mer for the spades75 assembly |
+| `--spades1-kmer` | `auto` | rnaSPAdes k-mer(s) for the spadesauto assembly — `auto` lets rnaSPAdes pick its documented default pair (~1/3 and ~1/2 of maximum read length). Also accepts percentages or an explicit list, same forms as `--spades2-kmer` |
+| `--spades2-kmer` | `60%,75%` | rnaSPAdes k-mer(s) for the spadeshigh assembly — percentages of maximum read length, an explicit comma-separated list of odd sizes under 128, or `auto`. Percentages resolve per dataset (61,75 at 101bp reads; 89,113 at 150bp), clamped to rnaSPAdes' 127 ceiling |
 | `--transabyss-kmer` | `32` | Trans-ABySS k-mer |
 | `--merge-method` | `twotrack` | How the four assemblies' contigs become one: `twotrack` keeps one contig per Swiss-Prot gene plus distinct, expressed copies, and deduplicates contigs without a hit; `orthofinder` is ORP's method through 4.0 (see [How the assemblies are merged](#how-the-assemblies-are-merged)) |
 | `--max-parallel` | `2` | Max concurrent jobs per stage (see [Parallel task management](#parallel-task-management) above) |

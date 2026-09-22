@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-#usage: python build_list5.py list3.txt list5.txt transabyss.diamond.txt spades75.diamond.txt spadesauto.diamond.txt trinity.diamond.txt
+#usage: python build_list5.py list3.txt list5.txt transabyss.diamond.txt spadeshigh.diamond.txt spadesauto.diamond.txt trinity.diamond.txt
 #
 #for each gene ID in list3, finds the first diamond hit (searching the
 #diamond.txt files in the order given) whose subject gene ID matches, and
