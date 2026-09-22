@@ -72,7 +72,7 @@ A completed run keeps five things and reclaims the rest:
 | Kept | |
 |---|---|
 | `assemblies/<run>.ORP.fasta` | the assembly — the point of the run, left uncompressed |
-| `assemblies/<run>.{spades55,spades75,transabyss,trinity.Trinity}.fasta.gz` | the four individual assemblies, gzipped |
+| `assemblies/<run>.{spadesauto,spades75,transabyss,trinity.Trinity}.fasta.gz` | the four individual assemblies, gzipped |
 | `rcorr/<run>.TRIM_{1,2}P.cor.fq.gz` | the trimmed **and error-corrected** reads, gzipped — the pair every assembler actually read |
 | `reports/` | BUSCO, transrate, strand evaluation, `qualreport.<run>`, timings |
 | `reports/<run>.cleanup.done` | what was reclaimed and what was kept, with sizes |
@@ -113,7 +113,7 @@ Because it appends, a value given here overrides the same flag ORP passes above 
 | `--lineage` | `eukaryota_odb12.2` | BUSCO lineage |
 | `--normalize-reads` | off | Let Trinity normalize reads (default is `--no_normalize_reads`) |
 | `--tpm-filt` | `0` | TPM filter threshold |
-| `--spades1-kmer` | `55` | rnaSPAdes k-mer for the spades55 assembly |
+| `--spades1-kmer` | `auto` | rnaSPAdes k-mer(s) for the spadesauto assembly — `auto` lets rnaSPAdes pick its documented default pair (~1/3 and ~1/2 of maximum read length), or give a comma-separated list of odd sizes under 128 |
 | `--spades2-kmer` | `75` | rnaSPAdes k-mer for the spades75 assembly |
 | `--transabyss-kmer` | `32` | Trans-ABySS k-mer |
 | `--max-parallel` | `2` | Max concurrent jobs per stage (see [Parallel task management](#parallel-task-management) above) |
