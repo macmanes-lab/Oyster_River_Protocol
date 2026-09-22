@@ -74,6 +74,12 @@ def read_transrate(reports, srr):
     return row, ""
 
 
+QUALREPORT_RE = {
+    "unique_genes_ORP": re.compile(r"UNIQUE GENES ORP\s*~*>\s*(\S+)"),
+    "proper_pairs": re.compile(r"READS MAPPED AS PROPER PAIRS\s*~*>\s*(\S+)"),
+}
+
+
 def read_unique_genes(rundir, srr):
     p = rundir / "assemblies" / "working" / f"{srr}.unique.ORP.txt"
     return p.read_text().strip() if p.is_file() else ""
@@ -91,6 +97,27 @@ def read_proper_pairs(rundir, srr):
     return ""
 
 
+def read_from_qualreport(reports, srr):
+    """Unique genes and proper pairs as reportgen recorded them.
+
+    Both are read above from the files the pipeline computes them in --
+    assemblies/working/<run>.unique.ORP.txt and <run>.flagstat -- and ORP's
+    end-of-run cleanup deletes both (oyster.py's cleanup list). So for exactly
+    the runs that finished, the direct reads return nothing, and the only
+    surviving copy is the text report reportgen wrote before the cleanup ran.
+    """
+    p = reports / f"qualreport.{srr}"
+    if not p.is_file():
+        return {}
+    text = p.read_text(errors="replace")
+    out = {}
+    for field, pattern in QUALREPORT_RE.items():
+        m = pattern.search(text)
+        if m:
+            out[field] = m.group(1)
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -103,6 +130,10 @@ def main():
                          "run and to report samples that produced no run "
                          "directory at all (default: $COMPARE/manifest.tsv)")
     ap.add_argument("-o", "--out", type=Path, default=Path("metrics.csv"))
+    ap.add_argument("--include-partial", action="store_true",
+                    help="also write a row for every run that has not produced "
+                         "both metric sources yet, with its cells left empty "
+                         "(default: list those on stderr and leave them out)")
     args = ap.parse_args()
 
     meta, order = {}, []
@@ -139,15 +170,18 @@ def main():
             m = re.search(r"[SED]RR\d{4,}", run)
             meta[run] = {"tsa": "", "code": "", "srr": m.group(0) if m else ""}
 
-    records, transrate_cols = [], []
+    records, skipped, transrate_cols = [], [], []
     for srr in order:
         rundir = args.runs / srr
         info = meta.get(srr, {})
         rec = {"run": srr, "srr": info.get("srr", ""),
                "code": info.get("code", ""), "tsa": info.get("tsa", "")}
         if not rundir.is_dir():
-            rec["status"] = "no run directory"
-            records.append(rec)
+            if args.include_partial:
+                rec["status"] = "no run directory"
+                records.append(rec)
+            else:
+                skipped.append((srr, "not started"))
             continue
 
         reports = rundir / "reports"
@@ -157,16 +191,33 @@ def main():
         rec.update(tr)
         rec["unique_genes_ORP"] = read_unique_genes(rundir, srr)
         rec["proper_pairs"] = read_proper_pairs(rundir, srr)
+        # Only where cleanup has taken the sources away; a live run's own files
+        # stay authoritative.
+        for field, value in read_from_qualreport(reports, srr).items():
+            if not rec.get(field):
+                rec[field] = value
 
         for col in tr:
             if col not in transrate_cols:
                 transrate_cols.append(col)
 
+        # A row is worth a line in the csv when both metric sources are there.
+        # Anything less is a run still working its way up to them, and printing
+        # it as a line of empty commas puts a placeholder in the table that has
+        # to be filtered out of every later analysis.
         notes = [n for n in (busco_note, tr_note) if n]
-        if (reports / f"qualreport.{srr}.done").is_file() and not notes:
+        if notes and not args.include_partial:
+            skipped.append((srr, "; ".join(notes)))
+            continue
+        # Past that, status distinguishes a run that reached the end from one
+        # that has the metrics but has not finished: the last steps after
+        # pytransrate and BUSCO are what write qualreport.<run>.done.
+        if notes:
+            rec["status"] = "; ".join(notes)
+        elif (reports / f"qualreport.{srr}.done").is_file():
             rec["status"] = "complete"
         else:
-            rec["status"] = "; ".join(notes) or "incomplete"
+            rec["status"] = "still running"
         records.append(rec)
 
     header = (["run", "srr", "code", "tsa", "status"] + BUSCO_FIELDS
@@ -178,10 +229,21 @@ def main():
             w.writerow(rec)
 
     done = sum(1 for r in records if r.get("status") == "complete")
-    print(f"{done}/{len(records)} complete -> {args.out}", file=sys.stderr)
-    for r in records:
-        if r.get("status") != "complete":
-            print(f"  {r['run']}: {r.get('status')}", file=sys.stderr)
+    running = sum(1 for r in records if r.get("status") == "still running")
+    parts = [f"{done} finished"]
+    if running:
+        parts.append(f"{running} with metrics but still running")
+    # Only reachable with --include-partial; without it these were skipped.
+    empty = len(records) - done - running
+    if empty:
+        parts.append(f"{empty} with no metrics")
+    print(f"wrote {len(records)} rows to {args.out} ({', '.join(parts)})",
+          file=sys.stderr)
+    if skipped:
+        print(f"left out {len(skipped)} of {len(order)} runs, no metrics yet:",
+              file=sys.stderr)
+        for run, why in skipped:
+            print(f"  {run}: {why}", file=sys.stderr)
 
 
 if __name__ == "__main__":

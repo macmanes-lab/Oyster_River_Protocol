@@ -127,10 +127,26 @@ Then the metrics: every pytransrate column from
 BUSCO C/S/D/F/M/n from `reports/run_<run>.ORP/short*.txt`, unique SwissProt genes
 and proper-pair rate. Columns come from the csv header by name, not by position.
 
-Safe to run while the array is still going: samples that have not finished get
-blank cells and a reason in `status` -- `no run directory`, `no transrate csv` --
-and are listed on stderr, so the same command doubles as a progress check.
+Safe to run while the array is still going, and built for it: a run that has not
+produced both pytransrate and BUSCO yet is left out of the csv entirely and
+listed on stderr instead, so every row in the table is a row with numbers in it.
 
 ```
-./collect_metrics.py -o metrics.csv && cut -d, -f1,3,5 metrics.csv | column -s, -t
+wrote 64 rows to metrics.csv (58 finished, 6 with metrics but still running)
+left out 44 of 108 runs, no metrics yet:
+  SRR500475: no busco dir; no transrate csv
+  SRR544868: not started
 ```
+
+`status` then separates a run that reached the end (`complete`) from one whose
+metrics are in but whose last steps are not (`still running`) -- those write
+`qualreport.<run>.done` after pytransrate and BUSCO. Pass `--include-partial` to
+get a row for every manifest line regardless, cells empty.
+
+### unique_genes_ORP and proper_pairs
+
+These come from `assemblies/working/<run>.unique.ORP.txt` and `<run>.flagstat`,
+and ORP's end-of-run cleanup deletes both -- so for exactly the runs that
+finished, reading them directly returns nothing. The collector falls back to
+`reports/qualreport.<run>`, which reportgen writes before the cleanup runs and
+which survives it. A live run's own files stay authoritative where they exist.
