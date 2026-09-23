@@ -8,6 +8,7 @@
 #
 #     ./make_manifest.sh                    # -> $COMPARE/manifest.tsv
 #     OUT=/tmp/subset.tsv ./make_manifest.sh
+#     MIN_READ_LEN=100 ./make_manifest.sh   # stricter length floor
 #
 # Column 5 is the run name: what --runout gets and what the run directory is
 # called. It is settled here, once, rather than re-derived inside each array
@@ -25,12 +26,33 @@ COMPARE="${COMPARE:-/mnt/home/macmaneslab/macmanes/compare}"
 BASE="${BASE:-$COMPARE/pairs}"
 OUT="${OUT:-$COMPARE/manifest.tsv}"
 
+# Reads shorter than this are excluded. The assemblers' default k-mers make
+# short reads a poor bargain -- rnaSPAdes runs at k=55 and k=75 here, so a 50 bp
+# library contributes nothing to the second of those and little to the first.
+MIN_READ_LEN="${MIN_READ_LEN:-76}"
+SAMPLE_READS="${SAMPLE_READS:-100}"
+
 [ -d "$BASE" ] || { echo "make_manifest: no pairs directory at $BASE" >&2; exit 1; }
+
+# Median read length over the first $SAMPLE_READS records, or "" if the file
+# cannot be read. The median rather than the max because a submission that was
+# trimmed before upload has a tail of short reads, and one surviving full-length
+# read should not speak for the library; the first records rather than all of
+# them because these are multi-GB files and the length is a property of the run.
+read_length() {
+    local f="$1" decomp="cat"
+    case "$f" in *.gz) decomp="gzip -cd" ;; esac
+    $decomp < "$f" 2>/dev/null \
+        | head -n $((SAMPLE_READS * 4)) \
+        | awk 'NR % 4 == 2 { print length($0) }' \
+        | sort -n \
+        | awk '{ a[NR] = $1 } END { if (NR) print a[int((NR + 1) / 2)] }'
+}
 
 tmp=$(mktemp "${TMPDIR:-/tmp}/manifest.XXXXXX") || exit 1
 trap 'rm -f "$tmp"' EXIT
 
-found=0 skipped=0 noasm=0
+found=0 skipped=0 noasm=0 tooshort=0
 
 for sampledir in "$BASE"/tsa_*; do
     [ -d "$sampledir" ] || continue
@@ -70,6 +92,20 @@ for sampledir in "$BASE"/tsa_*; do
     if [ -z "$r2" ] || [ ! -f "$r2" ]; then
         echo "SKIP $tsa: no mate for $(basename "$r1")" >&2
         skipped=$((skipped+1)); continue
+    fi
+
+    # Both mates, not just R1: a library can be 100 bp forward and 50 bp
+    # reverse, and the pair is only as usable as its shorter half.
+    len1=$(read_length "$r1")
+    len2=$(read_length "$r2")
+    if [ -z "$len1" ] || [ -z "$len2" ]; then
+        echo "SKIP $tsa: could not read a length from $(basename "$r1")" \
+             "or its mate (truncated or not fastq?)" >&2
+        skipped=$((skipped+1)); continue
+    fi
+    if [ "$len1" -lt "$MIN_READ_LEN" ] || [ "$len2" -lt "$MIN_READ_LEN" ]; then
+        echo "SKIP $tsa: reads are ${len1}/${len2} bp, under the ${MIN_READ_LEN} bp minimum" >&2
+        tooshort=$((tooshort+1)); continue
     fi
 
     asm=""
@@ -171,4 +207,5 @@ fi
 mv "$tmp" "$OUT"
 trap - EXIT
 
-echo "make_manifest: wrote $found samples to $OUT ($skipped skipped, $noasm without an assembly)" >&2
+echo "make_manifest: wrote $found samples to $OUT ($skipped skipped," \
+     "$tooshort under ${MIN_READ_LEN} bp, $noasm without an assembly)" >&2

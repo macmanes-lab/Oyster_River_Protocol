@@ -32,6 +32,18 @@ cannot tell that its accession belongs to two of them.
 message lists what the `reads/` directory actually contains, so an empty
 directory and an unrecognised naming convention are distinguishable at a glance.
 
+**Reads under 76 bp** -- left out. The length is the median of the first 100
+records of each mate, and both mates have to clear the floor, so a 100/50 bp
+library is excluded on its reverse read. The median rather than the maximum
+because a submission trimmed before upload has a tail of short reads that should
+not disqualify it, and one surviving full-length read should not qualify it
+either. Raise or lower with `MIN_READ_LEN=100 ./make_manifest.sh`; sample more
+records with `SAMPLE_READS=1000`.
+
+The floor is there because the assemblers' k-mers make short reads a poor
+bargain: rnaSPAdes runs at k=55 and k=75 in this pipeline, so a 50 bp library
+contributes nothing to the second and little to the first.
+
 **Two samples on one accession** -- three outcomes, decided by what the read
 files really are rather than by their paths:
 
