@@ -1,5 +1,28 @@
 ### CHANGELOG
 
+ORP Version 4.0.1-dev13
+
+- **Writing `<run>.orthomerged.fasta` is linear now, not quadratic.**
+  `scripts/filter.py` tested each record of `merged.fasta` with
+  `seq.id in wanted`, where `wanted` was a *list* of `good.<run>.list`, so
+  every record scanned the whole list. Doubling the input quadrupled the
+  time: 3.6s, 13.5s and 53.5s at 50k, 100k and 200k records with a quarter
+  of them wanted, against 0.22s, 0.38s and 0.81s now. A real
+  `merged.fasta` holds millions of records; scaling these up puts the old
+  script near an hour on a big assembly (untimed on a real run).
+
+- It is stdlib-only as well: a set of IDs, and a plain-bytes parse that
+  skips unwanted records without building them, in place of Biopython.
+  **The output is byte-identical**, and has to be, because this file's
+  record order and text reach cd-hit-est. It keeps Biopython's rules: the
+  first word of the header is the ID, the header keeps its description with
+  trailing whitespace stripped, the sequence loses spaces, tabs and `\r` and
+  is re-wrapped at 60 columns, an empty record is written as its header
+  alone, and a duplicate ID is written each time it appears. Checked with
+  `cmp` against the old script on inputs mixing all of those plus
+  line widths of 60, 70, 80 and unwrapped, blank lines, empty headers and
+  padded or blank lines in the list.
+
 ORP Version 4.0.1-dev12
 
 - **Per-search memory is now quadratic in query size, not linear.** Three
