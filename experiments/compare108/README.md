@@ -71,37 +71,44 @@ Expect `byo-assemblies` (or `pytransrate`) and `4.0.0`, not `master` / `3.1.0`.
 ## 1. Run
 
 ```
-./submit.sh
+./submit_all_orp.sh /mnt/home/macmaneslab/macmanes/compare/manifest.tsv \
+                    /mnt/home/macmaneslab/macmanes/compare/orp_runs
 ```
 
-That is the whole thing -- nothing needs to be exported first. `submit.sh` holds
-the one definition of `RUNS`, `MANIFEST` and `ORP`, passes them into the job with
-`--export`, sets the array range from the manifest and the throttle to 6, and
-creates `$RUNS/logs` before submitting.
-
-That last part matters: slurm opens the `--output` file when a task launches,
-*before* the job script runs, so submitting with a missing log directory kills
-every task instantly, writing nothing anywhere. If a run vanishes without a trace,
-check that directory first.
-
-Paths default off `COMPARE=/mnt/home/macmaneslab/macmanes/compare`: the manifest
-is `$COMPARE/manifest.tsv` and the runs go in `$COMPARE/orp_runs/`, which
-`submit.sh` creates. Override any of them on the command line:
+Both paths are given on the command line; a third argument sets the throttle,
+which defaults to 6 concurrent tasks. `ORP=/path/to/oyster.py` overrides which
+pipeline runs, defaulting to `$HOME/Oyster_River_Protocol/oyster.py`.
 
 ```
-COMPARE=/some/other/place THROTTLE=4 ./submit.sh
-MANIFEST=/elsewhere/subset.tsv ./submit.sh      # e.g. to rerun a handful
+./submit_all_orp.sh manifest.tsv /scratch/orp_runs 12
 ```
 
-Six samples at a time, each 24 cpus and 120G: 144 cores and 720G in flight.
+Relative paths are resolved before being handed over, because a task resolves
+neither against its own cwd. The runs directory is created if it does not exist.
 
-Each sample runs in `$RUNS/<SRR>/` with `--runout <SRR>`, so the run trees are
-fully isolated and every file inside carries the SRR. Logs are
-`$RUNS/logs/orp_<jobid>_<task>.log`, symlinked as both `<SRR>.log` and `<tsa>.log`.
+Before submitting it checks the manifest is 5 tab-separated columns with unique
+run names, that every R1/R2 in it exists, that `orp_array.sbatch` is the same
+vintage as itself, and that the ORP checkout is on a branch with pytransrate.
+Each of those otherwise fails one task at a time, at 24 cpus apiece.
 
-Reruns are cheap: finished samples exit immediately on the `qualreport.<SRR>.done`
+It also creates `<runs>/logs` before calling sbatch. Slurm opens the `--output`
+file when a task launches, *before* the job script runs, so submitting with a
+missing log directory kills every task instantly, writing nothing anywhere. If a
+run vanishes without a trace, check that directory first.
+
+Six samples at a time, each 24 cpus and 120G: 144 cores and 720G in flight. The
+allocation is stated once, in `orp_array.sbatch`'s `#SBATCH` directives; the job
+reads `--cpu` and `--mem` back out of what slurm granted, so changing a directive
+changes what ORP is told it has.
+
+Each sample runs in `<runs>/<run name>/` with `--runout <run name>`, so the run
+trees are fully isolated and every file inside carries that name. Logs are
+`<runs>/logs/orp_<jobid>_<task>.log`, symlinked as both `<run>.log` and
+`<tsa>.log`.
+
+Reruns are cheap: finished samples exit immediately on the `qualreport.<run>.done`
 guard, and ORP itself resumes a part-finished run from where it stopped. To retry
-only the failures, resubmit -- `./submit.sh` again is safe.
+only the failures, submit the same command again.
 
 ### When a task fails
 

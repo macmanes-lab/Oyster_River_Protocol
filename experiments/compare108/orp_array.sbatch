@@ -18,18 +18,20 @@
 # assemblies/, reports/ or orthofuse/ trees, and --runout is column 5, so every
 # file inside carries the SRR rather than the tsa code.
 #
-# Submit with ./submit.sh, not with sbatch directly. submit.sh creates the log
-# directory, checks the manifest and passes RUNS/MANIFEST/ORP in via --export.
+# Submit with ./submit_all_orp.sh, not with sbatch directly. That script creates
+# the log directory, checks the manifest and passes RUNS/MANIFEST/ORP in via
+# --export.
 # The --array and --output directives above are only a fallback for a bare
-# `sbatch orp_array.sbatch`, and that path needs $RUNS/logs to exist already:
+# `sbatch orp_array.sbatch`, and that path needs the log directory to exist
+# already:
 # slurm opens the --output file before this script runs, so a missing log
 # directory kills the task before line one with nothing written anywhere.
 
 set -euo pipefail
 
-# The manifest layout this script expects. submit.sh refuses to submit unless
-# this matches what it is about to hand over, so a half-copied set of scripts is
-# caught at submit time rather than by 108 tasks misparsing their line.
+# The manifest layout this script expects. submit_all_orp.sh refuses to submit
+# unless this matches what it is about to hand over, so a half-copied set of
+# scripts is caught at submit time rather than by 108 tasks misparsing a line.
 MANIFEST_COLUMNS=5
 
 MANIFEST="${MANIFEST:-/mnt/home/macmaneslab/macmanes/compare/manifest.tsv}"
@@ -98,11 +100,26 @@ if [ -f "$RUNS/$SRR/reports/qualreport.$SRR.done" ]; then
     exit 0
 fi
 
+# --cpu and --mem come from what slurm actually granted this task, not from
+# numbers repeated here: the #SBATCH directives above are the single place the
+# allocation is stated, and a job that asked for 24 cpus while telling ORP it
+# had 16 would leave a third of the node idle for a day per sample. Editing a
+# directive now changes both.
+CPU="${SLURM_CPUS_PER_TASK:-24}"
+if [ -n "${SLURM_MEM_PER_NODE:-}" ]; then
+    MEM=$(( SLURM_MEM_PER_NODE / 1024 ))          # slurm reports MB
+elif [ -n "${SLURM_MEM_PER_CPU:-}" ]; then
+    MEM=$(( SLURM_MEM_PER_CPU * CPU / 1024 ))
+else
+    MEM=120
+fi
+echo "    allocation: ${CPU} cpus, ${MEM}G"
+
 "$ORP" \
     --normalize-reads \
     --tpm-filt 1 \
-    --mem 120 \
-    --cpu 24 \
+    --mem "$MEM" \
+    --cpu "$CPU" \
     --read1 "$R1" \
     --read2 "$R2" \
     --max-parallel 2 \
