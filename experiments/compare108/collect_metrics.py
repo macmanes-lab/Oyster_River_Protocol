@@ -160,7 +160,11 @@ def main():
             order.append(run)
             meta[run] = {
                 "tsa": tsa,
-                "code": tsa[4:] if tsa.startswith("tsa_") else tsa,
+                # tsa_GADU -> GADU, orp_ABCD -> ABCD. The prefix says which
+                # collection a sample came from and is kept in `tsa`; `code` is
+                # the bare identifier, for joining against tables that carry it
+                # without one.
+                "code": re.sub(r"^(tsa|orp)_", "", tsa),
                 "srr": m.group(0) if m else "",
             }
     else:

@@ -1,8 +1,11 @@
 #!/bin/bash
 # Build the manifest from the pairs/ tree.
 #
-# Walks $COMPARE/pairs/tsa_XXXX/ and writes one headerless tab-separated line
-# per sample, in the layout the rest of these scripts read:
+# Walks $COMPARE/pairs/ and writes one headerless tab-separated line per sample,
+# in the layout the rest of these scripts read. Sample directories are the ones
+# whose names start with one of $SAMPLE_PREFIXES -- tsa_ for the TSA-derived
+# samples and orp_ for the ones assembled here -- so a stray directory beside
+# them is not mistaken for a sample:
 #
 #     tsa_GADU <TAB> assembly.fasta.gz <TAB> SRR527277_1.fastq.gz <TAB> SRR527277_2.fastq.gz <TAB> SRR527277
 #
@@ -32,6 +35,11 @@ OUT="${OUT:-$COMPARE/manifest.tsv}"
 MIN_READ_LEN="${MIN_READ_LEN:-76}"
 SAMPLE_READS="${SAMPLE_READS:-100}"
 
+# Which directories under pairs/ are samples. Space-separated glob prefixes;
+# a directory matching none of them is ignored rather than warned about, since
+# pairs/ holds other things too.
+SAMPLE_PREFIXES="${SAMPLE_PREFIXES:-tsa_ orp_}"
+
 [ -d "$BASE" ] || { echo "make_manifest: no pairs directory at $BASE" >&2; exit 1; }
 
 # Median read length over the first $SAMPLE_READS records, or "" if the file
@@ -54,8 +62,25 @@ trap 'rm -f "$tmp"' EXIT
 
 found=0 skipped=0 noasm=0 tooshort=0
 
-for sampledir in "$BASE"/tsa_*; do
-    [ -d "$sampledir" ] || continue
+# One pass per prefix, sorted together at the end so the manifest does not come
+# out grouped by prefix -- the run order should not depend on where a sample
+# came from.
+sampledirs=""
+for prefix in $SAMPLE_PREFIXES; do
+    for d in "$BASE"/${prefix}*; do
+        [ -d "$d" ] || continue
+        sampledirs="${sampledirs}${d}
+"
+    done
+done
+if [ -z "$sampledirs" ]; then
+    echo "make_manifest: no sample directories under $BASE matching:" \
+         "$SAMPLE_PREFIXES" >&2
+    exit 1
+fi
+
+while IFS= read -r sampledir; do
+    [ -n "$sampledir" ] || continue
     tsa=$(basename "$sampledir")
 
     # R1 first: without a pair there is nothing to run, whatever else is there.
@@ -132,7 +157,7 @@ for sampledir in "$BASE"/tsa_*; do
     printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
         "$tsa" "$asm" "$r1" "$r2" "$srr" "$canon" "$sizes" >> "$tmp"
     found=$((found+1))
-done
+done <<< "$(printf '%s' "$sampledirs" | sort)"
 
 # Resolve run-name collisions. Two samples can land on one SRR for two quite
 # different reasons, and they want opposite treatment:
@@ -145,7 +170,7 @@ done
 #
 #   same SRR, different read files -- distinct samples whose filenames happen to
 #       carry the same accession. Both must run, so both get a run name
-#       disambiguated with the tsa code: SRR516821_tsa_GBBZ.
+#       disambiguated with the sample directory name: SRR516821_tsa_GBBZ.
 #
 folded="${OUT%.tsv}.folded.tsv"
 : > "$folded"
@@ -180,14 +205,14 @@ nfolded=$(grep -c . "$folded" 2>/dev/null) || true
 nfolded=${nfolded:-0}
 if [ "$nfolded" -gt 0 ]; then
     echo "NOTE folded $nfolded sample(s) whose reads are the same files as another's;" \
-         "see $folded (columns: dropped tsa, run name, tsa kept):" >&2
+         "see $folded (columns: dropped sample, run name, sample kept):" >&2
     sed 's/^/    /' "$folded" >&2
     found=$((found - nfolded))
 else
     rm -f "$folded"
 fi
 
-renamed=$(awk -F'\t' 'index($5, "_tsa_") {print "    " $1 "  ->  " $5}' "$tmp")
+renamed=$(awk -F'\t' '$5 != $1 && index($5, "_" $1) {print "    " $1 "  ->  " $5}' "$tmp")
 if [ -n "$renamed" ]; then
     echo "NOTE these share an accession with another sample but have different reads," >&2
     echo "     so each runs under its own name:" >&2

@@ -10,15 +10,22 @@ by SRR.
 wc -l /mnt/home/macmaneslab/macmanes/compare/manifest.tsv
 ```
 
-Walks `$COMPARE/pairs/tsa_XXXX/` and writes `$COMPARE/manifest.tsv`, one
-headerless tab-separated line per sample:
+Walks `$COMPARE/pairs/` and writes `$COMPARE/manifest.tsv`, one headerless
+tab-separated line per sample. Sample directories are those whose names start
+with `tsa_` (the TSA-derived samples) or `orp_` (the ones assembled here);
+anything else under `pairs/` is ignored rather than warned about. Override with
+`SAMPLE_PREFIXES="tsa_ orp_ other_" ./make_manifest.sh`.
 
 ```
 tsa_GADU <TAB> assembly.fasta.gz <TAB> SRR527277_1.fastq.gz <TAB> SRR527277_2.fastq.gz <TAB> SRR527277
 ```
 
-Column 2 is the TSA assembly. `oyster.py` has no input for it -- bringing your own
-assembly is `chowder.py`'s job on this branch -- so the full-ORP run reads and
+Column 1 is the sample directory name, prefix included; the collector's `code`
+column is the same thing with the prefix stripped, for joining against tables
+that carry the bare identifier.
+
+Column 2 is the pre-existing assembly. `oyster.py` has no input for it --
+bringing your own assembly is `chowder.py`'s job -- so the full-ORP run reads and
 ignores it, and a sample missing one is still listed, with that column empty.
 
 Column 5 is the run name: what `--runout` gets and what the run directory is
@@ -50,8 +57,8 @@ files really are rather than by their paths:
 | what the reads are | outcome |
 | --- | --- |
 | resolve to the same files (symlink/hardlink) | folded to one run; the pairing recorded in `manifest.folded.tsv` |
-| different paths, identical sizes | both run, under `SRR..._tsa_XXXX`, with a warning that they may be duplicates |
-| genuinely different | both run, under `SRR..._tsa_XXXX` |
+| different paths, identical sizes | both run, suffixed with the sample directory (`SRR888888_orp_DUPY`), with a warning that they may be duplicates |
+| genuinely different | both run, suffixed with the sample directory |
 
 Folding only happens on proof that it is one set of files. Everything else runs
 both ways, because spending the compute twice is recoverable and silently
