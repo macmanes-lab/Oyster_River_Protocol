@@ -18,6 +18,7 @@ sequence has spaces, tabs and carriage returns removed and is re-wrapped at
 60 columns; a record with no sequence is written as its header alone; and a
 record listed once but present twice is written twice.
 """
+import itertools
 import sys
 
 WRAP = 60
@@ -56,8 +57,9 @@ def main():
         first = fasta.readline()
         if first and first[:1] != b">":
             sys.exit(f"{sys.argv[1]}: does not start with a '>' header line")
-        fasta.seek(0)
-        filter_fasta(fasta, wanted, sys.stdout.buffer)
+        # Chain the peeked line back on rather than seek(0): posthack passes
+        # <(cat ...), a pipe, which cannot seek.
+        filter_fasta(itertools.chain([first], fasta), wanted, sys.stdout.buffer)
 
 
 if __name__ == "__main__":
