@@ -78,8 +78,12 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 # across -- which otherwise shows up as every task misparsing its manifest line.
 jobcols=$(awk -F= '/^MANIFEST_COLUMNS=/ {print $2; exit}' "$HERE/orp_array.sbatch")
 [ "${jobcols:-}" = "5" ] || die \
-    "$HERE/orp_array.sbatch expects ${jobcols:-an older layout}, this script writes 5."$'\n'\
-"The two are out of step: re-copy the whole of $HERE to this machine."
+"$HERE/orp_array.sbatch is from an older version than this script"$'\n'\
+"(it expects ${jobcols:-an older manifest layout}; this script hands over 5 columns)."$'\n'\
+"The two must come from the same checkout. Rather than copying them, run this"$'\n'\
+"script from the checkout -- it works from any directory, and relative paths are"$'\n'\
+"taken from where you are:"$'\n'\
+"    \$HOME/Oyster_River_Protocol/experiments/compare108/submit_all_orp.sh ${FORCE:+--force }$*"
 
 n=$(grep -c . "$MANIFEST")
 [ "$n" -gt 0 ] || die "manifest $MANIFEST has no non-blank lines"
@@ -106,6 +110,10 @@ done | head -5)
 
 mkdir -p "$RUNS/logs" || die "cannot create $RUNS/logs"
 [ -w "$RUNS/logs" ] || die "$RUNS/logs is not writable"
+# Now that it exists it can be resolved properly: ../orp_runs/ becomes a clean
+# absolute path, rather than one carrying the .. and a doubled slash into every
+# log path and every task's --dir.
+RUNS=$(cd "$RUNS" && pwd)
 
 branch=$(git -C "$(dirname "$ORP")" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "?")
 version=$(cat "$(dirname "$ORP")/version.txt" 2>/dev/null || echo "?")
