@@ -83,7 +83,7 @@ Expect `byo-assemblies` (or `pytransrate`) and `4.0.0`, not `master` / `3.1.0`.
 ```
 
 Both paths are given on the command line; a third argument sets the throttle,
-which defaults to 6 concurrent tasks. `ORP=/path/to/oyster.py` overrides which
+which defaults to 2 concurrent tasks. `ORP=/path/to/oyster.py` overrides which
 pipeline runs, defaulting to `$HOME/Oyster_River_Protocol/oyster.py`.
 
 ```
@@ -103,7 +103,7 @@ file when a task launches, *before* the job script runs, so submitting with a
 missing log directory kills every task instantly, writing nothing anywhere. If a
 run vanishes without a trace, check that directory first.
 
-Six samples at a time, each 24 cpus and 120G: 144 cores and 720G in flight. The
+Two samples at a time, each 24 cpus and 120G: 48 cores and 240G in flight. The
 allocation is stated once, in `orp_array.sbatch`'s `#SBATCH` directives; the job
 reads `--cpu` and `--mem` back out of what slurm granted, so changing a directive
 changes what ORP is told it has.

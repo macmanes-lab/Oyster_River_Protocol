@@ -25,7 +25,7 @@ usage: submit_all_orp.sh <manifest.tsv> <runs directory> [throttle]
 
   manifest.tsv     5-column manifest from make_manifest.sh
   runs directory   where each sample's run tree goes; created if absent
-  throttle         max concurrent array tasks (default 6)
+  throttle         max concurrent array tasks (default 2)
 
   -f, --force      submit every sample, including ones already finished
                    (default: samples with reports/qualreport.<run>.done are
@@ -59,7 +59,7 @@ MANIFEST=$(cd "$(dirname "$1")" 2>/dev/null && pwd)/$(basename "$1") \
     || die "no such directory for manifest: $1"
 RUNS="$2"
 case "$RUNS" in /*) ;; *) RUNS="$PWD/$RUNS" ;; esac
-THROTTLE="${3:-6}"
+THROTTLE="${3:-2}"
 ORP="${ORP:-$HOME/Oyster_River_Protocol/oyster.py}"
 
 case "$THROTTLE" in

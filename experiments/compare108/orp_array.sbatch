@@ -4,7 +4,7 @@
 #SBATCH --cpus-per-task=24
 #SBATCH --mem 120G
 #SBATCH --exclude=node117,node118
-#SBATCH --array=1-108%6
+#SBATCH --array=1-108%2
 #SBATCH --output=/mnt/home/macmaneslab/macmanes/compare/orp_runs/logs/orp_%A_%a.log
 
 # One array task per line of the manifest, which is tab-separated:
