@@ -73,7 +73,7 @@ import time
 from pathlib import Path
 
 from oyster import (
-    ASSEMBLER_TOOLS, CHECK_TOOLS, RED, RESET, Assembly, Pipeline, line_buffer_stdio,
+    ASSEMBLER_TOOLS, RED, RESET, Assembly, Pipeline, line_buffer_stdio,
 )
 
 HERE = Path(__file__).resolve().parent
@@ -218,7 +218,6 @@ class Chowder(Pipeline):
         args.assemblies = [
             Assembly(f"{label}.fasta", label, label, label.upper()) for label, _ in pairs
         ]
-        self.corrected_reads = args.corrected_reads
         super().__init__(args)
         self.ingest_done = self.assemblies_dir / f"{self.runout}.ingest.done"
 
@@ -233,7 +232,7 @@ class Chowder(Pipeline):
         strandeval maps with it out of the orp_trinity env, and that env is
         no longer proven present by the Trinity check.
         """
-        tools = [t for t in CHECK_TOOLS if t not in ASSEMBLER_TOOLS]
+        tools = [t for t in super().required_tools() if t not in ASSEMBLER_TOOLS]
         return tools + [("orp_trinity", "bwa", "BWA")]
 
     def readcheck(self):

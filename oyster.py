@@ -87,6 +87,10 @@ TRINITY_TOOL = ("orp_trinity", "Trinity", "TRINITY")
 TRANSABYSS_TOOL = ("orp_transabyss", "transabyss", "TRANSABYSS")
 # The three an entry point that doesn't assemble has no use for.
 ASSEMBLER_TOOLS = (SPADES_TOOL, TRINITY_TOOL, TRANSABYSS_TOOL)
+TRIMMOMATIC_TOOL = ("orp", "trimmomatic", "TRIMMOMATIC")
+RCORRECTOR_TOOL = ("orp", "run_rcorrector.pl", "RCORRECTOR")
+# The two a run handed already-corrected reads has no use for.
+READ_PREP_TOOLS = (TRIMMOMATIC_TOOL, RCORRECTOR_TOOL)
 #: The pytransrate this pipeline needs, checked at preflight rather than
 #: assumed from orp_env.yml. The pin in that file describes the environment
 #: as built; it says nothing about the environment as it actually is, and the
@@ -112,9 +116,9 @@ CHECK_TOOLS = (
     ("orp", "mcl", "MCL"),
     SPADES_TOOL,
     TRINITY_TOOL,
-    ("orp", "trimmomatic", "TRIMMOMATIC"),
+    TRIMMOMATIC_TOOL,
     TRANSABYSS_TOOL,
-    ("orp", "run_rcorrector.pl", "RCORRECTOR"),
+    RCORRECTOR_TOOL,
     ("orp_orthofinder", "orthofinder", "ORTHOFINDER"),
     ("orp", "snap-aligner", "SNAP-ALIGNER"),
 )
@@ -588,6 +592,9 @@ class Pipeline:
         self.tpm_filt = args.tpm_filt
         self.max_parallel = max(1, args.max_parallel)
         self.keep_intermediates = args.keep_intermediates
+        # oyster.py spells it --trimmed-corrected-reads, chowder.py
+        # --corrected-reads; both mean trimmomatic and rcorrector are done.
+        self.corrected_reads = getattr(args, "corrected_reads", False)
         # Appended to both pytransrate invocations. shlex so a value can be
         # quoted, and so the flags arrive as separate argv entries rather
         # than one string pytransrate would reject.
@@ -896,11 +903,24 @@ class Pipeline:
         for src in [self.cor1(), self.cor2()] + self.assembly_fasta_paths():
             gz = src.with_suffix(src.suffix + ".gz")
             if src.is_symlink():
-                # Not ours to reclaim: chowder.py points the corrected pair
-                # straight at the user's own reads under
-                # --reads-are-corrected, and compressing or unlinking those
-                # is not what "reclaim this run's intermediates" means.
+                # Not ours to reclaim: under --corrected-reads (chowder.py)
+                # or --trimmed-corrected-reads (oyster.py) the corrected pair
+                # points straight at the user's own reads, and compressing or
+                # unlinking those is not what "reclaim this run's
+                # intermediates" means.
                 kept.append(f"{self._rel(src)}  (symlink to a file this run did not create)")
+                continue
+            if self.corrected_reads and src in (self.cor1(), self.cor2()):
+                # A plain copy of the user's gzipped reads, made only so the
+                # assemblers see content matching the name (see
+                # use_corrected_reads). The .gz it came from is still where
+                # the user left it, so there is nothing here worth keeping.
+                if src.exists():
+                    size = path_size(src)
+                    src.unlink()
+                    freed += size
+                    removed.append(f"{self._rel(src)}  ({human_size(size)}, "
+                                   "uncompressed copy of your reads)")
                 continue
             if src.exists() and self.compression_done(src):
                 freed += path_size(src)
@@ -921,6 +941,9 @@ class Pipeline:
             self.trinity_out_dir(),
             self.assemblies_dir / f"{self.runout}.orthomerged.fasta",
             self.assemblies_dir / f"{self.runout}.ORP.intermediate.fasta",
+            # cd-hit-est's cluster report, written beside its -o; nothing
+            # reads it.
+            self.assemblies_dir / f"{self.runout}.ORP.intermediate.fasta.clstr",
             self.assemblies_dir / f"{self.runout}.ORP.diamond.txt",
             self.assemblies_dir / f"{self.runout}.flagstat",
             self.assemblies_dir / f"{self.runout}.filter.done",
@@ -1112,8 +1135,11 @@ class Pipeline:
 
         Order is the order preflight prints them in. An entry point that
         doesn't assemble overrides this rather than demanding assemblers it
-        will never run (see chowder.py).
+        will never run (see chowder.py), and a run handed corrected reads
+        drops trimmomatic and rcorrector the same way.
         """
+        if self.corrected_reads:
+            return tuple(t for t in CHECK_TOOLS if t not in READ_PREP_TOOLS)
         return CHECK_TOOLS
 
     def check(self):
@@ -2597,6 +2623,8 @@ class Pipeline:
         pair, so a run that brings its own assemblies still comes through
         here.
         """
+        if self.corrected_reads:
+            return self.use_corrected_reads()
         t1, t2 = self.trim1(), self.trim2()
         trim_done = self.rcorr_dir / f"{self.runout}.trim.done"
         c1, c2 = self.cor1(), self.cor2()
@@ -2621,6 +2649,46 @@ class Pipeline:
         # for serially once the run is otherwise over.
         self.compress_async(c1)
         self.compress_async(c2)
+
+    def use_corrected_reads(self):
+        """Stand the user's already-corrected pair in for rcorrector's output.
+
+        A plain fastq is symlinked into place. A gzipped one is decompressed
+        instead, because the corrected pair is named .cor.fq and the
+        assemblers believe the name: Trinity and SPAdes decide whether to
+        gunzip from the extension, so a symlink to gzip data under that name
+        would be read as garbage. Neither is queued for compression -- the
+        user already has the reads, and cleanup() keeps the symlinks and
+        deletes the copies.
+        """
+        self.rcorr_dir.mkdir(parents=True, exist_ok=True)
+        for src, dst in ((self.read1, self.cor1()), (self.read2, self.cor2())):
+            if dst.exists() and not self.needs_run([dst], [src]):
+                continue
+            if dst.is_symlink() or dst.exists():
+                dst.unlink()
+            if is_gzip(src):
+                self.decompress(src, dst)
+            else:
+                dst.symlink_to(src.resolve())
+        print(f"[reads] corrected reads given: using {self.read1} / {self.read2} "
+              "as they are; trimmomatic and rcorrector skipped")
+
+    def decompress(self, src, dst):
+        """gunzip `src` to `dst`, via a .part so a killed run leaves no stub."""
+        part = dst.with_name(dst.name + ".part")
+        start = time.time()
+        try:
+            with open(part, "wb") as out:
+                self.run(self._resolve_compressor() + ["-d", str(src.resolve())], stdout=out,
+                         retries=0)
+            part.replace(dst)
+        except BaseException:
+            if part.exists():
+                part.unlink()
+            raise
+        print(f"[reads] {self._rel(dst)} decompressed in {int(time.time() - start)}s "
+              f"({human_size(path_size(src))} -> {human_size(path_size(dst))})")
 
     def run_assemblers(self):
         """Build the four assemblies this pipeline is named for.
@@ -2888,6 +2956,10 @@ def parse_args():
     p.add_argument("--lineage", default="eukaryota_odb12.2", help="BUSCO lineage (default: eukaryota_odb12.2)")
     p.add_argument("--normalize-reads", action="store_true", help="let Trinity normalize reads (default: off, i.e. --no_normalize_reads)")
     p.add_argument("--tpm-filt", type=float, default=0, help="TPM filter threshold (default: 0)")
+    p.add_argument("--trimmed-corrected-reads", dest="corrected_reads", action="store_true",
+                   help="the reads have already been through trimmomatic and "
+                        "rcorrector; skip both and assemble them as they are "
+                        "(default: off)")
     p.add_argument("--spades1-kmer", type=int, default=55, help="rnaSPAdes k-mer for spades55 (default: 55)")
     p.add_argument("--spades2-kmer", type=int, default=75, help="rnaSPAdes k-mer for spades75 (default: 75)")
     p.add_argument("--transabyss-kmer", type=int, default=32, help="Trans-ABySS k-mer (default: 32)")

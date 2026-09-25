@@ -24,6 +24,16 @@ By default, oyster.py runs Trinity with `--no_normalize_reads`, i.e. read normal
 python3 oyster.py --read1 R1.fq.gz --read2 R2.fq.gz --mem 110 --cpu 24 --runout runname --strand RF --normalize-reads
 ```
 
+### Reads you have already corrected
+
+If your pair has already been through trimmomatic and rcorrector, pass `--trimmed-corrected-reads` and oyster.py assembles it as it is, skipping both steps (and not requiring either tool at preflight):
+
+```bash
+python3 oyster.py --read1 R1.cor.fq.gz --read2 R2.cor.fq.gz --mem 110 --cpu 24 --runout runname --trimmed-corrected-reads
+```
+
+A plain fastq is symlinked into `rcorr/` as the corrected pair. A gzipped one is decompressed there instead, because Trinity and SPAdes decide whether to gunzip from the file extension; that copy is deleted at cleanup rather than re-gzipped, since your original is still where you left it.
+
 ### Merging assemblies you already have (`chowder.py`)
 
 `chowder.py` runs the second half of the ORP -- everything after the four assemblers -- over assemblies you bring yourself, so two or more existing transcriptomes can be merged into one the same way ORP merges its own:
@@ -113,6 +123,7 @@ Because it appends, a value given here overrides the same flag ORP passes above 
 | `--lineage` | `eukaryota_odb12.2` | BUSCO lineage |
 | `--normalize-reads` | off | Let Trinity normalize reads (default is `--no_normalize_reads`) |
 | `--tpm-filt` | `0` | TPM filter threshold |
+| `--trimmed-corrected-reads` | off | Treat `--read1`/`--read2` as already trimmed and error-corrected, and skip trimmomatic and rcorrector (see [Reads you have already corrected](#reads-you-have-already-corrected) above) |
 | `--spades1-kmer` | `55` | rnaSPAdes k-mer for the spades55 assembly |
 | `--spades2-kmer` | `75` | rnaSPAdes k-mer for the spades75 assembly |
 | `--transabyss-kmer` | `32` | Trans-ABySS k-mer |

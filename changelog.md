@@ -1,5 +1,27 @@
 ### CHANGELOG
 
+ORP Version 4.0.1-dev15
+
+- **`oyster.py --trimmed-corrected-reads`** skips trimmomatic and
+  rcorrector and assembles `--read1`/`--read2` as they are, for a pair that
+  has already been through both. A plain fastq is symlinked into `rcorr/`
+  as the corrected pair; a gzipped one is decompressed there, because
+  Trinity and SPAdes decide whether to gunzip from the extension and would
+  read gzip data under a `.cor.fq` name as garbage. Neither is compressed in
+  the background, and cleanup keeps the symlinks and deletes the
+  decompressed copies, since the originals are still where the user left
+  them. Preflight no longer requires trimmomatic or rcorrector on such a
+  run.
+
+- This shares its plumbing with `chowder.py --corrected-reads`, which now
+  also stops requiring trimmomatic and rcorrector at preflight. Its read
+  handling is otherwise unchanged: it still symlinks gzipped reads rather
+  than decompressing them.
+
+- **Cleanup now removes `assemblies/<run>.ORP.intermediate.fasta.clstr`**,
+  the cluster report cd-hit-est writes beside its output. Nothing reads
+  it, and cleanup was leaving it behind.
+
 ORP Version 4.0.1-dev13
 
 - **Writing `<run>.orthomerged.fasta` is linear now, not quadratic.**
