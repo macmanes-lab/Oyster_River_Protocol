@@ -5,6 +5,16 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-09-26
+
+- **`--no-cleanup` added (dev16)**, `--keep-intermediates` kept as an
+  alias. See changelog. Tested on this laptop only with the assemblers and
+  strandeval's tools stubbed out; **not yet exercised on a real run.** The
+  one behavioural change to watch is Trinity Phase 2 without
+  `--full_cleanup` -- output naming was checked against the 2.15.2 source,
+  but a real `--no-cleanup` run should confirm `<run>.trinity.Trinity.fasta`
+  lands where expected and `<run>.trinity/` survives.
+
 ## 2026-09-21
 
 **Handoff state.** Chowder run 380C_0C5D_001Fv3_955 under 4.0.1-dev9, Slurm

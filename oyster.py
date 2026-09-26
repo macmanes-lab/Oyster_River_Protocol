@@ -591,7 +591,7 @@ class Pipeline:
         self.normalize_reads = getattr(args, "normalize_reads", False)
         self.tpm_filt = args.tpm_filt
         self.max_parallel = max(1, args.max_parallel)
-        self.keep_intermediates = args.keep_intermediates
+        self.no_cleanup = args.no_cleanup
         # oyster.py spells it --trimmed-corrected-reads, chowder.py
         # --corrected-reads; both mean trimmomatic and rcorrector are done.
         self.corrected_reads = getattr(args, "corrected_reads", False)
@@ -752,7 +752,7 @@ class Pipeline:
         resumed run doesn't recompress work the previous one finished.
         """
         path = Path(path)
-        if self.keep_intermediates or not path.exists():
+        if self.no_cleanup or not path.exists():
             return
         gz = path.with_suffix(path.suffix + ".gz")
         if gz.exists() and gz.stat().st_mtime >= path.stat().st_mtime:
@@ -824,7 +824,7 @@ class Pipeline:
         main() asks for the TRIM files back as outputs only while the
         corrected pair is missing or stale.
         """
-        if self.keep_intermediates:
+        if self.no_cleanup:
             return
         freed = 0
         for suffix in ("1P", "2P", "1U", "2U"):
@@ -890,8 +890,10 @@ class Pipeline:
         assemblies between orthofusing and .ORP.fasta. Every number any of
         it contributed is already in reports/qualreport.<run>.
         """
-        if self.keep_intermediates:
-            print("[cleanup] --keep-intermediates given; leaving intermediates in place")
+        if self.no_cleanup:
+            # No cleanup.done either, so a later run of the same command
+            # without --no-cleanup finds this step pending and does it then.
+            print("[cleanup] --no-cleanup given; leaving intermediates in place")
             return
 
         orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
@@ -948,6 +950,13 @@ class Pipeline:
             self.assemblies_dir / f"{self.runout}.flagstat",
             self.assemblies_dir / f"{self.runout}.filter.done",
             self.trinity_phase1_done(),
+            # The rest are normally deleted by the step that made them, and
+            # are only here after a --no-cleanup run (or an interrupted one).
+            self.assemblies_dir / f"{self.runout}.transabyss",
+            # Directories only: a chowder assembly may be labelled spades_k*.
+            *(d for d in self.assemblies_dir.glob(f"{self.runout}.spades_k*") if d.is_dir()),
+            *self.assemblies_dir.glob(f"{self.runout}.*gene_trans_map"),
+            *self.strandeval_scratch(),
         ):
             if not path.exists():
                 continue
@@ -1383,7 +1392,11 @@ class Pipeline:
         cpu = self.cpu if cpu is None else cpu
         mem = self.mem if mem is None else mem
         out = self.assemblies_dir / f"{self.runout}.trinity.Trinity.fasta"
-        cmd = self._trinity_base_cmd(cpu, mem) + ["--full_cleanup"]
+        cmd = self._trinity_base_cmd(cpu, mem)
+        # Trinity writes <outdir>.Trinity.fasta either way; --full_cleanup
+        # only decides whether <outdir>/ survives it.
+        if not self.no_cleanup:
+            cmd.append("--full_cleanup")
         # No retries: this step's wall time dwarfs every other (hours to
         # days), so blindly retrying a deterministic failure could multiply
         # the wall time before finally giving up. It also resumes from its
@@ -1393,8 +1406,9 @@ class Pipeline:
         tmp = out.with_suffix(".fa")
         awk_first_field(out, tmp)
         tmp.replace(out)
-        for f in self.assemblies_dir.glob("*gene_trans_map"):
-            f.unlink()
+        if not self.no_cleanup:
+            for f in self.assemblies_dir.glob("*gene_trans_map"):
+                f.unlink()
 
     def run_spades(self, kmer, outname, workdir_suffix, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
@@ -1413,7 +1427,8 @@ class Pipeline:
         ]
         self.conda_run("orp_spades", *cmd, retry_cleanup=workdir)
         shutil.move(str(workdir / "transcripts.fasta"), str(out))
-        shutil.rmtree(workdir, ignore_errors=True)
+        if not self.no_cleanup:
+            shutil.rmtree(workdir, ignore_errors=True)
 
     def run_spades55(self, cpu=None, mem=None):
         self.run_spades(self.spades1_kmer, "spades55", "55", cpu=cpu, mem=mem)
@@ -1437,7 +1452,8 @@ class Pipeline:
         self.conda_run("orp_transabyss", *cmd, retry_cleanup=workdir)
         final = workdir / f"{self.runout}.transabyss.fasta-final.fa"
         awk_first_field(final, out)
-        shutil.rmtree(workdir, ignore_errors=True)
+        if not self.no_cleanup:
+            shutil.rmtree(workdir, ignore_errors=True)
 
     # -- orthofuse merge -------------------------------------------------------
 
@@ -2443,6 +2459,16 @@ class Pipeline:
         trinity_path = Path(result.stdout.strip()).resolve()
         return trinity_path.parent / "PerlLib"
 
+    def strandeval_scratch(self):
+        """strandeval's working files: the sampled BAM, its bwa index, and
+        the column hist was fed. Removed as soon as strandeval finishes,
+        or by cleanup() after a --no-cleanup run."""
+        paths = [self.dir / f"{self.runout}.hist_input.txt",
+                 self.dir / f"{self.runout}.sorted.bam"]
+        paths += [self.dir / f"{self.runout}.{ext}"
+                  for ext in ("bwt", "pac", "ann", "amb", "sa", "dat")]
+        return paths
+
     def strandeval(self, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
         orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
@@ -2489,15 +2515,10 @@ class Pipeline:
             check=True, cwd=self.dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True,
         )
 
-        if hist_input.exists():
-            hist_input.unlink()
-        sorted_bam = self.dir / f"{self.runout}.sorted.bam"
-        if sorted_bam.exists():
-            sorted_bam.unlink()
-        for ext in ("bwt", "pac", "ann", "amb", "sa", "dat"):
-            p = self.dir / f"{self.runout}.{ext}"
-            if p.exists():
-                p.unlink()
+        if not self.no_cleanup:
+            for p in self.strandeval_scratch():
+                if p.exists():
+                    p.unlink()
 
         (self.reports_dir / f"{self.runout}.strandeval.done").touch()
         histogram_text = hist_result.stdout.rstrip("\n")
@@ -2992,11 +3013,15 @@ def parse_args():
              "stages entirely (default: 2)",
     )
     p.add_argument(
-        "--keep-intermediates", action="store_true",
-        help="keep every file a run produces: skips both the end-of-run cleanup "
-             "(orthofuse/, quants/, diamond/, the working assemblies) and the "
-             "reclaim of the trimmed reads, and leaves the four assemblies and "
-             "the corrected reads uncompressed. For debugging a run (default: off)",
+        "--no-cleanup", "--keep-intermediates", dest="no_cleanup", action="store_true",
+        help="keep every file a run produces, for debugging: skips the end-of-run "
+             "cleanup (orthofuse/, quants/, diamond/, the working assemblies), "
+             "the reclaim of the trimmed reads, Trinity's --full_cleanup, the "
+             "removal of the rnaSPAdes and Trans-ABySS working directories and "
+             "of strandeval's BAM and bwa index, and leaves the four assemblies "
+             "and the corrected reads uncompressed. Re-running without it cleans "
+             "up afterwards. --keep-intermediates is an older name for the same "
+             "flag (default: off)",
     )
     p.add_argument(
         "--pytransrate-args", default="",

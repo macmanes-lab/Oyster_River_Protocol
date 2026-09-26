@@ -1,5 +1,24 @@
 ### CHANGELOG
 
+ORP Version 4.0.1-dev16
+
+- **`--no-cleanup`** (`oyster.py` and `chowder.py`) keeps every file a
+  run produces, for debugging. It replaces `--keep-intermediates`, which
+  still works as an alias, and covers more: besides the end-of-run
+  cleanup, the trimmed-read reclaim and the background gzip, it now also
+  stops the deletions individual steps make as they finish -- Trinity
+  Phase 2 runs without `--full_cleanup`, so `<run>.trinity/` survives;
+  the rnaSPAdes (`<run>.spades_k*/`) and Trans-ABySS (`<run>.transabyss/`)
+  working directories are kept; and so are Trinity's gene_trans_map and
+  strandeval's sorted BAM and bwa index. Trinity names its output
+  `<run>.trinity.Trinity.fasta` either way (checked against the 2.15.2
+  source), so nothing downstream moves.
+
+- A `--no-cleanup` run leaves `cleanup.done` unwritten, so re-running the
+  same command without the flag cleans up afterwards. `cleanup` now
+  sweeps the working directories and strandeval files listed above too,
+  which also tidies runs that were interrupted mid-step.
+
 ORP Version 4.0.1-dev15
 
 - **`oyster.py --trimmed-corrected-reads`** skips trimmomatic and

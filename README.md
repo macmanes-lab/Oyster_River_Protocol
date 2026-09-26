@@ -89,7 +89,7 @@ A completed run keeps five things and reclaims the rest:
 
 Everything else goes: the trimmed-but-uncorrected reads (deleted as soon as read correction is done with them — nothing downstream ever reads them again), the `orthofuse/` tree (OrthoFinder's all-vs-all output and the transrate scoring of the pooled fasta, normally the largest directory in a run), `quants/`, `assemblies/diamond/`, `assemblies/working/`, and the chain of working assemblies between `orthofusing` and `.ORP.fasta`. Every number any of those contributed is already in `reports/qualreport.<run>`.
 
-The gzipping runs in the background, starting the moment each file is finished being written rather than at the end of the run — the corrected reads compress alongside the assemblers, and each assembly compresses while the next stage runs — so cleanup itself is just an unlink and adds no wall time. Pass `--keep-intermediates` to switch all of this off and keep a run exactly as it was, which is what you want when debugging a run rather than shipping its results.
+The gzipping runs in the background, starting the moment each file is finished being written rather than at the end of the run — the corrected reads compress alongside the assemblers, and each assembly compresses while the next stage runs — so cleanup itself is just an unlink and adds no wall time. Pass `--no-cleanup` to switch all of this off and keep a run exactly as it was, which is what you want when debugging a run rather than shipping its results. It also keeps what individual steps would otherwise delete as they finish: Trinity's working directory (Phase 2 runs without `--full_cleanup`), the rnaSPAdes and Trans-ABySS working directories, and strandeval's BAM and bwa index. Running the same command again later without the flag does the cleanup then. `--keep-intermediates` is an older name for the same flag and still works.
 
 Re-running `oyster.py` on a directory whose run already finished and was cleaned up is a no-op: it reports where the assembly and reports are and exits, rather than treating the reclaimed intermediates as work to redo. To assemble the same reads again, use a different `--runout`/`--dir`, or delete `reports/<run>.cleanup.done` to force a full re-run in place.
 
@@ -128,7 +128,7 @@ Because it appends, a value given here overrides the same flag ORP passes above 
 | `--spades2-kmer` | `75` | rnaSPAdes k-mer for the spades75 assembly |
 | `--transabyss-kmer` | `32` | Trans-ABySS k-mer |
 | `--max-parallel` | `2` | Max concurrent jobs per stage (see [Parallel task management](#parallel-task-management) above) |
-| `--keep-intermediates` | off | Keep every file a run produces, uncompressed (see [What a finished run leaves behind](#what-a-finished-run-leaves-behind) below) |
+| `--no-cleanup` | off | Keep every file a run produces, uncompressed, including each assembler's working directory -- for debugging (see [What a finished run leaves behind](#what-a-finished-run-leaves-behind) below). Alias: `--keep-intermediates` |
 | `--pytransrate-args` | none | Extra arguments passed verbatim to both pytransrate runs, as one quoted string (see [Tuning pytransrate](#tuning-pytransrate) below) |
 | `--dir` | current directory | Working directory |
 | `--version` | — | Print the installed ORP version and exit |
@@ -154,7 +154,7 @@ There are no assembler flags — no k-mers, no `--strand`, no `--normalize-reads
 | `--lineage` | `eukaryota_odb12.2` | BUSCO lineage |
 | `--tpm-filt` | `0` | TPM filter threshold |
 | `--max-parallel` | `2` | Max concurrent jobs per stage (see [Parallel task management](#parallel-task-management) above) |
-| `--keep-intermediates` | off | Keep every file the run produces, uncompressed |
+| `--no-cleanup` | off | Keep every file the run produces, uncompressed -- for debugging. Alias: `--keep-intermediates` |
 | `--pytransrate-args` | none | Extra arguments passed verbatim to both pytransrate runs (see [Tuning pytransrate](#tuning-pytransrate) above) |
 | `--dir` | current directory | Working directory |
 | `--version` | — | Print the installed ORP version and exit |

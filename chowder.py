@@ -457,9 +457,12 @@ def parse_args():
              "once; 1 disables it (default: 2)",
     )
     p.add_argument(
-        "--keep-intermediates", action="store_true",
-        help="keep every file the run produces: skips the end-of-run cleanup and "
-             "the reclaim of the trimmed reads. For debugging (default: off)",
+        "--no-cleanup", "--keep-intermediates", dest="no_cleanup", action="store_true",
+        help="keep every file the run produces, for debugging: skips the end-of-run "
+             "cleanup, the reclaim of the trimmed reads, and the removal of "
+             "strandeval's BAM and bwa index. Re-running without it cleans up "
+             "afterwards. --keep-intermediates is an older name for the same "
+             "flag (default: off)",
     )
     p.add_argument(
         "--pytransrate-args", default="",
