@@ -102,6 +102,10 @@ READ_PREP_TOOLS = (TRIMMOMATIC_TOOL, RCORRECTOR_TOOL)
 #: only sign of the problem is a version number in the banner. Checked in
 #: seconds instead.
 PYTRANSRATE_MIN_VERSION = "2.2.1"
+#: What orp_env.yml installs, and so what the upgrade hint above installs: an
+#: env brought up to date by hand should match one built fresh. Can sit
+#: above the minimum -- 2.2.2 only adds logging -- and moves with that file.
+PYTRANSRATE_PINNED_VERSION = "2.2.2"
 
 #: --max-memory's own spellings in pytransrate, both of which it accepts. A
 #: user who set one in --pytransrate-args means it, so pytransrate_memory_args
@@ -1212,6 +1216,10 @@ class Pipeline:
         indistinguishable, in the log, from a fix that was never installed.
         The log now carries the answer at the top, before the hours.
 
+        Between the minimum and PYTRANSRATE_PINNED_VERSION it only warns:
+        such a version works, and the pin moves for reasons as small as
+        logging.
+
         A version that cannot be read is not fatal. This check exists to
         catch a known-old install, not to become a new way for the run to
         refuse to start.
@@ -1233,8 +1241,18 @@ class Pipeline:
                 "      conda run -n orp pip install --upgrade --force-reinstall \\\n"
                 "        --no-deps \\\n"
                 "        'pytransrate @ git+https://github.com/macmanes-lab/"
-                f"pytransrate.git@v{PYTRANSRATE_MIN_VERSION}'\n"
+                f"pytransrate.git@v{PYTRANSRATE_PINNED_VERSION}'\n"
             )
+        if version_below(version, PYTRANSRATE_PINNED_VERSION):
+            # Between the minimum and the pin: works, but not what a fresh
+            # env would hold. Said, not enforced -- see PYTRANSRATE_PINNED_VERSION.
+            print(f"[preflight] WARNING: pytransrate {version} is older than the "
+                  f"{PYTRANSRATE_PINNED_VERSION} this release pins. The run will "
+                  "carry on and its scores are unaffected; to match a fresh env:\n"
+                  "      conda run -n orp pip install --upgrade --force-reinstall "
+                  "--no-deps \\\n"
+                  "        'pytransrate @ git+https://github.com/macmanes-lab/"
+                  f"pytransrate.git@v{PYTRANSRATE_PINNED_VERSION}'")
 
     def welcome(self):
         print(RED)

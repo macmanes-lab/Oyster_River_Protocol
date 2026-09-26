@@ -1,5 +1,19 @@
 ### CHANGELOG
 
+ORP Version 4.0.1-dev17
+
+- **pytransrate pinned to 2.2.2** in `orp_env.yml` (was 2.2.1). 2.2.2 is
+  a logging release: the read-metrics step now reports which memory
+  budget it ran inside on every parallel run, not only when the budget
+  cut the worker count. Scores are unchanged. Preflight still accepts
+  2.2.1, so existing environments are not refused: the run carries on,
+  with a `[preflight] WARNING` that it is older than the pin. Anything
+  below 2.2.1 still stops the run, and that message's upgrade hint now
+  installs 2.2.2 to match a freshly built env. To update one in place:
+
+      conda run -n orp pip install --upgrade --force-reinstall --no-deps \
+        'pytransrate @ git+https://github.com/macmanes-lab/pytransrate.git@v2.2.2'
+
 ORP Version 4.0.1-dev16
 
 - **`--no-cleanup`** (`oyster.py` and `chowder.py`) keeps every file a
