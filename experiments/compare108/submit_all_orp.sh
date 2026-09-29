@@ -6,6 +6,11 @@
 #     ./submit_all_orp.sh /mnt/.../compare/manifest.tsv /mnt/.../compare/orp_runs
 #     ./submit_all_orp.sh manifest.tsv /scratch/orp_runs 12
 #
+# To see what would be submitted and then submit only some of it:
+#
+#     ./submit_all_orp.sh --dry-run manifest.tsv orp_runs
+#     ./submit_all_orp.sh --only SRR527277,SRR1234567 manifest.tsv orp_runs
+#
 # The runs directory is created if it does not exist; the manifest must already,
 # and comes from make_manifest.sh.
 #
@@ -30,6 +35,12 @@ usage: submit_all_orp.sh <manifest.tsv> <runs directory> [throttle]
   -f, --force      submit every sample, including ones already finished
                    (default: samples with reports/qualreport.<run>.done are
                    left out of the array)
+  -n, --dry-run    run every check, list the samples that would be submitted
+                   and the sbatch command, then stop; nothing is created or
+                   submitted
+  --only NAMES     submit only these samples: comma-separated run names
+                   (column 5) or TSA names (column 1); repeatable. Combine
+                   with --dry-run to check the selection first
 
   ORP=/path/to/oyster.py   override the pipeline used
                            (default: $HOME/Oyster_River_Protocol/oyster.py)
@@ -39,11 +50,19 @@ USAGE
 
 die() { echo "submit: $*" >&2; exit 1; }
 
-FORCE=""
+# Kept for the stale-script message below, which repeats the whole command.
+ARGS="$*"
+
+FORCE="" DRYRUN="" ONLY=""
 while [ $# -gt 0 ]; do
     case "$1" in
         -h|--help)  usage ;;
         -f|--force) FORCE=1; shift ;;
+        -n|--dry-run) DRYRUN=1; shift ;;
+        --only)     [ $# -ge 2 ] && [ -n "$2" ] || die "--only needs a list of names"
+                    ONLY="${ONLY:+$ONLY,}$2"; shift 2 ;;
+        --only=*)   [ -n "${1#--only=}" ] || die "--only needs a list of names"
+                    ONLY="${ONLY:+$ONLY,}${1#--only=}"; shift ;;
         --)         shift; break ;;
         -*)         die "unknown option: $1" ;;
         *)          break ;;
@@ -83,7 +102,7 @@ jobcols=$(awk -F= '/^MANIFEST_COLUMNS=/ {print $2; exit}' "$HERE/orp_array.sbatc
 "The two must come from the same checkout. Rather than copying them, run this"$'\n'\
 "script from the checkout -- it works from any directory, and relative paths are"$'\n'\
 "taken from where you are:"$'\n'\
-"    \$HOME/Oyster_River_Protocol/experiments/compare108/submit_all_orp.sh ${FORCE:+--force }$*"
+"    \$HOME/Oyster_River_Protocol/experiments/compare108/submit_all_orp.sh $ARGS"
 
 n=$(grep -c . "$MANIFEST")
 [ "$n" -gt 0 ] || die "manifest $MANIFEST has no non-blank lines"
@@ -108,12 +127,16 @@ missing=$(awk -F'\t' 'NF {print $3"\n"$4}' "$MANIFEST" | while read -r f; do
 done | head -5)
 [ -z "$missing" ] || die "read files missing, e.g.:"$'\n'"$missing"
 
-mkdir -p "$RUNS/logs" || die "cannot create $RUNS/logs"
-[ -w "$RUNS/logs" ] || die "$RUNS/logs is not writable"
+# A dry run creates nothing, so the runs directory is resolved only if it is
+# already there; otherwise the path is shown as given, made absolute above.
+if [ -z "$DRYRUN" ]; then
+    mkdir -p "$RUNS/logs" || die "cannot create $RUNS/logs"
+    [ -w "$RUNS/logs" ] || die "$RUNS/logs is not writable"
+fi
 # Now that it exists it can be resolved properly: ../orp_runs/ becomes a clean
 # absolute path, rather than one carrying the .. and a doubled slash into every
 # log path and every task's --dir.
-RUNS=$(cd "$RUNS" && pwd)
+[ -d "$RUNS" ] && RUNS=$(cd "$RUNS" && pwd)
 
 branch=$(git -C "$(dirname "$ORP")" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "?")
 version=$(cat "$(dirname "$ORP")/version.txt" 2>/dev/null || echo "?")
@@ -134,30 +157,74 @@ esac
 #
 # Indices count non-blank lines, exactly as the job's own `grep . | sed -n Np`
 # does, so the two agree about which line task N is.
-todo="" ndone=0 i=0
-while IFS=$'\t' read -r _ _ _ _ run; do
+#
+# --only narrows this to the named samples first; a finished one that was named
+# is still left out without --force, and said so, rather than silently rerun.
+todo="" ndone=0 nskip=0 i=0 matched="," listing=""
+# Tabs become \037 before read: a tab in IFS is whitespace, so read would fold
+# the empty column 2 of a sample with no assembly into its neighbour and find
+# column 5 empty -- dropping that sample from the array without a word.
+while IFS=$'\037' read -r tsa _ _ _ run; do
     i=$((i + 1))
     [ -n "$run" ] || continue
+    if [ -n "$ONLY" ]; then
+        case ",$ONLY," in
+            *",$run,"*|*",$tsa,"*) matched="$matched$run,$tsa," ;;
+            *) nskip=$((nskip + 1)); continue ;;
+        esac
+    fi
     if [ -z "$FORCE" ] && [ -f "$RUNS/$run/reports/qualreport.$run.done" ]; then
         ndone=$((ndone + 1))
+        [ -n "$ONLY" ] && echo "submit: $run is already complete; --force to run it again" >&2
         continue
     fi
     todo="${todo:+$todo,}$i"
-done < <(grep . "$MANIFEST")
+    listing="$listing$(printf '%5s  %-16s  %s' "$i" "$run" "$tsa")"$'\n'
+done < <(grep . "$MANIFEST" | tr '\t' '\037')
 
-nrun=$(( n - ndone ))
+# A misspelt name would otherwise just shrink the array without a word.
+if [ -n "$ONLY" ]; then
+    unknown=$(printf '%s\n' "${ONLY//,/$'\n'}" | grep . | while read -r name; do
+        case "$matched" in (*",$name,"*) ;; (*) echo "    $name" ;; esac
+    done)
+    [ -z "$unknown" ] || die "--only names not in column 5 or column 1 of the manifest:"$'\n'"$unknown"
+fi
+
+nrun=$(( n - ndone - nskip ))
 if [ -z "$todo" ]; then
-    echo "submit: all $n samples already complete in $RUNS, nothing to submit"
+    if [ -n "$ONLY" ]; then
+        echo "submit: every sample named by --only is already complete, nothing to submit"
+    else
+        echo "submit: all $n samples already complete in $RUNS, nothing to submit"
+    fi
     echo "submit: pass --force to run them again"
     exit 0
 fi
 
 echo "submit: $nrun of $n samples to run, $THROTTLE at a time, ORP $version on $branch"
+[ "$nskip" -gt 0 ] && echo "submit: $nskip not named by --only"
 [ "$ndone" -gt 0 ] && echo "submit: skipping $ndone already complete (--force overrides)"
 echo "submit: manifest $MANIFEST"
 echo "submit: runs -> $RUNS"
 
-sbatch --array="${todo}%${THROTTLE}" \
-       --export="ALL,RUNS=$RUNS,MANIFEST=$MANIFEST,ORP=$ORP" \
-       --output="$RUNS/logs/orp_%A_%a.log" \
-       "$HERE/orp_array.sbatch"
+cmd=(sbatch --array="${todo}%${THROTTLE}"
+            --export="ALL,RUNS=$RUNS,MANIFEST=$MANIFEST,ORP=$ORP"
+            --output="$RUNS/logs/orp_%A_%a.log"
+            "$HERE/orp_array.sbatch")
+
+if [ -n "$DRYRUN" ]; then
+    # The task number is what the log will be named by: orp_<jobid>_<task>.log.
+    echo
+    printf '%5s  %-16s  %s\n' task run tsa
+    printf '%s' "$listing"
+    echo
+    echo "submit: dry run, nothing submitted. Would run:"
+    printf '    %s \\\n' "${cmd[@]:0:${#cmd[@]}-1}"
+    printf '    %s\n' "${cmd[${#cmd[@]}-1]}"
+    [ -d "$RUNS/logs" ] || echo "submit: and would first create $RUNS/logs"
+    echo "submit: to submit some of these, rerun without --dry-run and with"
+    echo "submit:     --only <run>,<run>,..."
+    exit 0
+fi
+
+"${cmd[@]}"

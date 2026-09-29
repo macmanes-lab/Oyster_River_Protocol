@@ -93,6 +93,19 @@ pipeline runs, defaulting to `$HOME/Oyster_River_Protocol/oyster.py`.
 Relative paths are resolved before being handed over, because a task resolves
 neither against its own cwd. The runs directory is created if it does not exist.
 
+To see what would be submitted first, add `--dry-run` (`-n`). It runs every
+check below, then lists each sample it would schedule -- task number, run name,
+TSA -- and the exact sbatch command, creating and submitting nothing. To submit
+only some of them, name them with `--only`, by run name or TSA, comma-separated:
+
+```
+./submit_all_orp.sh --dry-run manifest.tsv orp_runs
+./submit_all_orp.sh --only SRR527277,SRR1234567 manifest.tsv orp_runs
+```
+
+`--only` still leaves out finished samples unless `--force` is given, saying so
+for each, and refuses a name that is in neither column.
+
 Before submitting it checks the manifest is 5 tab-separated columns with unique
 run names, that every R1/R2 in it exists, that `orp_array.sbatch` is the same
 vintage as itself, and that the ORP checkout is on a branch with pytransrate.

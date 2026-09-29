@@ -57,10 +57,14 @@ fi
 # last variable, separators and all, so parsing a 5-field line with 4 variables
 # silently produces an R2 of "<path><tab><runname>". Catching the overflow here
 # turns that into a stated error.
-IFS=$'\t' read -r TSA TSA_FASTA R1 R2 SRR EXTRA <<< "$line"
+#
+# Tabs become \037 first because a tab in IFS counts as whitespace, and read
+# folds runs of whitespace into one: the empty column 2 of a sample with no
+# assembly would vanish, shifting R2 into R1 and the run name into R2.
+IFS=$'\037' read -r TSA TSA_FASTA R1 R2 SRR EXTRA <<< "$(printf '%s' "$line" | tr '\t' '\037')"
 if [ -n "${EXTRA:-}" ]; then
     echo "manifest line $SLURM_ARRAY_TASK_ID has more than $MANIFEST_COLUMNS fields;" \
-         "leftover: [$EXTRA]" >&2
+         "leftover: [$(printf '%s' "$EXTRA" | tr '\037' '\t')]" >&2
     exit 1
 fi
 
