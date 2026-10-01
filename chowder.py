@@ -381,15 +381,11 @@ class Chowder(Pipeline):
         """Trim and correct, unless told the reads are already corrected."""
         if not self.corrected_reads:
             return super().prepare_reads()
-        c1, c2 = self.cor1(), self.cor2()
-        self.rcorr_dir.mkdir(parents=True, exist_ok=True)
-        for src, dst in ((self.read1, c1), (self.read2, c2)):
-            if dst.exists() and not self.needs_run([dst], [src]):
-                continue
-            if dst.is_symlink() or dst.exists():
-                dst.unlink()
-            dst.symlink_to(src.resolve())
-        print(f"[reads] --corrected-reads: using {self.read1} / {self.read2} as they are")
+        # oyster.py's own staging, not a copy of it: this used to symlink
+        # unconditionally, so a gzipped pair landed under the .cor.fq name
+        # and snap (in pytransrate) read gzip bytes as FASTQ. The inherited
+        # method decompresses a gzipped pair and symlinks a plain one.
+        self.use_corrected_reads()
 
 
 def parse_args():

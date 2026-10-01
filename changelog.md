@@ -1,5 +1,19 @@
 ### CHANGELOG
 
+ORP Version 4.0.1-dev18
+
+- **`chowder.py --corrected-reads` works with gzipped reads.** chowder
+  staged the corrected pair with its own copy of the read-staging code,
+  which symlinked every input into place under the `.cor.fq` name. A
+  gzipped pair therefore reached pytransrate as gzip bytes behind a FASTQ
+  name, and snap refused it on the first record ("FASTQ record larger than
+  buffer size ... :0"), failing the run at `orthotransrate`. chowder now
+  uses oyster.py's `use_corrected_reads`, which `--trimmed-corrected-reads`
+  already used: a gzipped pair is decompressed, a plain one is still
+  symlinked, and `cleanup` keeps the symlinks and deletes the decompressed
+  copies. That is what docs/pipeline-steps.md already described. Merges
+  given plain-FASTQ corrected reads behave exactly as before.
+
 ORP Version 4.0.1-dev17
 
 - **pytransrate pinned to 2.2.2** in `orp_env.yml` (was 2.2.1). 2.2.2 is
