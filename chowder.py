@@ -7,11 +7,13 @@ Usage:
                --runout myrun
 
 Everything oyster.py does after its four assemblers have finished, run over
-assemblies you already have: OrthoFinder groups the contigs, pytransrate
-scores them, the best-scoring member of each orthogroup is kept, the
-contigs that no orthogroup covered are rescued by their diamond hits,
-cd-hit-est collapses what is left, and the result is quantified, filtered,
-BUSCO'd, scored and reported exactly as a full ORP run would be.
+assemblies you already have: pytransrate scores the pooled contigs, they
+are reduced to one assembly (by default one contig per swissprot gene plus
+distinct expressed copies, and cd-hit-est over contigs without a hit; or
+OrthoFinder orthogroups under --merge-method orthofinder), genes the
+selection missed are rescued by their diamond hits, cd-hit-est collapses
+what is left, and the result is quantified, filtered, BUSCO'd, scored and
+reported exactly as a full ORP run would be.
 
 It is the same code, not a copy of it: chowder subclasses oyster.py's
 Pipeline and reuses `merge_and_report` wholesale. The selection rule, the
@@ -283,7 +285,7 @@ class Chowder(Pipeline):
         ))
         print("\n    This is chowder, NOT a full ORP run: rnaSPAdes, TransABySS and")
         print("    Trinity are never invoked here, and the assemblies merged are the")
-        print("    ones you supplied. Everything from OrthoFinder onward is oyster.py's")
+        print("    ones you supplied. Everything from the merge onward is oyster.py's")
         print("    own code, so the merge itself is exactly a full ORP's.\n")
         if self.order_mode == "shuffled":
             origin = f"shuffled, seed {self.seed} -- not the order you listed them in"
@@ -332,7 +334,7 @@ class Chowder(Pipeline):
                         sys.exit(
                             f"\n*** {src} contains the contig name {name!r} more than "
                             "once. Contig names have to be unique within an assembly: "
-                            "every stage from OrthoFinder on joins on them. ***"
+                            "every stage from the merge on joins on them. ***"
                         )
                     seen.add(name)
                     out.write(f">{prefix}{name}{rest}\n")

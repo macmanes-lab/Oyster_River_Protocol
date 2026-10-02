@@ -5,6 +5,79 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-10-02 (evening handoff) -- ORP 4.1.0-dev0, two-track merge
+
+**Where things stand.** `master` = 4.1.0-dev0, pushed to GitHub (head of
+the "two-track" commits; `git log --oneline -6`). The default merge in
+`oyster.py`/`chowder.py` is now `--merge-method twotrack`
+(`scripts/twotrack_select.py`, step `twotrack_select`); OrthoFinder is not
+run. `--merge-method orthofinder` gives the 4.0 merge exactly. Roll back by
+checking out `832f100` (4.0.1-dev18) if needed. All the experiments behind
+this are in `experiments/redundancy/` -- **read its README.md first**; the
+one-table summary is `experiments/redundancy/results/redundancy_trials.csv`.
+
+**The two-track merge, in short.**
+- Contigs with a swissprot hit are grouped by best-hit gene (the names
+  qualreport's UNIQUE GENES counts). Step 1: each gene keeps the *longest*
+  contig whose hit covers >= 90% of the best protein coverage. Step 2: up to
+  2 more copies per gene come back if distinct (the representative covers
+  < 50% of them at >= 95% id) and expressed (>= 1 TPM, pytransrate's pool
+  salmon).
+- Contigs with no hit: cd-hit-est `-c 0.95 -G 0 -aS 0.9 -r 1`, then ORP's
+  TPM filter keeps every one above `--tpm-filt`. **`--tpm-filt` defaults
+  to 0 = no filter; every test and the 108 runs pass `--tpm-filt 1`.**
+  Making 1 the default is an open decision.
+
+**Why** (details and numbers in the redundancy README):
+- OrthoFinder 3.1.5's `-d` no longer selects blastn (2.5.2's did), so since
+  the 2026-08-14 upgrade ORP's orthogroup search was one-strand diamond
+  blastp over DNA. A regression, not a design choice.
+- Orthogroups don't match genes: split genes -> duplicated BUSCOs; mixed
+  groups -> genes lost at the pick. Tuning blastn/diamond, `-I` and the pick
+  rule only traded one against the other. On 10 samples, two-track (before
+  the step 1/2 rescue) cut duplicated BUSCOs 307 -> 36, complete 909 -> 918,
+  unique genes +0.9%, but good mappings 0.953 -> 0.837 (median). The lost
+  reads sit on other versions of kept genes (shorter kept contig = missing
+  UTRs/ends; dropped isoforms/paralogs), not on lost genes or no-hit
+  contigs. Step 1/2 were added to win those reads back.
+
+**In flight: the end-to-end validation of 4.1.0-dev0.** Slurm job
+**1319977** (array 1-5, started ~15:10 Oct 2), `chowder.py` with production
+defaults from a fresh clone of the pushed commit at
+`~/redundancy_tests/orp_410` (diamond db linked in from the main checkout),
+on SRR954929, SRR1139198, SRR1060332, SRR1176880, SRR951913. Output:
+`~/redundancy_tests/prod_410/<SRR>/` (runout `<SRR>_v410`, normal cleanup).
+Script: `experiments/redundancy/prod_410.sbatch`. Expect ~1-2 h each.
+**Next:** compare each against that sample's control and two-track runs in
+`~/redundancy_tests/validate_arms/<SRR>/` (BUSCO C/S/D/F/M, unique genes,
+transrate, good mappings, proper pairs). Easiest: symlink
+`validate_arms/<SRR>/v410 -> ../../prod_410/<SRR>`, add `"v410"` to TRIALS
+in `redundancy_trials.py`, rerun it. The goal to judge by: duplicated
+BUSCOs down, complete/missing BUSCOs and unique genes held, good mappings
+back near the control's 0.95.
+
+**Pulling 4.1 into the Premise checkout** (`~/Oyster_River_Protocol`): safe
+for jobs already running (they have the old `oyster.py` loaded; helper
+scripts they call are unchanged or byte-identical by default). Any job
+started after the pull defaults to two-track -- pass `--merge-method
+orthofinder` to keep a 4.0-comparable run.
+
+**Premise practicalities learned this week** (see also memory notes):
+- No wallclock limit: don't pass `--time`; use `--partition=macmanes,shared`.
+- 2026-10-01 ~14:10 to the morning of 10-02: home GPFS file creates crawled
+  (seconds each) on create-heavy nodes, then on the login node. Back to normal
+  by midday 10-02. `/mnt/gpfs01/fast/macmaneslab` (fast fileset) stayed fast,
+  but has a 5M-inode limit and a hidden space quota (~10 merge runs at once
+  hit it, silently truncating BAMs). `validate_arms.sbatch`/
+  `repick_validate.sbatch` show the run-in-scratch, move-off-to-home pattern.
+- System python3 and the anaconda/colsa python are 3.6: no
+  `subprocess.run(capture_output=)` in scripts run outside conda envs.
+- OrthoFinder 3.1.5 ignores `-og` (keeps going into MSA/trees, hours and
+  >120 GB with big groups) and has a hard-coded 200 s stall watchdog that
+  kills runs with large blastn hit sets (DRR036858 never finished with
+  blastn). Both moot under two-track.
+
+
 ## 2026-09-26
 
 - **`--no-cleanup` added (dev16)**, `--keep-intermediates` kept as an
@@ -54,20 +127,42 @@ Paths (all under `~/tuco/assembly`):
     Python workers *and* mcl's thread count. dev10 caps `-a` at the number
     of assemblies on the reasoning that per-species tasks cannot use more,
     which is right for that phase and probably wrong for MCL, whose
-    threading has nothing to do with species count. Do not change it again
-    until the benchmark below reports.
+    threading has nothing to do with species count. Answered below: it
+    does not need changing.
   - Observed at 7h27m into the real MCL: `NLWP 1, %CPU 100` with `-te 5`
     available. A separate `mcl -te 8` on the same graph showed `NLWP 9,
     %CPU 487` at 53 seconds in. So MCL threads its early expansion and
     then spends most of its time somewhere serial. Whether `-te` helps
     overall is still unanswered.
 
-- **Benchmark in flight:** `mcl $G -I 12.0 -te 8 -o mcl_te8_test.out`,
-  logging to `~/tuco/assembly/mcl_te8.log`. Note `conda run` buffers unless
-  given `--no-capture-output`, so that log stays empty until it exits;
-  `/usr/bin/time -v` then prints wall clock and peak RSS. Compare against
-  MCL's 12:51:29 at `-te 5`. If it is not much faster, drop the whole idea:
-  the cost is serial and threading is a mirage.
+- **Benchmark answered: threading is a mirage, and the loop is not the
+  cost.** `mcl $G -I 12.0 -te 8` finished in **12:49:39** against 12:51:29
+  at `-te 5`: 110 seconds, 0.24%, at 3.44 GB peak RSS and an average of
+  **1.00 cores** over the whole run. That is the "drop the whole idea"
+  threshold, hit squarely. MCL threading is dead; stop paying it attention.
+  - **So dev10's `-a` cap stays.** `-a` is still overloaded, but the MCL
+    half of it does not care what number it gets, so capping at the
+    assembly count costs nothing.
+  - **The clustering loop is four minutes.** The per-iteration `time`
+    column sums to 234 s over 14 iterations, chaos 0.00 by ite 11, against
+    46,179 s of wall clock. **12h45m of CPU is spent outside the loop** --
+    in the matrix read, the setup before ite 1, the interpretation that
+    prints `cut <6> instances of overlap`, or the write of the
+    5,354,958x3,275,693 output. `-te`, `-I` and `-P`/`-S` all tune the
+    loop, which is why none of them can matter: the loop is 0.5% of the
+    runtime. Not memory either, at 3.44 GB.
+  - **Next, and cheap:** one rerun with timestamped stderr localises it.
+    `conda run` buffers unless given `--no-capture-output`; with that,
+
+        ... mcl $G -I 12.0 -o /dev/null 2>&1 \
+          | awk '{print strftime("%H:%M:%S"), $0; fflush()}'
+
+    (`ts -s` from moreutils if it is installed) and read off where the gap
+    falls between `[mclIO] reading`, `[mcl] pid`, ite 1 and `[mclIO]
+    writing`. It either names a phase or rules the whole thing
+    unaddressable.
+  - If it lands in interpret/write, the only lever left is **node count**
+    -- 5.35M, several times past MCL's usual range -- and no MCL flag.
 
 - **The graph is sparse, and the hub hypothesis is dead.**
   `OrthoFinder_graph.txt` is 172 MB: 5,354,958 x 5,354,958, one line per
@@ -83,6 +178,13 @@ Paths (all under `~/tuco/assembly`):
     themselves were healthy (19-63 MB, self-comparisons intact). Check the
     orthogroup count and size distribution when convenient rather than
     assuming it is fine because the step exited zero.
+  - **The `-te 8` run supplies the first half of that check:** 3,275,693
+    clusters from 5,354,958 nodes, mean size 1.63, against the 57,774
+    orthogroups OrthoFinder went on to report. So the graph is mostly
+    singletons and pairs and nearly all of MCL's 5.35M nodes are thrown
+    away downstream. Consistent with mean degree 1.5, and the same
+    suspicion: four assemblies of one organism should cluster better than
+    this.
 
 - **`-og` is not being honoured.** It is documented to stop after
   orthogroups and ORP passes it for exactly that reason, but the log goes
@@ -97,8 +199,8 @@ Paths (all under `~/tuco/assembly`):
     waiting once Orthogroups.txt appears.
 
 - **Still open, in rough priority order:**
-  1. `mcl_te8.log` result -> decides whether MCL's 12h51m is addressable,
-     and whether dev10's `-a` cap needs reverting.
+  1. Localise MCL's non-loop 12h45m with the timestamped rerun above.
+     Threading and the `-a` cap are settled; this is what is left of it.
   2. `-og` workaround, so runs stop at orthogroups as intended.
   3. `-b` resume in `run_orthofuser`: OrthoFinder's `-b <WorkingDirectory>`
      reuses a completed all-vs-all. Offered three times, never built;
