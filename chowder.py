@@ -313,7 +313,13 @@ class Chowder(Pipeline):
             dst = self.assembly_fasta(a)
             prefix = f"{a.diamond_label}_"
             seen, n = set(), 0
-            with open_maybe_gzip(src) as inf, open(dst, "w") as out:
+            # An input already sitting at its own destination (a chowder run
+            # started with the same --runout/--dir as the assemblies, as
+            # spades_branch.sbatch does) would be truncated by open(dst, "w")
+            # before a line was read. Write beside it and swap in at the end.
+            in_place = Path(src).resolve() == Path(dst).resolve()
+            target = str(dst) + ".ingest.tmp" if in_place else dst
+            with open_maybe_gzip(src) as inf, open(target, "w") as out:
                 for line in inf:
                     if not line.startswith(">"):
                         out.write(line)
@@ -340,6 +346,8 @@ class Chowder(Pipeline):
                     out.write(f">{prefix}{name}{rest}\n")
             if n == 0:
                 sys.exit(f"\n*** no sequences found in {src} -- is it FASTA? ***")
+            if in_place:
+                Path(target).replace(dst)
             print(f"[ingest] {src} -> {dst}  ({n} contigs, renamed {prefix}*)")
             # Same deal as oyster.py's assembler lanes: start the gzip as
             # soon as the file stops being written, so cleanup() at the end
