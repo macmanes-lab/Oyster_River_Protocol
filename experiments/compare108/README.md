@@ -189,3 +189,69 @@ and ORP's end-of-run cleanup deletes both -- so for exactly the runs that
 finished, reading them directly returns nothing. The collector falls back to
 `reports/qualreport.<run>`, which reportgen writes before the cleanup runs and
 which survives it. A live run's own files stay authoritative where they exist.
+
+## Re-merging the runs with chowder
+
+`run_all_chowder.sh` re-runs only the merge half of the ORP over finished runs,
+to test a merge-side setting (merge method, OrthoFinder program or inflation,
+pick rule) without reassembling. For each sample it hands `chowder.py` the four
+raw assemblies and the trimmed, corrected reads that the full run left behind.
+
+```
+./run_all_chowder.sh [options] <manifest.tsv> <orp runs dir> <out dir> [throttle] [-- chowder args...]
+```
+
+| argument | what it is |
+| --- | --- |
+| `manifest.tsv` | the same 5-column manifest; columns 1 and 5 name the samples for `--only` and the run directories |
+| `orp runs dir` | the finished full runs, `$COMPARE/orp_runs`. Read only: `<run>/assemblies/<run>.{spades55,spades75,transabyss,trinity.Trinity}.fasta(.gz)` and `<run>/rcorr/<run>.TRIM_{1,2}P.cor.fq(.gz)` |
+| `out dir` | where this setting's runs go, one `<run>/` per sample plus `logs/`. One setting per directory |
+| `throttle` | concurrent array tasks, default 2 |
+| `-- ARGS` | passed to every `chowder.py` call, after the script's own arguments, so they can override them |
+
+`--only`, `--dry-run` and `--force` work as in `submit_all_orp.sh`. Options go
+anywhere before the `--`.
+
+Compare a setting against a chowder baseline, not against the ORP runs. chowder
+uses one assembly order for both concatenation and the diamond rescue, where
+`oyster.py` uses two, and it prefixes every contig with its assembly's label, so
+even the same merge method gives a close but not identical `.ORP.fasta`. And
+with no chowder args the merge is chowder's default, which since 4.1.0-dev0 is
+`twotrack`; the runs in `orp_runs` were made with 4.0's OrthoFinder merge. For a
+baseline that matches them, pass `--merge-method orthofinder`:
+
+```
+C=/mnt/home/macmaneslab/macmanes/compare
+S=SRR807360,SRR651040            # or the 24-sample test set
+./run_all_chowder.sh --only $S $C/manifest.tsv $C/orp_runs $C/chowder/of40 \
+    -- --merge-method orthofinder
+./run_all_chowder.sh --only $S $C/manifest.tsv $C/orp_runs $C/chowder/blastn \
+    -- --merge-method orthofinder --orthofinder-program blastn
+./collect_metrics.py --runs $C/chowder/of40 -o of40.csv
+./collect_metrics.py --runs $C/chowder/blastn -o blastn.csv
+```
+
+Each run gets the assemblies in ORP's concatenation order (`--assembly-order
+given`, labels `spades55 spades75 transabyss trinity`), `--corrected-reads`,
+`--tpm-filt 1` and `--max-parallel 2`, as the full runs had, with `--cpu` and
+`--mem` from the allocation (24 cpus, 120G).
+
+The first submit to an out dir writes the chowder args to `<out dir>/chowder.args`,
+and a later submit there with different args is refused, so one directory never
+holds samples merged two ways. Each submit also appends the date, the chowder
+checkout's commit and the args to `<out dir>/chowder.submits`, and each task log
+prints the commit it ran. Tasks run whatever the checkout holds when they start,
+so leave it alone while an array is going; the submit warns if it has
+uncommitted changes.
+
+Before submitting it checks that every named sample has all six inputs (`.gz` or
+plain). Across the whole manifest, samples without a complete ORP run are listed
+and left out; with `--only`, a missing input is an error.
+
+`--corrected-reads` unpacks the gzipped reads into each run's `rcorr/`, several
+GB per sample and tens of GB for the deepest. chowder deletes those copies at
+cleanup, so at the default throttle the peak is two samples' worth.
+
+Logs are `<out dir>/logs/chowder_<jobid>_<task>.log`, symlinked as `<run>.log`
+and `<tsa>.log`. A finished sample (`reports/qualreport.<run>.done`) is skipped,
+both at submit and in the task, unless `--force` is given.

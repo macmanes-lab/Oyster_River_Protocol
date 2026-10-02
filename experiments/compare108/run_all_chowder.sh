@@ -5,16 +5,20 @@
 #SBATCH --mem 120G
 #SBATCH --exclude=node117,node118
 # Re-merge finished ORP runs with chowder.py, to test a merge-side setting
-# (OrthoFinder, the pick rule, rescue, cd-hit-est) without reassembling.
+# (merge method, OrthoFinder, the pick rule, rescue, cd-hit-est) without
+# reassembling.
 #
 #     ./run_all_chowder.sh [options] <manifest.tsv> <orp runs dir> <out dir> [throttle] [-- chowder args...]
 #
-#     # the baseline: chowder with its defaults
+#     # the baseline: the 4.0 merge the ORP runs were built with
 #     ./run_all_chowder.sh --only SRR807360,SRR651040 \
-#         manifest.tsv orp_runs chowder/baseline
+#         manifest.tsv orp_runs chowder/of40 -- --merge-method orthofinder
 #     # the same samples with the setting under test
 #     ./run_all_chowder.sh --only SRR807360,SRR651040 \
-#         manifest.tsv orp_runs chowder/blastn -- --orthofinder-program blastn
+#         manifest.tsv orp_runs chowder/blastn -- --merge-method orthofinder --orthofinder-program blastn
+#
+# No chowder args means chowder's defaults, which since 4.1.0-dev0 are the
+# twotrack merge, not the OrthoFinder merge the 4.0 ORP runs used.
 #
 # Each sample's inputs come from the ORP run that orp_array.sbatch left in
 # <orp runs dir>/<SRR>/: the four raw assemblies under assemblies/ and the
@@ -25,9 +29,9 @@
 # Compare a setting against a chowder baseline, not against the ORP run. chowder
 # uses one assembly order for both concatenation and the diamond rescue, while
 # oyster.py uses ASSEMBLY_ORDER for the first and DIAMOND_PRIORITY for the
-# second, and every contig carries a <label>_ prefix. So a default chowder merge
-# is close to the ORP's own .ORP.fasta but not identical, and only two chowder
-# runs differ by the setting alone.
+# second, and every contig carries a <label>_ prefix. So even with the same
+# merge method a chowder merge is close to the ORP's own .ORP.fasta but not
+# identical, and only two chowder runs differ by the setting alone.
 #
 # One out dir holds one setting. The chowder args are written to
 # <out dir>/chowder.args on the first submit, and a later submit to the same
