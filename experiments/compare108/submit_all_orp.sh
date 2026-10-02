@@ -26,7 +26,7 @@ set -euo pipefail
 
 usage() {
     cat >&2 <<'USAGE'
-usage: submit_all_orp.sh <manifest.tsv> <runs directory> [throttle]
+usage: submit_all_orp.sh [options] <manifest.tsv> <runs directory> [throttle]
 
   manifest.tsv     5-column manifest from make_manifest.sh
   runs directory   where each sample's run tree goes; created if absent
@@ -53,7 +53,9 @@ die() { echo "submit: $*" >&2; exit 1; }
 # Kept for the stale-script message below, which repeats the whole command.
 ARGS="$*"
 
-FORCE="" DRYRUN="" ONLY=""
+# Options may come before, between or after the paths; everything that is not
+# one is collected, in order, as a positional argument.
+FORCE="" DRYRUN="" ONLY="" pos=()
 while [ $# -gt 0 ]; do
     case "$1" in
         -h|--help)  usage ;;
@@ -63,11 +65,13 @@ while [ $# -gt 0 ]; do
                     ONLY="${ONLY:+$ONLY,}$2"; shift 2 ;;
         --only=*)   [ -n "${1#--only=}" ] || die "--only needs a list of names"
                     ONLY="${ONLY:+$ONLY,}${1#--only=}"; shift ;;
-        --)         shift; break ;;
+        --)         shift; pos+=("$@"); break ;;
         -*)         die "unknown option: $1" ;;
-        *)          break ;;
+        *)          pos+=("$1"); shift ;;
     esac
 done
+# The ${pos[@]+...} form because bash before 4.4 calls an empty array unbound.
+set -- ${pos[@]+"${pos[@]}"}
 
 [ $# -ge 2 ] && [ $# -le 3 ] || usage
 
