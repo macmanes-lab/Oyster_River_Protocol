@@ -9,6 +9,9 @@ sample and trial, for runs that finished (BUSCO and transrate both reported):
   validate_arms/<sample>/<trial>            the 10-sample grid
   chowder_arms/SRR1139197/<arm>             SRR1139197's first three arms
   repick_arms/SRR1139197/<arm>.<rule>       SRR1139197's pick-rule re-picks
+  prod_410/<sample>                         ORP 4.1.0-dev0 end to end (trial v410:
+                                            two-track + step 1/2 rescue, chowder
+                                            defaults, prod_410.sbatch)
 
 Columns: sample, trial, search, inflation, pick, contigs, BUSCO complete /
 single / duplicated / fragmented / missing (genes of 125), unique genes
@@ -36,6 +39,7 @@ TRIALS = {
     "blastn_I12_protein": ("blastn", "12", "protein"),
     "candidate_protein": ("blastn", "3", "protein"),
     "twotrack": ("swissprot gene + cd-hit", "-", "two-track"),
+    "v410": ("swissprot gene + cd-hit", "-", "two-track + rescue (4.1.0-dev0)"),
 }
 # SRR1139197-only arms: directory -> (trial name, search, inflation, pick)
 EXTRA = {
@@ -80,10 +84,19 @@ def main():
     rows = []
     for sdir in sorted((root / "validate_arms").iterdir()):
         for trial, (search, infl, pick) in TRIALS.items():
+            if trial == "v410":
+                continue
             if (sdir / trial).exists():
                 x = row(sdir / trial, sdir.name, trial, search, infl, pick)
                 if x:
                     rows.append(x)
+    # ORP 4.1.0-dev0 runs, one directory per sample.
+    if (root / "prod_410").is_dir():
+        search, infl, pick = TRIALS["v410"]
+        for sdir in sorted((root / "prod_410").iterdir()):
+            x = row(sdir, sdir.name, "v410", search, infl, pick)
+            if x:
+                rows.append(x)
     for d, (trial, search, infl, pick) in EXTRA.items():
         if (root / d).exists():
             x = row(root / d, "SRR1139197", trial, search, infl, pick)

@@ -48,13 +48,34 @@ defaults from a fresh clone of the pushed commit at
 on SRR954929, SRR1139198, SRR1060332, SRR1176880, SRR951913. Output:
 `~/redundancy_tests/prod_410/<SRR>/` (runout `<SRR>_v410`, normal cleanup).
 Script: `experiments/redundancy/prod_410.sbatch`. Expect ~1-2 h each.
-**Next:** compare each against that sample's control and two-track runs in
-`~/redundancy_tests/validate_arms/<SRR>/` (BUSCO C/S/D/F/M, unique genes,
-transrate, good mappings, proper pairs). Easiest: symlink
-`validate_arms/<SRR>/v410 -> ../../prod_410/<SRR>`, add `"v410"` to TRIALS
-in `redundancy_trials.py`, rerun it. The goal to judge by: duplicated
-BUSCOs down, complete/missing BUSCOs and unique genes held, good mappings
-back near the control's 0.95.
+**Comparing 4.1.0 with the earlier runs.** `redundancy_trials.py` already
+reads `~/redundancy_tests/prod_410/<SRR>` as trial `v410`. On Premise:
+
+    cd ~/redundancy_tests
+    python3 redundancy_trials.py . --out redundancy_trials.csv | less -S
+
+It writes the full per-sample table (BUSCO C/S/D/F/M, unique genes,
+transrate score/optimal, good mappings, proper pairs) and prints medians and
+median change vs the control for every trial, v410 included. Copy the csv
+into `experiments/redundancy/results/` to keep it. If this session was still
+up when the runs finished, the updated csv is already committed there. The
+goal to judge by: duplicated BUSCOs down, complete/missing BUSCOs and
+unique genes held, good mappings back near the control's 0.95 (two-track
+without the rescue was 0.837). Early sign to watch: on SRR1060332 step 2
+rescued 10,283 copies for 13,324 genes (SRR954929: 2,620 for 8,104), so the
+rescue may hand back much of the duplication drop; its knobs are
+`--distinct-cov`, `--rescue-tpm` and `--max-per-gene` in
+`scripts/twotrack_select.py`.
+
+**Test for the selector:** `tests/test_twotrack_select.py`, a synthetic pool
+with a known answer, one contig per rule (step 1, step 2's
+distinct/expressed/cap, track 2's dedup, the no-swissprot-fasta fallback).
+Needs blastn, makeblastdb and cd-hit-est, so run it in the orp env:
+
+    conda run -n orp python tests/test_twotrack_select.py
+
+It skips (exit 0) where those tools are missing, e.g. on a laptop. It
+passed on Premise on 2026-10-02.
 
 **Pulling 4.1 into the Premise checkout** (`~/Oyster_River_Protocol`): safe
 for jobs already running (they have the old `oyster.py` loaded; helper
