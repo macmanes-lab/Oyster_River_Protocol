@@ -55,6 +55,15 @@ Three things differ from `oyster.py`, and all three are worth knowing before you
 
 `python3 chowder.py --help` prints the full flag reference, and [All flags (`chowder.py`)](#all-flags-chowderpy) below is the same list. There are no assembler flags -- no k-mers, no `--strand`, no `--normalize-reads` -- and preflight does not require SPAdes, Trinity or Trans-ABySS, since a merge never runs them. It does check for `bwa`, which `strandeval` runs.
 
+### How the assemblies are merged
+
+From 4.1.0 the four assemblies are merged by Swiss-Prot gene (`--merge-method twotrack`, the default), not by OrthoFinder orthogroup:
+
+- **Contigs with a Swiss-Prot hit** are grouped by the gene of their best hit -- the same gene names the qualreport's UNIQUE GENES counts. Each gene keeps one representative (the longest of the contigs whose hit covers close to the best fraction of the protein), plus up to two more copies that are both distinct from it (it covers under half of them) and expressed (at least 1 TPM): other isoforms, paralogs under the same name.
+- **Contigs without a hit** are deduplicated with cd-hit-est on both strands, and the TPM filter (`--tpm-filt`) later drops those below threshold.
+
+Everything after that -- the diamond rescue, cd-hit-est, salmon, the TPM filter, BUSCO, transrate -- is unchanged. On 10 test samples this cut duplicated BUSCOs by about 90% against ORP 4.0 while keeping complete BUSCOs and raising unique genes; the experiments behind it are in `experiments/redundancy/`. `--merge-method orthofinder` runs the OrthoFinder merge exactly as 4.0 did. Assemblies from the two methods are not comparable.
+
 ### Parallel task management
 
 See [docs/pipeline-schedule.html](docs/pipeline-schedule.html) for a full DAG of execution order and concurrency (download and open locally, or view via [htmlpreview](https://htmlpreview.github.io/?https://github.com/macmanes-lab/Oyster_River_Protocol/blob/master/docs/pipeline-schedule.html)), and [docs/pipeline-steps.md](docs/pipeline-steps.md) for what each step actually reads and writes.
@@ -127,6 +136,7 @@ Because it appends, a value given here overrides the same flag ORP passes above 
 | `--spades1-kmer` | `55` | rnaSPAdes k-mer for the spades55 assembly |
 | `--spades2-kmer` | `75` | rnaSPAdes k-mer for the spades75 assembly |
 | `--transabyss-kmer` | `32` | Trans-ABySS k-mer |
+| `--merge-method` | `twotrack` | How the four assemblies' contigs become one: `twotrack` keeps one contig per Swiss-Prot gene plus distinct, expressed copies, and deduplicates contigs without a hit; `orthofinder` is ORP's method through 4.0 (see [How the assemblies are merged](#how-the-assemblies-are-merged)) |
 | `--max-parallel` | `2` | Max concurrent jobs per stage (see [Parallel task management](#parallel-task-management) above) |
 | `--no-cleanup` | off | Keep every file a run produces, uncompressed, including each assembler's working directory -- for debugging (see [What a finished run leaves behind](#what-a-finished-run-leaves-behind) below). Alias: `--keep-intermediates` |
 | `--pytransrate-args` | none | Extra arguments passed verbatim to both pytransrate runs, as one quoted string (see [Tuning pytransrate](#tuning-pytransrate) below) |
@@ -153,6 +163,7 @@ There are no assembler flags — no k-mers, no `--strand`, no `--normalize-reads
 | `--runout` | `USER_RUN` | Run name prefix |
 | `--lineage` | `eukaryota_odb12.2` | BUSCO lineage |
 | `--tpm-filt` | `0` | TPM filter threshold |
+| `--merge-method` | `twotrack` | How the four assemblies' contigs become one: `twotrack` keeps one contig per Swiss-Prot gene plus distinct, expressed copies, and deduplicates contigs without a hit; `orthofinder` is ORP's method through 4.0 (see [How the assemblies are merged](#how-the-assemblies-are-merged)) |
 | `--max-parallel` | `2` | Max concurrent jobs per stage (see [Parallel task management](#parallel-task-management) above) |
 | `--no-cleanup` | off | Keep every file the run produces, uncompressed -- for debugging. Alias: `--keep-intermediates` |
 | `--pytransrate-args` | none | Extra arguments passed verbatim to both pytransrate runs (see [Tuning pytransrate](#tuning-pytransrate) above) |

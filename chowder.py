@@ -73,7 +73,8 @@ import time
 from pathlib import Path
 
 from oyster import (
-    ASSEMBLER_TOOLS, RED, RESET, Assembly, Pipeline, line_buffer_stdio,
+    ASSEMBLER_TOOLS, RED, RESET, Assembly, Pipeline, add_merge_experiment_args,
+    line_buffer_stdio,
 )
 
 HERE = Path(__file__).resolve().parent
@@ -473,6 +474,7 @@ def parse_args():
              "real sequence alone still exceeded the four-byte ceiling. Run "
              "`pytransrate --help` for the full set (default: none)",
     )
+    add_merge_experiment_args(p)
     p.add_argument("--dir", default=None, help="working directory (default: current directory)")
     return p.parse_args()
 

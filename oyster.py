@@ -334,6 +334,39 @@ ORTHOFINDER_MAX_ANALYSIS = 16
 BLAST_SELF_HIT_FLOOR = 0.5
 
 
+# Pick rules that rank orthogroup members by their swissprot hits, and so
+# need every assembly's diamond blastx output before makeorthout.
+PROTEIN_PICK_RULES = ("protein", "protein_len")
+
+
+def add_merge_experiment_args(p):
+    """The orthogroup search program, MCL inflation and pick rule, hidden
+    from --help.
+
+    For testing alternatives to the defaults (experiments/redundancy), not
+    for production use: any of them changes which contigs reach .ORP.fasta,
+    so assemblies made with them are not comparable to a default run. The
+    defaults reproduce what ORP has always done: `-I 12` over diamond, then
+    the highest-scoring contig per orthogroup (scripts/pick_best_contigs.py).
+    Shared with chowder.py so the two cannot drift.
+    """
+    p.add_argument("--orthofinder-program", choices=["diamond", "blastn"],
+                   default="diamond", help=argparse.SUPPRESS)
+    p.add_argument("--orthofinder-inflation", type=float, default=12.0,
+                   help=argparse.SUPPRESS)
+    p.add_argument(
+        "--merge-method", choices=["twotrack", "orthofinder"], default="twotrack",
+        help="how the four assemblies' contigs are reduced to one: 'twotrack' "
+             "keeps one contig per swissprot gene (plus distinct, expressed "
+             "copies) and deduplicates contigs without a hit with cd-hit-est; "
+             "'orthofinder' clusters with OrthoFinder and keeps the best-scoring "
+             "contig per orthogroup, as ORP did through 4.0 (default: twotrack)",
+    )
+    p.add_argument("--pick-rule",
+                   choices=["score", "score_len", "score_orf", "near_best", *PROTEIN_PICK_RULES],
+                   default="score", help=argparse.SUPPRESS)
+
+
 def line_buffer_stdio():
     """Make our own output appear where it happened in a redirected log.
 
@@ -605,6 +638,15 @@ class Pipeline:
         self.pytransrate_args = shlex.split(getattr(args, "pytransrate_args", "") or "")
         self.orthofinder_searches = getattr(args, "orthofinder_searches", None) or 0
         self.orthofinder_analysis = getattr(args, "orthofinder_analysis", None) or 0
+        # Experimental, hidden from --help: see add_merge_experiment_args.
+        self.orthofinder_program = getattr(args, "orthofinder_program", None) or "diamond"
+        self.orthofinder_inflation = getattr(args, "orthofinder_inflation", None) or 12.0
+        self.pick_rule = getattr(args, "pick_rule", None) or "score"
+        # How the pooled contigs are reduced to one assembly: "twotrack"
+        # (by swissprot gene, scripts/twotrack_select.py; the default from
+        # 4.1.0) or "orthofinder" (orthogroups plus the per-group pick, ORP
+        # through 4.0).
+        self.merge_method = getattr(args, "merge_method", None) or "twotrack"
 
         # Everything from run_filtershort onwards works on "the assemblies"
         # rather than on four named assemblers, so a caller that brings its
@@ -1536,7 +1578,11 @@ class Pipeline:
         takes twelve hours. Only the clustering sees an X.
         """
         self.orthofuse_search.mkdir(parents=True, exist_ok=True)
-        table = bytes.maketrans(b"Nn", b"XX")
+        # blastn reads the input as nucleotides and copes with N itself, so
+        # the poly-asparagine problem above does not arise and the copies
+        # go in unmasked.
+        mask = self.orthofinder_program == "diamond"
+        table = bytes.maketrans(b"Nn", b"XX") if mask else None
         for src, dst in zip(self.short_fasta_paths(), self.search_fasta_paths()):
             masked = 0
             tmp = dst.with_suffix(dst.suffix + ".partial")
@@ -1545,12 +1591,13 @@ class Pipeline:
                     # Deflines are copied byte for byte: a contig whose name
                     # contains an N still has to answer to that name in
                     # Orthogroups.txt.
-                    if not line.startswith(b">"):
+                    if mask and not line.startswith(b">"):
                         masked += line.count(b"N") + line.count(b"n")
                         line = line.translate(table)
                     outf.write(line)
             tmp.replace(dst)
-            print(f"    {dst.name}: {masked} N -> X")
+            print(f"    {dst.name}: {masked} N -> X" if mask
+                  else f"    {dst.name}: copied unmasked for blastn")
 
     def orthofinder_search_plan(self, cpu, mem):
         """(concurrent diamonds, threads each, GB apiece) for the all-vs-all.
@@ -1722,19 +1769,13 @@ class Pipeline:
         species = max(1, len(self.search_fasta_paths()))
         return max(1, min(cpu // 8, ORTHOFINDER_MAX_ANALYSIS, species))
 
-    def run_orthofuser(self, cpu=None, mem=None):
-        cpu = self.cpu if cpu is None else cpu
-        mem = self.mem if mem is None else mem
-        # -t is the count of concurrent diamonds and so a memory knob before
-        # it is a core count -- see ORTHOFINDER_GB_PER_SEARCH_GB2. -a, the
-        # analysis threads, is RAM-hungry in its own right and OrthoFinder's
-        # own default is t/8; it used to be handed the whole core count here,
-        # which under -og buys nothing at all, since that run stops at
-        # orthogroups and never reaches the MSA/tree work -a exists to
-        # parallelise.
+    def diamond_search_plan(self, cpu, mem, jobs, analysis):
+        """(program, searches) for ORP's default search: diamond blastp.
+
+        -t is the count of concurrent diamonds and so a memory knob before
+        it is a core count -- see ORTHOFINDER_GB_PER_SEARCH_GB2.
+        """
         searches, threads, per_search = self.orthofinder_search_plan(cpu, mem)
-        analysis = self.orthofinder_analysis_threads(cpu)
-        jobs = max(1, len(self.search_fasta_paths()) ** 2)
         why = ("--orthofinder-searches" if self.orthofinder_searches
                else f"{mem}G / {per_search}G per search")
         print(f"    all-vs-all: {jobs} searches, {searches} at a time ({why}), "
@@ -1762,6 +1803,41 @@ class Pipeline:
             print(f"    *** could not set diamond's thread count: OrthoFinder's own `-p 1` "
                   f"stands, so this step gets {searches} of {cpu} cores. Correct, but slow. "
                   "Raise --orthofinder-searches to trade memory for cores. ***")
+        return program, searches
+
+    def blastn_search_plan(self, cpu, jobs, analysis):
+        """(program, searches) for --orthofinder-program blastn.
+
+        Experimental. diamond blastp over DNA searches one strand, so two
+        assemblers' copies of a transcript in opposite orientations never
+        share an orthogroup and both survive makeorthout
+        (experiments/redundancy). OrthoFinder's stock `blastn` entry
+        searches both. It has no thread flag, so each search is one core
+        and -t is simply how many run at once; the only cap is the number
+        of searches. Its memory has been measured once -- 36 GB peak on a
+        425K-contig merge against diamond's 9.6 -- and there is no model of
+        it here yet.
+        """
+        searches = max(1, min(cpu, jobs))
+        print(f"    all-vs-all: {jobs} blastn searches, {searches} at a time, "
+              f"1 thread each; -a {analysis} for the algorithm phase")
+        return "blastn", searches
+
+    def run_orthofuser(self, cpu=None, mem=None):
+        cpu = self.cpu if cpu is None else cpu
+        mem = self.mem if mem is None else mem
+        # -t, the concurrent searches, is planned per search program below.
+        # -a, the analysis threads, is RAM-hungry in its own right and
+        # OrthoFinder's own default is t/8; it used to be handed the whole
+        # core count here, which under -og buys nothing at all, since that
+        # run stops at orthogroups and never reaches the MSA/tree work -a
+        # exists to parallelise.
+        analysis = self.orthofinder_analysis_threads(cpu)
+        jobs = max(1, len(self.search_fasta_paths()) ** 2)
+        if self.orthofinder_program == "blastn":
+            program, searches = self.blastn_search_plan(cpu, jobs, analysis)
+        else:
+            program, searches = self.diamond_search_plan(cpu, mem, jobs, analysis)
         # OrthoFinder reports its own fatal errors and then exits 0. A run
         # whose diamonds were OOM-killed leaves truncated Blast*.txt behind,
         # prints "ERROR: Blast1_1.txt is corrupted" and "ERROR: An error
@@ -1778,7 +1854,7 @@ class Pipeline:
         marker.touch()
         self.conda_run(
             "orp_orthofinder", "orthofinder",
-            "-d", "-I", "12", "-f", self.orthofuse_search,
+            "-d", "-I", f"{self.orthofinder_inflation:g}", "-f", self.orthofuse_search,
             "-og", "-t", searches, "-a", analysis, "-S", program,
         )
         groups = self.newest_orthogroups_txt()
@@ -2223,6 +2299,30 @@ class Pipeline:
         self.conda_run(
             "orp", "python", self.makedir / "scripts" / "pick_best_contigs.py",
             contigs_csv, self.find_orthogroups_txt(), good_list,
+            *([] if self.pick_rule == "score" else ["--rule", self.pick_rule]),
+            *(["--diamond", *[self.diamond_txt(a) for a in self.diamond_priority]]
+              if self.pick_rule in PROTEIN_PICK_RULES else []),
+        )
+
+    def twotrack_select(self):
+        """Choose the contigs to carry forward by swissprot gene, not orthogroup.
+
+        See scripts/twotrack_select.py: one representative per gene (the
+        longest of those with near-best protein coverage), distinct expressed
+        copies of kept genes, and cd-hit-est over the contigs without a hit.
+        Writes good.<run>.list, so orthofusing onwards is unchanged, and
+        twotrack.<run>.tsv beside it saying what happened to every contig.
+        """
+        print("Selecting contigs by swissprot gene (two-track)")
+        good_list = self.orthofuse_dir / f"good.{self.runout}.list"
+        self.conda_run(
+            "orp", "python", self.makedir / "scripts" / "twotrack_select.py",
+            "--merged", self.orthofuse_dir / "merged.fasta",
+            "--contigs-csv", self.orthofuse_dir / "merged" / "contigs.csv",
+            "--diamond", *[self.diamond_txt(a) for a in self.diamond_priority],
+            "--sprot", self.makedir / "software" / "diamond" / "uniprot_sprot.fasta",
+            "--table", self.orthofuse_dir / f"twotrack.{self.runout}.tsv",
+            "--threads", self.cpu, "--out", good_list,
         )
 
     def orthofusing(self):
@@ -2904,6 +3004,36 @@ class Pipeline:
             self.step("orthotransrate", [merged_csv], [merged_fasta, c1, c2],
                       partial(self.orthotransrate, cpu=cpu, mem=mem))
 
+        if self.merge_method == "twotrack":
+            # No OrthoFinder: the pool is scored, every assembly gets its
+            # swissprot pass (normally after the pick, here before it, since
+            # the selection groups contigs by those hits), and
+            # twotrack_select writes good_list. From orthofusing on, the run
+            # is the same as under orthofinder.
+            merge_branch()
+            for a in self.diamond_priority:
+                fasta, out = self.assembly_fasta(a), self.diamond_txt(a)
+                self.step(
+                    f"diamond_{a.diamond_label}", [out], [fasta],
+                    partial(self.run_diamond_one, fasta, out),
+                )
+            self.step(
+                "twotrack_select", [good_list],
+                [merged_fasta, merged_csv] + diamond_outs[1:], self.twotrack_select,
+            )
+        else:
+            self.merge_by_orthofinder(short_fastas, orthofuser_done, merged_csv, good_list,
+                                      diamond_outs, orthofuser_branch, merge_branch)
+        self.step("orthofusing", [orthomerged_fasta], [good_list, merged_fasta], self.orthofusing)
+        self.after_pick(c1, c2, diamond_outs, diamond_orthomerged, orthomerged_fasta, uniq_outs,
+                        list1, list2, list3, list5, list6, list7, newbies, working_orthomerged,
+                        orp_intermediate, orp_diamond_txt, unique_orp_done, ortho_idx, quant_sf,
+                        filter_done, low_txt, high_txt, orp_fasta, busco_done, transrate_csv,
+                        strandeval_done, qualreport_done, cleanup_done, pipeline_start)
+
+    def merge_by_orthofinder(self, short_fastas, orthofuser_done, merged_csv, good_list,
+                             diamond_outs, orthofuser_branch, merge_branch):
+        """ORP through 4.0: OrthoFinder orthogroups, then one contig per group."""
         # run_orthofuser and merge->orthotransrate are independent chains that
         # both only need short_fastas; they join at makeorthout below.
         self.run_parallel(
@@ -2913,8 +3043,31 @@ class Pipeline:
             ],
             max_workers=self.max_parallel,
         )
-        self.step("makeorthout", [good_list], [orthofuser_done, merged_csv], self.makeorthout)
-        self.step("orthofusing", [orthomerged_fasta], [good_list, merged_fasta], self.orthofusing)
+        protein_pick = self.pick_rule in PROTEIN_PICK_RULES
+        if protein_pick:
+            # The protein pick rules read every assembly's swissprot hits, so
+            # those diamond passes have to finish before the pick rather than
+            # after it, where they normally run (see below; they then skip as
+            # up to date there). Only under a protein rule: the default keeps
+            # today's step order.
+            for a in self.diamond_priority:
+                fasta, out = self.assembly_fasta(a), self.diamond_txt(a)
+                self.step(
+                    f"diamond_{a.diamond_label}", [out], [fasta],
+                    partial(self.run_diamond_one, fasta, out),
+                )
+        self.step(
+            "makeorthout", [good_list],
+            [orthofuser_done, merged_csv] + (diamond_outs[1:] if protein_pick else []),
+            self.makeorthout,
+        )
+
+    def after_pick(self, c1, c2, diamond_outs, diamond_orthomerged, orthomerged_fasta, uniq_outs,
+                   list1, list2, list3, list5, list6, list7, newbies, working_orthomerged,
+                   orp_intermediate, orp_diamond_txt, unique_orp_done, ortho_idx, quant_sf,
+                   filter_done, low_txt, high_txt, orp_fasta, busco_done, transrate_csv,
+                   strandeval_done, qualreport_done, cleanup_done, pipeline_start):
+        """Everything after good_list exists, the same for both merge methods."""
 
         # Every assembly needs a diamond pass, and under oyster.py most of
         # them already had one: the assembler lanes fire each assembly's
@@ -3054,6 +3207,7 @@ def parse_args():
              "real sequence alone still exceeded the four-byte ceiling. Run "
              "`pytransrate --help` for the full set (default: none)",
     )
+    add_merge_experiment_args(p)
     p.add_argument("--dir", default=None, help="working directory (default: current directory)")
     return p.parse_args()
 

@@ -2,7 +2,7 @@
 
 What every `self.step()` in `Pipeline.main()` actually reads and writes, and what it does functionally. (`main()` is three methods -- `prepare_reads`, `run_assemblers`, `merge_and_report` -- matching the three sections below.) For execution order and where concurrency kicks in, see [pipeline-schedule.html](pipeline-schedule.html) — this document is the companion piece: same steps, but focused on inputs/outputs/purpose rather than scheduling, so a reader can tell what each stage is *for* and where the pipeline's CPU/time actually goes.
 
-Reflects `oyster.py` as of ORP 4.0.0. Every step below is timed and appears in `reports/<run>.timing.log`: the bookkeeping steps used to be exempt, which was fair when each was seconds against an assembler's tens of hours, but a `chowder.py` merge has no assemblers and the merge half is the whole run.
+Reflects `oyster.py` as of ORP 4.1.0. Every step below is timed and appears in `reports/<run>.timing.log`: the bookkeeping steps used to be exempt, which was fair when each was seconds against an assembler's tens of hours, but a `chowder.py` merge has no assemblers and the merge half is the whole run.
 
 All paths below are relative to the run directory (`--dir`) and use `<run>` for `--runout`. "Env" is the conda environment the step's tool runs in.
 
@@ -37,7 +37,17 @@ Two sequential stage-pairings, each a fixed `ThreadPoolExecutor(max_workers=2)`,
 | `run_transabyss` | `orp_transabyss` transabyss | `c1`, `c2` | `assemblies/<run>.transabyss.fasta` | De novo assembly at `--transabyss-kmer` (default 32). Paired with Phase 2 instead of Stage A's SPAdes pair, since its dominant cost (initial FASTQ read + De Bruijn graph build) can't use extra cores anyway. Deletes its `<run>.transabyss/` working directory when done, unless `--no-cleanup`. |
 | `diamond_transabyss` | `orp` diamond blastx | `<run>.transabyss.fasta` | `diamond/<run>.transabyss.diamond.txt` | Blastx against swissprot; fires immediately after the assembly. |
 
-## Merging into one assembly (OrthoFuser)
+## Merging into one assembly (two-track, the default from 4.1.0)
+
+Under `--merge-method twotrack` the merge runs `run_filtershort`, `merge` and `orthotransrate` as below, then every assembly's `diamond_<label>` pass (moved before the selection, which groups contigs by those hits), then:
+
+| Step | Env / tool | Inputs | Outputs | What it does |
+|---|---|---|---|---|
+| `twotrack_select` | `orp` `scripts/twotrack_select.py` (blastn, cd-hit-est inside) | `merged.fasta`, `merged/contigs.csv`, the 4 per-assembly diamond outputs, `software/diamond/uniprot_sprot.fasta` | `orthofuse/<run>/good.<run>.list`; `orthofuse/<run>/twotrack.<run>.tsv` (the fate of every pooled contig) | Contigs with a Swiss-Prot hit are grouped by best-hit gene; each gene keeps the longest contig with near-best protein coverage, plus up to two distinct (under 50% covered by it at >=95% identity), expressed (>=1 TPM) copies. Contigs without a hit go through cd-hit-est (`-c 0.95 -G 0 -aS 0.9 -r 1`). |
+
+`mask_search_input`, `run_orthofuser` and `makeorthout` do not run. From `orthofusing` on, everything is as described below.
+
+## Merging into one assembly (OrthoFuser, `--merge-method orthofinder`)
 
 `run_filtershort` fans out to both branches; `orthofuser_branch` (just `run_orthofuser`) and `merge_branch` run concurrently when `--max-parallel ≥ 2`, then join at `makeorthout`.
 

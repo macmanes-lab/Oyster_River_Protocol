@@ -1,5 +1,38 @@
 ### CHANGELOG
 
+ORP Version 4.1.0-dev0
+
+- **The assemblies are merged by Swiss-Prot gene, not by OrthoFinder
+  orthogroup** (`--merge-method twotrack`, the new default; `oyster.py` and
+  `chowder.py`). Contigs with a Swiss-Prot hit are grouped by the gene of
+  their best hit and each gene keeps one representative -- the longest
+  contig whose hit covers close to the best fraction of the protein -- plus
+  up to two copies that are distinct from it and expressed (>= 1 TPM).
+  Contigs without a hit are deduplicated with cd-hit-est on both strands and
+  left to the TPM filter. New step `twotrack_select`
+  (`scripts/twotrack_select.py`); OrthoFinder is not run.
+  Why: in 4.0 the orthogroups did not line up with genes. Some split one gene
+  (the extra duplicated BUSCOs), others mixed several (keeping one member
+  lost the rest). And since the OrthoFinder 2.5.2 -> 3.1.5 upgrade, `-d` no
+  longer meant blastn: the search silently became diamond blastp over DNA,
+  one strand only, so the same transcript in opposite orientations could
+  never share an orthogroup. Tuning the search, inflation and pick rule
+  traded duplication against gene loss without fixing it
+  (`experiments/redundancy/README.md`). On 10 test samples the gene-based
+  selection, before the copy rescue was added, cut duplicated BUSCOs from
+  307 to 36 and raised unique genes, with complete BUSCOs unchanged, but
+  about 11% fewer read pairs mapped well, mostly reads on other versions of
+  kept genes. The longest-representative rule and the copy rescue are there
+  to win those back, and are being validated end to end.
+  **This changes the assembly**: 4.1 output is not comparable with 4.0.
+  `--merge-method orthofinder` runs the 4.0 merge unchanged.
+- **Hidden options for testing the OrthoFinder merge**, all defaulting to
+  4.0's behaviour: `--orthofinder-program diamond|blastn`,
+  `--orthofinder-inflation N` and `--pick-rule
+  score|score_len|score_orf|near_best|protein|protein_len`
+  (`scripts/pick_best_contigs.py --rule`). Under a protein rule the
+  per-assembly diamond passes run before `makeorthout`.
+
 ORP Version 4.0.1-dev18
 
 - **`chowder.py --corrected-reads` works with gzipped reads.** chowder
