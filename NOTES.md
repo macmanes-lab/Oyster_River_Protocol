@@ -48,6 +48,23 @@ defaults from a fresh clone of the pushed commit at
 on SRR954929, SRR1139198, SRR1060332, SRR1176880, SRR951913. Output:
 `~/redundancy_tests/prod_410/<SRR>/` (runout `<SRR>_v410`, normal cleanup).
 Script: `experiments/redundancy/prod_410.sbatch`. Expect ~1-2 h each.
+**Result (all 5 done, 2026-10-02 16:53; job 1319977, no errors).** Totals
+over the 5 samples (BUSCO genes /625; contigs and unique genes summed;
+transrate and mapping rates means):
+
+| trial | contigs | C | S | D | F | M | unique genes | transrate | good | proper |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| control (4.0) | 523,823 | 487 | 360 | 127 | 88 | 50 | 49,670 | 0.445 | 0.928 | 0.941 |
+| two-track, no rescue | 449,720 | 499 | 475 | 24 | 63 | 63 | 49,884 | 0.404 | 0.818 | 0.839 |
+| **4.1.0-dev0** | 472,389 | 503 | 428 | 75 | 69 | 53 | 49,852 | 0.455 | 0.914 | 0.924 |
+
+Duplicated -41%, complete +16, missing +3, unique genes +182, transrate up,
+good mappings -0.014. The rescue won back about 10 of two-track's 11 lost
+mapping points and gave back part of its duplication cut (24 -> 75). Open
+levers: a stricter rescue (`--max-per-gene 2`, a higher `--rescue-tpm`),
+and making `--tpm-filt 1` the default. Per-sample rows are in
+`experiments/redundancy/results/redundancy_trials.csv` (trial `v410`).
+
 **Comparing 4.1.0 with the earlier runs.** `redundancy_trials.py` already
 reads `~/redundancy_tests/prod_410/<SRR>` as trial `v410`. On Premise:
 
