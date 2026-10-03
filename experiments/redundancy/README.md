@@ -555,6 +555,47 @@ kept after cd-hit-est and left to `--tpm-filt`, which keeps every one above
 1.** The end-to-end validation of 4.1.0-dev0 through `chowder.py` on 5 of
 the 10 samples is described in NOTES.md.
 
+## SPAdes with auto k (`spades_branch.sbatch`, 2026-10-03)
+
+The same two-track merge, but with the two rnaSPAdes runs changed: the
+first leaves `-k` off (rnaSPAdes' auto pair, k=33,49 on these 100 bp reads),
+the second uses 60% and 75% of read length (k=59,75) instead of the fixed
+k=55 and k=75. `spades_branch.sbatch` re-runs both from each sample's
+existing corrected reads, then runs `chowder.py` (default merge,
+`--tpm-filt 1`) with the sample's existing Trans-ABySS and Trinity
+assemblies. Results land in `~/redundancy_tests/spades_branch/<run>/`. The
+numbers below are from the ten `qualreport.*_spadesbr` files (BUSCO counts
+are the report's percentages x 125; no contig count or good-mapping rate
+is in a qualreport, so proper pairs are shown instead).
+
+Same 5 samples as `v410` (BUSCO genes out of 625):
+
+| arm | C | S | D | F | M | unique genes | transrate | proper pairs |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| control (4.0) | 487 | 360 | 127 | 88 | 50 | 49,670 | 0.445 | 0.941 |
+| two-track, no rescue | 499 | 475 | 24 | 63 | 63 | 49,884 | 0.404 | 0.839 |
+| v410 (two-track + rescue) | 503 | 428 | 75 | 69 | 53 | 49,852 | 0.455 | 0.924 |
+| **spades branch** | 512 | 433 | 79 | 70 | 43 | 50,556 | 0.469 | 0.914 |
+
+Nine samples (everything but DRR036858, which has no earlier arm), against
+the control: complete 983 vs 956, duplicated 148 vs 324, missing 57 vs 64,
+unique genes 89,501 vs 87,203, transrate 0.481 vs 0.471, proper pairs 0.933
+vs 0.953. DRR036858 alone: 124/125 complete, 16 duplicated, 16,183 unique
+genes, transrate 0.266.
+
+What this does and does not show:
+
+- Complete BUSCOs were equal or higher than v410's on all 5 shared samples,
+  unique genes higher on 4 (SRR1139198 was the exception, 8,553 vs 8,696).
+  SRR954929 lost proper pairs (0.924 to 0.872).
+- Two things changed together (the auto first run and the 60%/75% second
+  run), so the gain is not yet credited to either. In every qualreport the
+  spadesauto assembly has more unique genes than spadeshigh.
+- Samples are 100 bp reads only; one BUSCO gene is 0.8% of 125.
+- Still to do: compare spadesauto with the old spades55 per sample (the
+  `v410` run directories hold both), and run auto with the old k=75 to
+  isolate the second run's change.
+
 ## Not yet done
 
 - **Check isoform calls across assemblers.** For each isoform-like pair, see

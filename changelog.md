@@ -1,5 +1,37 @@
 ### CHANGELOG
 
+ORP Version 4.1.0-dev1
+
+- **The two rnaSPAdes assemblies are `spadesauto` and `spadeshigh`**, not the
+  fixed k=55 and k=75 runs (`oyster.py`). `--spades1-kmer` now defaults to
+  `auto`: `-k` is left off and rnaSPAdes picks its documented pair, about
+  1/3 and 1/2 of the maximum read length (k=33,49 on 100 bp reads).
+  `--spades2-kmer` defaults to `60%,75%`: percentages of maximum read
+  length, resolved per dataset (59,75 on 100 bp reads; 89,113 on 150 bp).
+  Both flags take `auto`, percentages or an explicit odd list below 128.
+  The outputs are renamed `<run>.spades{auto,high}.fasta`, and the unique-gene
+  lines in the quality report are now `UNIQUE GENES SPADESAUTO` and
+  `SPADESHIGH`. A fixed k meant something different on every dataset (k=75
+  is half the read length at 150 bp but 74% of it at 101 bp).
+  **This changes the assembly**, and a run directory holding the old
+  `spades55`/`spades75` files is not reused.
+  Why: on 9 test samples run through the default two-track merge, this
+  gave 983 complete BUSCOs against 956 for the 4.0 control, duplicated
+  BUSCOs 148 against 324, 2.6% more unique genes and a higher transrate
+  score (0.481 against 0.471), with proper pairs 0.020 lower (0.933 against
+  0.953). Against 4.1.0-dev0 on the same 5 samples it added 9 complete BUSCOs,
+  704 unique genes (+1.4%) and 0.014 transrate, at equal duplication. The
+  gain cannot yet be split between the auto first run and the changed
+  second run (`experiments/redundancy/README.md`).
+- **`chowder.py` no longer empties an input that is already at its own
+  ingest path.** Passing the same `--runout` and `--dir` as the assemblies
+  made `<runout>.<label>.fasta` both the input and the output, and ingest
+  truncated it before reading ("no sequences found"). It now writes beside
+  the file and swaps it in.
+- New test harness `experiments/redundancy/spades_branch.sbatch` (with
+  `spades_only.py`): the two SPAdes runs, then the default merge with a
+  sample's existing Trans-ABySS and Trinity assemblies.
+
 ORP Version 4.1.0-dev0
 
 - **The assemblies are merged by Swiss-Prot gene, not by OrthoFinder

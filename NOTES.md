@@ -5,6 +5,35 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-10-03 -- ORP 4.1.0-dev1, spades auto-k merged to master
+
+**Where things stand.** The `spades` branch is merged into `master` as
+4.1.0-dev1. Defaults: `--spades1-kmer auto` (rnaSPAdes' own pair, k=33,49 on
+100 bp reads) and `--spades2-kmer 60%,75%` (k=59,75 on 100 bp). Outputs are
+`<run>.spades{auto,high}.fasta`. All of it is described in changelog.md and
+the new section in `experiments/redundancy/README.md`.
+
+**Result (10 samples, `spades_branch.sbatch`, default two-track merge).** On the
+5 samples that also have v410: complete 512 vs 503, unique genes 50,556 vs
+49,852, duplicated 79 vs 75, transrate 0.469 vs 0.455, proper pairs 0.914 vs
+0.924. Over 9 samples against the 4.0 control: duplicated BUSCOs 324 -> 148,
+complete +27, unique genes +2.6%, proper pairs 0.953 -> 0.933. Contig counts and good
+mappings are not in qualreports, so they are not compared. Output is in
+`~/redundancy_tests/spades_branch/<run>/` on Premise.
+
+**Not settled.** The auto first run and the 60%/75% second run changed
+together, so "auto is good" is not yet separable from "k=59,75 is good".
+Next: compare spadesauto with the old spades55 per sample (the `v410`
+qualreports have both), and run auto with the old k=75. SRR954929's proper
+pairs fell 0.924 -> 0.872; look at why. 100 bp reads only.
+
+**A bug found on the way.** `chowder.py` truncated an input that sat at its
+own ingest path (same `--runout`/`--dir` as the assemblies) -- fixed. Job
+logs record the code hash on their first line; the first two spades_branch
+submissions ran an old checkout because `CODE_DIR` was a stale
+`orp_spades` directory. Check that line says the commit you expect.
+
+
 ## 2026-10-02 (evening handoff) -- ORP 4.1.0-dev0, two-track merge
 
 **Where things stand.** `master` = 4.1.0-dev0, pushed to GitHub (head of
