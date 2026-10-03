@@ -23,11 +23,17 @@ ORP Version 4.1.0-dev1
   704 unique genes (+1.4%) and 0.014 transrate, at equal duplication. The
   gain cannot yet be split between the auto first run and the changed
   second run (`experiments/redundancy/README.md`).
-- **`chowder.py` no longer empties an input that is already at its own
-  ingest path.** Passing the same `--runout` and `--dir` as the assemblies
-  made `<runout>.<label>.fasta` both the input and the output, and ingest
-  truncated it before reading ("no sequences found"). It now writes beside
-  the file and swaps it in.
+- **`chowder.py` never writes to its input assemblies.** Its renamed copies
+  now go to `assemblies/ingested/<runout>.<label>.fasta`, a directory of
+  their own, rather than `assemblies/<runout>.<label>.fasta` -- which is also
+  where `oyster.py` leaves an assembly it built, so a chowder run given the
+  same `--runout` and `--dir` (as `spades_branch.sbatch` does) used to
+  replace its input with the renamed copy. A second ingest of that run then
+  prefixed the names again (`a_c` -> `a_a_c`), and cleanup deleted the
+  input in favour of its .gz. An input inside `assemblies/ingested/` is
+  refused, and each copy is written via a `.part` so a killed ingest leaves
+  nothing a resume would mistake for finished. A chowder run directory from
+  before this re-ingests and re-merges on resume.
 - **Resumes notice more stale inputs** (`oyster.py`, `chowder.py`): Trinity
   phase 1 now depends on both corrected mates, not only R1; the orthofinder
   merge's pooled scoring re-runs when only the corrected reads changed;

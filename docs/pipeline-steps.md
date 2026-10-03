@@ -6,7 +6,7 @@ Reflects `oyster.py` as of ORP 4.1.0. Every step below is timed and appears in `
 
 All paths below are relative to the run directory (`--dir`) and use `<run>` for `--runout`. "Env" is the conda environment the step's tool runs in.
 
-`chowder.py` runs this same reference from `run_filtershort` down, over assemblies it was handed rather than ones it built: it skips the whole Assembly lanes section and puts one `ingest` step in front of it (pure Python -- copies each input under `assemblies/<run>.<label>.fasta`, prefixing every contig name with `<label>_`, and declares those copies as its outputs so a re-invocation resumes). Everywhere a row below says "the 4 assemblies", read "the N assemblies given to `--assemblies`". See the README for what else differs.
+`chowder.py` runs this same reference from `run_filtershort` down, over assemblies it was handed rather than ones it built: it skips the whole Assembly lanes section and puts one `ingest` step in front of it (pure Python -- copies each input to `assemblies/ingested/<run>.<label>.fasta`, prefixing every contig name with `<label>_`, and declares those copies as its outputs so a re-invocation resumes; the inputs themselves are never written, and one inside `assemblies/ingested/` is refused). Everywhere a row below says "the 4 assemblies", read "the N assemblies given to `--assemblies`". See the README for what else differs.
 
 ## Read prep
 

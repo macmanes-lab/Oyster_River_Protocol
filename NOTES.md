@@ -5,6 +5,19 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-10-03 -- 4.1.0-dev6: chowder stages copies in assemblies/ingested/
+
+Chowder's renamed copies moved to `assemblies/ingested/`, so the
+`spades_branch`/`spades_all` pattern (chowder's --runout/--dir equal to the
+spades run's) no longer rewrites spades_only's outputs in place, and a
+re-ingest can't double-prefix. Inputs inside ingested/ are refused; writes go
+via .part. Tested with a scratch harness (forced re-ingest, aliasing input,
+duplicate-name failure). Side effect worth knowing: the raw
+`<R>.spades{auto,high}.fasta` now stay in `$OUT/assemblies/` after a
+spades_all task (before, chowder's cleanup removed them) -- add them to the
+sbatch's end-of-task deletes if disk matters.
+
+
 ## 2026-10-03 -- 4.1.0-dev5: pooled scoring gets --mem
 
 The default two-track path called `merge_branch()` bare, so

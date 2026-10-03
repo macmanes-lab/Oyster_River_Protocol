@@ -253,6 +253,17 @@ class Chowder(Pipeline):
                 sys.exit(f"\n*** assembly is empty: {src} ***")
         if len(self.sources) < 2:
             sys.exit("\n*** chowder merges assemblies: give it at least two ***")
+        # Checked against the whole directory, not each input against its own
+        # copy: an input can alias another input's copy, or the .gz/.part
+        # written beside one, and ingest would overwrite it before (or
+        # after) reading it.
+        staging = self.ingested_dir().resolve()
+        for src in self.sources:
+            resolved = Path(src).resolve()
+            if resolved == staging or staging in resolved.parents:
+                sys.exit(f"\n*** {src} is inside {staging}, where chowder writes its "
+                         "renamed copies of the inputs. Pass the original assembly, "
+                         "or move it out first. ***")
 
     def run_inputs(self):
         return [self.read1, self.read2] + self.sources
@@ -300,8 +311,26 @@ class Chowder(Pipeline):
 
     # -- ingest ------------------------------------------------------------
 
+    def ingested_dir(self):
+        """Where ingest writes its renamed copies, and only they live.
+
+        Its own directory rather than assemblies/ itself, because
+        assemblies/<runout>.<label>.fasta is also where oyster.py leaves an
+        assembly it built -- which is exactly what spades_branch.sbatch hands
+        chowder, under the same --runout and --dir. With the copy at that
+        path, ingest replaced the input with its renamed self, and any later
+        ingest (a run killed partway through it, or an output deleted)
+        prefixed the prefixed names again; cleanup then removed the input
+        in favour of its .gz. assemblycheck() refuses any input inside this
+        directory, so the inputs are never written.
+        """
+        return self.assemblies_dir / "ingested"
+
+    def assembly_fasta(self, assembly):
+        return self.ingested_dir() / f"{self.runout}.{assembly.fasta_name}"
+
     def ingest(self):
-        """Copy each input under assemblies/, prefixing every contig name.
+        """Copy each input under assemblies/ingested/, prefixing every contig name.
 
         Prefixing is not cosmetic. Contig names are the key every downstream
         stage joins on -- OrthoFinder's orthogroups, pytransrate's
@@ -309,46 +338,20 @@ class Chowder(Pipeline):
         library routinely share them. Unprefixed, two contigs called
         TRINITY_DN0_c0_g1_i1 would be silently treated as one.
         """
+        self.ingested_dir().mkdir(parents=True, exist_ok=True)
         for a, src in zip(self.assemblies, self.sources):
             dst = self.assembly_fasta(a)
-            prefix = f"{a.diamond_label}_"
-            seen, n = set(), 0
-            # An input already sitting at its own destination (a chowder run
-            # started with the same --runout/--dir as the assemblies, as
-            # spades_branch.sbatch does) would be truncated by open(dst, "w")
-            # before a line was read. Write beside it and swap in at the end.
-            in_place = Path(src).resolve() == Path(dst).resolve()
-            target = str(dst) + ".ingest.tmp" if in_place else dst
-            with open_maybe_gzip(src) as inf, open(target, "w") as out:
-                for line in inf:
-                    if not line.startswith(">"):
-                        out.write(line)
-                        continue
-                    n += 1
-                    # Split rather than index by len(name): a header written
-                    # "> name desc" puts the name at a non-zero offset, and
-                    # slicing by length there would re-emit part of the name
-                    # as the head of the description.
-                    header = line[1:].rstrip("\n")
-                    parts = header.split(None, 1)
-                    if parts:
-                        name = parts[0]
-                        rest = " " + parts[1] if len(parts) > 1 else ""
-                    else:
-                        name, rest = f"contig{n}", ""
-                    if name in seen:
-                        sys.exit(
-                            f"\n*** {src} contains the contig name {name!r} more than "
-                            "once. Contig names have to be unique within an assembly: "
-                            "every stage from the merge on joins on them. ***"
-                        )
-                    seen.add(name)
-                    out.write(f">{prefix}{name}{rest}\n")
-            if n == 0:
-                sys.exit(f"\n*** no sequences found in {src} -- is it FASTA? ***")
-            if in_place:
-                Path(target).replace(dst)
-            print(f"[ingest] {src} -> {dst}  ({n} contigs, renamed {prefix}*)")
+            # Via a .part, so a run killed mid-file leaves no truncated copy
+            # that a resume would take for finished on mtime alone.
+            part = dst.with_name(dst.name + ".part")
+            try:
+                n = self.ingest_one(a, src, part)
+                part.replace(dst)
+            except BaseException:
+                if part.exists():
+                    part.unlink()
+                raise
+            print(f"[ingest] {src} -> {dst}  ({n} contigs, renamed {a.diamond_label}_*)")
             # Same deal as oyster.py's assembler lanes: start the gzip as
             # soon as the file stops being written, so cleanup() at the end
             # has nothing to do but unlink.
@@ -365,6 +368,42 @@ class Chowder(Pipeline):
                         for i, (a, src) in enumerate(zip(self.assemblies, self.sources), start=1))
             + "\n"
         )
+
+    def ingest_one(self, a, src, target):
+        """Write `src` to `target` with every contig renamed <label>_<name>.
+
+        Returns the number of contigs.
+        """
+        prefix = f"{a.diamond_label}_"
+        seen, n = set(), 0
+        with open_maybe_gzip(src) as inf, open(target, "w") as out:
+            for line in inf:
+                if not line.startswith(">"):
+                    out.write(line)
+                    continue
+                n += 1
+                # Split rather than index by len(name): a header written
+                # "> name desc" puts the name at a non-zero offset, and
+                # slicing by length there would re-emit part of the name
+                # as the head of the description.
+                header = line[1:].rstrip("\n")
+                parts = header.split(None, 1)
+                if parts:
+                    name = parts[0]
+                    rest = " " + parts[1] if len(parts) > 1 else ""
+                else:
+                    name, rest = f"contig{n}", ""
+                if name in seen:
+                    sys.exit(
+                        f"\n*** {src} contains the contig name {name!r} more than "
+                        "once. Contig names have to be unique within an assembly: "
+                        "every stage from the merge on joins on them. ***"
+                    )
+                seen.add(name)
+                out.write(f">{prefix}{name}{rest}\n")
+        if n == 0:
+            sys.exit(f"\n*** no sequences found in {src} -- is it FASTA? ***")
+        return n
 
     # -- orchestration -----------------------------------------------------
 
