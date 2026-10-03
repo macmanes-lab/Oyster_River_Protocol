@@ -56,7 +56,7 @@ python3 "$CODE/experiments/redundancy/spades_only.py" --oyster "$CODE/oyster.py"
     --runout "$R" --dir "$OUT" 2>&1 | tee "$OUT/spades_only.log"
 python3 "$CODE/chowder.py" \
     --assemblies "$OUT/assemblies/$R.spadesauto.fasta" "$OUT/assemblies/$R.spadeshigh.fasta" "$TA" "$TR" \
-    --labels spadesauto spadeshigh transabyss trinity --assembly-order given \
+    --labels spadesauto spadeshigh transabyss trinity --max-parallel 2 \
     --read1 "$R1" --read2 "$R2" \
     --corrected-reads --cpu "$CPU" --mem "$MEM" --tpm-filt 1 --runout "$R" --dir "$OUT"
 ) || status=$?
