@@ -188,7 +188,7 @@
 
   <figure>
     <div class="diagram-frame">
-      <svg viewBox="0 0 1000 2070" role="img" aria-label="Directed acyclic graph of oyster.py's pipeline at --max-parallel 2: a long sequential chain of steps interrupted by four concurrent stages -- always-on Stage A (Trinity phase 1 vs. SPAdes55/SPAdes75, 25/75 split) then Stage B (Trinity phase 2 vs. Trans-ABySS, 95/5 split), orthofuser_branch running alongside merge_branch, and transrate running alongside strandeval. The chain ends at reportgen and then cleanup.">
+      <svg viewBox="0 0 1000 2070" role="img" aria-label="Directed acyclic graph of oyster.py's pipeline at --max-parallel 2: a long sequential chain of steps interrupted by four concurrent stages -- always-on Stage A (Trinity phase 1 vs. SPAdes55/SPAdes75, 25/75 split) then Stage B (Trinity phase 2 vs. Trans-ABySS, 95/5 split), orthofinder_branch running alongside pool_branch, and transrate running alongside strandeval. The chain ends at reportgen and then cleanup.">
         <defs>
           <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
             <path d="M0,0 L10,5 L0,10 z" fill="currentColor" class="flow-marker"></path>
@@ -311,25 +311,25 @@
         <!-- BAND B -->
         <rect class="band-fixed" x="180" y="724" width="640" height="204" rx="16"></rect>
         <text class="t-band" x="500" y="745" text-anchor="middle" font-size="12">CONCURRENT AT --max-parallel 2</text>
-        <text class="t-sub" x="500" y="759" text-anchor="middle" font-size="10.5">run_parallel([orthofuser_branch, merge_branch], max_workers=2)</text>
+        <text class="t-sub" x="500" y="759" text-anchor="middle" font-size="10.5">run_parallel([orthofinder_branch, pool_branch], max_workers=2)</text>
 
-        <!-- left lane: orthofuser_branch -->
-        <text class="t-sub" x="340" y="776" text-anchor="middle" font-size="10">orthofuser_branch</text>
+        <!-- left lane: orthofinder_branch -->
+        <text class="t-sub" x="340" y="776" text-anchor="middle" font-size="10">orthofinder_branch</text>
         <g class="node-work">
           <rect x="245" y="781" width="190" height="28" rx="6"></rect>
-          <text x="340" y="800" text-anchor="middle" font-size="11.5">run_orthofuser</text>
+          <text x="340" y="800" text-anchor="middle" font-size="11.5">run_orthofinder</text>
         </g>
 
-        <!-- right lane: merge_branch -->
-        <text class="t-sub" x="660" y="776" text-anchor="middle" font-size="10">merge_branch</text>
+        <!-- right lane: pool_branch -->
+        <text class="t-sub" x="660" y="776" text-anchor="middle" font-size="10">pool_branch</text>
         <g class="node-book">
           <rect x="575" y="781" width="170" height="22" rx="6"></rect>
-          <text x="660" y="796" text-anchor="middle" font-size="10.5">merge</text>
+          <text x="660" y="796" text-anchor="middle" font-size="10.5">build_pool</text>
         </g>
         <line class="flow" x1="660" y1="803" x2="660" y2="811" marker-end="url(#arrow)"></line>
         <g class="node-work">
           <rect x="565" y="813" width="190" height="28" rx="6"></rect>
-          <text x="660" y="832" text-anchor="middle" font-size="11.5">orthotransrate</text>
+          <text x="660" y="832" text-anchor="middle" font-size="11.5">score_pool</text>
         </g>
 
         <!-- converge band B -->
@@ -348,13 +348,13 @@
 
         <g class="node-work">
           <rect x="395" y="1020" width="210" height="34" rx="6"></rect>
-          <text x="500" y="1041" text-anchor="middle">orthofusing</text>
+          <text x="500" y="1041" text-anchor="middle">shuck</text>
         </g>
         <line class="flow" x1="500" y1="1054" x2="500" y2="1078" marker-end="url(#arrow)"></line>
 
         <g class="node-work">
           <rect x="390" y="1080" width="220" height="30" rx="6"></rect>
-          <text x="500" y="1099" text-anchor="middle" font-size="11.5">diamond_orthomerged</text>
+          <text x="500" y="1099" text-anchor="middle" font-size="11.5">diamond_shucked</text>
         </g>
         <line class="flow" x1="500" y1="1110" x2="500" y2="1126" marker-end="url(#arrow)"></line>
 
@@ -488,7 +488,7 @@
     <ol>
       <li><strong>Stage A: Trinity phase 1 vs. SPAdes55/SPAdes75 (always on).</strong> Phase 1 is largely insensitive to its CPU share above Inchworm's own <code>--inchworm_cpu=10</code> cap, so it only needs <code>TRINITY_PHASE1_SHARE</code> (25%) of the CPU/mem budget; SPAdes -- fast, but does scale with cores -- gets the rest. Each SPAdes assembly is followed immediately by its own DIAMOND search.</li>
       <li><strong>Stage B: Trinity phase 2 vs. Trans-ABySS (always on).</strong> Phase 2 (thousands of independent per-gene-component ParaFly jobs, by far Trinity's dominant cost -- around 34h on the SRR1789336 benchmark) gets <code>TRINITY_PHASE2_SHARE</code> (95%) of CPU; Trans-ABySS gets the rest, since its own dominant cost -- the initial FASTQ read + De Bruijn graph build -- runs single-threaded no matter how many cores it's given (traced to <code>abyss-pe</code> falling through to the plain, unthreaded <code>ABYSS</code> binary; see NOTES.md 2026-08-19). Its mem share isn't cut the same way, since its memory footprint doesn't shrink with fewer cores. Starting Phase 2 here rather than after Trans-ABySS finishes reclaims what was previously idle Trinity-lane time -- not yet validated on a real run.</li>
-      <li><strong>orthofuser_branch alongside merge_branch.</strong> Both only need <code>short_fastas</code>, so they're independent until they join at <code>makeorthout</code>. This is the branch pair behind the test37/test36 timing delta you looked at earlier &mdash; each branch only took ~5s on the sample dataset, so the concurrency saved seconds there, but ~5h11m on the full SRR1789336 benchmark.</li>
+      <li><strong>orthofinder_branch alongside pool_branch.</strong> Both only need <code>short_fastas</code>, so they're independent until they join at <code>makeorthout</code>. This is the branch pair behind the test37/test36 timing delta you looked at earlier &mdash; each branch only took ~5s on the sample dataset, so the concurrency saved seconds there, but ~5h11m on the full SRR1789336 benchmark.</li>
       <li><strong>transrate alongside strandeval.</strong> Cheap and independent, so they still run as a small concurrent pair even though BUSCO right before them deliberately does <em>not</em> share its CPU budget with anything &mdash; it dwarfs both in wall time.</li>
     </ol>
 

@@ -63,7 +63,7 @@ def build(tmp):
         "B1": rand_seq(rng, 600), "B2": rand_seq(rng, 1200),
         "N1": n1, "N2": n1[25:975], "N3": rand_seq(rng, 500),
     }
-    write_fasta(os.path.join(tmp, "merged.fasta"), pool)
+    write_fasta(os.path.join(tmp, "pool.fasta"), pool)
     write_fasta(os.path.join(tmp, "sprot.fasta"),
                 {"sp|P00001|GENEA_HUMAN": "M" * 300, "sp|P00002|GENEB_HUMAN": "M" * 200})
     # contig -> (subject, sstart, send, bitscore), sstart/send in protein coordinates
@@ -88,7 +88,7 @@ def build(tmp):
 
 def run(tmp, with_sprot=True):
     out = os.path.join(tmp, "good.list")
-    cmd = [sys.executable, SCRIPT, "--merged", os.path.join(tmp, "merged.fasta"),
+    cmd = [sys.executable, SCRIPT, "--pool", os.path.join(tmp, "pool.fasta"),
            "--contigs-csv", os.path.join(tmp, "contigs.csv"),
            "--diamond", os.path.join(tmp, "a.diamond.txt"),
            "--table", os.path.join(tmp, "table.tsv"), "--out", out]

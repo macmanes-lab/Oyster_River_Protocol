@@ -5,6 +5,20 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-10-03 -- 4.1.0-dev8: orthofuse -> shuck rename
+
+Everything named for orthofuse is renamed for "shuck" (oyster theme: keep
+the meat, drop the shell) -- directory, files, steps and internal names; the
+full mapping is in changelog.md. OrthoFinder-only pieces are now
+`orthofinder_*` rather than `orthofuser_*`. Checked by dumping the step graph
+(name, outputs, inputs) for both merge methods before and after: identical
+up to the renames. Deliberately NOT renamed: `experiments/redundancy/`
+(compare_arms.py, nohit_lowexp.py, preview_pick.py, trace_arms.py,
+reads_lost.py, repick_*.sbatch, validate_arms.sbatch) -- they read or reseed
+existing old-layout run dirs, so they need `shuck/`, `pool.fasta`,
+`pool/contigs.csv`, `salmon_shucked_*` before being pointed at a dev8 run
+(e.g. spades_all output). Historical changelog/NOTES/benchmarks left as is.
+
 ## 2026-10-03 -- 4.1.0-dev6: chowder stages copies in assemblies/ingested/
 
 Chowder's renamed copies moved to `assemblies/ingested/`, so the

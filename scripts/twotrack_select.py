@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
-#usage: python twotrack_select.py --merged merged.fasta --contigs-csv contigs.csv
+#usage: python twotrack_select.py --pool pool.fasta --contigs-csv contigs.csv
 #           --diamond a.diamond.txt [b ...] --out good.list
 #           [--sprot uniprot_sprot.fasta] [--table selection.tsv] [--threads N]
 #
 #The two-track merge, which replaces OrthoFinder plus the per-orthogroup pick
-#(ORP 4.1.0). It writes the list of pooled contigs (merged.fasta) to carry
+#(ORP 4.1.0). It writes the list of pooled contigs (pool.fasta) to carry
 #forward, in the format of makeorthout's good.<run>.list, so everything
 #downstream -- the diamond rescue, cd-hit-est, salmon and the TPM filter --
 #runs unchanged.
@@ -159,7 +159,7 @@ def coverage_by_rep(blastn_bin, makeblastdb_bin, query_fa, rep_fa, rep_of, tmp, 
 
 def main():
     p = argparse.ArgumentParser(description="ORP's two-track merge selection")
-    p.add_argument("--merged", required=True)
+    p.add_argument("--pool", required=True)
     p.add_argument("--contigs-csv", required=True)
     p.add_argument("--diamond", nargs="+", required=True)
     p.add_argument("--out", required=True)
@@ -179,7 +179,7 @@ def main():
     p.add_argument("--makeblastdb", default="makeblastdb")
     args = p.parse_args()
 
-    pool = fasta_lengths(args.merged)
+    pool = fasta_lengths(args.pool)
     hits = best_hits(args.diamond)
     metrics = contig_metrics(args.contigs_csv)
     slen = fasta_lengths(args.sprot) if args.sprot and os.path.isfile(args.sprot) else {}
@@ -215,15 +215,15 @@ def main():
         rescued = set()
         if others:
             q_fa, r_fa = os.path.join(tmp, "others.fa"), os.path.join(tmp, "reps.fa")
-            write_subset(args.merged, set(others), q_fa)
-            write_subset(args.merged, reps, r_fa)
+            write_subset(args.pool, set(others), q_fa)
+            write_subset(args.pool, reps, r_fa)
             covered = coverage_by_rep(args.blastn, args.makeblastdb, q_fa, r_fa, rep_of,
                                       tmp, args.threads)
             distinct = {c for c in others
                         if covered.get(c, 0) / pool[c] < args.distinct_cov}
             if distinct:
                 d_fa, d_out = os.path.join(tmp, "distinct.fa"), os.path.join(tmp, "distinct.cd.fa")
-                write_subset(args.merged, distinct, d_fa)
+                write_subset(args.pool, distinct, d_fa)
                 distinct = cdhit(args.cdhit, d_fa, d_out, 0.95, 0.9, args.threads, args.mem_mb)
             by_gene = defaultdict(list)
             for c in distinct:
@@ -235,7 +235,7 @@ def main():
         # Track 2: contigs with no hit, nucleotide-deduplicated on both strands.
         nohit = [c for c in pool if c not in info]
         n_fa, n_out = os.path.join(tmp, "nohit.fa"), os.path.join(tmp, "nohit.cd.fa")
-        write_subset(args.merged, set(nohit), n_fa)
+        write_subset(args.pool, set(nohit), n_fa)
         keep2 = set()
         if nohit:
             keep2 = cdhit(args.cdhit, n_fa, n_out, args.nohit_id, args.nohit_cov,
@@ -243,7 +243,7 @@ def main():
 
     keep = reps | rescued | keep2
     with open(args.out, "w") as out:
-        for c in pool:  # merged.fasta order
+        for c in pool:  # pool.fasta order
             if c in keep:
                 out.write(c + "\n")
     if args.table:

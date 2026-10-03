@@ -77,7 +77,7 @@ This split is fixed and not affected by `--max-parallel`.
 
 By default (`--max-parallel 2`), oyster.py runs up to 2 jobs at once within the other stages of the pipeline that benefit from it, splitting `--cpu`/`--mem` across however many jobs are running concurrently:
 
-- the orthofuser branch vs. the merge/orthotransrate branch
+- the orthofinder branch vs. the build_pool/score_pool branch
 - transrate vs. strandeval
 
 CPU-bound stages that don't benefit from splitting cores — diamond, orp_diamond, salmon, and BUSCO — always run sequentially at the full `--cpu` count regardless of this flag.
@@ -96,7 +96,7 @@ A completed run keeps five things and reclaims the rest:
 | `reports/` | BUSCO, transrate, strand evaluation, `qualreport.<run>`, timings |
 | `reports/<run>.cleanup.done` | what was reclaimed and what was kept, with sizes |
 
-Everything else goes: the trimmed-but-uncorrected reads (deleted as soon as read correction is done with them — nothing downstream ever reads them again), the `orthofuse/` tree (OrthoFinder's all-vs-all output and the transrate scoring of the pooled fasta, normally the largest directory in a run), `quants/`, `assemblies/diamond/`, `assemblies/working/`, and the chain of working assemblies between `orthofusing` and `.ORP.fasta`. Every number any of those contributed is already in `reports/qualreport.<run>`.
+Everything else goes: the trimmed-but-uncorrected reads (deleted as soon as read correction is done with them — nothing downstream ever reads them again), the `shuck/` tree (OrthoFinder's all-vs-all output and the transrate scoring of the pooled fasta, normally the largest directory in a run), `quants/`, `assemblies/diamond/`, `assemblies/working/`, and the chain of working assemblies between `shuck` and `.ORP.fasta`. Every number any of those contributed is already in `reports/qualreport.<run>`.
 
 The gzipping runs in the background, starting the moment each file is finished being written rather than at the end of the run — the corrected reads compress alongside the assemblers, and each assembly compresses while the next stage runs — so cleanup itself is just an unlink and adds no wall time. Pass `--no-cleanup` to switch all of this off and keep a run exactly as it was, which is what you want when debugging a run rather than shipping its results. It also keeps what individual steps would otherwise delete as they finish: Trinity's working directory (Phase 2 runs without `--full_cleanup`), the rnaSPAdes and Trans-ABySS working directories, and strandeval's BAM and bwa index. Running the same command again later without the flag does the cleanup then. `--keep-intermediates` is an older name for the same flag and still works.
 

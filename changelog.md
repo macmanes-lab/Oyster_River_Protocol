@@ -23,6 +23,20 @@ ORP Version 4.1.0-dev1
   704 unique genes (+1.4%) and 0.014 transrate, at equal duplication. The
   gain cannot yet be split between the auto first run and the changed
   second run (`experiments/redundancy/README.md`).
+- **The pick stage is called "shuck", not "orthofuse"** (`oyster.py`,
+  `chowder.py`): under the default two-track merge OrthoFinder never runs,
+  so the old name described nothing. `orthofuse/<run>/` is now
+  `shuck/<run>/`; the pooled fasta `merged.fasta` is `pool.fasta` and its
+  pytransrate output `merged/` is `pool/`; `<run>.orthomerged.fasta` (and
+  its diamond output, working copy and salmon directory) is
+  `<run>.shucked.fasta`; `<run>.ortho.idx` is `<run>.shucked.idx`. Steps:
+  `merge` -> `build_pool`, `orthotransrate` -> `score_pool`, `orthofusing`
+  -> `shuck`, `diamond_orthomerged` -> `diamond_shucked`, and the
+  OrthoFinder-only `run_orthofuser`/`orthofuser_branch`/`orthofuser.done`
+  -> `run_orthofinder`/`orthofinder_branch`/`orthofinder.done`.
+  `scripts/twotrack_select.py` takes `--pool` instead of `--merged`. A run
+  directory from before this resumes from `run_filtershort`, not where it
+  stopped; cleanup also removes its old `orthofuse/` tree.
 - **`chowder.py` never writes to its input assemblies.** Its renamed copies
   now go to `assemblies/ingested/<runout>.<label>.fasta`, a directory of
   their own, rather than `assemblies/<runout>.<label>.fasta` -- which is also

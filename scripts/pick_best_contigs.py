@@ -39,7 +39,7 @@
 #Group ORDER is preserved exactly, and deliberately: the old glob-and-sort
 #ordered groups by *filename* ("1.groups", "10.groups", "100.groups",
 #"2.groups", ...), which is lexicographic, not numeric. That order carries
-#into good.list.txt, from there into contig order in orthomerged.fasta, and
+#into good.list.txt, from there into contig order in shucked.fasta, and
 #so into cd-hit-est, where input order breaks length ties and can change
 #which representative survives into the final assembly. Emitting groups in
 #Orthogroups.txt's own line order instead would be an assembly-changing

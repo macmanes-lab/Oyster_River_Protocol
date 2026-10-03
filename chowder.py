@@ -83,7 +83,7 @@ HERE = Path(__file__).resolve().parent
 
 # Labels that would collide with a file the pipeline writes itself under
 # assemblies/<runout>.*.
-RESERVED_LABELS = frozenset({"orthomerged", "orp", "orp.intermediate", "filter", "flagstat"})
+RESERVED_LABELS = frozenset({"shucked", "orp", "orp.intermediate", "filter", "flagstat"})
 
 # The seed strandeval already samples reads with, reused rather than adding a
 # second arbitrary constant to the repo.
@@ -498,7 +498,7 @@ def parse_args():
     p.add_argument(
         "--max-parallel", type=int, default=2,
         help="max concurrent jobs within each independent stage that benefits "
-             "from it (orthofuser vs. merge/orthotransrate; transrate vs. "
+             "from it (orthofinder vs. build_pool/score_pool; transrate vs. "
              "strandeval), splitting --cpu/--mem across however many run at "
              "once; 1 disables it (default: 2)",
     )

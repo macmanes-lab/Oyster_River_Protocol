@@ -71,7 +71,7 @@ TRINITY = Assembly("trinity.Trinity.fasta", "trinity", "trinity", "TRINITY")
 # assembly, so they are spelled out rather than sorted:
 #
 #   ASSEMBLY_ORDER    concatenation order. Sets contig order in
-#                     orthofuse/merged.fasta and in posthack's `cat` of the
+#                     shuck/pool.fasta and in posthack's `cat` of the
 #                     assemblies, which flows through to cd-hit-est -- where
 #                     input order breaks length ties and so decides which
 #                     representative survives into .ORP.fasta.
@@ -88,7 +88,7 @@ REPORT_ORDER = (TRINITY, SPADES_AUTO, SPADES_HIGH, TRANSABYSS)
 
 # Preflight, in the order it prints. Everything here is shelled out to at
 # some point in a full run, and finding it missing hours in -- at
-# orthotransrate, or at the assembler that was going to run overnight -- is
+# score_pool, or at the assembler that was going to run overnight -- is
 # the thing this list exists to prevent. snap-aligner is on it because
 # pytransrate maps with it.
 SPADES_TOOL = ("orp_spades", "rnaspades.py", "SPADES")
@@ -138,7 +138,7 @@ CHECK_TOOLS = (
 
 # Reference profile (minutes, from a representative run at --max-parallel 2)
 # used only to decide submission order within the two remaining
-# run_parallel() concurrent groups (orthofuser_branch vs. merge_branch;
+# run_parallel() concurrent groups (orthofinder_branch vs. pool_branch;
 # transrate vs. strandeval) -- run the historically slow step first so it
 # isn't left waiting behind a quick one. The assemblers no longer go
 # through run_parallel (see TRINITY_PHASE1_SHARE/TRINITY_PHASE2_SHARE and
@@ -148,8 +148,8 @@ CHECK_TOOLS = (
 # learned per-run. Names with no entry sort after every hinted step, in the
 # order they were given.
 STEP_TIME_HINTS = {
-    "merge_branch": 27,
-    "orthofuser_branch": 6,
+    "pool_branch": 27,
+    "orthofinder_branch": 6,
     "transrate": 16,
     "strandeval": 2,
 }
@@ -541,7 +541,7 @@ def bam_is_complete(path: Path) -> bool:
 def count_sequences(path: Path) -> int:
     """Records in a fasta, counted in binary chunks.
 
-    Chunks rather than lines because this runs on merged.fasta, which is
+    Chunks rather than lines because this runs on pool.fasta, which is
     four assemblies concatenated -- millions of records and gigabytes of
     sequence -- and the answer is only wanted to compare against a row
     count. The one-byte `tail` carries a chunk boundary that falls between
@@ -810,11 +810,11 @@ class Pipeline:
         self.assemblies_working = self.assemblies_dir / "working"
         self.diamond_dir = self.assemblies_dir / "diamond"
         self.reports_dir = self.dir / "reports"
-        self.orthofuse_dir = self.dir / "orthofuse" / self.runout
-        self.orthofuse_working = self.orthofuse_dir / "working"
+        self.shuck_dir = self.dir / "shuck" / self.runout
+        self.shuck_working = self.shuck_dir / "working"
         # OrthoFinder gets its own copies of the filtered assemblies rather
         # than the originals -- see write_search_inputs.
-        self.orthofuse_search = self.orthofuse_dir / "search"
+        self.shuck_search = self.shuck_dir / "search"
         self.quants_dir = self.dir / "quants"
 
         self.timing_log = self.reports_dir / f"{self.runout}.timing.log"
@@ -879,7 +879,7 @@ class Pipeline:
         subprocess's own name for the environment block, and a caller that
         wants to set one would otherwise be handing this method two values
         for the same parameter -- a TypeError raised at the call, hours into
-        a run. (The caller that wanted one, run_orthofuser, no longer does:
+        a run. (The caller that wanted one, run_orthofinder, no longer does:
         setting PATH from out here could not beat OrthoFinder's own
         prepending. The name stays right regardless.)
         """
@@ -1065,11 +1065,11 @@ class Pipeline:
         finish is kept uncompressed instead of being deleted.
 
         Everything removed here is reproducible from what's kept: the
-        orthofuse tree (OrthoFinder's all-vs-all output plus pytransrate's
+        shuck tree (OrthoFinder's all-vs-all output plus pytransrate's
         scoring of the pooled fasta -- normally the largest directory in the
         run), the diamond hits and the list1-list7 set algebra built from
         them, the salmon index and quantification, and the chain of working
-        assemblies between orthofusing and .ORP.fasta. Every number any of
+        assemblies between shuck and .ORP.fasta. Every number any of
         it contributed is already in reports/qualreport.<run>.
         """
         if self.no_cleanup:
@@ -1116,6 +1116,9 @@ class Pipeline:
                 kept.append(f"{self._rel(gz)}  ({human_size(path_size(gz))})")
 
         for path in (
+            self.dir / "shuck",
+            # The same tree under its pre-4.1.0-dev8 name, left behind when a
+            # run directory from before the rename was resumed under it.
             self.dir / "orthofuse",
             self.assemblies_working,
             self.diamond_dir,
@@ -1123,7 +1126,7 @@ class Pipeline:
             # Trinity's --full_cleanup normally removes this itself; a run
             # that was interrupted and resumed can still leave it behind.
             self.trinity_out_dir(),
-            self.assemblies_dir / f"{self.runout}.orthomerged.fasta",
+            self.assemblies_dir / f"{self.runout}.shucked.fasta",
             self.assemblies_dir / f"{self.runout}.ORP.intermediate.fasta",
             # cd-hit-est's cluster report, written beside its -o; nothing
             # reads it.
@@ -1206,7 +1209,7 @@ class Pipeline:
         newer than its inputs looks up to date even when the tool that has to
         read it can no longer do so. salmon 2.7.0 is exactly that case: it
         rejects any index built by an earlier salmon, so on a resumed run a
-        stale <run>.ortho.idx would be kept, salmon_index skipped, and
+        stale <run>.shucked.idx would be kept, salmon_index skipped, and
         salmon quant left to fail against an index it cannot read.
 
         Declaring this stamp as an input turns a version change into an
@@ -1302,7 +1305,7 @@ class Pipeline:
     def setup(self):
         for d in (
             self.assemblies_dir, self.rcorr_dir, self.reports_dir,
-            self.orthofuse_dir, self.quants_dir, self.diamond_dir, self.assemblies_working,
+            self.shuck_dir, self.quants_dir, self.diamond_dir, self.assemblies_working,
         ):
             d.mkdir(parents=True, exist_ok=True)
 
@@ -1695,7 +1698,7 @@ class Pipeline:
         if not self.no_cleanup:
             shutil.rmtree(workdir, ignore_errors=True)
 
-    # -- orthofuse merge -------------------------------------------------------
+    # -- shuck: pool the assemblies, score the pool, pick from it --------------
 
     def assembly_fasta(self, assembly):
         return self.assemblies_dir / f"{self.runout}.{assembly.fasta_name}"
@@ -1710,18 +1713,18 @@ class Pipeline:
         return self.diamond_dir / f"{self.runout}.unique.{assembly.unique_label}.txt"
 
     def short_fasta_paths(self):
-        return [self.orthofuse_working / f"{self.assembly_fasta(a).name}.short.fasta"
+        return [self.shuck_working / f"{self.assembly_fasta(a).name}.short.fasta"
                 for a in self.assemblies]
 
     def run_filtershort(self):
-        self.orthofuse_working.mkdir(parents=True, exist_ok=True)
+        self.shuck_working.mkdir(parents=True, exist_ok=True)
         for a in self.diamond_priority:
             fasta = self.assembly_fasta(a)
-            outp = self.orthofuse_working / f"{fasta.name}.short.fasta"
+            outp = self.shuck_working / f"{fasta.name}.short.fasta"
             self.conda_run("orp", "python", self.makedir / "scripts" / "long.seq.py", fasta, outp, "200")
 
     def search_fasta_paths(self):
-        return [self.orthofuse_search / p.name for p in self.short_fasta_paths()]
+        return [self.shuck_search / p.name for p in self.short_fasta_paths()]
 
     def write_search_inputs(self):
         """Copy the filtered assemblies for OrthoFinder, with N runs neutered.
@@ -1751,13 +1754,13 @@ class Pipeline:
         safer than deciding what counts as a run.
 
         These are written to their own directory and are not the assemblies
-        that go on to be merged. merge() concatenates short_fasta_paths()
-        into merged.fasta, which is what pytransrate scores and what
-        orthofusing pulls the final sequence out of -- masking in place
+        that go on to be pooled. build_pool() concatenates short_fasta_paths()
+        into pool.fasta, which is what pytransrate scores and what
+        shuck pulls the final sequence out of -- masking in place
         would edit the output assembly and invalidate a scoring run that
         takes twelve hours. Only the clustering sees an X.
         """
-        self.orthofuse_search.mkdir(parents=True, exist_ok=True)
+        self.shuck_search.mkdir(parents=True, exist_ok=True)
         # blastn reads the input as nucleotides and copes with N itself, so
         # the poly-asparagine problem above does not arise and the copies
         # go in unmasked.
@@ -1858,7 +1861,7 @@ class Pipeline:
         is not likely to lose twice.
 
         Returns None if the file cannot be read or written, which is a slow
-        all-vs-all and not a wrong one -- run_orthofuser falls back to the
+        all-vs-all and not a wrong one -- run_orthofinder falls back to the
         stock program and says what that costs.
         """
         config = self.orthofinder_config()
@@ -2003,7 +2006,7 @@ class Pipeline:
               f"1 thread each; -a {analysis} for the algorithm phase")
         return "blastn", searches
 
-    def run_orthofuser(self, cpu=None, mem=None):
+    def run_orthofinder(self, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
         mem = self.mem if mem is None else mem
         # -t, the concurrent searches, is planned per search program below.
@@ -2029,12 +2032,12 @@ class Pipeline:
         # computed. Take the sentinel from the artifact instead of from the
         # exit status: drop a marker first, and require orthogroups newer
         # than it, so a stale result from a previous attempt cannot pass.
-        marker = self.orthofuse_dir / "orthofuser.attempt"
+        marker = self.shuck_dir / "orthofinder.attempt"
         marker.parent.mkdir(parents=True, exist_ok=True)
         marker.touch()
         self.conda_run(
             "orp_orthofinder", "orthofinder",
-            "-d", "-I", f"{self.orthofinder_inflation:g}", "-f", self.orthofuse_search,
+            "-d", "-I", f"{self.orthofinder_inflation:g}", "-f", self.shuck_search,
             "-og", "-t", searches, "-a", analysis, "-S", program,
         )
         groups = self.newest_orthogroups_txt()
@@ -2050,10 +2053,10 @@ class Pipeline:
         if workdir is None:
             sys.exit(f"no WorkingDirectory above {groups} -- cannot check orthofinder's all-vs-all")
         self.check_orthofinder_searches(workdir)
-        (self.orthofuse_dir / "orthofuser.done").touch()
+        (self.shuck_dir / "orthofinder.done").touch()
 
-    def merge(self):
-        out = self.orthofuse_dir / "merged.fasta"
+    def build_pool(self):
+        out = self.shuck_dir / "pool.fasta"
         with open(out, "wb") as outf:
             for p in self.short_fasta_paths():
                 with open(p, "rb") as inf:
@@ -2070,7 +2073,7 @@ class Pipeline:
         the one that succeeded -- and makeorthout would pick contigs from it
         without complaint.
         """
-        matches = list(self.orthofuse_search.rglob("Orthogroups.txt"))
+        matches = list(self.shuck_search.rglob("Orthogroups.txt"))
         if not matches:
             return None
         return max(matches, key=lambda p: p.stat().st_mtime)
@@ -2078,7 +2081,7 @@ class Pipeline:
     def find_orthogroups_txt(self):
         match = self.newest_orthogroups_txt()
         if match is None:
-            sys.exit("Orthogroups.txt not found under orthofuse working directory")
+            sys.exit("Orthogroups.txt not found under the shuck search directory")
         return match
 
     # -- all-vs-all validation ---------------------------------------------
@@ -2127,7 +2130,7 @@ class Pipeline:
             candidate = parent / "WorkingDirectory"
             if candidate.is_dir():
                 return candidate
-            if parent == self.orthofuse_search:
+            if parent == self.shuck_search:
                 break
         return None
 
@@ -2141,7 +2144,7 @@ class Pipeline:
         that produced no orthogroups may still have produced sixteen
         perfectly good Blast files that cost four and a half hours.
         """
-        matches = [d for d in self.orthofuse_search.rglob("WorkingDirectory") if d.is_dir()]
+        matches = [d for d in self.shuck_search.rglob("WorkingDirectory") if d.is_dir()]
         if not matches:
             return None
         return max(matches, key=lambda d: d.stat().st_mtime)
@@ -2438,27 +2441,27 @@ class Pipeline:
             return []
         return ["--max-memory", f"{mem}G"]
 
-    def orthotransrate(self, cpu=None, mem=None):
+    def score_pool(self, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
-        # The two-track path calls merge_branch() bare, so mem arrives as
+        # The two-track path calls pool_branch() bare, so mem arrives as
         # None there -- which pytransrate_memory_args reads as "no budget".
         mem = self.mem if mem is None else mem
-        outdir = self.orthofuse_dir / "merged"
-        merged = self.orthofuse_dir / "merged.fasta"
+        outdir = self.shuck_dir / "pool"
+        pool = self.shuck_dir / "pool.fasta"
         # needs_run() re-runs this step whenever the corrected reads are
-        # newer than merged/assemblies.csv -- not only when it is absent --
+        # newer than pool/assemblies.csv -- not only when it is absent --
         # so a resumed run would abort on that csv unless it is cleared
         # first. retry_cleanup repeats the clear before each retry, because
         # the one below happens once, outside run()'s retry loop. See
         # clear_transrate_outdir for what survives it and why.
-        self.clear_transrate_outdir(outdir, merged)
+        self.clear_transrate_outdir(outdir, pool)
         self.conda_run(
             "orp", "pytransrate",
-            "-o", outdir, "-t", cpu, "-a", merged,
+            "-o", outdir, "-t", cpu, "-a", pool,
             "--left", self.cor1(), "--right", self.cor2(),
             *self.pytransrate_memory_args(mem),
             *self.pytransrate_args,
-            retry_cleanup=partial(self.clear_transrate_outdir, outdir, merged),
+            retry_cleanup=partial(self.clear_transrate_outdir, outdir, pool),
         )
 
     def makeorthout(self):
@@ -2475,10 +2478,10 @@ class Pipeline:
         scripts/pick_best_contigs.py).
         """
         print("Picking the best contig per orthogroup")
-        contigs_csv = next(self.orthofuse_dir.rglob("contigs.csv"), None)
+        contigs_csv = next(self.shuck_dir.rglob("contigs.csv"), None)
         if contigs_csv is None:
-            sys.exit("contigs.csv not found under orthofuse directory")
-        good_list = self.orthofuse_dir / f"good.{self.runout}.list"
+            sys.exit("contigs.csv not found under the shuck directory")
+        good_list = self.shuck_dir / f"good.{self.runout}.list"
         self.conda_run(
             "orp", "python", self.makedir / "scripts" / "pick_best_contigs.py",
             contigs_csv, self.find_orthogroups_txt(), good_list,
@@ -2493,28 +2496,28 @@ class Pipeline:
         See scripts/twotrack_select.py: one representative per gene (the
         longest of those with near-best protein coverage), distinct expressed
         copies of kept genes, and cd-hit-est over the contigs without a hit.
-        Writes good.<run>.list, so orthofusing onwards is unchanged, and
+        Writes good.<run>.list, so shuck onwards is unchanged, and
         twotrack.<run>.tsv beside it saying what happened to every contig.
         """
         print("Selecting contigs by swissprot gene (two-track)")
-        good_list = self.orthofuse_dir / f"good.{self.runout}.list"
+        good_list = self.shuck_dir / f"good.{self.runout}.list"
         self.conda_run(
             "orp", "python", self.makedir / "scripts" / "twotrack_select.py",
-            "--merged", self.orthofuse_dir / "merged.fasta",
-            "--contigs-csv", self.orthofuse_dir / "merged" / "contigs.csv",
+            "--pool", self.shuck_dir / "pool.fasta",
+            "--contigs-csv", self.shuck_dir / "pool" / "contigs.csv",
             "--diamond", *[self.diamond_txt(a) for a in self.diamond_priority],
             "--sprot", self.makedir / "software" / "diamond" / "uniprot_sprot.fasta",
-            "--table", self.orthofuse_dir / f"twotrack.{self.runout}.tsv",
+            "--table", self.shuck_dir / f"twotrack.{self.runout}.tsv",
             "--threads", self.cpu, "--mem-mb", self.mem * 1000, "--out", good_list,
         )
 
-    def orthofusing(self):
-        good_list = self.orthofuse_dir / f"good.{self.runout}.list"
-        out = self.assemblies_dir / f"{self.runout}.orthomerged.fasta"
+    def shuck(self):
+        good_list = self.shuck_dir / f"good.{self.runout}.list"
+        out = self.assemblies_dir / f"{self.runout}.shucked.fasta"
         with open(out, "w") as outf:
             subprocess.run(
                 ["conda", "run", "--no-capture-output", "-n", "orp", "python",
-                 str(self.makedir / "scripts" / "filter.py"), str(self.orthofuse_dir / "merged.fasta"), str(good_list)],
+                 str(self.makedir / "scripts" / "filter.py"), str(self.shuck_dir / "pool.fasta"), str(good_list)],
                 check=True, stdout=outf, cwd=self.dir,
             )
 
@@ -2522,8 +2525,8 @@ class Pipeline:
 
     def diamond_jobs(self):
         return [
-            (self.assemblies_dir / f"{self.runout}.orthomerged.fasta",
-             self.diamond_dir / f"{self.runout}.orthomerged.diamond.txt"),
+            (self.assemblies_dir / f"{self.runout}.shucked.fasta",
+             self.diamond_dir / f"{self.runout}.shucked.diamond.txt"),
         ] + [(self.assembly_fasta(a), self.diamond_txt(a)) for a in self.diamond_priority]
 
     def run_diamond_one(self, query, out, cpu=None, mem=None):
@@ -2539,7 +2542,7 @@ class Pipeline:
             self.unique_txt(a).write_text(f"{count}\n")
 
     def make_list1(self):
-        ids = extract_gene_ids(self.diamond_dir / f"{self.runout}.orthomerged.diamond.txt")
+        ids = extract_gene_ids(self.diamond_dir / f"{self.runout}.shucked.diamond.txt")
         write_sorted(self.diamond_dir / f"{self.runout}.list1", ids)
 
     def make_list2(self):
@@ -2568,7 +2571,7 @@ class Pipeline:
         )
 
     def make_list6(self):
-        fasta = self.assemblies_dir / f"{self.runout}.orthomerged.fasta"
+        fasta = self.assemblies_dir / f"{self.runout}.shucked.fasta"
         out = self.diamond_dir / f"{self.runout}.list6"
         with open(fasta) as f, open(out, "w") as o:
             for line in f:
@@ -2590,20 +2593,20 @@ class Pipeline:
         fastas = " ".join(str(p) for p in self.assembly_fasta_paths())
         list7 = self.diamond_dir / f"{self.runout}.list7"
         newbies = self.diamond_dir / f"{self.runout}.newbies.fasta"
-        orthomerged = self.assemblies_dir / f"{self.runout}.orthomerged.fasta"
-        working_out = self.assemblies_working / f"{self.runout}.orthomerged.fasta"
+        shucked = self.assemblies_dir / f"{self.runout}.shucked.fasta"
+        working_out = self.assemblies_working / f"{self.runout}.shucked.fasta"
         filter_py = self.makedir / "scripts" / "filter.py"
         script = f"python {filter_py} <(cat {fastas}) {list7} >> {newbies}"
         self.run(["conda", "run", "--no-capture-output", "-n", "orp", "bash", "-c", script])
         with open(working_out, "wb") as outf:
-            for p in (newbies, orthomerged):
+            for p in (newbies, shucked):
                 with open(p, "rb") as inf:
                     shutil.copyfileobj(inf, outf)
 
     # -- dedup / quantify -----------------------------------------------------
 
     def cdhit(self):
-        src = self.assemblies_working / f"{self.runout}.orthomerged.fasta"
+        src = self.assemblies_working / f"{self.runout}.shucked.fasta"
         out = self.assemblies_dir / f"{self.runout}.ORP.intermediate.fasta"
         self.conda_run(
             "orp", "cd-hit-est", "-M", self.mem * 1000, "-T", self.cpu,
@@ -2629,7 +2632,7 @@ class Pipeline:
     def salmon_index(self, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
         src = self.assemblies_dir / f"{self.runout}.ORP.intermediate.fasta"
-        idx = self.quants_dir / f"{self.runout}.ortho.idx"
+        idx = self.quants_dir / f"{self.runout}.shucked.idx"
         # A rebuild here is usually a rebuild *over* an index salmon has
         # already refused to load, so clear it rather than writing into the
         # old directory alongside whatever format it was in.
@@ -2641,8 +2644,8 @@ class Pipeline:
 
     def salmon(self, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
-        idx = self.quants_dir / f"{self.runout}.ortho.idx"
-        outdir = self.quants_dir / f"salmon_orthomerged_{self.runout}"
+        idx = self.quants_dir / f"{self.runout}.shucked.idx"
+        outdir = self.quants_dir / f"salmon_shucked_{self.runout}"
         self.conda_run(
             "orp", "salmon", "quant", "--no-version-check",
             "-p", cpu, "-i", idx, "--seqBias", "--gcBias", "--libType", "A",
@@ -2650,7 +2653,7 @@ class Pipeline:
         )
 
     def filter_tpm(self):
-        quant = self.quants_dir / f"salmon_orthomerged_{self.runout}" / "quant.sf"
+        quant = self.quants_dir / f"salmon_shucked_{self.runout}" / "quant.sf"
         high = self.assemblies_working / f"{self.runout}.HIGHEXP.txt"
         low = self.assemblies_working / f"{self.runout}.LOWEXP.txt"
         with open(quant) as f, open(high, "w") as hf, open(low, "w") as lf:
@@ -2742,7 +2745,7 @@ class Pipeline:
         mem = self.mem if mem is None else mem
         orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
         outdir = self.reports_dir / f"transrate_{self.runout}"
-        # See orthotransrate() and clear_transrate_outdir.
+        # See score_pool() and clear_transrate_outdir.
         self.clear_transrate_outdir(outdir, orp_fasta)
         self.conda_run(
             "orp", "pytransrate",
@@ -3077,7 +3080,7 @@ class Pipeline:
             # cost) first, since it has been the slower of the two --
             # historically the fixed k=55 run against the fixed k=75 one.
             # diamond_{spadesauto, spadeshigh} depend only on their own assembly
-            # (not on Trinity or the orthofuser merge below), so each fires as
+            # (not on Trinity or the shuck stage below), so each fires as
             # soon as its assembly is done instead of waiting for the merge.
             try:
                 for step_name, outputs, inputs, assemble, diamond_name, diamond_out in (
@@ -3142,13 +3145,13 @@ class Pipeline:
         c1, c2 = self.cor1(), self.cor2()
         assembly_fastas = self.assembly_fasta_paths()
         short_fastas = self.short_fasta_paths()
-        orthofuser_done = self.orthofuse_dir / "orthofuser.done"
-        merged_fasta = self.orthofuse_dir / "merged.fasta"
-        merged_csv = self.orthofuse_dir / "merged" / "assemblies.csv"
-        good_list = self.orthofuse_dir / f"good.{self.runout}.list"
-        orthomerged_fasta = self.assemblies_dir / f"{self.runout}.orthomerged.fasta"
+        orthofinder_done = self.shuck_dir / "orthofinder.done"
+        pool_fasta = self.shuck_dir / "pool.fasta"
+        pool_csv = self.shuck_dir / "pool" / "assemblies.csv"
+        good_list = self.shuck_dir / f"good.{self.runout}.list"
+        shucked_fasta = self.assemblies_dir / f"{self.runout}.shucked.fasta"
         diamond_outs = [o for _, o in self.diamond_jobs()]
-        diamond_orthomerged = self.diamond_dir / f"{self.runout}.orthomerged.diamond.txt"
+        diamond_shucked = self.diamond_dir / f"{self.runout}.shucked.diamond.txt"
         uniq_outs = [self.unique_txt(a) for a in self.report_order]
         list1 = self.diamond_dir / f"{self.runout}.list1"
         list2 = self.diamond_dir / f"{self.runout}.list2"
@@ -3157,12 +3160,12 @@ class Pipeline:
         list6 = self.diamond_dir / f"{self.runout}.list6"
         list7 = self.diamond_dir / f"{self.runout}.list7"
         newbies = self.diamond_dir / f"{self.runout}.newbies.fasta"
-        working_orthomerged = self.assemblies_working / f"{self.runout}.orthomerged.fasta"
+        working_shucked = self.assemblies_working / f"{self.runout}.shucked.fasta"
         orp_intermediate = self.assemblies_dir / f"{self.runout}.ORP.intermediate.fasta"
         orp_diamond_txt = self.assemblies_dir / f"{self.runout}.ORP.diamond.txt"
         unique_orp_done = self.assemblies_working / f"{self.runout}.unique.ORP.done"
-        ortho_idx = self.quants_dir / f"{self.runout}.ortho.idx"
-        quant_sf = self.quants_dir / f"salmon_orthomerged_{self.runout}" / "quant.sf"
+        shucked_idx = self.quants_dir / f"{self.runout}.shucked.idx"
+        quant_sf = self.quants_dir / f"salmon_shucked_{self.runout}" / "quant.sf"
         filter_done = self.assemblies_dir / f"{self.runout}.filter.done"
         low_txt = self.assemblies_working / f"{self.runout}.LOWEXP.txt"
         high_txt = self.assemblies_working / f"{self.runout}.HIGHEXP.txt"
@@ -3175,27 +3178,27 @@ class Pipeline:
 
         self.step("run_filtershort", short_fastas, assembly_fastas, self.run_filtershort)
 
-        def orthofuser_branch(cpu=None, mem=None):
+        def orthofinder_branch(cpu=None, mem=None):
             self.step("mask_search_input", self.search_fasta_paths(), short_fastas,
                       self.write_search_inputs)
-            # mem reaches run_orthofuser because OrthoFinder's search
+            # mem reaches run_orthofinder because OrthoFinder's search
             # concurrency is now capped against it; left unforwarded it would
             # cap against the whole machine while holding half of it.
-            self.step("run_orthofuser", [orthofuser_done], self.search_fasta_paths(),
-                      partial(self.run_orthofuser, cpu=cpu, mem=mem))
+            self.step("run_orthofinder", [orthofinder_done], self.search_fasta_paths(),
+                      partial(self.run_orthofinder, cpu=cpu, mem=mem))
 
-        def merge_branch(cpu=None, mem=None):
-            self.step("merge", [merged_fasta], short_fastas, self.merge)
-            self.step("orthotransrate", [merged_csv], [merged_fasta, c1, c2],
-                      partial(self.orthotransrate, cpu=cpu, mem=mem))
+        def pool_branch(cpu=None, mem=None):
+            self.step("build_pool", [pool_fasta], short_fastas, self.build_pool)
+            self.step("score_pool", [pool_csv], [pool_fasta, c1, c2],
+                      partial(self.score_pool, cpu=cpu, mem=mem))
 
         if self.merge_method == "twotrack":
             # No OrthoFinder: the pool is scored, every assembly gets its
             # swissprot pass (normally after the pick, here before it, since
             # the selection groups contigs by those hits), and
-            # twotrack_select writes good_list. From orthofusing on, the run
+            # twotrack_select writes good_list. From shuck on, the run
             # is the same as under orthofinder.
-            merge_branch()
+            pool_branch()
             for a in self.diamond_priority:
                 fasta, out = self.assembly_fasta(a), self.diamond_txt(a)
                 self.step(
@@ -3204,32 +3207,32 @@ class Pipeline:
                 )
             self.step(
                 "twotrack_select", [good_list],
-                [merged_fasta, merged_csv] + diamond_outs[1:], self.twotrack_select,
+                [pool_fasta, pool_csv] + diamond_outs[1:], self.twotrack_select,
             )
         else:
-            self.merge_by_orthofinder(short_fastas, orthofuser_done, merged_csv, good_list,
-                                      diamond_outs, orthofuser_branch, merge_branch)
-        self.step("orthofusing", [orthomerged_fasta], [good_list, merged_fasta], self.orthofusing)
-        self.after_pick(c1, c2, diamond_outs, diamond_orthomerged, orthomerged_fasta, uniq_outs,
-                        list1, list2, list3, list5, list6, list7, newbies, working_orthomerged,
-                        orp_intermediate, orp_diamond_txt, unique_orp_done, ortho_idx, quant_sf,
+            self.merge_by_orthofinder(short_fastas, orthofinder_done, pool_csv, good_list,
+                                      diamond_outs, orthofinder_branch, pool_branch)
+        self.step("shuck", [shucked_fasta], [good_list, pool_fasta], self.shuck)
+        self.after_pick(c1, c2, diamond_outs, diamond_shucked, shucked_fasta, uniq_outs,
+                        list1, list2, list3, list5, list6, list7, newbies, working_shucked,
+                        orp_intermediate, orp_diamond_txt, unique_orp_done, shucked_idx, quant_sf,
                         filter_done, low_txt, high_txt, orp_fasta, busco_done, transrate_csv,
                         strandeval_done, qualreport_done, cleanup_done, pipeline_start)
 
-    def merge_by_orthofinder(self, short_fastas, orthofuser_done, merged_csv, good_list,
-                             diamond_outs, orthofuser_branch, merge_branch):
+    def merge_by_orthofinder(self, short_fastas, orthofinder_done, pool_csv, good_list,
+                             diamond_outs, orthofinder_branch, pool_branch):
         """ORP through 4.0: OrthoFinder orthogroups, then one contig per group."""
-        # run_orthofuser and merge->orthotransrate are independent chains that
+        # run_orthofinder and build_pool->score_pool are independent chains that
         # both start from short_fastas; they join at makeorthout below.
         # run_parallel() checks these gates before either branch's own steps
         # get a look, so each gate has to name everything its branch reads:
-        # orthotransrate also scores against the corrected pair, and a gate
+        # score_pool also scores against the corrected pair, and a gate
         # of short_fastas alone skipped it when only the reads had changed.
         self.run_parallel(
             [
-                ("orthofuser_branch", [orthofuser_done], short_fastas, orthofuser_branch),
-                ("merge_branch", [merged_csv], short_fastas + [self.cor1(), self.cor2()],
-                 merge_branch),
+                ("orthofinder_branch", [orthofinder_done], short_fastas, orthofinder_branch),
+                ("pool_branch", [pool_csv], short_fastas + [self.cor1(), self.cor2()],
+                 pool_branch),
             ],
             max_workers=self.max_parallel,
         )
@@ -3248,13 +3251,13 @@ class Pipeline:
                 )
         self.step(
             "makeorthout", [good_list],
-            [orthofuser_done, merged_csv] + (diamond_outs[1:] if protein_pick else []),
+            [orthofinder_done, pool_csv] + (diamond_outs[1:] if protein_pick else []),
             self.makeorthout,
         )
 
-    def after_pick(self, c1, c2, diamond_outs, diamond_orthomerged, orthomerged_fasta, uniq_outs,
-                   list1, list2, list3, list5, list6, list7, newbies, working_orthomerged,
-                   orp_intermediate, orp_diamond_txt, unique_orp_done, ortho_idx, quant_sf,
+    def after_pick(self, c1, c2, diamond_outs, diamond_shucked, shucked_fasta, uniq_outs,
+                   list1, list2, list3, list5, list6, list7, newbies, working_shucked,
+                   orp_intermediate, orp_diamond_txt, unique_orp_done, shucked_idx, quant_sf,
                    filter_done, low_txt, high_txt, orp_fasta, busco_done, transrate_csv,
                    strandeval_done, qualreport_done, cleanup_done, pipeline_start):
         """Everything after good_list exists, the same for both merge methods."""
@@ -3263,15 +3266,15 @@ class Pipeline:
         # them already had one: the assembler lanes fire each assembly's
         # diamond the moment that assembler returns, rather than leaving all
         # four to queue up here. Those steps are up to date by now and skip;
-        # what is genuinely left is orthomerged, which depends on the merge
+        # what is genuinely left is shucked, which depends on the merge
         # stage just above, and Trinity, whose lane only just finished. A run
         # that brought its own assemblies had no lanes, so all of them run
         # here -- which is why this is a loop over the set and not the two
         # named steps it used to be.
         print("\n\n\n\n Starting diamond \n\n\n\n")
         self.step(
-            "diamond_orthomerged", [diamond_orthomerged], [orthomerged_fasta],
-            partial(self.run_diamond_one, orthomerged_fasta, diamond_orthomerged),
+            "diamond_shucked", [diamond_shucked], [shucked_fasta],
+            partial(self.run_diamond_one, shucked_fasta, diamond_shucked),
         )
         for a in self.diamond_priority:
             fasta, out = self.assembly_fasta(a), self.diamond_txt(a)
@@ -3280,14 +3283,14 @@ class Pipeline:
                 partial(self.run_diamond_one, fasta, out),
             )
         self.step("diamond_uniq", uniq_outs, diamond_outs, self.diamond_uniq)
-        self.step("make_list1", [list1], [diamond_orthomerged], self.make_list1)
+        self.step("make_list1", [list1], [diamond_shucked], self.make_list1)
         self.step("make_list2", [list2], [self.diamond_txt(a) for a in self.assemblies], self.make_list2)
         self.step("make_list3", [list3], [list1, list2], self.make_list3)
         self.step("make_list5", [list5], [list3] + [self.diamond_txt(a) for a in self.diamond_priority], self.make_list5)
-        self.step("make_list6", [list6], [orthomerged_fasta], self.make_list6)
+        self.step("make_list6", [list6], [shucked_fasta], self.make_list6)
         self.step("make_list7", [list7], [list6, list5], self.make_list7)
-        self.step("posthack", [newbies, working_orthomerged], [list7], self.posthack)
-        self.step("cdhit", [orp_intermediate], [working_orthomerged], self.cdhit)
+        self.step("posthack", [newbies, working_shucked], [list7], self.posthack)
+        self.step("cdhit", [orp_intermediate], [working_shucked], self.cdhit)
 
         # orp_diamond is the same CPU-bound diamond blastx as above, paired
         # here with salmon_branch which is tiny (~2s); halving orp_diamond's
@@ -3296,8 +3299,8 @@ class Pipeline:
         self.step("orp_diamond", [orp_diamond_txt], [orp_intermediate], self.orp_diamond)
         self.step("orp_uniq", [unique_orp_done], [orp_diamond_txt], self.orp_uniq)
         salmon_stamp = self.stamp_tool_version("orp", "salmon", self.quants_dir / "salmon.version")
-        self.step("salmon_index", [ortho_idx], [orp_intermediate, salmon_stamp], self.salmon_index)
-        self.step("salmon", [quant_sf], [ortho_idx, c1, c2], self.salmon)
+        self.step("salmon_index", [shucked_idx], [orp_intermediate, salmon_stamp], self.salmon_index)
+        self.step("salmon", [quant_sf], [shucked_idx, c1, c2], self.salmon)
         self.step("filter", [filter_done], [orp_intermediate, quant_sf, orp_diamond_txt], self.filter_tpm)
         self.step(
             "secondfilter", [orp_fasta],
@@ -3377,7 +3380,7 @@ def parse_args():
     p.add_argument(
         "--max-parallel", type=int, default=2,
         help="max concurrent jobs within each independent stage that benefits from "
-             "it (orthofuser vs. merge/orthotransrate; transrate vs. strandeval), "
+             "it (orthofinder vs. build_pool/score_pool; transrate vs. strandeval), "
              "splitting --cpu/--mem across however many run at once; the 4 "
              "assemblers instead run as two sequential stage-pairings (see "
              "TRINITY_PHASE1_SHARE/TRINITY_PHASE2_SHARE), unaffected by this flag; "
@@ -3389,7 +3392,7 @@ def parse_args():
     p.add_argument(
         "--no-cleanup", "--keep-intermediates", dest="no_cleanup", action="store_true",
         help="keep every file a run produces, for debugging: skips the end-of-run "
-             "cleanup (orthofuse/, quants/, diamond/, the working assemblies), "
+             "cleanup (shuck/, quants/, diamond/, the working assemblies), "
              "the reclaim of the trimmed reads, Trinity's --full_cleanup, the "
              "removal of the rnaSPAdes and Trans-ABySS working directories and "
              "of strandeval's BAM and bwa index, and leaves the four assemblies "

@@ -10,6 +10,7 @@ __pycache__/
 
 # Run output, for a run started from inside the checkout
 assemblies/
+shuck/
 orthofuse/
 quants/
 rcorr/
