@@ -12,9 +12,8 @@
 #      k values used);
 #   2. chowder.py's default twotrack merge of those two with the sample's
 #      existing Trans-ABySS and Trinity assemblies, production settings.
-# Runs in fast scratch and is moved to
-# $HOME/redundancy_tests/spades_branch/<run>/ afterwards (see
-# validate_arms.sbatch for why). Run 3 at a time: --array=1-10%3.
+# Works directly in $HOME/redundancy_tests/spades_branch/<run>/ (GPFS home,
+# no scratch step). Run 3 at a time: --array=1-10%3.
 #
 # usage: sbatch --array=1-N%3 spades_branch.sbatch SAMPLES_FILE CODE_DIR
 set -euo pipefail
@@ -25,8 +24,7 @@ COMPARE=${COMPARE:-/mnt/home/macmaneslab/macmanes/compare}
 RUN=$(grep -v '^\s*$' "$SAMPLES" | sed -n "${SLURM_ARRAY_TASK_ID}p")
 SRC=$COMPARE/orp_runs/$RUN
 OUT=$HOME/redundancy_tests/spades_branch/$RUN
-SCRATCH_BASE=${SCRATCH_BASE:-/mnt/gpfs01/fast/macmaneslab/$USER/scratch}
-WORK=$SCRATCH_BASE/spades_branch/$RUN.${SLURM_JOB_ID}
+WORK=$OUT
 R=${RUN}_spadesbr
 R1=$SRC/rcorr/$RUN.TRIM_1P.cor.fq.gz
 R2=$SRC/rcorr/$RUN.TRIM_2P.cor.fq.gz
@@ -36,10 +34,10 @@ for f in "$R1" "$R2" "$SRC/assemblies/$RUN.transabyss.fasta.gz" "$SRC/assemblies
 done
 
 module load anaconda/colsa
-rm -rf "$OUT" "$WORK"
-mkdir -p "$OUT" "$WORK"
+rm -rf "$OUT"
+mkdir -p "$OUT"
 echo "$RUN spades branch on $(hostname): $(cat "$CODE/version.txt"), $(git -C "$CODE" rev-parse --short HEAD)"
-echo "scratch $WORK -> $OUT"
+echo "writing to $OUT"
 status=0
 (
 python3 "$CODE/experiments/redundancy/spades_only.py" --oyster "$CODE/oyster.py" \
@@ -57,25 +55,9 @@ echo "exit status $status"
 # k values used, pulled out for easy collection
 grep -h '^\[kmer\]' "$SLURM_SUBMIT_DIR/spades_branch_${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}.log" > "$OUT/kmers.txt" || true
 
-# keep the analysis files, then archive the rest and free scratch
+# Free the bulky files; the rest stays where it is.
 find "$WORK/rcorr" -maxdepth 1 -type f -name '*.cor.fq' -delete 2>/dev/null || true
 find "$WORK" -type f \( -name '*.bam' -o -name '*.bam.bai' -o -name GenomeIndex -o -name GenomeIndexHash \
      -o -name OverflowTable -o -name Genome \) -delete
-KEEP=$(mktemp)
-( cd "$WORK" && find . -type f \( \
-      -path "./assemblies/$R.ORP.fasta" -o -path "./assemblies/$R.spades*.fasta" \
-      -o -path "./reports/run_$R.ORP/short_summary*" -o -path "./reports/run_$R.ORP/run_*/full_table.tsv" \
-      -o -path "./reports/transrate_$R/*.csv" -o -path "./reports/$R.timing.log" \
-      -o -path "./reports/qualreport.$R" \) ) > "$KEEP"
-rsync -a --files-from="$KEEP" "$WORK"/ "$OUT"/
-rm -f "$KEEP"
-tar -C "$WORK" -cf "$OUT/run.tar" .
-n_scratch=$(find "$WORK" -mindepth 1 | wc -l)
-n_tar=$(tar -tf "$OUT/run.tar" | grep -vc '^\./$' || true)
-if [[ $n_scratch -eq $n_tar ]]; then
-    rm -rf "$WORK"; echo "moved off scratch to $OUT"
-else
-    echo "*** archive check failed ($n_scratch vs $n_tar); scratch kept at $WORK ***"
-    [[ $status -eq 0 ]] && status=1
-fi
+echo "results in $OUT"
 exit "$status"
