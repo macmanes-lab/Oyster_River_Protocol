@@ -43,6 +43,9 @@ ORP Version 4.1.0-dev1
   `--mem`** as `--max-memory`; it was getting no budget at all, and
   pytransrate fell back to the node's free memory. `twotrack_select.py`'s
   cd-hit-est runs get `--mem` too (`-M` was 0, unlimited).
+- The step-timing table and cleanup's kept/removed list are no longer
+  printed at the end of a run, only written to the timing log and
+  `reports/<run>.cleanup.done`; the run ends with a pointer to each.
 - New test harness `experiments/redundancy/spades_branch.sbatch` (with
   `spades_only.py`): the two SPAdes runs, then the default merge with a
   sample's existing Trans-ABySS and Trinity assemblies.

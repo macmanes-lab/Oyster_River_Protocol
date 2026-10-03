@@ -1157,8 +1157,10 @@ class Pipeline:
         lines += ["", "removed:"]
         lines += [f"  {r}" for r in removed] or ["  (nothing left to remove)"]
         text = "\n".join(lines) + "\n"
-        (self.reports_dir / f"{self.runout}.cleanup.done").write_text(text)
-        print("\n" + text)
+        marker = self.reports_dir / f"{self.runout}.cleanup.done"
+        marker.write_text(text)
+        print(f"\nReclaimed {human_size(freed)} of intermediate files; "
+              f"what was kept and removed is in {marker}")
 
     # -- resumability ------------------------------------------------------
 
@@ -2917,9 +2919,8 @@ class Pipeline:
         out_lines.append(f"{'TOTAL':<16} {h:02d}:{m:02d}:{s:02d}")
 
         text = "\n".join(out_lines) + "\n"
-        print(text)
         self.timing_log.write_text(text)
-        print(f"\nFull timing log saved to: {self.timing_log}\n")
+        print(f"\nStep timing saved to: {self.timing_log}\n")
 
     # -- orchestration -------------------------------------------------------
 
