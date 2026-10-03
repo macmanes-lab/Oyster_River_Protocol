@@ -5,6 +5,25 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-10-03 (later) -- spades_all: 4.1.0 spades on every dataset
+
+`experiments/redundancy/spades_all.sh` (submit, on the login node) +
+`spades_all.sbatch` (array task): the `spades_branch.sbatch` recipe over
+every `compare/orp_runs/<run>/` that has `<run>.transabyss.fasta[.gz]`,
+`<run>.trinity.Trinity.fasta[.gz]` and corrected reads
+`rcorr/<run>.TRIM_{1,2}P.cor.fq[.gz]`. Re-runs only spadesauto/spadeshigh
+from the corrected reads, then chowder's default merge with the existing
+Trans-ABySS and Trinity (`--tpm-filt 1`, corrected reads). 20 at a time by
+default. Output `~/redundancy_tests/spades_all/<run>/` (runout
+`<run>_spadesbr`), logs in `.../spades_all/logs/` with `<run>.log` links.
+Finished runs (qualreport `.done`) are skipped on resubmit unless `--force`.
+Tested only on a mock directory tree on the laptop (stub sbatch).
+
+    cd ~/Oyster_River_Protocol && git pull
+    experiments/redundancy/spades_all.sh --dry-run
+    experiments/redundancy/spades_all.sh
+
+
 ## 2026-10-03 -- ORP 4.1.0-dev1, spades auto-k merged to master
 
 **Where things stand.** The `spades` branch is merged into `master` as
