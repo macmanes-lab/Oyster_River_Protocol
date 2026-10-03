@@ -28,6 +28,11 @@ ORP Version 4.1.0-dev1
   made `<runout>.<label>.fasta` both the input and the output, and ingest
   truncated it before reading ("no sequences found"). It now writes beside
   the file and swaps it in.
+- **Resumes notice more stale inputs** (`oyster.py`, `chowder.py`): Trinity
+  phase 1 now depends on both corrected mates, not only R1; the orthofinder
+  merge's pooled scoring re-runs when only the corrected reads changed;
+  strandeval depends on the corrected reads; and the quality report is
+  rewritten when BUSCO, transrate, strandeval or the unique-gene counts are.
 - New test harness `experiments/redundancy/spades_branch.sbatch` (with
   `spades_only.py`): the two SPAdes runs, then the default merge with a
   sample's existing Trans-ABySS and Trinity assemblies.

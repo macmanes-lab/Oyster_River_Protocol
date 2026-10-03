@@ -5,6 +5,19 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-10-03 -- 4.1.0-dev4: resume dependency gaps
+
+Four steps declared fewer inputs than they read, so a resumed run could skip
+them over stale outputs: Trinity phase 1 (only R1; now R1+R2), the outer
+`merge_branch` gate under `--merge-method orthofinder` (only short_fastas, so
+`run_parallel()` skipped orthotransrate before its own c1/c2 check ran; now
++ corrected reads -- kept the gate rather than dropping it, since it stops a
+cleaned-up merged.fasta from forcing a re-merge), strandeval (now + c1/c2),
+and reportgen (now + busco/transrate/strandeval sentinels and the unique-gene
+counts). The merge_branch case was reproduced with a stubbed pipeline object
+before/after; nothing run under conda.
+
+
 ## 2026-10-03 (later) -- spades_all: 4.1.0 spades on every dataset
 
 `experiments/redundancy/spades_all.sh` (submit, on the login node) +

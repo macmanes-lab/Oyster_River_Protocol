@@ -3060,7 +3060,7 @@ class Pipeline:
         def trinity_phase1_lane():
             try:
                 self.step(
-                    "run_trinity_phase1", [phase1_done], [c1],
+                    "run_trinity_phase1", [phase1_done], [c1, c2],
                     partial(self.run_trinity_phase1, cpu=phase1_cpu, mem=phase1_mem),
                 )
             except Exception as e:
@@ -3215,11 +3215,16 @@ class Pipeline:
                              diamond_outs, orthofuser_branch, merge_branch):
         """ORP through 4.0: OrthoFinder orthogroups, then one contig per group."""
         # run_orthofuser and merge->orthotransrate are independent chains that
-        # both only need short_fastas; they join at makeorthout below.
+        # both start from short_fastas; they join at makeorthout below.
+        # run_parallel() checks these gates before either branch's own steps
+        # get a look, so each gate has to name everything its branch reads:
+        # orthotransrate also scores against the corrected pair, and a gate
+        # of short_fastas alone skipped it when only the reads had changed.
         self.run_parallel(
             [
                 ("orthofuser_branch", [orthofuser_done], short_fastas, orthofuser_branch),
-                ("merge_branch", [merged_csv], short_fastas, merge_branch),
+                ("merge_branch", [merged_csv], short_fastas + [self.cor1(), self.cor2()],
+                 merge_branch),
             ],
             max_workers=self.max_parallel,
         )
@@ -3303,11 +3308,18 @@ class Pipeline:
         self.run_parallel(
             [
                 ("transrate", [transrate_csv], [orp_fasta, c1, c2], self.transrate),
-                ("strandeval", [strandeval_done], [orp_fasta], self.strandeval),
+                ("strandeval", [strandeval_done], [orp_fasta, c1, c2], self.strandeval),
             ],
             max_workers=self.max_parallel,
         )
-        self.step("reportgen", [qualreport_done], [unique_orp_done, orp_fasta], self.reportgen)
+        # Everything the report quotes, so a re-scored transrate or BUSCO
+        # (say, against newer reads) rewrites the report rather than leaving
+        # the old numbers in it.
+        self.step(
+            "reportgen", [qualreport_done],
+            [unique_orp_done, orp_fasta, busco_done, transrate_csv, strandeval_done] + uniq_outs,
+            self.reportgen,
+        )
         # Last, because it deletes inputs several of the steps above declare.
         self.step("cleanup", [cleanup_done], [qualreport_done], self.cleanup)
 
