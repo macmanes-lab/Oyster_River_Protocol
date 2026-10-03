@@ -5,6 +5,16 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-10-03 -- 4.1.0-dev5: pooled scoring gets --mem
+
+The default two-track path called `merge_branch()` bare, so
+orthotransrate ran without `--max-memory` (pytransrate fell back to the
+node's free memory -- the OOM the forwarding was added for). orthotransrate
+and transrate now default mem to `--mem`; twotrack_select.py takes
+`--mem-mb` for its cd-hit-est `-M` (was 0, unlimited). Checked by stubbing
+conda_run; tests/test_twotrack_select.py not run (needs the orp env).
+
+
 ## 2026-10-03 -- 4.1.0-dev4: resume dependency gaps
 
 Four steps declared fewer inputs than they read, so a resumed run could skip

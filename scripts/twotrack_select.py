@@ -115,10 +115,10 @@ def contig_metrics(path):
     return out
 
 
-def cdhit(cdhit_bin, src, dst, ident, cov, threads):
+def cdhit(cdhit_bin, src, dst, ident, cov, threads, mem_mb=0):
     word = 10 if ident >= 0.95 else 8
     subprocess.run([cdhit_bin, "-i", src, "-o", dst, "-c", str(ident), "-G", "0",
-                    "-aS", str(cov), "-r", "1", "-n", str(word), "-M", "0",
+                    "-aS", str(cov), "-r", "1", "-n", str(word), "-M", str(mem_mb),
                     "-T", str(threads), "-d", "0"],
                    check=True, stdout=subprocess.DEVNULL)
     return set(fasta_lengths(dst))
@@ -166,6 +166,8 @@ def main():
     p.add_argument("--sprot", default=None)
     p.add_argument("--table", default=None)
     p.add_argument("--threads", type=int, default=1)
+    p.add_argument("--mem-mb", type=int, default=0,
+                   help="cd-hit-est -M, in MB; 0 is cd-hit's 'no limit' (default: 0)")
     p.add_argument("--near", type=float, default=0.9)
     p.add_argument("--distinct-cov", type=float, default=0.5)
     p.add_argument("--rescue-tpm", type=float, default=1.0)
@@ -222,7 +224,7 @@ def main():
             if distinct:
                 d_fa, d_out = os.path.join(tmp, "distinct.fa"), os.path.join(tmp, "distinct.cd.fa")
                 write_subset(args.merged, distinct, d_fa)
-                distinct = cdhit(args.cdhit, d_fa, d_out, 0.95, 0.9, args.threads)
+                distinct = cdhit(args.cdhit, d_fa, d_out, 0.95, 0.9, args.threads, args.mem_mb)
             by_gene = defaultdict(list)
             for c in distinct:
                 by_gene[info[c][0]].append(c)
@@ -234,8 +236,10 @@ def main():
         nohit = [c for c in pool if c not in info]
         n_fa, n_out = os.path.join(tmp, "nohit.fa"), os.path.join(tmp, "nohit.cd.fa")
         write_subset(args.merged, set(nohit), n_fa)
-        keep2 = cdhit(args.cdhit, n_fa, n_out, args.nohit_id, args.nohit_cov, args.threads) \
-            if nohit else set()
+        keep2 = set()
+        if nohit:
+            keep2 = cdhit(args.cdhit, n_fa, n_out, args.nohit_id, args.nohit_cov,
+                          args.threads, args.mem_mb)
 
     keep = reps | rescued | keep2
     with open(args.out, "w") as out:

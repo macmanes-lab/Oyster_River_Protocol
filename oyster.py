@@ -2438,6 +2438,9 @@ class Pipeline:
 
     def orthotransrate(self, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
+        # The two-track path calls merge_branch() bare, so mem arrives as
+        # None there -- which pytransrate_memory_args reads as "no budget".
+        mem = self.mem if mem is None else mem
         outdir = self.orthofuse_dir / "merged"
         merged = self.orthofuse_dir / "merged.fasta"
         # needs_run() re-runs this step whenever the corrected reads are
@@ -2500,7 +2503,7 @@ class Pipeline:
             "--diamond", *[self.diamond_txt(a) for a in self.diamond_priority],
             "--sprot", self.makedir / "software" / "diamond" / "uniprot_sprot.fasta",
             "--table", self.orthofuse_dir / f"twotrack.{self.runout}.tsv",
-            "--threads", self.cpu, "--out", good_list,
+            "--threads", self.cpu, "--mem-mb", self.mem * 1000, "--out", good_list,
         )
 
     def orthofusing(self):
@@ -2734,6 +2737,7 @@ class Pipeline:
 
     def transrate(self, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
+        mem = self.mem if mem is None else mem
         orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
         outdir = self.reports_dir / f"transrate_{self.runout}"
         # See orthotransrate() and clear_transrate_outdir.

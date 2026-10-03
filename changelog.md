@@ -33,6 +33,10 @@ ORP Version 4.1.0-dev1
   merge's pooled scoring re-runs when only the corrected reads changed;
   strandeval depends on the corrected reads; and the quality report is
   rewritten when BUSCO, transrate, strandeval or the unique-gene counts are.
+- **The pooled pytransrate scoring on the default two-track path is given
+  `--mem`** as `--max-memory`; it was getting no budget at all, and
+  pytransrate fell back to the node's free memory. `twotrack_select.py`'s
+  cd-hit-est runs get `--mem` too (`-M` was 0, unlimited).
 - New test harness `experiments/redundancy/spades_branch.sbatch` (with
   `spades_only.py`): the two SPAdes runs, then the default merge with a
   sample's existing Trans-ABySS and Trinity assemblies.
