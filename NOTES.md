@@ -5,6 +5,70 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-10-04 -- 4.1.0-dev9: pre-v5 review fixes, OrthoFinder removed
+
+From a whole-repo review before cutting v5. One commit each:
+
+- **OrthoFinder merge removed.** `--merge-method`, `--orthofinder-*`,
+  `--pick-rule` are gone, along with `orp_orthofinder`/`mcl` in the
+  Makefile, the env file and preflight. `pick_best_contigs.py` moved to
+  `experiments/redundancy/`. The OrthoFinder experiment sbatch scripts
+  (`chowder_arms`, `repick_*`, `validate_arms`, `inflation_sweep`,
+  `time_orthofinder_search`, compare108's `of40`/`blastn` arms) still pass
+  the removed flags, so run them from a checkout at or before `74b31a0`
+  (dev8). The `bridges.psc.edu` trimmomatic jar branch is gone too.
+- **Unfinished steps re-run on resume.** `reports/.<run>.<step>.running`
+  is touched before each step and removed on success. Reproduced before the
+  fix: a fake rcorrector that wrote half its output and failed left a
+  resume assembling from half the reads, with the trimmed reads deleted.
+  The rnaSPAdes and Trans-ABySS work dirs are also cleared before the first
+  attempt.
+- `posthack` (`>>` -> `>`) and `secondfilter` (`"a"` -> `"w"`) no longer
+  accumulate across retries; a duplicate contig name in `.ORP.fasta` was
+  possible.
+- BUSCO re-runs replace `reports/run_<run>.ORP` instead of nesting inside it.
+- Preflight covers diamond, cd-hit-est, blastn, makeblastdb, samtools,
+  orp_trinity's bwa/seqtk/hist, and the swissprot `.dmnd`, swissprot fasta
+  and BUSCO lineage. It makes one `conda run which` per env.
+- TPM == `--tpm-filt` now counts as high (it used to be dropped).
+- `run_parallel` -> `run_beside`: the long job keeps all of `--cpu`, and
+  the short one gets 1/4 of it (strandeval capped at 8) on top, with memory
+  taken from the long job's budget. Used for strandeval beside transrate,
+  and for the remaining per-assembly diamonds beside `score_pool` (they used
+  to wait for it).
+- `run_filtershort` runs `long.seq.py` on all assemblies in parallel.
+- `diamond_shucked`/`orp_diamond` are lookups (`hits_for`) into the
+  per-assembly diamond outputs instead of blastx runs: 6 -> 4 searches.
+
+**How it was tested.** No conda on the laptop, so a fake-tool harness: a
+stub `conda` that execs fake trimmomatic/rcorrector/assemblers/diamond/
+pytransrate/salmon/busco/etc. Full oyster.py and chowder.py runs,
+resume-after-failure cases, BUSCO re-runs, preflight with missing tools and
+databases, `--max-parallel 1`. Final assemblies were compared byte for byte
+against the previous commit for the filtershort and hits_for changes. The
+harness lived in the session scratchpad and isn't committed.
+
+**Still open / unverified:**
+- `hits_for`: compare UNIQUE GENES ORP, list1 and `.ORP.fasta` against a
+  dev8 run on real data. Expected identical (diamond scores each query on
+  its own), but not shown on real diamond output.
+- `run_beside`'s wall time isn't measured. Check the timing log for
+  `pool_branch`/`assembly_diamonds` and `transrate`/`strandeval` on the
+  next cluster run.
+- `busco_lineage_present` is deliberately lenient (any `busco_dbs/**`
+  dir starting with the lineage less `.N`). If it ever blocks a valid
+  install, check the real layout of a `busco --download` tree.
+- `docs/pipeline-schedule.html` still draws the OrthoFinder branch and the
+  old even CPU split.
+- Not done from the review: chowder `--seed`/`--assembly-order` changes
+  ignored on resume (needs an order stamp as a `build_pool` input);
+  `cleanup()` deletes shared `shuck/`, `quants/`, `diamond/` and `working/`
+  across runouts in one `--dir`; `--inchworm_cpu 10` oversubscribes at the
+  default `--cpu 16`; Makefile `grep orp` matching `orp_*` envs, the
+  hard-coded bundled-conda paths, Anaconda 2020.11, `ftp://` UniProt;
+  Dockerfile on Ubuntu 20.04.
+
+
 ## 2026-10-03 -- 4.1.0-dev8: orthofuse -> shuck rename
 
 Everything named for orthofuse is renamed for "shuck" (oyster theme: keep
