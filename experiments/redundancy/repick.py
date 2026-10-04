@@ -2,7 +2,7 @@
 """Re-pick one contig per orthogroup under an alternative rule.
 
 usage: repick.py --contigs-csv merged/contigs.csv --orthogroups Orthogroups.txt
-                 --rule RULE --out good.list [--pick-script scripts/pick_best_contigs.py]
+                 --rule RULE --out good.list [--pick-script experiments/redundancy/pick_best_contigs.py]
        repick.py --contigs-csv ... --orthogroups ... --compare [--watch CONTIG ...]
 
 makeorthout keeps the member with the highest pytransrate contig score.
@@ -99,7 +99,7 @@ def main():
     p.add_argument("--compare", action="store_true")
     p.add_argument("--watch", nargs="*", default=[])
     p.add_argument("--pick-script",
-                   default=str(Path(__file__).resolve().parents[2] / "scripts" / "pick_best_contigs.py"))
+                   default=str(Path(__file__).resolve().parent / "pick_best_contigs.py"))
     args = p.parse_args()
 
     picker = load_picker(args.pick_script)

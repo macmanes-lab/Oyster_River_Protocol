@@ -17,7 +17,7 @@ cd Oyster_River_Protocol
 make
 ```
 
-`make` chains through everything: creates the conda environments (including OrthoFinder's), builds the diamond search database, downloads the BUSCO lineage database, and appends any needed PATH entries to `~/.profile`/`~/.bash_profile`. Each step checks whether it's already done and skips itself if so, so re-running `make` after a partial or failed install picks up where it left off rather than starting over.
+`make` chains through everything: creates the conda environments, builds the diamond search database, downloads the BUSCO lineage database, and appends any needed PATH entries to `~/.profile`/`~/.bash_profile`. Each step checks whether it's already done and skips itself if so, so re-running `make` after a partial or failed install picks up where it left off rather than starting over.
 
 When it finishes, run:
 
@@ -37,33 +37,26 @@ conda config --add channels bioconda
 conda install mamba -n base -yc conda-forge
 ```
 
-**2. Create the 5 isolated tool environments**
+**2. Create the 4 isolated tool environments**
 
 Only `orp_spades` pins `python=3.14` — that env has a confirmed bug (see [Known gotchas](#known-gotchas)) that requires forcing a modern Python. The others resolve whatever compatible Python their own recipe naturally wants; forcing 3.14 there bought no benefit (each env's Python is invisible outside that env) and broke `orp_transabyss`'s solve in practice.
-
-`orp_orthofinder` is kept isolated rather than folded into the shared `orp` env because OrthoFinder 3.x requires `diamond <2.2`, which conflicts with `orp`'s own `diamond=2.2.5` (used for the Swiss-Prot search, a separate purpose from OrthoFinder's internal one).
 
 ```bash
 mamba create -y -c bioconda -c conda-forge --override-channels --name orp_spades spades=4.3.0 python=3.14
 mamba create -y -c bioconda -c conda-forge --override-channels --name orp_trinity trinity=2.15.2 bwa=0.7.19 bashplotlib seqtk=1.5 salmon=1.10.3
 mamba create -y -c bioconda -c conda-forge --override-channels --name orp_busco busco=6.1.0
 mamba create -y -c bioconda -c conda-forge --override-channels --name orp_transabyss transabyss=2.0.1
-mamba create -y -c bioconda -c conda-forge --override-channels --name orp_orthofinder orthofinder=3.1.5
 ```
 
 **3. Create the consolidated `orp` environment**
 
-Everything else — rcorrector, trimmomatic, cd-hit, diamond, salmon (the pipeline's own, modern version), samtools, seqtk, mcl, sra-tools, blast, parallel, biopython, scipy, numpy, bashplotlib, pigz, plus pytransrate and the snap-aligner it maps with — lives in one `orp` environment, defined in `orp_env.yml`:
+Everything else — rcorrector, trimmomatic, cd-hit, diamond, salmon (the pipeline's own, modern version), samtools, seqtk, sra-tools, blast, parallel, biopython, scipy, numpy, bashplotlib, pigz, plus pytransrate and the snap-aligner it maps with — lives in one `orp` environment, defined in `orp_env.yml`:
 
 ```bash
 mamba env create -f orp_env.yml
 ```
 
-**4. OrthoFinder**
-
-Already created in step 2 above (`orp_orthofinder`) — nothing further needed here.
-
-**5. Diamond's Swiss-Prot search database**
+**4. Diamond's Swiss-Prot search database**
 
 ```bash
 mkdir -p software/diamond
@@ -74,7 +67,7 @@ conda run -n orp diamond makedb --in uniprot_sprot.fasta -d swissprot
 cd ../..
 ```
 
-**6. BUSCO's eukaryota lineage database**
+**5. BUSCO's eukaryota lineage database**
 
 ```bash
 mkdir -p busco_dbs

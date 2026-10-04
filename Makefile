@@ -49,7 +49,6 @@ else
 				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_trinity trinity=2.15.2 bwa=0.7.19 bashplotlib seqtk=1.5 salmon=1.10.3; \
 				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_busco busco=6.1.0; \
 				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_transabyss transabyss=2.0.1; \
-				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_orthofinder orthofinder=3.1.5; \
 				mamba env create -f ${DIR}/orp_env.yml; \
 				mamba clean -ya; \
 				conda deactivate; \

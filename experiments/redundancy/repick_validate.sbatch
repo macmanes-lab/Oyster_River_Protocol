@@ -102,7 +102,7 @@ if [[ $rule == twotrack ]]; then
         --cdhit /mnt/home/macmaneslab/macmanes/orp_envs/orp/bin/cd-hit-est --threads "$SLURM_CPUS_PER_TASK"
     chowder_rule=score  # makeorthout is skipped either way; the list above is newer
 else
-    python3 "$CODE/scripts/pick_best_contigs.py" "$WORK/orthofuse/$R/merged/contigs.csv" "$groups" \
+    python3 "$CODE/experiments/redundancy/pick_best_contigs.py" "$WORK/orthofuse/$R/merged/contigs.csv" "$groups" \
         "$WORK/orthofuse/$R/good.$R.list" --rule "$rule" --diamond "${diamond[@]}"
 fi
 echo "picks: $(wc -l < "$WORK/orthofuse/$R/good.$R.list") (source arm: $(wc -l < "$SRCDIR/orthofuse/$R/good.$R.list"))"

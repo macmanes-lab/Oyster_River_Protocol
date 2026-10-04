@@ -57,12 +57,12 @@ Three things differ from `oyster.py`, and all three are worth knowing before you
 
 ### How the assemblies are merged
 
-From 4.1.0 the four assemblies are merged by Swiss-Prot gene (`--merge-method twotrack`, the default), not by OrthoFinder orthogroup:
+From 4.1.0 the four assemblies are merged by Swiss-Prot gene, not by OrthoFinder orthogroup:
 
 - **Contigs with a Swiss-Prot hit** are grouped by the gene of their best hit -- the same gene names the qualreport's UNIQUE GENES counts. Each gene keeps one representative (the longest of the contigs whose hit covers close to the best fraction of the protein), plus up to two more copies that are both distinct from it (it covers under half of them) and expressed (at least 1 TPM): other isoforms, paralogs under the same name.
 - **Contigs without a hit** are deduplicated with cd-hit-est on both strands, and the TPM filter (`--tpm-filt`) later drops those below threshold.
 
-Everything after that -- the diamond rescue, cd-hit-est, salmon, the TPM filter, BUSCO, transrate -- is unchanged. On 10 test samples this cut duplicated BUSCOs by about 90% against ORP 4.0 while keeping complete BUSCOs and raising unique genes; the experiments behind it are in `experiments/redundancy/`. `--merge-method orthofinder` runs the OrthoFinder merge exactly as 4.0 did. Assemblies from the two methods are not comparable.
+Everything after that -- the diamond rescue, cd-hit-est, salmon, the TPM filter, BUSCO, transrate -- is unchanged. On 10 test samples this cut duplicated BUSCOs by about 90% against ORP 4.0 while keeping complete BUSCOs and raising unique genes; the experiments behind it are in `experiments/redundancy/`. The OrthoFinder merge ORP used through 4.0 was removed in 5.0, so a 5.0 assembly is not directly comparable with a 4.x one.
 
 ### Parallel task management
 
@@ -70,14 +70,13 @@ See [docs/pipeline-schedule.html](docs/pipeline-schedule.html) for a full DAG of
 
 Trinity itself runs in two stages, using its documented [multi-stage execution support](https://github.com/trinityrnaseq/trinityrnaseq/wiki/Running-Trinity#running-trinity-in-multiple-sequential-stages), and each stage is paired with a different assembler rather than sharing one fixed lane for the whole run:
 
-- **Stage A**: Trinity Phase 1 (Inchworm + Chrysalis, building the whole-transcriptome graph and partitioning reads per gene component) runs alongside rnaSPAdes (the `spadesauto` and `spadeshigh` runs), splitting `--cpu`/`--mem` 25/75 (`TRINITY_PHASE1_SHARE`) -- Phase 1's own share barely matters (Inchworm is capped at a fixed thread count regardless, and Chrysalis's clustering is brief), so SPAdes gets the bulk of the machine since it's fast but does scale with cores. Each SPAdes assembly is immediately followed by its own diamond search rather than waiting for the orthofuser/merge stage below, since that search only ever needed its own assembly.
+- **Stage A**: Trinity Phase 1 (Inchworm + Chrysalis, building the whole-transcriptome graph and partitioning reads per gene component) runs alongside rnaSPAdes (the `spadesauto` and `spadeshigh` runs), splitting `--cpu`/`--mem` 25/75 (`TRINITY_PHASE1_SHARE`) -- Phase 1's own share barely matters (Inchworm is capped at a fixed thread count regardless, and Chrysalis's clustering is brief), so SPAdes gets the bulk of the machine since it's fast but does scale with cores. Each SPAdes assembly is immediately followed by its own diamond search rather than waiting for the merge stage below, since that search only ever needed its own assembly.
 - **Stage B**: once Stage A finishes, Trinity Phase 2 -- the actual per-gene-component assembly, thousands of small independent jobs and by far Trinity's dominant cost -- runs alongside Trans-ABySS, splitting `--cpu`/`--mem` 95/5 (`TRINITY_PHASE2_SHARE`). Trans-ABySS's own dominant cost (the initial FASTQ read + De Bruijn graph build) is single-threaded regardless of CPU count, so it gets just enough cores to keep its own threaded sub-stages moving while Phase 2 takes the rest; its memory share isn't cut along with its CPU share, since its memory footprint doesn't shrink the same way. Trans-ABySS's diamond search runs immediately after it finishes, same as the Stage A assemblers.
 
 This split is fixed and not affected by `--max-parallel`.
 
 By default (`--max-parallel 2`), oyster.py runs up to 2 jobs at once within the other stages of the pipeline that benefit from it, splitting `--cpu`/`--mem` across however many jobs are running concurrently:
 
-- the orthofinder branch vs. the build_pool/score_pool branch
 - transrate vs. strandeval
 
 CPU-bound stages that don't benefit from splitting cores — diamond, orp_diamond, salmon, and BUSCO — always run sequentially at the full `--cpu` count regardless of this flag.
@@ -96,7 +95,7 @@ A completed run keeps five things and reclaims the rest:
 | `reports/` | BUSCO, transrate, strand evaluation, `qualreport.<run>`, timings |
 | `reports/<run>.cleanup.done` | what was reclaimed and what was kept, with sizes |
 
-Everything else goes: the trimmed-but-uncorrected reads (deleted as soon as read correction is done with them — nothing downstream ever reads them again), the `shuck/` tree (OrthoFinder's all-vs-all output and the transrate scoring of the pooled fasta, normally the largest directory in a run), `quants/`, `assemblies/diamond/`, `assemblies/working/`, and the chain of working assemblies between `shuck` and `.ORP.fasta`. Every number any of those contributed is already in `reports/qualreport.<run>`.
+Everything else goes: the trimmed-but-uncorrected reads (deleted as soon as read correction is done with them — nothing downstream ever reads them again), the `shuck/` tree (the pooled fasta and its transrate scoring, normally the largest directory in a run), `quants/`, `assemblies/diamond/`, `assemblies/working/`, and the chain of working assemblies between `shuck` and `.ORP.fasta`. Every number any of those contributed is already in `reports/qualreport.<run>`.
 
 The gzipping runs in the background, starting the moment each file is finished being written rather than at the end of the run — the corrected reads compress alongside the assemblers, and each assembly compresses while the next stage runs — so cleanup itself is just an unlink and adds no wall time. Pass `--no-cleanup` to switch all of this off and keep a run exactly as it was, which is what you want when debugging a run rather than shipping its results. It also keeps what individual steps would otherwise delete as they finish: Trinity's working directory (Phase 2 runs without `--full_cleanup`), the rnaSPAdes and Trans-ABySS working directories, and strandeval's BAM and bwa index. Running the same command again later without the flag does the cleanup then. `--keep-intermediates` is an older name for the same flag and still works.
 
@@ -136,7 +135,6 @@ Because it appends, a value given here overrides the same flag ORP passes above 
 | `--spades1-kmer` | `auto` | rnaSPAdes k-mer(s) for the spadesauto assembly — `auto` lets rnaSPAdes pick its documented default pair (~1/3 and ~1/2 of maximum read length). Also accepts percentages or an explicit list, same forms as `--spades2-kmer` |
 | `--spades2-kmer` | `60%,75%` | rnaSPAdes k-mer(s) for the spadeshigh assembly — percentages of maximum read length, an explicit comma-separated list of odd sizes under 128, or `auto`. Percentages resolve per dataset (61,75 at 101bp reads; 89,113 at 150bp), clamped to rnaSPAdes' 127 ceiling |
 | `--transabyss-kmer` | `32` | Trans-ABySS k-mer |
-| `--merge-method` | `twotrack` | How the four assemblies' contigs become one: `twotrack` keeps one contig per Swiss-Prot gene plus distinct, expressed copies, and deduplicates contigs without a hit; `orthofinder` is ORP's method through 4.0 (see [How the assemblies are merged](#how-the-assemblies-are-merged)) |
 | `--max-parallel` | `2` | Max concurrent jobs per stage (see [Parallel task management](#parallel-task-management) above) |
 | `--no-cleanup` | off | Keep every file a run produces, uncompressed, including each assembler's working directory -- for debugging (see [What a finished run leaves behind](#what-a-finished-run-leaves-behind) below). Alias: `--keep-intermediates` |
 | `--pytransrate-args` | none | Extra arguments passed verbatim to both pytransrate runs, as one quoted string (see [Tuning pytransrate](#tuning-pytransrate) below) |
@@ -163,7 +161,6 @@ There are no assembler flags — no k-mers, no `--strand`, no `--normalize-reads
 | `--runout` | `USER_RUN` | Run name prefix |
 | `--lineage` | `eukaryota_odb12.2` | BUSCO lineage |
 | `--tpm-filt` | `0` | TPM filter threshold |
-| `--merge-method` | `twotrack` | How the four assemblies' contigs become one: `twotrack` keeps one contig per Swiss-Prot gene plus distinct, expressed copies, and deduplicates contigs without a hit; `orthofinder` is ORP's method through 4.0 (see [How the assemblies are merged](#how-the-assemblies-are-merged)) |
 | `--max-parallel` | `2` | Max concurrent jobs per stage (see [Parallel task management](#parallel-task-management) above) |
 | `--no-cleanup` | off | Keep every file the run produces, uncompressed -- for debugging. Alias: `--keep-intermediates` |
 | `--pytransrate-args` | none | Extra arguments passed verbatim to both pytransrate runs (see [Tuning pytransrate](#tuning-pytransrate) above) |

@@ -8,9 +8,8 @@ Usage:
 
 Everything oyster.py does after its four assemblers have finished, run over
 assemblies you already have: pytransrate scores the pooled contigs, they
-are reduced to one assembly (by default one contig per swissprot gene plus
-distinct expressed copies, and cd-hit-est over contigs without a hit; or
-OrthoFinder orthogroups under --merge-method orthofinder), genes the
+are reduced to one assembly (one contig per swissprot gene plus distinct
+expressed copies, and cd-hit-est over contigs without a hit), genes the
 selection missed are rescued by their diamond hits, cd-hit-est collapses
 what is left, and the result is quantified, filtered, BUSCO'd, scored and
 reported exactly as a full ORP run would be.
@@ -43,7 +42,7 @@ It matters twice:
     where input order breaks length ties -- so it can decide which of two
     equally long, 98%-identical contigs survives; and
   * build_list5.py keeps the *first* diamond hit per gene in that order, so
-    for contigs no orthogroup covered, earlier assemblies are preferred.
+    for genes the selection missed, earlier assemblies are preferred.
 
 Rather than let the sequence you happened to type decide either of those,
 the assemblies are sorted by label and then permuted with a fixed seed, so
@@ -75,8 +74,7 @@ import time
 from pathlib import Path
 
 from oyster import (
-    ASSEMBLER_TOOLS, RED, RESET, Assembly, Pipeline, add_merge_experiment_args,
-    line_buffer_stdio,
+    ASSEMBLER_TOOLS, RED, RESET, Assembly, Pipeline, line_buffer_stdio,
 )
 
 HERE = Path(__file__).resolve().parent
@@ -333,7 +331,7 @@ class Chowder(Pipeline):
         """Copy each input under assemblies/ingested/, prefixing every contig name.
 
         Prefixing is not cosmetic. Contig names are the key every downstream
-        stage joins on -- OrthoFinder's orthogroups, pytransrate's
+        stage joins on -- the swissprot hits, pytransrate's
         contigs.csv, filter.py's keep-lists -- and two assemblies of one
         library routinely share them. Unprefixed, two contigs called
         TRINITY_DN0_c0_g1_i1 would be silently treated as one.
@@ -480,26 +478,9 @@ def parse_args():
     p.add_argument("--lineage", default="eukaryota_odb12.2", help="BUSCO lineage (default: eukaryota_odb12.2)")
     p.add_argument("--tpm-filt", type=float, default=0, help="TPM filter threshold (default: 0)")
     p.add_argument(
-        "--orthofinder-searches", type=int, default=None, metavar="N",
-        help="how many of OrthoFinder's n_assemblies^2 diamond searches may run "
-             "at once. Default: as many as --mem allows, sized off the largest "
-             "search input. --cpu is split across them, so lowering this costs "
-             "memory rather than cores. Lower it if diamonds are OOM-killed "
-             "(returncode -9 in the log)",
-    )
-    p.add_argument(
-        "--orthofinder-analysis", type=int, default=None, metavar="N",
-        help="OrthoFinder's -a, the workers for its algorithm phase after the "
-             "searches. Default: min(--cpu/8, 16, number of assemblies). Not "
-             "sized by memory -- that phase reads only the search output and has "
-             "not been measured; raise it if it stalls, lower it if it runs a "
-             "node out of memory",
-    )
-    p.add_argument(
         "--max-parallel", type=int, default=2,
         help="max concurrent jobs within each independent stage that benefits "
-             "from it (orthofinder vs. build_pool/score_pool; transrate vs. "
-             "strandeval), splitting --cpu/--mem across however many run at "
+             "from it (transrate vs. strandeval), splitting --cpu/--mem across however many run at "
              "once; 1 disables it (default: 2)",
     )
     p.add_argument(
@@ -523,7 +504,6 @@ def parse_args():
              "real sequence alone still exceeded the four-byte ceiling. Run "
              "`pytransrate --help` for the full set (default: none)",
     )
-    add_merge_experiment_args(p)
     p.add_argument("--dir", default=None, help="working directory (default: current directory)")
     return p.parse_args()
 

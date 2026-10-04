@@ -9,7 +9,6 @@ dependencies:
   - biopython
   - samtools=1.24
   - seqtk=1.5
-  - mcl=22.282
   - rcorrector=1.0.7
   - trimmomatic=0.41
   - cd-hit=4.8.1

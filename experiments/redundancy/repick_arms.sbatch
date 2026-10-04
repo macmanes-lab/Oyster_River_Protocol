@@ -64,7 +64,7 @@ done
 
 groups=$(ls "$ofrom"/search/OrthoFinder/Results_*/Orthogroups/Orthogroups.txt | head -1)
 module load anaconda/colsa
-python3 "$HERE/repick.py" --pick-script "$CODE/scripts/pick_best_contigs.py" \
+python3 "$HERE/repick.py" --pick-script "$CODE/experiments/redundancy/pick_best_contigs.py" \
     --contigs-csv "$oto/merged/contigs.csv" --orthogroups "$groups" \
     --rule "$rule" --out "$oto/good.$runout.list"
 echo "picks: $(wc -l < "$oto/good.$runout.list")"

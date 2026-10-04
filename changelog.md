@@ -2,6 +2,17 @@
 
 ORP Version 4.1.0-dev1
 
+- **The OrthoFinder merge is gone** (`oyster.py`, `chowder.py`): the
+  two-track merge, the default since 4.1.0-dev0, is now the only one.
+  `--merge-method`, `--orthofinder-searches`, `--orthofinder-analysis` and
+  the hidden `--orthofinder-program`, `--orthofinder-inflation` and
+  `--pick-rule` are removed, and neither the `orp_orthofinder` env nor `mcl`
+  is needed or checked at startup. `scripts/pick_best_contigs.py` moved to
+  `experiments/redundancy/`, the only place left that uses it. The 4.x
+  OrthoFinder experiment sbatch scripts in `experiments/` need a checkout
+  from before this change.
+- Removed the `bridges.psc.edu` special case for trimmomatic (a bare
+  trimmomatic-0.36 jar); trimmomatic always comes from the `orp` env.
 - **The two rnaSPAdes assemblies are `spadesauto` and `spadeshigh`**, not the
   fixed k=55 and k=75 runs (`oyster.py`). `--spades1-kmer` now defaults to
   `auto`: `-k` is left off and rnaSPAdes picks its documented pair, about
