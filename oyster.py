@@ -1619,11 +1619,24 @@ class Pipeline:
                 for a in self.assemblies]
 
     def run_filtershort(self):
+        """Drop contigs of 200 bp or less from every assembly, all at once.
+
+        One single-threaded Biopython pass per assembly, independent of each
+        other, with nothing else running at this point -- so they go in
+        parallel rather than one after another, each paying its own
+        `conda run` startup in the same few seconds.
+        """
         self.shuck_working.mkdir(parents=True, exist_ok=True)
-        for a in self.diamond_priority:
+
+        def filter_one(a):
             fasta = self.assembly_fasta(a)
             outp = self.shuck_working / f"{fasta.name}.short.fasta"
             self.conda_run("orp", "python", self.makedir / "scripts" / "long.seq.py", fasta, outp, "200")
+
+        workers = max(1, min(len(self.assemblies), self.cpu))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
+            for future in [ex.submit(filter_one, a) for a in self.diamond_priority]:
+                future.result()
 
     def build_pool(self):
         out = self.shuck_dir / "pool.fasta"

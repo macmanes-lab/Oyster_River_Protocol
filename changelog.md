@@ -2,6 +2,8 @@
 
 ORP Version 4.1.0-dev1
 
+- `run_filtershort` filters all the assemblies at once instead of one
+  after another (`oyster.py`, `chowder.py`). The output is unchanged.
 - **Short jobs run beside long ones instead of splitting the cores with them**
   (`oyster.py`, `chowder.py`). strandeval used to take half of `--cpu` from
   transrate for transrate's whole run, though it finishes in minutes. Now
