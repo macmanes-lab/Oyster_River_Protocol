@@ -2,6 +2,12 @@
 
 ORP Version 4.1.0-dev1
 
+- **`posthack` and `secondfilter` overwrite their working files instead of
+  appending to them** (`oyster.py`). On a retry or resume, `newbies.fasta`
+  gained a second copy of every rescued contig, and an ID left in
+  `donotremove.list` from an earlier attempt could end up in `.ORP.fasta`
+  twice. `secondfilter` also prints a one-line count instead of every ID it
+  keeps.
 - **A step that dies partway is re-run on resume** (`oyster.py`,
   `chowder.py`). Trimmomatic, rcorrector and diamond write their output as
   they go, so a step that was killed, ran out of memory or used up its retries

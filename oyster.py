@@ -1824,13 +1824,16 @@ class Pipeline:
     def posthack(self):
         # Concatenation order, so ASSEMBLY_ORDER and not diamond_priority:
         # this reaches cd-hit-est, where input order breaks length ties.
-        fastas = " ".join(str(p) for p in self.assembly_fasta_paths())
+        fastas = " ".join(shlex.quote(str(p)) for p in self.assembly_fasta_paths())
         list7 = self.diamond_dir / f"{self.runout}.list7"
         newbies = self.diamond_dir / f"{self.runout}.newbies.fasta"
         shucked = self.assemblies_dir / f"{self.runout}.shucked.fasta"
         working_out = self.assemblies_working / f"{self.runout}.shucked.fasta"
         filter_py = self.makedir / "scripts" / "filter.py"
-        script = f"python {filter_py} <(cat {fastas}) {list7} >> {newbies}"
+        # `>`, not `>>`: a retry or a resumed run would otherwise add a second
+        # copy of every rescued contig on top of the first.
+        q = shlex.quote
+        script = f"python {q(str(filter_py))} <(cat {fastas}) {q(str(list7))} > {q(str(newbies))}"
         self.run(["conda", "run", "--no-capture-output", "-n", "orp", "bash", "-c", script])
         with open(working_out, "wb") as outf:
             for p in (newbies, shucked):
@@ -1931,16 +1934,19 @@ class Pipeline:
             blasted = self.assemblies_working / f"{self.runout}.blasted"
             donotremove = self.assemblies_working / f"{self.runout}.donotremove.list"
             do_not_remove_ids = set()
-            with open(diamond_txt) as f, open(blasted, "a") as bf:
+            # "w", not "a": IDs left from an earlier attempt would be kept
+            # again, and one that is now in HIGHEXP would be written twice.
+            with open(diamond_txt) as f, open(blasted, "w") as bf:
                 for line in f:
                     cols = line.rstrip("\n").split("\t")
                     if cols and cols[0] in low_ids:
                         bf.write(line)
                         do_not_remove_ids.add(cols[0])
-            with open(donotremove, "a") as df:
+            with open(donotremove, "w") as df:
                 for i in sorted(do_not_remove_ids):
-                    print(i)
                     df.write(i + "\n")
+            print(f"[secondfilter] {len(do_not_remove_ids)} low-expression contigs kept "
+                  "for their swissprot hit")
 
             saveme = self.assemblies_working / f"{self.runout}.saveme.fasta"
             with open(saveme, "w") as outf:
