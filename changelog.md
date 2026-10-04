@@ -2,6 +2,14 @@
 
 ORP Version 4.1.0-dev1
 
+- **Two fewer diamond blastx searches per run** (`oyster.py`, `chowder.py`).
+  `diamond_shucked` and `orp_diamond` searched `shucked.fasta` and
+  `ORP.intermediate.fasta`, but every contig in those came whole, under its
+  own name, out of one of the assemblies, and each assembly has already
+  been searched against the same database with the same settings. Their
+  hits are now looked up from the per-assembly outputs. On the fake-tool
+  harness every downstream file is byte-identical; check UNIQUE GENES ORP
+  and the final assembly against a 4.1.0-dev8 run on real data.
 - `run_filtershort` filters all the assemblies at once instead of one
   after another (`oyster.py`, `chowder.py`). The output is unchanged.
 - **Short jobs run beside long ones instead of splitting the cores with them**

@@ -1866,6 +1866,33 @@ class Pipeline:
             "-e", "1e-8", "--top", "0.1", "-q", query, "-d", self.diamond_db, "-o", out,
         )
 
+    def hits_for(self, fasta, out):
+        """Write to `out` the swissprot hits, already in hand, of every contig in `fasta`.
+
+        shucked.fasta and ORP.intermediate.fasta contain nothing but contigs
+        lifted whole, under their own names, out of the assemblies: shuck
+        filters the pool, posthack filters the assemblies, and cd-hit-est
+        only chooses among them. Each assembly has already been through
+        diamond blastx against the same database with the same settings,
+        and diamond scores each query on its own, so a contig's hits are the
+        same whichever file it is searched from. These two used to be blastx
+        runs of their own; now they are a lookup.
+
+        Grouped by assembly rather than in `fasta`'s order. Nothing reads
+        them in order: make_list1 and orp_uniq take the set of genes, and
+        secondfilter the set of contigs with a hit.
+        """
+        with open(fasta) as f:
+            ids = {(line[1:].split() or [""])[0] for line in f if line.startswith(">")}
+        part = out.with_name(out.name + ".part")
+        with open(part, "w") as o:
+            for a in self.diamond_priority:
+                with open(self.diamond_txt(a)) as f:
+                    for line in f:
+                        if line.split("\t", 1)[0] in ids:
+                            o.write(line)
+        part.replace(out)
+
     def diamond_uniq(self):
         for a in self.report_order:
             count = parse_unique_count(self.diamond_txt(a))
@@ -1946,15 +1973,9 @@ class Pipeline:
             "-c", ".98", "-i", src, "-o", out,
         )
 
-    def orp_diamond(self, cpu=None, mem=None):
-        cpu = self.cpu if cpu is None else cpu
-        src = self.assemblies_dir / f"{self.runout}.ORP.intermediate.fasta"
-        out = self.assemblies_dir / f"{self.runout}.ORP.diamond.txt"
-        self.conda_run(
-            "orp", "diamond", "blastx", "--quiet", "-p", cpu,
-            "-e", "1e-8", "--top", "0.1", "-q", src, "-d", self.diamond_db, "-o", out,
-        )
-        out.touch()
+    def orp_diamond(self):
+        self.hits_for(self.assemblies_dir / f"{self.runout}.ORP.intermediate.fasta",
+                      self.assemblies_dir / f"{self.runout}.ORP.diamond.txt")
 
     def orp_uniq(self):
         diamond_txt = self.assemblies_dir / f"{self.runout}.ORP.diamond.txt"
@@ -2568,26 +2589,14 @@ class Pipeline:
                    strandeval_done, qualreport_done, cleanup_done, pipeline_start):
         """Everything after good_list exists."""
 
-        # Every assembly needs a diamond pass, and under oyster.py most of
-        # them already had one: the assembler lanes fire each assembly's
-        # diamond the moment that assembler returns, rather than leaving all
-        # four to queue up here. Those steps are up to date by now and skip;
-        # what is genuinely left is shucked, which depends on the merge
-        # stage just above, and Trinity, whose lane only just finished. A run
-        # that brought its own assemblies had no lanes, so all of them run
-        # here -- which is why this is a loop over the set and not the two
-        # named steps it used to be.
-        print("\n\n\n\n Starting diamond \n\n\n\n")
+        # Every assembly's diamond pass is done by now (twotrack_select needed
+        # them). shucked's hits are looked up from them rather than searched
+        # for again -- see hits_for.
+        assembly_diamonds = diamond_outs[1:]
         self.step(
-            "diamond_shucked", [diamond_shucked], [shucked_fasta],
-            partial(self.run_diamond_one, shucked_fasta, diamond_shucked),
+            "diamond_shucked", [diamond_shucked], [shucked_fasta] + assembly_diamonds,
+            partial(self.hits_for, shucked_fasta, diamond_shucked),
         )
-        for a in self.diamond_priority:
-            fasta, out = self.assembly_fasta(a), self.diamond_txt(a)
-            self.step(
-                f"diamond_{a.diamond_label}", [out], [fasta],
-                partial(self.run_diamond_one, fasta, out),
-            )
         self.step("diamond_uniq", uniq_outs, diamond_outs, self.diamond_uniq)
         self.step("make_list1", [list1], [diamond_shucked], self.make_list1)
         self.step("make_list2", [list2], [self.diamond_txt(a) for a in self.assemblies], self.make_list2)
@@ -2598,11 +2607,9 @@ class Pipeline:
         self.step("posthack", [newbies, working_shucked], [list7], self.posthack)
         self.step("cdhit", [orp_intermediate], [working_shucked], self.cdhit)
 
-        # orp_diamond is the same CPU-bound diamond blastx as above, paired
-        # here with salmon_branch which is tiny (~2s); halving orp_diamond's
-        # CPU to overlap with it costs more than the overlap saves, so both
-        # run sequentially at full CPU instead.
-        self.step("orp_diamond", [orp_diamond_txt], [orp_intermediate], self.orp_diamond)
+        # A lookup like diamond_shucked's, not a search.
+        self.step("orp_diamond", [orp_diamond_txt], [orp_intermediate] + assembly_diamonds,
+                  self.orp_diamond)
         self.step("orp_uniq", [unique_orp_done], [orp_diamond_txt], self.orp_uniq)
         salmon_stamp = self.stamp_tool_version("orp", "salmon", self.quants_dir / "salmon.version")
         self.step("salmon_index", [shucked_idx], [orp_intermediate, salmon_stamp], self.salmon_index)
