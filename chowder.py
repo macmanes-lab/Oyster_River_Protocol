@@ -225,16 +225,15 @@ class Chowder(Pipeline):
     # -- preflight ---------------------------------------------------------
 
     def required_tools(self):
-        """Everything a full run checks, less the assemblers, plus bwa.
+        """Everything a full run checks, less the assemblers.
 
         The three assemblers are the one part of the ORP chowder never
         reaches, so demanding them would fail a preflight over software this
-        run has no use for. bwa takes their place on the list because
-        strandeval maps with it out of the orp_trinity env, and that env is
-        no longer proven present by the Trinity check.
+        run has no use for. strandeval's bwa, seqtk and hist stay on the
+        list: they come out of the orp_trinity env, so a chowder install
+        still needs that env even though it never runs Trinity.
         """
-        tools = [t for t in super().required_tools() if t not in ASSEMBLER_TOOLS]
-        return tools + [("orp_trinity", "bwa", "BWA")]
+        return tuple(t for t in super().required_tools() if t not in ASSEMBLER_TOOLS)
 
     def readcheck(self):
         """Existence only -- there is no assembler k-mer to be too long for."""

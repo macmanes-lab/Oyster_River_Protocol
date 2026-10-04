@@ -84,11 +84,10 @@ ASSEMBLY_ORDER = (SPADES_AUTO, SPADES_HIGH, TRANSABYSS, TRINITY)
 DIAMOND_PRIORITY = (TRANSABYSS, SPADES_HIGH, SPADES_AUTO, TRINITY)
 REPORT_ORDER = (TRINITY, SPADES_AUTO, SPADES_HIGH, TRANSABYSS)
 
-# Preflight, in the order it prints. Everything here is shelled out to at
-# some point in a full run, and finding it missing hours in -- at
-# score_pool, or at the assembler that was going to run overnight -- is
-# the thing this list exists to prevent. snap-aligner is on it because
-# pytransrate maps with it.
+# Preflight. Everything here is shelled out to at some point in a full run,
+# and finding it missing hours in -- at score_pool, or at the assembler that
+# was going to run overnight -- is the thing this list exists to prevent.
+# snap-aligner is on it because pytransrate maps with it.
 SPADES_TOOL = ("orp_spades", "rnaspades.py", "SPADES")
 TRINITY_TOOL = ("orp_trinity", "Trinity", "TRINITY")
 TRANSABYSS_TOOL = ("orp_transabyss", "transabyss", "TRANSABYSS")
@@ -122,14 +121,23 @@ PYTRANSRATE_MEMORY_FLAGS = ("--max-memory", "--mem")
 CHECK_TOOLS = (
     ("orp", "salmon", "SALMON"),
     ("orp", "pytransrate", "PYTRANSRATE"),
-    ("orp", "seqtk", "SEQTK"),
+    ("orp", "snap-aligner", "SNAP-ALIGNER"),
+    ("orp", "diamond", "DIAMOND"),
+    ("orp", "cd-hit-est", "CD-HIT-EST"),
+    # twotrack_select.py's distinct-copy test.
+    ("orp", "blastn", "BLASTN"),
+    ("orp", "makeblastdb", "MAKEBLASTDB"),
+    ("orp", "samtools", "SAMTOOLS"),
     ("orp_busco", "busco", "BUSCO"),
+    # strandeval maps a read sample with these, out of the Trinity env.
+    ("orp_trinity", "bwa", "BWA"),
+    ("orp_trinity", "seqtk", "SEQTK"),
+    ("orp_trinity", "hist", "HIST (bashplotlib)"),
     SPADES_TOOL,
     TRINITY_TOOL,
     TRIMMOMATIC_TOOL,
     TRANSABYSS_TOOL,
     RCORRECTOR_TOOL,
-    ("orp", "snap-aligner", "SNAP-ALIGNER"),
 )
 
 # Reference profile (minutes, from a representative run at --max-parallel 2)
@@ -603,6 +611,9 @@ class Pipeline:
         self.busco_config = self.makedir / "software" / "config.ini"
         os.environ["BUSCO_CONFIG_FILE"] = str(self.busco_config)
         self.diamond_db = self.makedir / "software" / "diamond" / "swissprot"
+        # The fasta the diamond database was built from: twotrack_select.py
+        # reads protein lengths from it.
+        self.sprot_fasta = self.makedir / "software" / "diamond" / "uniprot_sprot.fasta"
 
         self.rcorr_dir = self.dir / "rcorr"
         self.assemblies_dir = self.dir / "assemblies"
@@ -1156,6 +1167,23 @@ class Pipeline:
             return path
         return None
 
+    def which_all_in_env(self, env, binaries):
+        """The subset of `binaries` on PATH in `env`, from one `conda run`.
+
+        One call per environment rather than per tool: each `conda run`
+        costs a second or more of conda's own startup, and preflight checks
+        a dozen and a half tools.
+        """
+        try:
+            result = subprocess.run(
+                ["conda", "run", "-n", env, "which", *binaries],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True,
+            )
+        except FileNotFoundError:
+            return set()
+        found = {os.path.basename(line.strip()) for line in result.stdout.splitlines()}
+        return found & set(binaries)
+
     def required_tools(self):
         """(env, binary, label) for every tool this entry point shells out to.
 
@@ -1174,11 +1202,62 @@ class Pipeline:
         A dozen "installed" lines is noise on every successful run; the only
         news preflight has is a tool that is missing.
         """
+        by_env = {}
         for env, binary, label in self.required_tools():
-            if not self.which_in_env(env, binary):
-                sys.exit(f"*** {label} is not installed, must fix ***")
+            by_env.setdefault(env, []).append((binary, label))
+        missing = []
+        for env, tools in by_env.items():
+            found = self.which_all_in_env(env, [b for b, _ in tools])
+            missing += [f"{label} (in the {env} env)" for b, label in tools if b not in found]
+        if missing:
+            sys.exit("*** not installed, must fix: " + ", ".join(missing) + " ***")
+        self.check_databases()
         self.check_pytransrate_version()
         self.log_provenance()
+
+    def busco_lineage_present(self) -> bool:
+        """Whether --lineage names a BUSCO dataset this install has.
+
+        Lenient on purpose: --lineage may be a path, and the directory a
+        download leaves can carry a version suffix the flag does not (or the
+        reverse), so any directory under busco_dbs/ whose name starts with
+        the lineage less a trailing `.N` counts -- the same test the
+        Makefile's busco_data target uses to decide it is installed.
+        """
+        if Path(self.lineage).is_dir():
+            return True
+        base = re.sub(r"\.\d+$", "", Path(self.lineage).name)
+        root = self.makedir / "busco_dbs"
+        for depth in ("*", "*/*", "*/*/*"):
+            if any(d.is_dir() and d.name.startswith(base) for d in root.glob(depth)):
+                return True
+        return False
+
+    def check_databases(self):
+        """Refuse to start without the databases a run reads.
+
+        Each of these used to be found missing late. The diamond database at
+        the first diamond pass, which under oyster.py is in Stage A, hours
+        in; the BUSCO lineage at the very end. The swissprot fasta was never
+        found missing at all: twotrack_select.py quietly ranked contigs by
+        aligned length instead of protein coverage, and so built a different
+        assembly, with one line in the log to say so.
+        """
+        problems = []
+        dmnd = self.diamond_db.with_suffix(".dmnd")
+        if not dmnd.is_file():
+            problems.append(f"{dmnd}\n    the swissprot diamond database; `make diamond_data` builds it")
+        if not self.sprot_fasta.is_file():
+            problems.append(f"{self.sprot_fasta}\n    the fasta that database was built from; "
+                            "the two-track merge reads protein lengths from it. "
+                            "`make diamond_data` downloads it")
+        if not self.busco_lineage_present():
+            problems.append(f"BUSCO lineage {self.lineage!r} under {self.makedir / 'busco_dbs'}\n"
+                            f"    `conda run -n orp_busco busco --download {self.lineage} "
+                            f"--download_path {self.makedir / 'busco_dbs'}`, or pass "
+                            "--lineage a dataset you have")
+        if problems:
+            sys.exit("*** missing, must fix:\n  " + "\n  ".join(problems) + "\n***")
 
     def log_provenance(self):
         """Print what a later post-mortem needs and cannot recover.
@@ -1740,7 +1819,7 @@ class Pipeline:
             "--pool", self.shuck_dir / "pool.fasta",
             "--contigs-csv", self.shuck_dir / "pool" / "contigs.csv",
             "--diamond", *[self.diamond_txt(a) for a in self.diamond_priority],
-            "--sprot", self.makedir / "software" / "diamond" / "uniprot_sprot.fasta",
+            "--sprot", self.sprot_fasta,
             "--table", self.shuck_dir / f"twotrack.{self.runout}.tsv",
             "--threads", self.cpu, "--mem-mb", self.mem * 1000, "--out", good_list,
         )

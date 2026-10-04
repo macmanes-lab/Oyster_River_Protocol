@@ -2,6 +2,16 @@
 
 ORP Version 4.1.0-dev1
 
+- **Preflight checks what a run actually uses** (`oyster.py`, `chowder.py`).
+  Added diamond, cd-hit-est, blastn, makeblastdb and samtools (`orp`) and
+  bwa, seqtk and hist (`orp_trinity`, for strandeval), and dropped `orp`'s
+  seqtk, which nothing ran. It also refuses to start without
+  `software/diamond/swissprot.dmnd`, `software/diamond/uniprot_sprot.fasta`
+  or the `--lineage` BUSCO dataset. These used to be found missing hours in
+  or at the very end. A missing swissprot fasta was never caught at all:
+  the two-track selection silently ranked contigs differently. Every missing
+  item is listed at once, and tools are checked with one `conda run` per
+  env instead of one per tool.
 - **Re-running BUSCO replaces its report instead of nesting it**
   (`oyster.py`). A second BUSCO run in the same directory was moved to
   `reports/run_<run>.ORP/run_<run>.ORP`, so `reportgen` could quote either
