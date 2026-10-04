@@ -1970,14 +1970,23 @@ class Pipeline:
     def busco(self, cpu=None, mem=None):
         cpu = self.busco_threads if cpu is None else cpu
         orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
+        name = f"run_{self.runout}.ORP"
+        work, final = self.dir / name, self.reports_dir / name
+        # BUSCO refuses to start over an existing -o, which an interrupted
+        # attempt leaves behind. And shutil.move into an existing directory
+        # moves *inside* it: a re-run used to land at
+        # reports/<name>/<name>, where reportgen could read either summary,
+        # and the run after that failed outright. Clear both ends.
+        shutil.rmtree(work, ignore_errors=True)
         self.conda_run(
             "orp_busco", "busco", "--offline", "--lineage", self.lineage,
             "--download_path", self.makedir / "busco_dbs",
             "-i", orp_fasta, "-m", "transcriptome", "--cpu", cpu,
-            "-o", f"run_{self.runout}.ORP", "--config", self.busco_config,
+            "-o", name, "--config", self.busco_config,
+            retry_cleanup=work,
         )
-        for p in self.dir.glob(f"run_{self.runout}*"):
-            shutil.move(str(p), str(self.reports_dir / p.name))
+        shutil.rmtree(final, ignore_errors=True)
+        shutil.move(str(work), str(final))
         (self.reports_dir / f"{self.runout}.busco.done").touch()
 
     def transrate(self, cpu=None, mem=None):

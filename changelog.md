@@ -2,6 +2,12 @@
 
 ORP Version 4.1.0-dev1
 
+- **Re-running BUSCO replaces its report instead of nesting it**
+  (`oyster.py`). A second BUSCO run in the same directory was moved to
+  `reports/run_<run>.ORP/run_<run>.ORP`, so `reportgen` could quote either
+  summary, and a third run failed. A leftover BUSCO directory from an
+  interrupted attempt is now cleared first too, since BUSCO won't start
+  over one.
 - **`posthack` and `secondfilter` overwrite their working files instead of
   appending to them** (`oyster.py`). On a retry or resume, `newbies.fasta`
   gained a second copy of every rescued contig, and an ID left in
