@@ -2,9 +2,11 @@
 
 What every `self.step()` in `Pipeline.main()` actually reads and writes, and what it does functionally. (`main()` is three methods -- `prepare_reads`, `run_assemblers`, `merge_and_report` -- matching the three sections below.) For execution order and where concurrency kicks in, see [pipeline-schedule.html](pipeline-schedule.html) — this document is the companion piece: same steps, but focused on inputs/outputs/purpose rather than scheduling, so a reader can tell what each stage is *for* and where the pipeline's CPU/time actually goes.
 
-Reflects `oyster.py` as of ORP 4.1.0. Every step below is timed and appears in `reports/<run>.timing.log`: the bookkeeping steps used to be exempt, which was fair when each was seconds against an assembler's tens of hours, but a `chowder.py` merge has no assemblers and the merge half is the whole run.
+Reflects `oyster.py` as of ORP 4.1.0-dev9 (two-track merge only; the OrthoFinder merge was removed). Every step below is timed and appears in `reports/<run>.timing.log`: the bookkeeping steps used to be exempt, which was fair when each was seconds against an assembler's tens of hours, but a `chowder.py` merge has no assemblers and the merge half is the whole run.
 
 All paths below are relative to the run directory (`--dir`) and use `<run>` for `--runout`. "Env" is the conda environment the step's tool runs in.
+
+A step is skipped when its outputs exist and are newer than its inputs. Each step also touches `reports/.<run>.<step>.running` before it starts and removes it on success, so a step that was killed or failed partway is re-run on the next invocation even if it left output files behind.
 
 `chowder.py` runs this same reference from `run_filtershort` down, over assemblies it was handed rather than ones it built: it skips the whole Assembly lanes section and puts one `ingest` step in front of it (pure Python -- copies each input to `assemblies/ingested/<run>.<label>.fasta`, prefixing every contig name with `<label>_`, and declares those copies as its outputs so a re-invocation resumes; the inputs themselves are never written, and one inside `assemblies/ingested/` is refused). Everywhere a row below says "the 4 assemblies", read "the N assemblies given to `--assemblies`". See the README for what else differs.
 
@@ -12,7 +14,7 @@ All paths below are relative to the run directory (`--dir`) and use `<run>` for 
 
 | Step | Env / tool | Inputs | Outputs | What it does |
 |---|---|---|---|---|
-| `run_trimmomatic` | `orp` trimmomatic (or a bare jar on `bridges.psc.edu`) | `--read1`/`--read2` | `rcorr/<run>.TRIM_{1,2}P.fastq` | Adapter/quality trims raw reads (`LEADING:3 TRAILING:3 ILLUMINACLIP MINLEN:25`), paired output only. Declares `rcorr/<run>.trim.done` as its output instead of the TRIM files themselves once the corrected pair below is present and current, since by then `reclaim_trimmed_reads` has deleted them. |
+| `run_trimmomatic` | `orp` trimmomatic | `--read1`/`--read2` | `rcorr/<run>.TRIM_{1,2}P.fastq` | Adapter/quality trims raw reads (`LEADING:3 TRAILING:3 ILLUMINACLIP MINLEN:25`), paired output only. Declares `rcorr/<run>.trim.done` as its output instead of the TRIM files themselves once the corrected pair below is present and current, since by then `reclaim_trimmed_reads` has deleted them. |
 | `run_rcorrector` | `orp` `run_rcorrector.pl` | the two `TRIM_*P.fastq` files | `rcorr/<run>.TRIM_{1,2}P.cor.fq` | K-mer-based read error correction (k=31). This corrected pair (`c1`/`c2`) is what every assembler and downstream alignment step reads from here on — trimmed-but-uncorrected reads are never touched again. |
 | `reclaim_trimmed_reads` (not a step) | pure Python | — | deletes all four `rcorr/<run>.TRIM_*.fastq`; touches `rcorr/<run>.trim.done` | Runs inline right after `run_rcorrector`, not at the end: those four files are the size of the raw input and, per the row above, nothing ever opens them again. The corrected pair is then queued for background gzipping (`compress_async`), which runs through the whole assembly phase below. Skipped under `--no-cleanup`. |
 | `use_corrected_reads` (not a step) | pure Python, or `pigz`/`gzip -d` | `--read1`/`--read2` | `rcorr/<run>.TRIM_{1,2}P.cor.fq` | Replaces the three rows above under `--trimmed-corrected-reads` (`--corrected-reads` in `chowder.py`): the user's pair stands in for rcorrector's output. A plain fastq is symlinked; a gzipped one is decompressed, since Trinity and SPAdes trust the `.fq` name. Neither is queued for compression, and `cleanup` keeps the symlinks and deletes the decompressed copies. |
@@ -38,6 +40,8 @@ Two sequential stage-pairings, each a fixed `ThreadPoolExecutor(max_workers=2)`,
 | `diamond_transabyss` | `orp` diamond blastx | `<run>.transabyss.fasta` | `diamond/<run>.transabyss.diamond.txt` | Blastx against swissprot; fires immediately after the assembly. |
 
 ## Merging into one assembly (two-track)
+
+`build_pool` → `score_pool` (as `pool_branch`) and any per-assembly `diamond_<label>` pass not already done (as `assembly_diamonds`) are independent until `twotrack_select`, so at `--max-parallel ≥ 2` they run together: `score_pool` keeps all of `--cpu`, and the diamond passes run beside it on a quarter of it, with up to 16 GB of `--mem` taken from pytransrate's budget (`run_beside`).
 
 | Step | Env / tool | Inputs | Outputs | What it does |
 |---|---|---|---|---|
@@ -74,16 +78,16 @@ This is the least obvious part of the pipeline: a set-algebra pass that finds ge
 | `orp_uniq` | pure Python | `ORP.diamond.txt` | `assemblies/working/<run>.unique.ORP.txt` | Counts distinct genes hit — the headline "unique genes (ORP)" metric in the final report. |
 | `salmon_index` | `orp` salmon | `ORP.intermediate.fasta` | `quants/<run>.shucked.idx` | Builds a salmon index (k=31) over the intermediate assembly. |
 | `salmon` | `orp` salmon quant | the index, `c1`, `c2` | `quants/salmon_shucked_<run>/quant.sf` | Quantifies expression (TPM) per contig by pseudo-aligning the corrected reads. |
-| `filter` | pure Python | `quant.sf` | `assemblies/working/<run>.{HIGH,LOW}EXP.txt` | Splits contigs into above/below `--tpm-filt` TPM lists. |
+| `filter` | pure Python | `quant.sf` | `assemblies/working/<run>.{HIGH,LOW}EXP.txt` | Splits contigs into at-or-above / below `--tpm-filt` TPM lists (a contig exactly at the threshold counts as high). |
 | `secondfilter` | `orp` `scripts/filter.py` (×2) + pure Python | `ORP.intermediate.fasta`, `LOWEXP.txt`, `HIGHEXP.txt`, `ORP.diamond.txt` | `assemblies/<run>.ORP.fasta`; a `*_BEFORE_TPM_FILT.fasta` backup copy | If any contigs fell below the TPM threshold: keeps all high-TPM contigs outright, but rescues a low-TPM contig anyway if it's the *only* one with a diamond hit to its gene (`donotremove.list`) — so a real-but-lowly-expressed transcript with no redundant coverage isn't thrown away just for being quiet. If nothing was below threshold, `ORP.intermediate.fasta` is simply copied through unchanged. This is the file every later step (BUSCO, transrate, strandeval, `reportgen`) treats as "the assembly." |
 
 ## QC / report
 
-`transrate` and `strandeval` run concurrently when `--max-parallel ≥ 2`; `busco` runs alone just before them (see [pipeline-schedule.html](pipeline-schedule.html) for why it isn't folded into that pair).
+At `--max-parallel ≥ 2`, `strandeval` runs beside `transrate` on a quarter of `--cpu` (at most 8 threads) while `transrate` keeps all of it (`run_beside`); `busco` runs alone just before them with the whole of `--cpu`/`--busco-threads`.
 
 | Step | Env / tool | Inputs | Outputs | What it does |
 |---|---|---|---|---|
-| `busco` | `orp_busco` busco, `--offline`, `-m transcriptome` | `ORP.fasta` | `reports/run_<run>.ORP/` | Scores completeness against the `--lineage` ortholog set (default `eukaryota_odb12.2`). |
+| `busco` | `orp_busco` busco, `--offline`, `-m transcriptome` | `ORP.fasta` | `reports/run_<run>.ORP/` | Scores completeness against the `--lineage` ortholog set (default `eukaryota_odb12.2`). A re-run replaces the previous report. |
 | `transrate` | `orp` pytransrate | `ORP.fasta`, `c1`, `c2` | `reports/transrate_<run>/assemblies.csv` | Same read-support quality scoring as `score_pool` earlier, now on the final assembly rather than the mid-pipeline pool. |
 | `strandeval` | `orp_trinity` bwa + `orp` samtools + `scripts/examine_strand.pl` | `ORP.fasta`, a 400k-read subsample of `c1`/`c2` | `reports/<run>.strandeval_summary.txt` | Aligns a read subsample back to the assembly and checks read-orientation-vs-transcript-strand agreement — a sanity check on whether `--strand` was set correctly. Deletes its sorted BAM and bwa index when done, unless `--no-cleanup`. |
 | `reportgen` | pure Python | BUSCO/transrate/diamond/salmon/strandeval outputs above | `reports/qualreport.<run>` | Pulls one headline number from each prior report into a single human-readable summary (BUSCO score, transrate scores, unique-gene counts per assembler, proper-pair mapping rate, strand histogram). |

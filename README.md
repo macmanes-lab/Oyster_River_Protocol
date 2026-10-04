@@ -43,7 +43,7 @@ python3 chowder.py --assemblies best.fasta other.fasta third.fasta.gz \
         --read1 R1.fq.gz --read2 R2.fq.gz --mem 110 --cpu 24 --runout runname
 ```
 
-It is the same code rather than a copy of it -- `chowder.py` subclasses `oyster.py`'s pipeline and reuses the merge stages wholesale -- so the orthogroup selection rule, the group ordering that reaches cd-hit-est's tie-breaks, and the pytransrate scoring are identical to a full ORP run's by construction. The output is a `<run>.ORP.fasta` and a `reports/qualreport.<run>` in the usual layout, with one `UNIQUE GENES` line per input assembly.
+It is the same code rather than a copy of it -- `chowder.py` subclasses `oyster.py`'s pipeline and reuses the merge stages wholesale -- so the two-track selection rule, the contig ordering that reaches cd-hit-est's tie-breaks, and the pytransrate scoring are identical to a full ORP run's by construction. The output is a `<run>.ORP.fasta` and a `reports/qualreport.<run>` in the usual layout, with one `UNIQUE GENES` line per input assembly.
 
 Three things differ from `oyster.py`, and all three are worth knowing before you run it:
 

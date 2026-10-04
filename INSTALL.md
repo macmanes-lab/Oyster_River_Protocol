@@ -97,13 +97,13 @@ mamba env create -f orp_env.yml
 python3 oyster.py --version
 ```
 
-Then run the pipeline once on real (or the bundled sample) data — `oyster.py`'s own preflight `check()` step verifies every tool it needs is actually reachable and fails fast with a clear message naming whatever's missing, rather than failing partway through a multi-hour run:
+Then run the pipeline once on real (or the bundled sample) data — `oyster.py`'s own preflight `check()` step verifies that every tool it runs is reachable in its env, and that the Swiss-Prot diamond database, the Swiss-Prot fasta and the `--lineage` BUSCO dataset are installed. If anything is missing it lists all of it and stops, rather than failing partway through a multi-hour run:
 
 ```bash
 python3 oyster.py --read1 R1.fq.gz --read2 R2.fq.gz --runout myrun --cpu 24 --mem 110 --strand RF
 ```
 
-`chowder.py` — the merge-only entry point, for assemblies you already have — shares that preflight, less the three assemblers it never runs and plus `bwa`:
+`chowder.py` — the merge-only entry point, for assemblies you already have — shares that preflight, less the three assemblers it never runs. It still needs the `orp_trinity` env, for strandeval's `bwa`, `seqtk` and `hist`:
 
 ```bash
 python3 chowder.py --assemblies a.fasta b.fasta --read1 R1.fq.gz --read2 R2.fq.gz --runout mymerge --cpu 24 --mem 110

@@ -105,6 +105,7 @@
   .sw-work { background: var(--surface); border: 1.5px solid var(--ink); }
   .sw-book { background: var(--surface-muted); border: 1px dashed var(--muted); }
   .sw-fixed { background: var(--accent-soft); border: 1.5px solid var(--accent); }
+  .sw-side { background: var(--surface); border: 1.5px dashed var(--accent-strong); }
 
   figure { margin: 0; }
   .diagram-frame {
@@ -122,6 +123,7 @@
 
   .node-work rect { fill: var(--surface); stroke: var(--ink); stroke-width: 1.4; }
   .node-book rect { fill: var(--surface-muted); stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 2; }
+  .node-side rect { fill: var(--surface); stroke: var(--accent-strong); stroke-width: 1.4; stroke-dasharray: 5 3; }
   .node-final rect { fill: var(--accent); stroke: var(--accent-strong); stroke-width: 1.4; }
   .node-final text { fill: var(--paper); font-weight: 650; }
   .node-input rect { fill: none; stroke: var(--muted); stroke-width: 1; stroke-dasharray: 2 2; }
@@ -174,9 +176,10 @@
       concurrent stages &mdash; two always on regardless of the flag, two switched on by it.
     </p>
     <p class="provenance">
-      Reflects <code>oyster.py</code> on <code>master</code> at ORP 4.0.0. <code>chowder.py</code> runs this same
-      graph from <code>run_filtershort</code> down, with one <code>ingest</code> step in place of the assembler
-      stages &mdash; see <a href="pipeline-steps.md">pipeline-steps.md</a>.
+      Reflects <code>oyster.py</code> on <code>master</code> at ORP 4.1.0-dev9 (the two-track merge; the
+      OrthoFinder merge was removed). <code>chowder.py</code> runs this same graph from
+      <code>run_filtershort</code> down, with one <code>ingest</code> step in place of the assembler stages &mdash;
+      see <a href="pipeline-steps.md">pipeline-steps.md</a>.
     </p>
   </div>
 
@@ -184,11 +187,12 @@
     <div class="legend-item"><span class="swatch sw-work"></span>step that does real work (timed)</div>
     <div class="legend-item"><span class="swatch sw-book"></span>bookkeeping step, sub-second on a full run</div>
     <div class="legend-item"><span class="swatch sw-fixed"></span>two branches running concurrently</div>
+    <div class="legend-item"><span class="swatch sw-side"></span>side job: a few threads of its own, beside a job that keeps all of <code>--cpu</code></div>
   </div>
 
   <figure>
     <div class="diagram-frame">
-      <svg viewBox="0 0 1000 2070" role="img" aria-label="Directed acyclic graph of oyster.py's pipeline at --max-parallel 2: a long sequential chain of steps interrupted by four concurrent stages -- always-on Stage A (Trinity phase 1 vs. SPAdes55/SPAdes75, 25/75 split) then Stage B (Trinity phase 2 vs. Trans-ABySS, 95/5 split), orthofinder_branch running alongside pool_branch, and transrate running alongside strandeval. The chain ends at reportgen and then cleanup.">
+      <svg viewBox="0 0 1000 1980" role="img" aria-label="Directed acyclic graph of oyster.py's pipeline at --max-parallel 2: a long sequential chain of steps interrupted by four concurrent stages -- always-on Stage A (Trinity phase 1 vs. spadesauto/spadeshigh, 25/75 split) then Stage B (Trinity phase 2 vs. Trans-ABySS, 95/5 split), the remaining diamond passes running beside pool_branch, and strandeval running beside transrate. The two-track selection joins the pool and the diamond hits. The chain ends at reportgen and then cleanup.">
         <defs>
           <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
             <path d="M0,0 L10,5 L0,10 z" fill="currentColor" class="flow-marker"></path>
@@ -233,7 +237,7 @@
         </g>
         <line class="flow" x1="270" y1="358" x2="270" y2="440" ></line>
 
-        <!-- right lane: SPAdes55/75, each -> diamond -->
+        <!-- right lane: spadesauto/spadeshigh, each -> diamond -->
         <g class="node-work">
           <rect x="635" y="228" width="190" height="28" rx="6"></rect>
           <text x="730" y="247" text-anchor="middle" font-size="11.5">run_spadesauto</text>
@@ -302,6 +306,7 @@
           <rect x="395" y="680" width="210" height="34" rx="6"></rect>
           <text x="500" y="701" text-anchor="middle">run_filtershort</text>
         </g>
+        <text class="t-note" x="613" y="701" font-size="10">&larr; one long.seq.py per assembly, in parallel</text>
 
         <!-- fan out to band B -->
         <path class="flow" d="M500,714 L500,732" marker-end="url(#arrow)"></path>
@@ -309,187 +314,184 @@
         <path class="flow" d="M500,732 C500,746 660,752 660,764" marker-end="url(#arrow)"></path>
 
         <!-- BAND B -->
-        <rect class="band-fixed" x="180" y="724" width="640" height="204" rx="16"></rect>
-        <text class="t-band" x="500" y="745" text-anchor="middle" font-size="12">CONCURRENT AT --max-parallel 2</text>
-        <text class="t-sub" x="500" y="759" text-anchor="middle" font-size="10.5">run_parallel([orthofinder_branch, pool_branch], max_workers=2)</text>
+        <rect class="band-fixed" x="180" y="724" width="640" height="170" rx="16"></rect>
+        <text class="t-band" x="500" y="745" text-anchor="middle" font-size="12">SIDE JOB AT --max-parallel 2</text>
+        <text class="t-sub" x="500" y="759" text-anchor="middle" font-size="10.5">run_beside(pool_branch, assembly_diamonds)</text>
 
-        <!-- left lane: orthofinder_branch -->
-        <text class="t-sub" x="340" y="776" text-anchor="middle" font-size="10">orthofinder_branch</text>
-        <g class="node-work">
-          <rect x="245" y="781" width="190" height="28" rx="6"></rect>
-          <text x="340" y="800" text-anchor="middle" font-size="11.5">run_orthofinder</text>
-        </g>
-
-        <!-- right lane: pool_branch -->
-        <text class="t-sub" x="660" y="776" text-anchor="middle" font-size="10">pool_branch</text>
+        <!-- main lane: pool_branch -->
+        <text class="t-sub" x="340" y="776" text-anchor="middle" font-size="10">pool_branch &middot; all of --cpu</text>
         <g class="node-book">
-          <rect x="575" y="781" width="170" height="22" rx="6"></rect>
-          <text x="660" y="796" text-anchor="middle" font-size="10.5">build_pool</text>
+          <rect x="255" y="781" width="170" height="22" rx="6"></rect>
+          <text x="340" y="796" text-anchor="middle" font-size="10.5">build_pool</text>
         </g>
-        <line class="flow" x1="660" y1="803" x2="660" y2="811" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="340" y1="803" x2="340" y2="811" marker-end="url(#arrow)"></line>
         <g class="node-work">
-          <rect x="565" y="813" width="190" height="28" rx="6"></rect>
-          <text x="660" y="832" text-anchor="middle" font-size="11.5">score_pool</text>
+          <rect x="245" y="813" width="190" height="28" rx="6"></rect>
+          <text x="340" y="832" text-anchor="middle" font-size="11.5">score_pool</text>
         </g>
+
+        <!-- side lane: assembly_diamonds -->
+        <text class="t-sub" x="660" y="776" text-anchor="middle" font-size="10">assembly_diamonds &middot; &frac14; of --cpu</text>
+        <g class="node-side">
+          <rect x="565" y="781" width="190" height="28" rx="6"></rect>
+          <text x="660" y="800" text-anchor="middle" font-size="11.5">diamond_trinity</text>
+        </g>
+        <text class="t-note" x="660" y="826" text-anchor="middle" font-size="10">every assembly's under chowder.py</text>
 
         <!-- converge band B -->
-        <line class="flow" x1="340" y1="809" x2="340" y2="898"></line>
-        <line class="flow" x1="660" y1="841" x2="660" y2="898"></line>
-        <path class="flow" d="M340,898 C340,916 500,910 500,926"></path>
-        <path class="flow" d="M660,898 C660,916 500,910 500,926"></path>
-        <circle class="dot" cx="500" cy="926" r="2.4"></circle>
-        <line class="flow" x1="500" y1="926" x2="500" y2="958" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="340" y1="841" x2="340" y2="862"></line>
+        <line class="flow" x1="660" y1="834" x2="660" y2="862"></line>
+        <path class="flow" d="M340,862 C340,880 500,874 500,890"></path>
+        <path class="flow" d="M660,862 C660,880 500,874 500,890"></path>
+        <circle class="dot" cx="500" cy="890" r="2.4"></circle>
+        <line class="flow" x1="500" y1="890" x2="500" y2="918" marker-end="url(#arrow)"></line>
 
         <g class="node-work">
-          <rect x="395" y="960" width="210" height="34" rx="6"></rect>
-          <text x="500" y="981" text-anchor="middle">makeorthout</text>
+          <rect x="395" y="920" width="210" height="34" rx="6"></rect>
+          <text x="500" y="941" text-anchor="middle">twotrack_select</text>
         </g>
-        <line class="flow" x1="500" y1="994" x2="500" y2="1018" marker-end="url(#arrow)"></line>
+        <text class="t-note" x="613" y="941" font-size="10">&larr; + 3 diamond_* from the assembler lanes</text>
+        <line class="flow" x1="500" y1="954" x2="500" y2="978" marker-end="url(#arrow)"></line>
 
         <g class="node-work">
-          <rect x="395" y="1020" width="210" height="34" rx="6"></rect>
-          <text x="500" y="1041" text-anchor="middle">shuck</text>
+          <rect x="395" y="980" width="210" height="34" rx="6"></rect>
+          <text x="500" y="1001" text-anchor="middle">shuck</text>
         </g>
-        <line class="flow" x1="500" y1="1054" x2="500" y2="1078" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="500" y1="1014" x2="500" y2="1038" marker-end="url(#arrow)"></line>
 
-        <g class="node-work">
-          <rect x="390" y="1080" width="220" height="30" rx="6"></rect>
-          <text x="500" y="1099" text-anchor="middle" font-size="11.5">diamond_shucked</text>
+        <g class="node-book">
+          <rect x="405" y="1040" width="190" height="26" rx="6"></rect>
+          <text x="500" y="1057" text-anchor="middle" font-size="11">diamond_shucked</text>
+        </g>
+        <text class="t-note" x="603" y="1057" font-size="10">&larr; looked up in the four per-assembly hit files, not searched</text>
+        <line class="flow" x1="500" y1="1066" x2="500" y2="1082" marker-end="url(#arrow)"></line>
+
+        <g class="node-book">
+          <rect x="405" y="1084" width="190" height="26" rx="6"></rect>
+          <text x="500" y="1101" text-anchor="middle" font-size="11">diamond_uniq</text>
         </g>
         <line class="flow" x1="500" y1="1110" x2="500" y2="1126" marker-end="url(#arrow)"></line>
 
-        <g class="node-work">
-          <rect x="390" y="1128" width="220" height="30" rx="6"></rect>
-          <text x="500" y="1147" text-anchor="middle" font-size="11.5">diamond_trinity</text>
+        <g class="node-book">
+          <rect x="370" y="1128" width="260" height="30" rx="6"></rect>
+          <text x="500" y="1147" text-anchor="middle" font-size="11">make_list1 &rarr; make_list7</text>
         </g>
-        <text class="t-note" x="618" y="1147" font-size="10">&larr; trinity_fa, from phase2 above</text>
-        <line class="flow" x1="500" y1="1158" x2="500" y2="1174" marker-end="url(#arrow)"></line>
+        <text class="t-note" x="638" y="1147" font-size="10">list-file bookkeeping, &lt;1s each</text>
+        <line class="flow" x1="500" y1="1158" x2="500" y2="1184" marker-end="url(#arrow)"></line>
+
+        <g class="node-work">
+          <rect x="395" y="1186" width="210" height="34" rx="6"></rect>
+          <text x="500" y="1207" text-anchor="middle">posthack</text>
+        </g>
+        <line class="flow" x1="500" y1="1220" x2="500" y2="1244" marker-end="url(#arrow)"></line>
+
+        <g class="node-work">
+          <rect x="395" y="1246" width="210" height="34" rx="6"></rect>
+          <text x="500" y="1267" text-anchor="middle">cdhit</text>
+        </g>
+        <line class="flow" x1="500" y1="1280" x2="500" y2="1304" marker-end="url(#arrow)"></line>
 
         <g class="node-book">
-          <rect x="405" y="1176" width="190" height="26" rx="6"></rect>
-          <text x="500" y="1193" text-anchor="middle" font-size="11">diamond_uniq</text>
+          <rect x="405" y="1306" width="190" height="26" rx="6"></rect>
+          <text x="500" y="1323" text-anchor="middle" font-size="11">orp_diamond</text>
         </g>
-        <text class="t-note" x="603" y="1193" font-size="10">&larr; + 3 diamond_* from the lane split above</text>
-
-        <line class="flow" x1="500" y1="1202" x2="500" y2="1218" marker-end="url(#arrow)"></line>
+        <text class="t-note" x="603" y="1323" font-size="10">&larr; a lookup too, like diamond_shucked</text>
+        <line class="flow" x1="500" y1="1332" x2="500" y2="1346" marker-end="url(#arrow)"></line>
 
         <g class="node-book">
-          <rect x="370" y="1220" width="260" height="30" rx="6"></rect>
-          <text x="500" y="1239" text-anchor="middle" font-size="11">make_list1 &rarr; make_list7</text>
+          <rect x="415" y="1348" width="170" height="22" rx="6"></rect>
+          <text x="500" y="1363" text-anchor="middle" font-size="10.5">orp_uniq</text>
         </g>
-        <text class="t-note" x="500" y="1264" text-anchor="middle" font-size="10">list-file bookkeeping, &lt;1s each</text>
-        <line class="flow" x1="500" y1="1250" x2="500" y2="1276" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="500" y1="1370" x2="500" y2="1388" marker-end="url(#arrow)"></line>
 
         <g class="node-work">
-          <rect x="395" y="1278" width="210" height="34" rx="6"></rect>
-          <text x="500" y="1299" text-anchor="middle">posthack</text>
+          <rect x="395" y="1390" width="210" height="30" rx="6"></rect>
+          <text x="500" y="1409" text-anchor="middle" font-size="11.5">salmon_index</text>
         </g>
-        <line class="flow" x1="500" y1="1312" x2="500" y2="1334" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="500" y1="1420" x2="500" y2="1434" marker-end="url(#arrow)"></line>
 
         <g class="node-work">
-          <rect x="395" y="1336" width="210" height="34" rx="6"></rect>
-          <text x="500" y="1357" text-anchor="middle">cdhit</text>
+          <rect x="395" y="1436" width="210" height="30" rx="6"></rect>
+          <text x="500" y="1455" text-anchor="middle" font-size="11.5">salmon</text>
         </g>
-        <line class="flow" x1="500" y1="1370" x2="500" y2="1394" marker-end="url(#arrow)"></line>
-
-        <text class="t-note" x="500" y="1388" text-anchor="middle" font-size="10">orp_diamond &rarr; salmon kept sequential by design (splitting CPU costs more than the overlap saves)</text>
-
-        <g class="node-work">
-          <rect x="395" y="1396" width="210" height="34" rx="6"></rect>
-          <text x="500" y="1417" text-anchor="middle">orp_diamond</text>
-        </g>
-        <line class="flow" x1="500" y1="1430" x2="500" y2="1444" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="500" y1="1466" x2="500" y2="1484" marker-end="url(#arrow)"></line>
 
         <g class="node-book">
-          <rect x="415" y="1446" width="170" height="22" rx="6"></rect>
-          <text x="500" y="1461" text-anchor="middle" font-size="10.5">orp_uniq</text>
+          <rect x="415" y="1486" width="170" height="22" rx="6"></rect>
+          <text x="500" y="1501" text-anchor="middle" font-size="10.5">filter</text>
         </g>
-        <line class="flow" x1="500" y1="1468" x2="500" y2="1486" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="500" y1="1508" x2="500" y2="1524" marker-end="url(#arrow)"></line>
 
         <g class="node-work">
-          <rect x="395" y="1488" width="210" height="30" rx="6"></rect>
-          <text x="500" y="1507" text-anchor="middle" font-size="11.5">salmon_index</text>
+          <rect x="395" y="1526" width="210" height="34" rx="6"></rect>
+          <text x="500" y="1547" text-anchor="middle">secondfilter</text>
         </g>
-        <line class="flow" x1="500" y1="1518" x2="500" y2="1532" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="500" y1="1560" x2="500" y2="1584" marker-end="url(#arrow)"></line>
 
         <g class="node-work">
-          <rect x="395" y="1534" width="210" height="30" rx="6"></rect>
-          <text x="500" y="1553" text-anchor="middle" font-size="11.5">salmon</text>
+          <rect x="380" y="1586" width="240" height="40" rx="6"></rect>
+          <text x="500" y="1611" text-anchor="middle" font-size="12.5">busco</text>
         </g>
-        <line class="flow" x1="500" y1="1564" x2="500" y2="1582" marker-end="url(#arrow)"></line>
-
-        <g class="node-book">
-          <rect x="415" y="1584" width="170" height="22" rx="6"></rect>
-          <text x="500" y="1599" text-anchor="middle" font-size="10.5">filter</text>
-        </g>
-        <line class="flow" x1="500" y1="1606" x2="500" y2="1622" marker-end="url(#arrow)"></line>
-
-        <g class="node-work">
-          <rect x="395" y="1624" width="210" height="34" rx="6"></rect>
-          <text x="500" y="1645" text-anchor="middle">secondfilter</text>
-        </g>
-        <line class="flow" x1="500" y1="1658" x2="500" y2="1682" marker-end="url(#arrow)"></line>
-
-        <g class="node-work">
-          <rect x="380" y="1684" width="240" height="40" rx="6"></rect>
-          <text x="500" y="1709" text-anchor="middle" font-size="12.5">busco</text>
-        </g>
-        <text class="t-note" x="500" y="1740" text-anchor="middle" font-size="10.5">long pole of this stage &mdash; gets full --cpu/--busco-threads alone</text>
+        <text class="t-note" x="628" y="1611" font-size="10">&larr; all of --cpu/--busco-threads, alone</text>
 
         <!-- fan out to band C -->
-        <path class="flow" d="M500,1724 L500,1746" marker-end="url(#arrow)"></path>
-        <path class="flow" d="M500,1746 C500,1760 380,1766 380,1778" marker-end="url(#arrow)"></path>
-        <path class="flow" d="M500,1746 C500,1760 620,1766 620,1778" marker-end="url(#arrow)"></path>
+        <path class="flow" d="M500,1626 L500,1648" marker-end="url(#arrow)"></path>
+        <path class="flow" d="M500,1648 C500,1662 380,1668 380,1690" marker-end="url(#arrow)"></path>
+        <path class="flow" d="M500,1648 C500,1662 620,1668 620,1690" marker-end="url(#arrow)"></path>
 
         <!-- BAND C -->
-        <rect class="band-fixed" x="260" y="1742" width="480" height="140" rx="16"></rect>
-        <text class="t-band" x="500" y="1763" text-anchor="middle" font-size="12">CONCURRENT AT --max-parallel 2</text>
+        <rect class="band-fixed" x="250" y="1640" width="500" height="160" rx="16"></rect>
+        <text class="t-band" x="500" y="1661" text-anchor="middle" font-size="12">SIDE JOB AT --max-parallel 2</text>
+        <text class="t-sub" x="500" y="1675" text-anchor="middle" font-size="10.5">run_beside(transrate, strandeval)</text>
 
         <g class="node-work">
-          <rect x="285" y="1780" width="190" height="34" rx="6"></rect>
-          <text x="380" y="1801" text-anchor="middle">transrate</text>
+          <rect x="285" y="1692" width="190" height="34" rx="6"></rect>
+          <text x="380" y="1713" text-anchor="middle">transrate</text>
         </g>
-        <g class="node-work">
-          <rect x="525" y="1780" width="190" height="34" rx="6"></rect>
-          <text x="620" y="1801" text-anchor="middle">strandeval</text>
+        <text class="t-note" x="380" y="1742" text-anchor="middle" font-size="10">all of --cpu</text>
+        <g class="node-side">
+          <rect x="525" y="1692" width="190" height="34" rx="6"></rect>
+          <text x="620" y="1713" text-anchor="middle">strandeval</text>
         </g>
+        <text class="t-note" x="620" y="1742" text-anchor="middle" font-size="10">&frac14; of --cpu, at most 8</text>
 
         <!-- converge band C -->
-        <line class="flow" x1="380" y1="1814" x2="380" y2="1858"></line>
-        <line class="flow" x1="620" y1="1814" x2="620" y2="1858"></line>
-        <path class="flow" d="M380,1858 C380,1874 500,1868 500,1884"></path>
-        <path class="flow" d="M620,1858 C620,1874 500,1868 500,1884"></path>
-        <circle class="dot" cx="500" cy="1884" r="2.4"></circle>
-        <line class="flow" x1="500" y1="1884" x2="500" y2="1914" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="380" y1="1748" x2="380" y2="1766"></line>
+        <line class="flow" x1="620" y1="1748" x2="620" y2="1766"></line>
+        <path class="flow" d="M380,1766 C380,1782 500,1776 500,1792"></path>
+        <path class="flow" d="M620,1766 C620,1782 500,1776 500,1792"></path>
+        <circle class="dot" cx="500" cy="1792" r="2.4"></circle>
+        <line class="flow" x1="500" y1="1792" x2="500" y2="1824" marker-end="url(#arrow)"></line>
 
         <g class="node-work">
-          <rect x="405" y="1916" width="190" height="34" rx="6"></rect>
-          <text x="500" y="1937" text-anchor="middle">reportgen</text>
+          <rect x="405" y="1826" width="190" height="34" rx="6"></rect>
+          <text x="500" y="1847" text-anchor="middle">reportgen</text>
         </g>
 
-        <line class="flow" x1="500" y1="1950" x2="500" y2="1994" marker-end="url(#arrow)"></line>
+        <line class="flow" x1="500" y1="1860" x2="500" y2="1904" marker-end="url(#arrow)"></line>
 
         <g class="node-final">
-          <rect x="400" y="1996" width="200" height="38" rx="19"></rect>
-          <text x="500" y="2020" text-anchor="middle" font-size="12.5">cleanup</text>
+          <rect x="400" y="1906" width="200" height="38" rx="19"></rect>
+          <text x="500" y="1930" text-anchor="middle" font-size="12.5">cleanup</text>
         </g>
       </svg>
     </div>
     <figcaption>
       Sequence of every <code>self.step()</code> call in <code>Pipeline.main()</code>, as it runs at
       <code>--max-parallel 2</code>. Two of the four concurrent stages exist only because of that setting
-      (<code>run_parallel(..., max_workers=self.max_parallel)</code>); Stage A and Stage B run concurrently
-      regardless of the flag, each its own fixed <code>ThreadPoolExecutor(max_workers=2)</code>.
+      (<code>run_beside()</code>; at <code>--max-parallel 1</code> each pair runs one after the other, every
+      step with the whole machine). Stage A and Stage B run concurrently regardless of the flag, each its own
+      fixed <code>ThreadPoolExecutor(max_workers=2)</code>.
     </figcaption>
   </figure>
 
   <div class="notes">
     <h2>The four concurrency decisions</h2>
     <ol>
-      <li><strong>Stage A: Trinity phase 1 vs. SPAdes55/SPAdes75 (always on).</strong> Phase 1 is largely insensitive to its CPU share above Inchworm's own <code>--inchworm_cpu=10</code> cap, so it only needs <code>TRINITY_PHASE1_SHARE</code> (25%) of the CPU/mem budget; SPAdes -- fast, but does scale with cores -- gets the rest. Each SPAdes assembly is followed immediately by its own DIAMOND search.</li>
-      <li><strong>Stage B: Trinity phase 2 vs. Trans-ABySS (always on).</strong> Phase 2 (thousands of independent per-gene-component ParaFly jobs, by far Trinity's dominant cost -- around 34h on the SRR1789336 benchmark) gets <code>TRINITY_PHASE2_SHARE</code> (95%) of CPU; Trans-ABySS gets the rest, since its own dominant cost -- the initial FASTQ read + De Bruijn graph build -- runs single-threaded no matter how many cores it's given (traced to <code>abyss-pe</code> falling through to the plain, unthreaded <code>ABYSS</code> binary; see NOTES.md 2026-08-19). Its mem share isn't cut the same way, since its memory footprint doesn't shrink with fewer cores. Starting Phase 2 here rather than after Trans-ABySS finishes reclaims what was previously idle Trinity-lane time -- not yet validated on a real run.</li>
-      <li><strong>orthofinder_branch alongside pool_branch.</strong> Both only need <code>short_fastas</code>, so they're independent until they join at <code>makeorthout</code>. This is the branch pair behind the test37/test36 timing delta you looked at earlier &mdash; each branch only took ~5s on the sample dataset, so the concurrency saved seconds there, but ~5h11m on the full SRR1789336 benchmark.</li>
-      <li><strong>transrate alongside strandeval.</strong> Cheap and independent, so they still run as a small concurrent pair even though BUSCO right before them deliberately does <em>not</em> share its CPU budget with anything &mdash; it dwarfs both in wall time.</li>
+      <li><strong>Stage A: Trinity phase 1 vs. spadesauto/spadeshigh (always on).</strong> Phase 1 is largely insensitive to its CPU share above Inchworm's own <code>--inchworm_cpu=10</code> cap, so it only needs <code>TRINITY_PHASE1_SHARE</code> (25%) of the CPU/mem budget; rnaSPAdes -- fast, but does scale with cores -- gets the rest. Each SPAdes assembly is followed immediately by its own DIAMOND search.</li>
+      <li><strong>Stage B: Trinity phase 2 vs. Trans-ABySS (always on).</strong> Phase 2 (thousands of independent per-gene-component ParaFly jobs, by far Trinity's dominant cost -- around 34h on the SRR1789336 benchmark) gets <code>TRINITY_PHASE2_SHARE</code> (95%) of CPU; Trans-ABySS gets the rest, since its own dominant cost -- the initial FASTQ read + De Bruijn graph build -- runs single-threaded no matter how many cores it's given (traced to <code>abyss-pe</code> falling through to the plain, unthreaded <code>ABYSS</code> binary; see NOTES.md 2026-08-19). Its mem share isn't cut the same way, since its memory footprint doesn't shrink with fewer cores.</li>
+      <li><strong>The remaining diamond passes beside pool_branch.</strong> The two-track selection needs every assembly's Swiss-Prot hits as well as the pool's scores, and the two are independent until <code>twotrack_select</code>. Under oyster.py the assembler lanes have already run three of the four searches, so only Trinity's is left (its lane has only just finished); under chowder.py none have run. <code>score_pool</code> (pytransrate over the pool, hours) keeps all of <code>--cpu</code>; the diamond passes run beside it on a quarter of <code>--cpu</code>, with a quarter of <code>--mem</code> (at most 16 GB) taken out of pytransrate's budget.</li>
+      <li><strong>strandeval beside transrate.</strong> strandeval takes minutes and transrate much longer, so splitting the cores evenly, which ORP did through 4.1.0-dev8, left strandeval's half idle for most of transrate's run. transrate now keeps every core and strandeval runs on a quarter of <code>--cpu</code>, at most 8 threads. BUSCO just before them shares its budget with nothing.</li>
     </ol>
 
     <h2>One thing this diagram deliberately doesn't show</h2>
@@ -504,6 +506,12 @@
       until <code>cleanup</code> &mdash; by which point there is nothing left to compress and the last
       node is a series of unlinks. The one place the pool is ever waited on is <code>cleanup</code>
       itself, which refuses to delete an original whose <code>.gz</code> didn't finish.
+    </p>
+    <p>
+      Nor does it show what makes the chain resumable. A step is skipped when its outputs exist and are
+      newer than its inputs, and each step touches <code>reports/.&lt;run&gt;.&lt;step&gt;.running</code> before
+      it starts and removes it when it succeeds. A step that was killed or failed partway is therefore re-run
+      on the next invocation, rather than trusted on the strength of a half-written output.
     </p>
   </div>
 
