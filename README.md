@@ -75,13 +75,14 @@ Trinity itself runs in two stages, using its documented [multi-stage execution s
 
 This split is fixed and not affected by `--max-parallel`.
 
-By default (`--max-parallel 2`), oyster.py runs up to 2 jobs at once within the other stages of the pipeline that benefit from it, splitting `--cpu`/`--mem` across however many jobs are running concurrently:
+Two later pairs of steps are independent of each other, and each pairs a short job with a long one. By default (`--max-parallel 2`) the short job runs beside the long one on a few threads of its own (a quarter of `--cpu`, at most 8 for strandeval), while the long job keeps all of `--cpu`:
 
-- transrate vs. strandeval
+- the diamond passes not already run in an assembler lane (Trinity's under oyster.py, every assembly's under chowder.py) beside `score_pool`
+- strandeval beside transrate
 
-CPU-bound stages that don't benefit from splitting cores — diamond, orp_diamond, salmon, and BUSCO — always run sequentially at the full `--cpu` count regardless of this flag.
+The short job's memory (a quarter of `--mem`, at most 16 GB) comes out of the long job's budget, so memory is never overcommitted. This used to split the cores evenly, which left the short job's half of the machine idle once it finished while the long job carried on at half speed.
 
-Set `--max-parallel 1` to disable concurrency for those stages and run them one at a time (useful when debugging, or on a machine where you'd rather not split cores). Raise it above 2 to run more jobs at once within a stage, at the cost of each job getting a smaller slice of `--cpu`/`--mem`.
+Everything else (`orp_diamond`, salmon, BUSCO and the rest) runs on its own with the full `--cpu`. `--max-parallel 1` runs each pair one after the other, every step with the whole machine.
 
 ### What a finished run leaves behind
 
@@ -137,7 +138,7 @@ Because it appends, a value given here overrides the same flag ORP passes above 
 | `--spades1-kmer` | `auto` | rnaSPAdes k-mer(s) for the spadesauto assembly — `auto` lets rnaSPAdes pick its documented default pair (~1/3 and ~1/2 of maximum read length). Also accepts percentages or an explicit list, same forms as `--spades2-kmer` |
 | `--spades2-kmer` | `60%,75%` | rnaSPAdes k-mer(s) for the spadeshigh assembly — percentages of maximum read length, an explicit comma-separated list of odd sizes under 128, or `auto`. Percentages resolve per dataset (61,75 at 101bp reads; 89,113 at 150bp), clamped to rnaSPAdes' 127 ceiling |
 | `--transabyss-kmer` | `32` | Trans-ABySS k-mer |
-| `--max-parallel` | `2` | Max concurrent jobs per stage (see [Parallel task management](#parallel-task-management) above) |
+| `--max-parallel` | `2` | `1` runs the short jobs that would otherwise run beside a long one (see [Parallel task management](#parallel-task-management) above) one after the other |
 | `--no-cleanup` | off | Keep every file a run produces, uncompressed, including each assembler's working directory -- for debugging (see [What a finished run leaves behind](#what-a-finished-run-leaves-behind) below). Alias: `--keep-intermediates` |
 | `--pytransrate-args` | none | Extra arguments passed verbatim to both pytransrate runs, as one quoted string (see [Tuning pytransrate](#tuning-pytransrate) below) |
 | `--dir` | current directory | Working directory |
@@ -163,7 +164,7 @@ There are no assembler flags — no k-mers, no `--strand`, no `--normalize-reads
 | `--runout` | `USER_RUN` | Run name prefix |
 | `--lineage` | `eukaryota_odb12.2` | BUSCO lineage |
 | `--tpm-filt` | `0` | TPM filter threshold |
-| `--max-parallel` | `2` | Max concurrent jobs per stage (see [Parallel task management](#parallel-task-management) above) |
+| `--max-parallel` | `2` | `1` runs the short jobs that would otherwise run beside a long one (see [Parallel task management](#parallel-task-management) above) one after the other |
 | `--no-cleanup` | off | Keep every file the run produces, uncompressed -- for debugging. Alias: `--keep-intermediates` |
 | `--pytransrate-args` | none | Extra arguments passed verbatim to both pytransrate runs (see [Tuning pytransrate](#tuning-pytransrate) above) |
 | `--dir` | current directory | Working directory |

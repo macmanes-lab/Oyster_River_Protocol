@@ -478,9 +478,10 @@ def parse_args():
     p.add_argument("--tpm-filt", type=float, default=0, help="TPM filter threshold (default: 0)")
     p.add_argument(
         "--max-parallel", type=int, default=2,
-        help="max concurrent jobs within each independent stage that benefits "
-             "from it (transrate vs. strandeval), splitting --cpu/--mem across however many run at "
-             "once; 1 disables it (default: 2)",
+        help="2 or more (the default) runs a short independent job beside a long "
+             "one on a few threads of its own: the diamond passes beside score_pool, "
+             "and strandeval beside transrate. 1 runs them one after the other "
+             "(default: 2)",
     )
     p.add_argument(
         "--no-cleanup", "--keep-intermediates", dest="no_cleanup", action="store_true",

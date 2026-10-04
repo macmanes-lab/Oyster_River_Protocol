@@ -140,22 +140,12 @@ CHECK_TOOLS = (
     RCORRECTOR_TOOL,
 )
 
-# Reference profile (minutes, from a representative run at --max-parallel 2)
-# used only to decide submission order within the run_parallel() concurrent
-# groups (pool_branch vs. the remaining diamond passes; transrate vs.
-# strandeval) -- run the historically slow step first so it
-# isn't left waiting behind a quick one. The assemblers no longer go
-# through run_parallel (see TRINITY_PHASE1_SHARE/TRINITY_PHASE2_SHARE and
-# the assembly-lane pairings in
-# main()), so they have no entries here. Each dataset is normally assembled
-# only once, so this is a fixed relative ranking rather than something
-# learned per-run. Names with no entry sort after every hinted step, in the
-# order they were given.
-STEP_TIME_HINTS = {
-    "pool_branch": 27,
-    "transrate": 16,
-    "strandeval": 2,
-}
+# A job run *beside* another (see run_beside) gets this many threads on top
+# of the main job's, never more than SIDE_JOB_MAX_CPU, plus at most
+# SIDE_JOB_MAX_MEM GB taken out of the main job's memory budget.
+SIDE_JOB_CPU_SHARE = 0.25
+SIDE_JOB_MAX_CPU = 8
+SIDE_JOB_MAX_MEM = 16
 
 # Trinity's own CPU/mem is fixed at launch for however long that stage
 # runs, so which assembler it's paired against matters more than a single
@@ -1094,50 +1084,64 @@ class Pipeline:
             with open(self.timing_log, "a") as f:
                 f.write(f"{name}\t{elapsed}\t{self._ts(start)}\n")
 
-    def run_parallel(self, jobs, max_workers=2):
-        """Run independent (name, outputs, inputs, func) jobs concurrently.
+    def side_job_budget(self, max_cpu=SIDE_JOB_MAX_CPU):
+        """(cpu, mem) for a job run beside another; see run_beside."""
+        cpu = max(1, min(max_cpu, int(self.cpu * SIDE_JOB_CPU_SHARE)))
+        mem = max(1, min(SIDE_JOB_MAX_MEM, self.mem // 4))
+        return cpu, mem
 
-        Each pending job's func is called as func(cpu=<split>, mem=<split>),
-        where self.cpu/self.mem are divided across however many jobs actually
-        run at once (capped at max_workers). Already up-to-date jobs are
-        skipped and don't count toward the split.
+    def _run_job(self, name, func, cpu, mem):
+        """One run_beside job: step()'s marker, banner and timing, with a budget."""
+        marker = self.step_marker(name)
+        marker.touch()
+        start = time.time()
+        print(f"\n=== {name} (cpu={cpu}, mem={mem}G) -- start {self._ts(start)} ===")
+        func(cpu=cpu, mem=mem)
+        marker.unlink()
+        elapsed = int(time.time() - start)
+        print(f"=== {name} -- done {self._ts()} ({elapsed}s) ===")
+        self._record_timing(name, elapsed, start)
+
+    def run_beside(self, main, side, side_cpu, side_mem):
+        """Run two independent jobs at once, `side` on a few threads beside `main`.
+
+        Each job is (name, outputs, inputs, func), and func is called as
+        func(cpu=, mem=). `main` keeps every one of --cpu's cores and gives
+        up `side_mem` GB of --mem; `side` runs on `side_cpu` threads on top.
+
+        This replaced an even split of the cores, which was the wrong shape
+        for every pair it was used on: one job of the pair is short
+        (strandeval, minutes; a diamond pass) and the other long (transrate;
+        score_pool, hours), so once the short one finished its half of the
+        machine sat idle while the long one carried on at half speed.
+        Oversubscribing by a few threads instead costs the main job a little
+        while both run and nothing afterwards, and the side job mostly fills
+        cores pytransrate leaves idle in its serial phases (snap's index
+        build, salmon). Memory is never oversubscribed: side_mem comes out
+        of main's budget, which is what pytransrate sizes its workers to.
+
+        With --max-parallel 1, or when only one of them is pending, they run
+        one after the other with the whole machine each.
         """
         pending = []
-        for name, outputs, inputs, func in jobs:
+        for name, outputs, inputs, func in (main, side):
             if self.is_pending(name, outputs, inputs):
                 pending.append((name, func))
             else:
                 print(f"[{name}] up to date, skipping")
-        if not pending:
+        if len(pending) < 2 or self.max_parallel < 2:
+            for name, func in pending:
+                self._run_job(name, func, self.cpu, self.mem)
             return
-
-        # Longest-processing-time-first: submit the slowest known jobs first so
-        # they start immediately instead of waiting behind quick ones, using
-        # a fixed reference profile (STEP_TIME_HINTS) rather than this run's
-        # own history -- each dataset is normally only ever assembled once,
-        # so there's no prior run of *this* data to learn from. Jobs with no
-        # hint keep their given relative order, after every hinted job.
-        pending.sort(key=lambda item: STEP_TIME_HINTS.get(item[0], -1), reverse=True)
-
-        workers = min(max_workers, len(pending), max(1, self.cpu))
-        job_cpu = max(1, self.cpu // workers)
-        job_mem = max(1, self.mem // workers)
-        if workers > 1:
-            print(f"\n=== running {len(pending)} step(s), {workers} at a time (cpu={job_cpu}, mem={job_mem}G each) ===")
-
-        def run_one(name, func):
-            marker = self.step_marker(name)
-            marker.touch()
-            start = time.time()
-            print(f"\n=== {name} (cpu={job_cpu}, mem={job_mem}G) -- start {self._ts(start)} ===")
-            func(cpu=job_cpu, mem=job_mem)
-            marker.unlink()
-            elapsed = int(time.time() - start)
-            print(f"=== {name} -- done {self._ts()} ({elapsed}s) ===")
-            self._record_timing(name, elapsed, start)
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
-            futures = [ex.submit(run_one, name, func) for name, func in pending]
+        side_cpu = max(1, min(side_cpu, self.cpu))
+        side_mem = max(1, min(side_mem, self.mem - 1))
+        main_mem = max(1, self.mem - side_mem)
+        (main_name, main_func), (side_name, side_func) = pending
+        print(f"\n=== {main_name} (cpu={self.cpu}, mem={main_mem}G) with {side_name} "
+              f"beside it (cpu={side_cpu}, mem={side_mem}G) ===")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
+            futures = [ex.submit(self._run_job, main_name, main_func, self.cpu, main_mem),
+                       ex.submit(self._run_job, side_name, side_func, side_cpu, side_mem)]
             for future in concurrent.futures.as_completed(futures):
                 future.result()
 
@@ -2115,8 +2119,8 @@ class Pipeline:
             f'conda run --no-capture-output -n orp_trinity bash -c '
             f'"bwa mem -t {cpu} {self.runout} '
             f'<(seqtk sample -s 23894 {r1} 400000) <(seqtk sample -s 23894 {r2} 400000)" '
-            f"| conda run --no-capture-output -n orp samtools view -@10 -Sb - "
-            f"| conda run --no-capture-output -n orp samtools sort -T {self.runout} -O bam -@10 "
+            f"| conda run --no-capture-output -n orp samtools view -@{cpu} -Sb - "
+            f"| conda run --no-capture-output -n orp samtools sort -T {self.runout} -O bam -@{cpu} "
             f"-o {self.runout}.sorted.bam -"
         )
         self.run(["bash", "-o", "pipefail", "-c", pipeline_script])
@@ -2513,16 +2517,26 @@ class Pipeline:
             self.step("score_pool", [pool_csv], [pool_fasta, c1, c2],
                       partial(self.score_pool, cpu=cpu, mem=mem))
 
-        # The pool is scored, every assembly gets its swissprot pass (the
-        # selection groups contigs by those hits), and twotrack_select writes
-        # good_list.
-        pool_branch()
-        for a in self.diamond_priority:
-            fasta, out = self.assembly_fasta(a), self.diamond_txt(a)
-            self.step(
-                f"diamond_{a.diamond_label}", [out], [fasta],
-                partial(self.run_diamond_one, fasta, out),
-            )
+        def assembly_diamonds(cpu=None, mem=None):
+            for a in self.diamond_priority:
+                fasta, out = self.assembly_fasta(a), self.diamond_txt(a)
+                self.step(
+                    f"diamond_{a.diamond_label}", [out], [fasta],
+                    partial(self.run_diamond_one, fasta, out, cpu=cpu),
+                )
+
+        # The pool is scored while any swissprot pass not already done runs
+        # beside it -- under oyster.py only Trinity's, whose lane has just
+        # finished; under chowder.py every assembly's. They are independent
+        # until twotrack_select, which groups the pooled contigs by those
+        # hits. The pool-side gate names everything score_pool reads,
+        # corrected reads included, since it is checked before the inner
+        # steps get a look.
+        self.run_beside(
+            ("pool_branch", [pool_csv], short_fastas + [c1, c2], pool_branch),
+            ("assembly_diamonds", diamond_outs[1:], assembly_fastas, assembly_diamonds),
+            *self.side_job_budget(max_cpu=self.cpu),
+        )
         self.step(
             "twotrack_select", [good_list],
             [pool_fasta, pool_csv] + diamond_outs[1:], self.twotrack_select,
@@ -2586,18 +2600,15 @@ class Pipeline:
             [filter_done, low_txt, high_txt, orp_intermediate, quant_sf, orp_diamond_txt],
             self.secondfilter,
         )
-        # BUSCO dwarfs transrate/strandeval (minutes vs. seconds); splitting its
-        # CPUs to overlap with them would slow it down far more than the
-        # overlap could ever save, so it gets the full --cpu/--busco-threads
-        # budget to itself. transrate and strandeval are independent of each
-        # other and cheap, so they still run as a small concurrent pair.
+        # BUSCO gets the whole of --cpu/--busco-threads to itself. strandeval
+        # (a few minutes) runs beside transrate (pytransrate over the final
+        # assembly, much longer) on a few threads of its own, rather than
+        # taking half the cores from transrate for transrate's whole run.
         self.step("busco", [busco_done], [orp_fasta], self.busco)
-        self.run_parallel(
-            [
-                ("transrate", [transrate_csv], [orp_fasta, c1, c2], self.transrate),
-                ("strandeval", [strandeval_done], [orp_fasta, c1, c2], self.strandeval),
-            ],
-            max_workers=self.max_parallel,
+        self.run_beside(
+            ("transrate", [transrate_csv], [orp_fasta, c1, c2], self.transrate),
+            ("strandeval", [strandeval_done], [orp_fasta, c1, c2], self.strandeval),
+            *self.side_job_budget(),
         )
         # Everything the report quotes, so a re-scored transrate or BUSCO
         # (say, against newer reads) rewrites the report rather than leaving
@@ -2642,15 +2653,11 @@ def parse_args():
     p.add_argument("--transabyss-kmer", type=int, default=32, help="Trans-ABySS k-mer (default: 32)")
     p.add_argument(
         "--max-parallel", type=int, default=2,
-        help="max concurrent jobs within each independent stage that benefits from "
-             "it (transrate vs. strandeval), "
-             "splitting --cpu/--mem across however many run at once; the 4 "
-             "assemblers instead run as two sequential stage-pairings (see "
-             "TRINITY_PHASE1_SHARE/TRINITY_PHASE2_SHARE), unaffected by this flag; "
-             "other CPU-bound stages "
-             "that don't benefit (diamond, orp_diamond, salmon, busco) always run "
-             "sequentially at full --cpu; 1 disables concurrency for the remaining "
-             "stages entirely (default: 2)",
+        help="2 or more (the default) runs a short independent job beside a long "
+             "one on a few threads of its own: the remaining diamond passes beside "
+             "score_pool, and strandeval beside transrate. 1 runs them one after "
+             "the other. The assemblers' two stage-pairings (see "
+             "TRINITY_PHASE1_SHARE/TRINITY_PHASE2_SHARE) are unaffected (default: 2)",
     )
     p.add_argument(
         "--no-cleanup", "--keep-intermediates", dest="no_cleanup", action="store_true",

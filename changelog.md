@@ -2,6 +2,16 @@
 
 ORP Version 4.1.0-dev1
 
+- **Short jobs run beside long ones instead of splitting the cores with them**
+  (`oyster.py`, `chowder.py`). strandeval used to take half of `--cpu` from
+  transrate for transrate's whole run, though it finishes in minutes. Now
+  transrate keeps every core, and strandeval runs beside it on a quarter of
+  `--cpu` (at most 8) plus at most 16 GB taken from transrate's memory
+  budget. The diamond passes the two-track merge still needs (Trinity's
+  under oyster.py, all of them under chowder.py) used to wait for
+  `score_pool` to finish and now run beside it the same way. `--max-parallel
+  1` still runs everything one step at a time. strandeval's samtools
+  threads follow its budget instead of a fixed 10.
 - **A contig whose TPM equals `--tpm-filt` is kept** (`oyster.py`). It used
   to fall into neither the high- nor the low-expression list and was
   dropped from `.ORP.fasta` whenever any contig was below threshold. The
