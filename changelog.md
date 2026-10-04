@@ -2,6 +2,10 @@
 
 ORP Version 4.1.0-dev1
 
+- **A contig whose TPM equals `--tpm-filt` is kept** (`oyster.py`). It used
+  to fall into neither the high- nor the low-expression list and was
+  dropped from `.ORP.fasta` whenever any contig was below threshold. The
+  default `--tpm-filt 0` is unaffected.
 - **Preflight checks what a run actually uses** (`oyster.py`, `chowder.py`).
   Added diamond, cd-hit-est, blastn, makeblastdb and samtools (`orp`) and
   bwa, seqtk and hist (`orp_trinity`, for strandeval), and dropped `orp`'s

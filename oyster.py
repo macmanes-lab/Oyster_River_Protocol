@@ -1982,9 +1982,12 @@ class Pipeline:
                     tpm = float(cols[3])
                 except ValueError:
                     continue
-                if tpm > self.tpm_filt:
+                # At-threshold counts as high: with `>` and `<` a contig whose
+                # TPM equalled --tpm-filt landed in neither list and so was
+                # dropped from .ORP.fasta whenever LOWEXP was non-empty.
+                if tpm >= self.tpm_filt:
                     hf.write(cols[0] + "\n")
-                elif tpm < self.tpm_filt:
+                else:
                     lf.write(cols[0] + "\n")
         (self.assemblies_dir / f"{self.runout}.filter.done").touch()
         print("\n\n\n\n PART: TPM_FILT MAKE LOW AND HIGH\n\n\n\n")
