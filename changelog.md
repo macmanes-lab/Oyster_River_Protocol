@@ -2,6 +2,17 @@
 
 ORP Version 4.1.0-dev1
 
+- **A step that dies partway is re-run on resume** (`oyster.py`,
+  `chowder.py`). Trimmomatic, rcorrector and diamond write their output as
+  they go, so a step that was killed, ran out of memory or used up its retries
+  left a truncated file that looked finished, and the next run skipped the
+  step and built on it. With rcorrector that meant assembling from part of
+  the reads, and the trimmed reads were deleted afterwards so the damage
+  could not be undone. Each step now leaves `reports/.<run>.<step>.running`
+  while it runs, and a step whose marker is still there is re-run. The
+  rnaSPAdes and Trans-ABySS working directories are also cleared before
+  the first attempt, not only between retries, so an interrupted assembly
+  no longer fails its first try on resume.
 - **The OrthoFinder merge is gone** (`oyster.py`, `chowder.py`): the
   two-track merge, the default since 4.1.0-dev0, is now the only one.
   `--merge-method`, `--orthofinder-searches`, `--orthofinder-analysis` and

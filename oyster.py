@@ -960,6 +960,35 @@ class Pipeline:
 
     # -- resumability ------------------------------------------------------
 
+    def step_marker(self, name):
+        """A file that exists while step `name` runs, and is left behind if it
+        never finishes.
+
+        needs_run() trusts any output that exists and is newer than its
+        inputs, which is the wrong question for a step that died partway:
+        trimmomatic, rcorrector and diamond all write their output as they
+        go, so a run OOM-killed, killed at walltime or out of retries leaves
+        a truncated file with a fresh mtime, and every later resume skips the
+        step and builds on it. For rcorrector that is the whole assembly run
+        off part of the reads, with the trimmed reads deleted behind it.
+
+        Exit status can't be relied on to clear such a file up -- SIGKILL
+        and a walltime kill never reach Python -- so the evidence is written
+        before the work instead: a step whose marker is still there did not
+        finish, whatever its outputs look like.
+        """
+        return self.reports_dir / f".{self.runout}.{name}.running"
+
+    def is_pending(self, name, outputs, inputs) -> bool:
+        """needs_run(), plus a re-run of any step an earlier attempt left unfinished."""
+        marker = self.step_marker(name)
+        if marker.exists():
+            print(f"[{name}] an attempt started {self._ts(marker.stat().st_mtime)} "
+                  "and never finished; re-running it rather than trusting what it "
+                  "left behind")
+            return True
+        return self.needs_run(outputs, inputs)
+
     def needs_run(self, outputs, inputs) -> bool:
         if not outputs:
             return True
@@ -1032,12 +1061,17 @@ class Pipeline:
         return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(t if t is not None else time.time()))
 
     def step(self, name, outputs, inputs, func, timed=True):
-        if not self.needs_run(outputs, inputs):
+        if not self.is_pending(name, outputs, inputs):
             print(f"[{name}] up to date, skipping")
             return
+        marker = self.step_marker(name)
+        marker.touch()
         start = time.time()
         print(f"\n=== {name} -- start {self._ts(start)} ===")
         func()
+        # Only on success: a step that raised keeps its marker, so the next
+        # run redoes it (see step_marker).
+        marker.unlink()
         elapsed = int(time.time() - start)
         print(f"=== {name} -- done {self._ts()} ({elapsed}s) ===")
         if timed:
@@ -1059,7 +1093,7 @@ class Pipeline:
         """
         pending = []
         for name, outputs, inputs, func in jobs:
-            if self.needs_run(outputs, inputs):
+            if self.is_pending(name, outputs, inputs):
                 pending.append((name, func))
             else:
                 print(f"[{name}] up to date, skipping")
@@ -1081,9 +1115,12 @@ class Pipeline:
             print(f"\n=== running {len(pending)} step(s), {workers} at a time (cpu={job_cpu}, mem={job_mem}G each) ===")
 
         def run_one(name, func):
+            marker = self.step_marker(name)
+            marker.touch()
             start = time.time()
             print(f"\n=== {name} (cpu={job_cpu}, mem={job_mem}G) -- start {self._ts(start)} ===")
             func(cpu=job_cpu, mem=job_mem)
+            marker.unlink()
             elapsed = int(time.time() - start)
             print(f"=== {name} -- done {self._ts()} ({elapsed}s) ===")
             self._record_timing(name, elapsed, start)
@@ -1445,6 +1482,10 @@ class Pipeline:
         if kmers:
             cmd += ["-k", ",".join(str(k) for k in kmers)]
         cmd += ["-1", str(self.cor1()), "-2", str(self.cor2())]
+        # Cleared first as well as between retries: rnaSPAdes won't start in a
+        # non-empty output directory, and the one an interrupted attempt left
+        # would otherwise fail every retry of the resume too.
+        shutil.rmtree(workdir, ignore_errors=True)
         self.conda_run("orp_spades", *cmd, retry_cleanup=workdir)
         shutil.move(str(workdir / "transcripts.fasta"), str(out))
         if not self.no_cleanup:
@@ -1469,6 +1510,7 @@ class Pipeline:
             "--name", f"{self.runout}.transabyss.fasta",
             "--pe", str(self.cor1()), str(self.cor2()),
         ]
+        shutil.rmtree(workdir, ignore_errors=True)  # see run_spades
         self.conda_run("orp_transabyss", *cmd, retry_cleanup=workdir)
         final = workdir / f"{self.runout}.transabyss.fasta-final.fa"
         awk_first_field(final, out)
