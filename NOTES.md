@@ -14,10 +14,8 @@ after the tool check), `full` (8 complete runs covering every oyster.py and
 chowder.py option, plus rerun-is-a-no-op, a left-behind `.running` marker,
 `--keep-intermediates` then cleanup, and standalone `strandeval.py`).
 `tests/release_check.sbatch` runs it all on one node, 4 runs at a time.
-Only the quick tier has been run (laptop, no conda) -- still open: the
-first preflight + full pass on the cluster, where some checks may need
-loosening for the tiny data set (e.g. a BUSCO line or proper-pair rate the
-27k-pair sample can't produce).
+First cluster pass (2026-10-05, --jobs 4 --cpu 10 --mem 32, python 3.6.8):
+18/18 passed, ~15 min wall. Run it before every release and feature push.
 
 ## 2026-10-05 -- 4.1.0-dev12: standalone strand exam (scripts/strandeval.py)
 
