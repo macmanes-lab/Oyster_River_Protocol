@@ -11,8 +11,8 @@ stale.
 shift inside the loop halves the table (5 of 10 on a stub SAM_reader, 10 of
 10 after). Removed the shift. The release check's `check_strand_table`
 compares `<run>.dat` with `samtools view -f 66` contigs, in sim_oyster and
-strandeval_standalone. Checked locally with stub Trinity Perl modules only;
-still open: a cluster pass of the release check.
+strandeval_standalone. Cluster pass of the full release check on dev17:
+22/22, so the table matches the BAM on real (sampledata) and simulated reads.
 
 ## 2026-10-05 -- 4.1.0-dev15: release check fixes from its first dev14 pass
 
