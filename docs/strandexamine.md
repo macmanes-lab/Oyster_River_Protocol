@@ -8,14 +8,14 @@ It samples 400,000 read pairs from the corrected reads (`seqtk sample`, fixed se
 
 This plot, showing a somewhat normal distribution, is an example of a *non-strand-specific* library, assembled properly.
 
-![Non-strand-specific library, assembled properly](https://oyster-river-protocol.readthedocs.io/en/latest/_images/notss.png)
+![Non-strand-specific library, assembled properly](images/notss.png)
 
 This plot, showing an extremely biased (can be either left or right side) unimodal distribution, is an example of a *strand-specific* library, assembled properly. It should be noted that as a result of imperfect library generation (wet-lab issue), there may be a second, smaller peak on the opposite side of the histogram. Basically, the quality of strand-specific libraries varies, and this may introduce noise in this analysis.
 
-![Strand-specific library, assembled properly](https://oyster-river-protocol.readthedocs.io/en/latest/_images/ss.png)
+![Strand-specific library, assembled properly](images/ss.png)
 
 ## Assembled Improperly
 
 This plot, showing an extremely biased bimodal distribution, is an example of a *strand-specific* library, assembled in a non-strand-specific fashion.
 
-![Strand-specific library, assembled in a non-strand-specific fashion](https://oyster-river-protocol.readthedocs.io/en/latest/_images/ss_mis.png)
+![Strand-specific library, assembled in a non-strand-specific fashion](images/ss_mis.png)
