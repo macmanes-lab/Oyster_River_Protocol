@@ -5,6 +5,20 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-10-05 -- 4.1.0-dev13: release check (tests/release_check.py)
+
+Pre-release / pre-push test of function on `sampledata/test.{1,2}.fq.gz`.
+`--tier quick` (no conda: CLI rejections, k-mer specs, chowder labels/order/
+ingest renaming, test_twotrack_select.py), `preflight` (conda: the refusals
+after the tool check), `full` (8 complete runs covering every oyster.py and
+chowder.py option, plus rerun-is-a-no-op, a left-behind `.running` marker,
+`--keep-intermediates` then cleanup, and standalone `strandeval.py`).
+`tests/release_check.sbatch` runs it all on one node, 4 runs at a time.
+Only the quick tier has been run (laptop, no conda) -- still open: the
+first preflight + full pass on the cluster, where some checks may need
+loosening for the tiny data set (e.g. a BUSCO line or proper-pair rate the
+27k-pair sample can't produce).
+
 ## 2026-10-05 -- 4.1.0-dev12: standalone strand exam (scripts/strandeval.py)
 
 `strandeval.mk` (deleted in 24f8648) has a Python replacement:
