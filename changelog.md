@@ -2,6 +2,15 @@
 
 ORP Version 4.1.0-dev1
 
+- **The strand exam counts every transcript, not every other one**
+  (`scripts/examine_strand.pl`, used by `oyster.py`, `chowder.py` and
+  `scripts/strandeval.py`). Inherited from Trinity's
+  `examine_strand_specificity.pl`, the script shifted the array its
+  `foreach` was walking, so half the transcripts never reached
+  `<run>.dat` or the histogram in the quality report. The histogram's
+  shape is a sample either way and should not move much, but its counts
+  roughly double. `tests/release_check.py` now checks the table against
+  the BAM.
 - **pyTransRate is called pyTransRate everywhere** (`oyster.py`,
   `chowder.py`, docs). The quality report's lines are now `PYTRANSRATE
   SCORE` and `PYTRANSRATE OPTIMAL SCORE`, the final scoring step is

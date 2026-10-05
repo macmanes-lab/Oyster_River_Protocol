@@ -61,10 +61,11 @@ main: {
     
     print $ofh join("\t", "#transcript", "plus_strand_1stReads", "minus_strand_1stReads", "total_reads", "diff_ratio") . "\n";
     
+    # Not `my $struct = shift @structs` inside the loop, as Trinity's
+    # examine_strand_specificity.pl has it: shifting the array foreach is
+    # walking skips every other element, so only half the transcripts
+    # reached the table and the histogram.
     foreach my $struct (@structs) {
-        
-        my $struct = shift @structs;
-        
 
         my ($plus, $minus, $total_reads, $transcript) = ($struct->{'+'},
                                                          $struct->{'-'},

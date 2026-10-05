@@ -5,6 +5,15 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-10-05 -- 4.1.0-dev17: examine_strand.pl kept every other transcript
+
+`foreach my $struct (@structs) { my $struct = shift @structs; ...}` -- the
+shift inside the loop halves the table (5 of 10 on a stub SAM_reader, 10 of
+10 after). Removed the shift. The release check's `check_strand_table`
+compares `<run>.dat` with `samtools view -f 66` contigs, in sim_oyster and
+strandeval_standalone. Checked locally with stub Trinity Perl modules only;
+still open: a cluster pass of the release check.
+
 ## 2026-10-05 -- 4.1.0-dev15: release check fixes from its first dev14 pass
 
 dev14's cluster pass: 11 pass / 5 fail / 6 skip. sim_oyster failed in
@@ -42,7 +51,7 @@ back to refseq_db.faa.gz, else the case skips); whether trimmomatic fails on
 a truncated gzip at all; whether 5x coverage assembles the low class (the case
 says so explicitly if not). Aside: `scripts/examine_strand.pl` shifts
 `@structs` inside `foreach (@structs)`, so `.dat` holds only about half the
-transcripts -- inherited from Trinity's script, not yet fixed.
+transcripts -- inherited from Trinity's script. Fixed in dev17.
 
 ## 2026-10-05 -- 4.1.0-dev13: release check (tests/release_check.py)
 

@@ -53,7 +53,8 @@ status. Three tiers, each a superset of the cost of the one before:
                sim_oyster          tests/simulate_reads.py's RF library, whose
                                    answer is known: genes recovered, BUSCO
                                    genes found, no adapter in the assembly,
-                                   strandedness detected, and --tpm-filt
+                                   strandedness detected (every transcript
+                                   in the strand table), and --tpm-filt
                                    drops low no-hit contigs but keeps low
                                    contigs with a swissprot hit
 
@@ -775,6 +776,20 @@ def case_chowder_collide(ctx, run):
             f"colliding labels not numbered by path: {rows}")
 
 
+def check_strand_table(run, bam, dat):
+    """The strand exam's per-transcript table has a row for every transcript
+    with a properly paired first read -- the reads examine_strand.pl counts.
+    It used to shift the array its foreach walked, and kept every other one."""
+    sam = run(["conda", "run", "--no-capture-output", "-n", "orp",
+               "samtools", "view", "-f", "66", bam])
+    mapped = {f[2] for f in (l.split("\t") for l in sam.splitlines()) if len(f) >= 11}
+    rows = {l.split("\t")[0] for l in dat.read_text().splitlines()[1:] if l.strip()}
+    require(mapped, f"no properly paired first reads in {bam}")
+    require(rows == mapped, f"{dat.name} has {len(rows)} transcripts, the BAM has "
+                            f"{len(mapped)} with a properly paired first read "
+                            f"({len(mapped - rows)} missing, {len(rows - mapped)} extra)")
+
+
 @case("full", needs=("oyster_default",))
 def case_strandeval_standalone(ctx, run):
     """scripts/strandeval.py on oyster_default's assembly, with and without --no-cleanup"""
@@ -792,6 +807,7 @@ def case_strandeval_standalone(ctx, run):
     run(base + ["--runout", "s2", "--no-cleanup"])
     require((d / "s2.sorted.bam").is_file() and (d / "s2.dat").is_file(),
             "--no-cleanup did not keep the BAM and table")
+    check_strand_table(run, d / "s2.sorted.bam", d / "s2.dat")
     out = run([sys.executable, STRANDEVAL, "--assembly", asm, "--read1", READ1, "--read2", READ2,
                "--pairs", "5000", "--cpu", ctx.cpu], cwd=d)
     require((d / "reports" / "oyster_default.strandeval_summary.txt").is_file(),
@@ -958,6 +974,7 @@ def case_sim_oyster(ctx, run):
     require(ratios, f"no per-transcript rows in {dat}")
     strong = sum(1 for r in ratios if abs(r) >= 0.8) / len(ratios)
     require(strong >= 0.7, f"only {strong:.0%} of transcripts look stranded on an RF library")
+    check_strand_table(run, d / "sim.sorted.bam", dat)
 
     # 5. --tpm-filt: low-expression contigs go, unless they have a swissprot hit.
     hits = {l.split("\t")[0] for l in (asm / "sim.ORP.diamond.txt").read_text().splitlines()}
