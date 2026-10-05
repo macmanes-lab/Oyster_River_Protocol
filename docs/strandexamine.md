@@ -1,16 +1,8 @@
 # Oyster River Strand Exam Tool
 
-The Oyster River Strand Exam Tool, which is adapted from the [Trinity Strand Examination script](https://github.com/trinityrnaseq/trinityrnaseq/wiki/Examine-Strand-Specificity), can be used as per the following:
+The Oyster River Strand Exam Tool is adapted from the [Trinity Strand Examination script](https://github.com/trinityrnaseq/trinityrnaseq/wiki/Examine-Strand-Specificity). It runs automatically as the `strandeval` step of both `oyster.py` and `chowder.py`, once the final `<run>.ORP.fasta` is written; there is nothing to run by hand.
 
-```
-/path/to/Oyster_River_Protocol/strandeval.mk main \
-ASSEMBLY=test.fasta \
-READ1=1.subsamp_1.cor.fq \
-READ2=1.subsamp_2.cor.fq \
-RUNOUT=test
-```
-
-This script maps a random 1M reads to the assembly, then plots (plus_strand - minus_strand) / total, which helps us understand the strandedness of the assembly, and if we assembled correctly. Here are the 3 major types of plots you could receive back.
+It samples 400,000 read pairs from the corrected reads (`seqtk sample`, fixed seed), maps them to the assembly with `bwa mem`, and for each transcript counts which strand the first read of each properly-paired pair lands on (`scripts/examine_strand.pl`). It then plots (plus_strand - minus_strand) / total across transcripts as a text histogram, which helps us understand the strandedness of the assembly, and if we assembled correctly. The histogram is printed at the end of the run and saved in `reports/<run>.strandeval_summary.txt` and `reports/qualreport.<run>`. Here are the 3 major types of plots you could receive back.
 
 ## Assembled Correctly
 

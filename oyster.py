@@ -2214,7 +2214,7 @@ class Pipeline:
             "\n*****  STRAND EXAMINATION HISTOGRAM ***** \n"
             f"{histogram_text}\n"
             "\n*****  See the following link for interpretation ***** \n"
-            "*****  https://oyster-river-protocol.readthedocs.io/en/latest/strandexamine.html ***** \n"
+            "*****  https://github.com/macmanes-lab/Oyster_River_Protocol/blob/master/docs/strandexamine.md ***** \n"
         )
         print(summary)
         (self.reports_dir / f"{self.runout}.strandeval_summary.txt").write_text(summary)
