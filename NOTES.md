@@ -5,7 +5,7 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
-## 2026-10-05 -- 4.1.0-dev11: standalone strand exam (scripts/strandeval.py)
+## 2026-10-05 -- 4.1.0-dev12: standalone strand exam (scripts/strandeval.py)
 
 `strandeval.mk` (deleted in 24f8648) has a Python replacement:
 `scripts/strandeval.py --assembly --read1 --read2 [--runout --cpu --pairs
