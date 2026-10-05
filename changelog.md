@@ -2,6 +2,14 @@
 
 ORP Version 4.1.0-dev1
 
+- **pyTransRate is called pyTransRate everywhere** (`oyster.py`,
+  `chowder.py`, docs). The quality report's lines are now `PYTRANSRATE
+  SCORE` and `PYTRANSRATE OPTIMAL SCORE`, the final scoring step is
+  `pytransrate` rather than `transrate`, and it writes
+  `reports/pytransrate_<run>/` rather than `reports/transrate_<run>/`. A
+  resumed run renames an existing `transrate_<run>/` instead of scoring
+  again. The experiment scripts that read that directory accept either
+  name.
 - **Two fewer diamond blastx searches per run** (`oyster.py`, `chowder.py`).
   `diamond_shucked` and `orp_diamond` searched `shucked.fasta` and
   `ORP.intermediate.fasta`, but every contig in those came whole, under its
@@ -14,9 +22,9 @@ ORP Version 4.1.0-dev1
   after another (`oyster.py`, `chowder.py`). The output is unchanged.
 - **Short jobs run beside long ones instead of splitting the cores with them**
   (`oyster.py`, `chowder.py`). strandeval used to take half of `--cpu` from
-  transrate for transrate's whole run, though it finishes in minutes. Now
-  transrate keeps every core, and strandeval runs beside it on a quarter of
-  `--cpu` (at most 8) plus at most 16 GB taken from transrate's memory
+  pyTransRate for pyTransRate's whole run, though it finishes in minutes. Now
+  pyTransRate keeps every core, and strandeval runs beside it on a quarter of
+  `--cpu` (at most 8) plus at most 16 GB taken from pyTransRate's memory
   budget. The diamond passes the two-track merge still needs (Trinity's
   under oyster.py, all of them under chowder.py) used to wait for
   `score_pool` to finish and now run beside it the same way. `--max-parallel
@@ -85,17 +93,17 @@ ORP Version 4.1.0-dev1
   `spades55`/`spades75` files is not reused.
   Why: on 9 test samples run through the default two-track merge, this
   gave 983 complete BUSCOs against 956 for the 4.0 control, duplicated
-  BUSCOs 148 against 324, 2.6% more unique genes and a higher transrate
+  BUSCOs 148 against 324, 2.6% more unique genes and a higher pyTransRate
   score (0.481 against 0.471), with proper pairs 0.020 lower (0.933 against
   0.953). Against 4.1.0-dev0 on the same 5 samples it added 9 complete BUSCOs,
-  704 unique genes (+1.4%) and 0.014 transrate, at equal duplication. The
+  704 unique genes (+1.4%) and 0.014 pyTransRate score, at equal duplication. The
   gain cannot yet be split between the auto first run and the changed
   second run (`experiments/redundancy/README.md`).
 - **The pick stage is called "shuck", not "orthofuse"** (`oyster.py`,
   `chowder.py`): under the default two-track merge OrthoFinder never runs,
   so the old name described nothing. `orthofuse/<run>/` is now
   `shuck/<run>/`; the pooled fasta `merged.fasta` is `pool.fasta` and its
-  pytransrate output `merged/` is `pool/`; `<run>.orthomerged.fasta` (and
+  pyTransRate output `merged/` is `pool/`; `<run>.orthomerged.fasta` (and
   its diamond output, working copy and salmon directory) is
   `<run>.shucked.fasta`; `<run>.ortho.idx` is `<run>.shucked.idx`. Steps:
   `merge` -> `build_pool`, `orthotransrate` -> `score_pool`, `orthofusing`
@@ -120,10 +128,10 @@ ORP Version 4.1.0-dev1
   phase 1 now depends on both corrected mates, not only R1; the orthofinder
   merge's pooled scoring re-runs when only the corrected reads changed;
   strandeval depends on the corrected reads; and the quality report is
-  rewritten when BUSCO, transrate, strandeval or the unique-gene counts are.
-- **The pooled pytransrate scoring on the default two-track path is given
+  rewritten when BUSCO, pyTransRate, strandeval or the unique-gene counts are.
+- **The pooled pyTransRate scoring on the default two-track path is given
   `--mem`** as `--max-memory`; it was getting no budget at all, and
-  pytransrate fell back to the node's free memory. `twotrack_select.py`'s
+  pyTransRate fell back to the node's free memory. `twotrack_select.py`'s
   cd-hit-est runs get `--mem` too (`-M` was 0, unlimited).
 - The step-timing table and cleanup's kept/removed list are no longer
   printed at the end of a run, only written to the timing log and

@@ -18,7 +18,8 @@ mkdir -p "$OUT"
 while IFS=$'\t' read -r code _asm _r1 _r2 run; do
     new_table=$(ls "$COMPARE"/orp_runs/"$run"/reports/run_"$run".ORP/run_*/full_table.tsv 2>/dev/null | head -1 || true)
     new_fasta=$COMPARE/orp_runs/$run/assemblies/$run.ORP.fasta
-    new_csv=$COMPARE/orp_runs/$run/reports/transrate_$run/contigs.csv
+    new_csv=$COMPARE/orp_runs/$run/reports/pytransrate_$run/contigs.csv
+    [[ -s $new_csv ]] || new_csv=$COMPARE/orp_runs/$run/reports/transrate_$run/contigs.csv  # before 4.1.0-dev9
     old_table=$COMPARE/busco/busco_out/$code/full_table.tsv
     old_fasta=$(ls "$COMPARE"/pairs/"$code"/assembly/*.fasta* 2>/dev/null | head -1 || true)
     if [[ -z $new_table || ! -s $new_fasta || ! -s $old_table || -z $old_fasta ]]; then

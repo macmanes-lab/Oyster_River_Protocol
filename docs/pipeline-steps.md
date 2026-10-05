@@ -41,20 +41,20 @@ Two sequential stage-pairings, each a fixed `ThreadPoolExecutor(max_workers=2)`,
 
 ## Merging into one assembly (two-track)
 
-`build_pool` → `score_pool` (as `pool_branch`) and any per-assembly `diamond_<label>` pass not already done (as `assembly_diamonds`) are independent until `twotrack_select`, so at `--max-parallel ≥ 2` they run together: `score_pool` keeps all of `--cpu`, and the diamond passes run beside it on a quarter of it, with up to 16 GB of `--mem` taken from pytransrate's budget (`run_beside`).
+`build_pool` → `score_pool` (as `pool_branch`) and any per-assembly `diamond_<label>` pass not already done (as `assembly_diamonds`) are independent until `twotrack_select`, so at `--max-parallel ≥ 2` they run together: `score_pool` keeps all of `--cpu`, and the diamond passes run beside it on a quarter of it, with up to 16 GB of `--mem` taken from pyTransRate's budget (`run_beside`).
 
 | Step | Env / tool | Inputs | Outputs | What it does |
 |---|---|---|---|---|
 | `run_filtershort` | `orp` `scripts/long.seq.py` (×4, one per assembly, in parallel) | the 4 raw assembly fastas | `shuck/<run>/working/<run>.<name>.short.fasta` ×4 | Drops contigs ≤200bp from each of the four assemblies. |
 | `build_pool` | pure Python (file concat) | the 4 `*.short.fasta` | `shuck/<run>/pool.fasta` | Concatenates the four short-filtered assemblies into one pool — no dedup yet, just union. |
-| `score_pool` | `orp` pytransrate | `pool.fasta`, `c1`, `c2` | `shuck/<run>/pool/contigs.csv` | Scores every contig in the pooled fasta for assembly quality (read-support based), by aligning `c1`/`c2` back to it. |
+| `score_pool` | `orp` pyTransRate | `pool.fasta`, `c1`, `c2` | `shuck/<run>/pool/contigs.csv` | Scores every contig in the pooled fasta for assembly quality (read-support based), by aligning `c1`/`c2` back to it. |
 | `diamond_<label>` | `orp` diamond blastx | each assembly | `diamond/<run>.<label>.diamond.txt` | Any per-assembly swissprot pass not already run in an assembler lane (normally only Trinity's under oyster.py; all of them under chowder.py). |
 | `twotrack_select` | `orp` `scripts/twotrack_select.py` (blastn, cd-hit-est inside) | `pool.fasta`, `pool/contigs.csv`, the 4 per-assembly diamond outputs, `software/diamond/uniprot_sprot.fasta` | `shuck/<run>/good.<run>.list`; `shuck/<run>/twotrack.<run>.tsv` (the fate of every pooled contig) | Contigs with a Swiss-Prot hit are grouped by best-hit gene; each gene keeps the longest contig with near-best protein coverage, plus up to two distinct (under 50% covered by it at >=95% identity), expressed (>=1 TPM) copies. Contigs without a hit go through cd-hit-est (`-c 0.95 -G 0 -aS 0.9 -r 1`). |
 | `shuck` | `orp` `scripts/filter.py` | `pool.fasta`, `good.<run>.list` | `assemblies/<run>.shucked.fasta` | Filters the pooled fasta down to just the winning contigs — the first cut of the merged, deduplicated assembly. |
 
 ## Gene-uniqueness accounting
 
-This is the least obvious part of the pipeline: a set-algebra pass that finds genes the pick *dropped* (because their contig lost the transrate vote, or wasn't grouped at all) and rescues them back into the assembly.
+This is the least obvious part of the pipeline: a set-algebra pass that finds genes the pick *dropped* (because their contig lost the pyTransRate vote, or wasn't grouped at all) and rescues them back into the assembly.
 
 | Step | Env / tool | Inputs | Outputs | What it does |
 |---|---|---|---|---|
@@ -79,18 +79,18 @@ This is the least obvious part of the pipeline: a set-algebra pass that finds ge
 | `salmon_index` | `orp` salmon | `ORP.intermediate.fasta` | `quants/<run>.shucked.idx` | Builds a salmon index (k=31) over the intermediate assembly. |
 | `salmon` | `orp` salmon quant | the index, `c1`, `c2` | `quants/salmon_shucked_<run>/quant.sf` | Quantifies expression (TPM) per contig by pseudo-aligning the corrected reads. |
 | `filter` | pure Python | `quant.sf` | `assemblies/working/<run>.{HIGH,LOW}EXP.txt` | Splits contigs into at-or-above / below `--tpm-filt` TPM lists (a contig exactly at the threshold counts as high). |
-| `secondfilter` | `orp` `scripts/filter.py` (×2) + pure Python | `ORP.intermediate.fasta`, `LOWEXP.txt`, `HIGHEXP.txt`, `ORP.diamond.txt` | `assemblies/<run>.ORP.fasta`; a `*_BEFORE_TPM_FILT.fasta` backup copy | If any contigs fell below the TPM threshold: keeps all high-TPM contigs outright, but rescues a low-TPM contig anyway if it's the *only* one with a diamond hit to its gene (`donotremove.list`) — so a real-but-lowly-expressed transcript with no redundant coverage isn't thrown away just for being quiet. If nothing was below threshold, `ORP.intermediate.fasta` is simply copied through unchanged. This is the file every later step (BUSCO, transrate, strandeval, `reportgen`) treats as "the assembly." |
+| `secondfilter` | `orp` `scripts/filter.py` (×2) + pure Python | `ORP.intermediate.fasta`, `LOWEXP.txt`, `HIGHEXP.txt`, `ORP.diamond.txt` | `assemblies/<run>.ORP.fasta`; a `*_BEFORE_TPM_FILT.fasta` backup copy | If any contigs fell below the TPM threshold: keeps all high-TPM contigs outright, but rescues a low-TPM contig anyway if it's the *only* one with a diamond hit to its gene (`donotremove.list`) — so a real-but-lowly-expressed transcript with no redundant coverage isn't thrown away just for being quiet. If nothing was below threshold, `ORP.intermediate.fasta` is simply copied through unchanged. This is the file every later step (BUSCO, pyTransRate, strandeval, `reportgen`) treats as "the assembly." |
 
 ## QC / report
 
-At `--max-parallel ≥ 2`, `strandeval` runs beside `transrate` on a quarter of `--cpu` (at most 8 threads) while `transrate` keeps all of it (`run_beside`); `busco` runs alone just before them with the whole of `--cpu`/`--busco-threads`.
+At `--max-parallel ≥ 2`, `strandeval` runs beside `pytransrate` on a quarter of `--cpu` (at most 8 threads) while `pytransrate` keeps all of it (`run_beside`); `busco` runs alone just before them with the whole of `--cpu`/`--busco-threads`.
 
 | Step | Env / tool | Inputs | Outputs | What it does |
 |---|---|---|---|---|
 | `busco` | `orp_busco` busco, `--offline`, `-m transcriptome` | `ORP.fasta` | `reports/run_<run>.ORP/` | Scores completeness against the `--lineage` ortholog set (default `eukaryota_odb12.2`). A re-run replaces the previous report. |
-| `transrate` | `orp` pytransrate | `ORP.fasta`, `c1`, `c2` | `reports/transrate_<run>/assemblies.csv` | Same read-support quality scoring as `score_pool` earlier, now on the final assembly rather than the mid-pipeline pool. |
+| `pytransrate` | `orp` pyTransRate | `ORP.fasta`, `c1`, `c2` | `reports/pytransrate_<run>/assemblies.csv` (a `reports/transrate_<run>/` left by an older run is renamed to this) | Same read-support quality scoring as `score_pool` earlier, now on the final assembly rather than the mid-pipeline pool. |
 | `strandeval` | `orp_trinity` bwa + `orp` samtools + `scripts/examine_strand.pl` | `ORP.fasta`, a 400k-read subsample of `c1`/`c2` | `reports/<run>.strandeval_summary.txt` | Aligns a read subsample back to the assembly and checks read-orientation-vs-transcript-strand agreement — a sanity check on whether `--strand` was set correctly. Deletes its sorted BAM and bwa index when done, unless `--no-cleanup`. |
-| `reportgen` | pure Python | BUSCO/transrate/diamond/salmon/strandeval outputs above | `reports/qualreport.<run>` | Pulls one headline number from each prior report into a single human-readable summary (BUSCO score, transrate scores, unique-gene counts per assembler, proper-pair mapping rate, strand histogram). |
+| `reportgen` | pure Python | BUSCO/pyTransRate/diamond/salmon/strandeval outputs above | `reports/qualreport.<run>` | Pulls one headline number from each prior report into a single human-readable summary (BUSCO score, pyTransRate scores, unique-gene counts per assembler, proper-pair mapping rate, strand histogram). |
 | `cleanup` | pure Python | `qualreport.<run>` | `reports/<run>.cleanup.done` (a manifest of what was kept and removed, with sizes) | Last, because it deletes files earlier steps declare as inputs. Keeps `reports/`, `.ORP.fasta`, and the four individual assemblies plus the corrected reads as the `.gz` that `compress_async` has been building in the background since each was written — so this only unlinks, and the compression cost was already paid in parallel with an assembler. Removes `shuck/`, `quants/`, `assemblies/diamond/`, `assemblies/working/`, and the working assemblies between `shuck` and `.ORP.fasta` (including cd-hit-est's `.ORP.intermediate.fasta.clstr`); all of it is reproducible from what's kept, and every number it fed is already in `qualreport.<run>`. Also sweeps up what the steps above normally delete themselves — the rnaSPAdes and Trans-ABySS working directories, Trinity's gene_trans_map, strandeval's BAM and bwa index — which are only still there after a `--no-cleanup` or interrupted run. A file whose background gzip didn't finish is kept uncompressed instead of deleted. Skipped under `--no-cleanup`, which also leaves `cleanup.done` unwritten, so re-running without the flag cleans up then. |
 
 ## Observations: where the time goes and where to look for further gains

@@ -87,7 +87,7 @@ REPORT_ORDER = (TRINITY, SPADES_AUTO, SPADES_HIGH, TRANSABYSS)
 # Preflight. Everything here is shelled out to at some point in a full run,
 # and finding it missing hours in -- at score_pool, or at the assembler that
 # was going to run overnight -- is the thing this list exists to prevent.
-# snap-aligner is on it because pytransrate maps with it.
+# snap-aligner is on it because pyTransRate maps with it.
 SPADES_TOOL = ("orp_spades", "rnaspades.py", "SPADES")
 TRINITY_TOOL = ("orp_trinity", "Trinity", "TRINITY")
 TRANSABYSS_TOOL = ("orp_transabyss", "transabyss", "TRANSABYSS")
@@ -97,7 +97,7 @@ TRIMMOMATIC_TOOL = ("orp", "trimmomatic", "TRIMMOMATIC")
 RCORRECTOR_TOOL = ("orp", "run_rcorrector.pl", "RCORRECTOR")
 # The two a run handed already-corrected reads has no use for.
 READ_PREP_TOOLS = (TRIMMOMATIC_TOOL, RCORRECTOR_TOOL)
-#: The pytransrate this pipeline needs, checked at preflight rather than
+#: The pyTransRate this pipeline needs, checked at preflight rather than
 #: assumed from orp_env.yml. The pin in that file describes the environment
 #: as built; it says nothing about the environment as it actually is, and the
 #: two diverge the moment anyone installs by hand or reuses an older env. The
@@ -113,7 +113,7 @@ PYTRANSRATE_MIN_VERSION = "2.2.1"
 #: above the minimum -- 2.2.2 only adds logging -- and moves with that file.
 PYTRANSRATE_PINNED_VERSION = "2.2.2"
 
-#: --max-memory's own spellings in pytransrate, both of which it accepts. A
+#: --max-memory's own spellings in pyTransRate, both of which it accepts. A
 #: user who set one in --pytransrate-args means it, so pytransrate_memory_args
 #: stands aside rather than passing the flag twice.
 PYTRANSRATE_MEMORY_FLAGS = ("--max-memory", "--mem")
@@ -197,7 +197,7 @@ def line_buffer_stdio():
     the same file descriptor and writes to it directly, unbuffered. So the
     pipeline's own narrative -- the banner, the `=== step -- start ===`
     lines, the `+ <command>` echoes, the retry warnings -- sits in our
-    buffer while hours of OrthoFinder and pytransrate output stream past it,
+    buffer while hours of OrthoFinder and pyTransRate output stream past it,
     and only lands when the buffer happens to fill.
 
     It is not a cosmetic problem. On the 380C_0C5D_001F run the banner and
@@ -302,7 +302,7 @@ def is_gzip(path: Path) -> bool:
 BGZF_EOF = bytes.fromhex("1f8b08040000000000ff0600424302001b0003" + "00" * 9)
 
 #: Columns in a salmon quant.sf: Name, Length, EffectiveLength, TPM,
-#: NumReads. pytransrate rejects any other count as a version mismatch.
+#: NumReads. pyTransRate rejects any other count as a version mismatch.
 QUANT_COLUMNS = 5
 
 
@@ -378,7 +378,7 @@ def quant_sf_is_complete(path: Path, expected: int) -> bool:
     """Whether a salmon quant.sf holds one whole row per contig.
 
     salmon writes quant.sf in a single pass at the end of its run, so a run
-    killed during that pass leaves a short file -- and pytransrate reuses
+    killed during that pass leaves a short file -- and pyTransRate reuses
     quant.sf on existence alone, without counting rows, at every version to
     date including the 2.2.0 that does check its BAM. That would not fail
     loudly: it would quietly score the assembly off whichever contigs made
@@ -576,9 +576,9 @@ class Pipeline:
         # oyster.py spells it --trimmed-corrected-reads, chowder.py
         # --corrected-reads; both mean trimmomatic and rcorrector are done.
         self.corrected_reads = getattr(args, "corrected_reads", False)
-        # Appended to both pytransrate invocations. shlex so a value can be
+        # Appended to both pyTransRate invocations. shlex so a value can be
         # quoted, and so the flags arrive as separate argv entries rather
-        # than one string pytransrate would reject.
+        # than one string pyTransRate would reject.
         self.pytransrate_args = shlex.split(getattr(args, "pytransrate_args", "") or "")
 
         # Everything from run_filtershort onwards works on "the assemblies"
@@ -646,7 +646,7 @@ class Pipeline:
         A path or iterable of paths is rmtree'd. A callable is called
         instead, for a step where "clear the output directory" is too blunt
         and something in it has to survive the retry -- see
-        clear_transrate_outdir.
+        clear_pytransrate_outdir.
         """
         printable = " ".join(str(c) for c in cmd)
         for attempt in range(retries + 1):
@@ -860,7 +860,7 @@ class Pipeline:
         finish is kept uncompressed instead of being deleted.
 
         Everything removed here is reproducible from what's kept: the
-        shuck tree (the pooled fasta and pytransrate's scoring of it --
+        shuck tree (the pooled fasta and pyTransRate's scoring of it --
         normally the largest directory in the run), the diamond hits and the list1-list7 set algebra built from
         them, the salmon index and quantification, and the chain of working
         assemblies between shuck and .ORP.fasta. Every number any of
@@ -1111,14 +1111,14 @@ class Pipeline:
 
         This replaced an even split of the cores, which was the wrong shape
         for every pair it was used on: one job of the pair is short
-        (strandeval, minutes; a diamond pass) and the other long (transrate;
-        score_pool, hours), so once the short one finished its half of the
+        (strandeval, minutes; a diamond pass) and the other long (the final
+        pyTransRate scoring; score_pool, hours), so once the short one finished its half of the
         machine sat idle while the long one carried on at half speed.
         Oversubscribing by a few threads instead costs the main job a little
         while both run and nothing afterwards, and the side job mostly fills
-        cores pytransrate leaves idle in its serial phases (snap's index
+        cores pyTransRate leaves idle in its serial phases (snap's index
         build, salmon). Memory is never oversubscribed: side_mem comes out
-        of main's budget, which is what pytransrate sizes its workers to.
+        of main's budget, which is what pyTransRate sizes its workers to.
 
         With --max-parallel 1, or when only one of them is pending, they run
         one after the other with the whole machine each.
@@ -1289,7 +1289,7 @@ class Pipeline:
                   "batch job, peak memory will not be recoverable afterwards")
 
     def check_pytransrate_version(self):
-        """Refuse to start on a pytransrate older than the pipeline needs.
+        """Refuse to start on a pyTransRate older than the pipeline needs.
 
         Present-and-runnable is the wrong question for this one tool: the
         version that matters is the difference between a 16-hour failure and
@@ -1311,13 +1311,13 @@ class Pipeline:
         """
         version = self.tool_version("orp", "pytransrate")
         if version is None:
-            print("[preflight] could not read the pytransrate version; "
+            print("[preflight] could not read the pyTransRate version; "
                   f"carrying on (this pipeline needs >= {PYTRANSRATE_MIN_VERSION})")
             return
-        print(f"[preflight] pytransrate {version}")
+        print(f"[preflight] pyTransRate {version}")
         if version_below(version, PYTRANSRATE_MIN_VERSION):
             sys.exit(
-                f"\n*** pytransrate {version} is installed and this pipeline "
+                f"\n*** pyTransRate {version} is installed and this pipeline "
                 f"needs at least {PYTRANSRATE_MIN_VERSION}. ***\n\n"
                 "    Older versions size the read-metrics step against the\n"
                 "    whole machine rather than the memory budget, and delete\n"
@@ -1331,7 +1331,7 @@ class Pipeline:
         if version_below(version, PYTRANSRATE_PINNED_VERSION):
             # Between the minimum and the pin: works, but not what a fresh
             # env would hold. Said, not enforced -- see PYTRANSRATE_PINNED_VERSION.
-            print(f"[preflight] WARNING: pytransrate {version} is older than the "
+            print(f"[preflight] WARNING: pyTransRate {version} is older than the "
                   f"{PYTRANSRATE_PINNED_VERSION} this release pins. The run will "
                   "carry on and its scores are unaffected; to match a fresh env:\n"
                   "      conda run -n orp pip install --upgrade --force-reinstall "
@@ -1646,10 +1646,10 @@ class Pipeline:
                     shutil.copyfileobj(inf, outf)
 
     @staticmethod
-    def clear_transrate_outdir(outdir, assembly):
-        """Clear pytransrate's -o of what a retry must not reuse, and only that.
+    def clear_pytransrate_outdir(outdir, assembly):
+        """Clear pyTransRate's -o of what a retry must not reuse, and only that.
 
-        A retry has to start from a directory pytransrate can work in:
+        A retry has to start from a directory pyTransRate can work in:
         it will not overwrite an existing assemblies.csv, and it reuses the
         BAM and the quant.sf it finds in -o on their existence alone, so a
         step killed part-way leaves half-written copies of both behind and
@@ -1668,7 +1668,7 @@ class Pipeline:
         **The snap index.** Building it is the longest single piece of work
         in the run -- the better part of an hour on a multi-million-contig
         merge, and two builds rather than one whenever the -locationSize
-        sweep steps up. pytransrate keys its own reuse on the GenomeIndex
+        sweep steps up. pyTransRate keys its own reuse on the GenomeIndex
         marker snap writes when a build completes, and a build that died
         half way leaves its directory behind without one, so that is the
         marker checked here too: trusting a partial index yields a corrupt
@@ -1685,7 +1685,7 @@ class Pipeline:
         would be keeping hundreds of gigabytes nothing can use. It is not
         kept as evidence either -- logs/snap.log is the evidence. A BAM
         that is kept keeps its .align.done marker beside it, which is what
-        pytransrate reads after 2.2.0 to decide the same question: drop the
+        pyTransRate reads after 2.2.0 to decide the same question: drop the
         marker and it would move a perfectly good BAM aside and map again.
         The <index>.index.lock file is kept for the same reason -- it sits
         beside the index rather than inside it precisely so an rmtree of a
@@ -1695,7 +1695,7 @@ class Pipeline:
         **The read count** that goes with it, `*-read_count.txt`. It is
         keyed on the read filenames and depends only on the reads, so it
         cannot go stale while those names hold. Keeping it matters more
-        than its size suggests: it is what pytransrate reads when it reuses
+        than its size suggests: it is what pyTransRate reads when it reuses
         a BAM, and without it that path falls back to counting lines in the
         fastq itself.
 
@@ -1704,17 +1704,17 @@ class Pipeline:
         BAM*, so keeping it when the BAM it was computed from has gone
         would score the assembly off numbers belonging to a file that no
         longer exists; and see quant_sf_is_complete for why existence is
-        not enough on its own -- no pytransrate to date checks it.
+        not enough on its own -- no pyTransRate to date checks it.
 
-        **logs/**, which holds snap.log, the file pytransrate points at
+        **logs/**, which holds snap.log, the file pyTransRate points at
         when snap dies without explaining itself, so deleting it is
-        deleting the evidence the retry exists to gather. pytransrate
+        deleting the evidence the retry exists to gather. pyTransRate
         rewrites it per attempt, so what survives the last retry is the
         last attempt's output, which is the one worth reading.
 
         Everything else goes: assemblies.csv, contigs.csv and the score
         optimisation csv are the outputs being recomputed, and anything a
-        future pytransrate leaves behind that this does not recognise is
+        future pyTransRate leaves behind that this does not recognise is
         cleared rather than assumed safe.
         """
         outdir = Path(outdir)
@@ -1766,15 +1766,15 @@ class Pipeline:
         # because the log is the only place anyone can check it after the
         # fact: a retry that silently remapped and a retry that reused a
         # good BAM look identical from outside until the wall time comes in.
-        print("[transrate] {}: kept from the last attempt: {}".format(
+        print("[pytransrate] {}: kept from the last attempt: {}".format(
             outdir.name,
             ", ".join(p.name for p in sorted(survived)) or "nothing",
         ))
 
     def pytransrate_memory_args(self, mem):
-        """``--max-memory`` for a pytransrate call, or nothing.
+        """``--max-memory`` for a pyTransRate call, or nothing.
 
-        pytransrate sizes the read-metrics step's shared accumulators by the
+        pyTransRate sizes the read-metrics step's shared accumulators by the
         assembly and multiplies them by ``--threads``: on a 5.8 Gbp merge
         that is 23 GB per worker, so ``-t 40`` asks for 928 GB. It caps the
         workers at what fits, but only against a budget it can find, and on
@@ -1787,7 +1787,7 @@ class Pipeline:
         So --mem is forwarded. It is the number the user chose and the number
         every step above already splits between concurrent jobs; leaving it
         at this one boundary meant the most memory-hungry step in the run was
-        the only one that never heard it. Requires pytransrate >= 2.2.0,
+        the only one that never heard it. Requires pyTransRate >= 2.2.0,
         which is what PYTRANSRATE_MIN_VERSION enforces at preflight.
         """
         if mem is None:
@@ -1809,15 +1809,15 @@ class Pipeline:
         # so a resumed run would abort on that csv unless it is cleared
         # first. retry_cleanup repeats the clear before each retry, because
         # the one below happens once, outside run()'s retry loop. See
-        # clear_transrate_outdir for what survives it and why.
-        self.clear_transrate_outdir(outdir, pool)
+        # clear_pytransrate_outdir for what survives it and why.
+        self.clear_pytransrate_outdir(outdir, pool)
         self.conda_run(
             "orp", "pytransrate",
             "-o", outdir, "-t", cpu, "-a", pool,
             "--left", self.cor1(), "--right", self.cor2(),
             *self.pytransrate_memory_args(mem),
             *self.pytransrate_args,
-            retry_cleanup=partial(self.clear_transrate_outdir, outdir, pool),
+            retry_cleanup=partial(self.clear_pytransrate_outdir, outdir, pool),
         )
 
     def twotrack_select(self):
@@ -2109,20 +2109,34 @@ class Pipeline:
         shutil.move(str(work), str(final))
         (self.reports_dir / f"{self.runout}.busco.done").touch()
 
-    def transrate(self, cpu=None, mem=None):
+    def adopt_pre_rename_reports(self):
+        """Carry reports/transrate_<run>/ across its rename to pytransrate_<run>/.
+
+        Before 4.1.0-dev9 the final scoring step was called `transrate` and
+        wrote there. Renaming the directory in place, rather than letting the
+        step find its new output missing, keeps a resumed run from scoring
+        the assembly all over again.
+        """
+        old = self.reports_dir / f"transrate_{self.runout}"
+        new = self.reports_dir / f"pytransrate_{self.runout}"
+        if old.is_dir() and not new.exists():
+            old.rename(new)
+            print(f"[resume] renamed {self._rel(old)} to {self._rel(new)}")
+
+    def pytransrate(self, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
         mem = self.mem if mem is None else mem
         orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
-        outdir = self.reports_dir / f"transrate_{self.runout}"
-        # See score_pool() and clear_transrate_outdir.
-        self.clear_transrate_outdir(outdir, orp_fasta)
+        outdir = self.reports_dir / f"pytransrate_{self.runout}"
+        # See score_pool() and clear_pytransrate_outdir.
+        self.clear_pytransrate_outdir(outdir, orp_fasta)
         self.conda_run(
             "orp", "pytransrate",
             "-o", outdir, "-a", orp_fasta,
             "--left", self.cor1(), "--right", self.cor2(), "-t", cpu,
             *self.pytransrate_memory_args(mem),
             *self.pytransrate_args,
-            retry_cleanup=partial(self.clear_transrate_outdir, outdir, orp_fasta),
+            retry_cleanup=partial(self.clear_pytransrate_outdir, outdir, orp_fasta),
         )
 
     def trinity_perllib_dir(self):
@@ -2228,12 +2242,12 @@ class Pipeline:
                     busco_line = line.strip()
         emit("*****  BUSCO SCORE ~~~~~~~~~~~~~~~~~~~~~~>", busco_line)
 
-        csv_path = next((self.reports_dir / f"transrate_{runout}").rglob("assemblies.csv"), None)
+        csv_path = next((self.reports_dir / f"pytransrate_{runout}").rglob("assemblies.csv"), None)
         rows = list(csv.reader(open(csv_path))) if csv_path else []
-        transrate_score = rows[1][36] if len(rows) > 1 and len(rows[1]) > 36 else ""
-        transrate_optimal = rows[1][37] if len(rows) > 1 and len(rows[1]) > 37 else ""
-        emit("*****  TRANSRATE SCORE ~~~~~~~~~~~~~~~~~~>     ", transrate_score)
-        emit("*****  TRANSRATE OPTIMAL SCORE ~~~~~~~~~~>     ", transrate_optimal)
+        pytransrate_score = rows[1][36] if len(rows) > 1 and len(rows[1]) > 36 else ""
+        pytransrate_optimal = rows[1][37] if len(rows) > 1 and len(rows[1]) > 37 else ""
+        emit("*****  PYTRANSRATE SCORE ~~~~~~~~~~~~~~~~>     ", pytransrate_score)
+        emit("*****  PYTRANSRATE OPTIMAL SCORE ~~~~~~~~>     ", pytransrate_optimal)
 
         def read_count(path):
             return path.read_text().strip() if path.exists() else ""
@@ -2539,7 +2553,7 @@ class Pipeline:
         high_txt = self.assemblies_working / f"{self.runout}.HIGHEXP.txt"
         orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
         busco_done = self.reports_dir / f"{self.runout}.busco.done"
-        transrate_csv = self.reports_dir / f"transrate_{self.runout}" / "assemblies.csv"
+        pytransrate_csv = self.reports_dir / f"pytransrate_{self.runout}" / "assemblies.csv"
         strandeval_done = self.reports_dir / f"{self.runout}.strandeval.done"
         qualreport_done = self.reports_dir / f"qualreport.{self.runout}.done"
         cleanup_done = self.reports_dir / f"{self.runout}.cleanup.done"
@@ -2579,13 +2593,13 @@ class Pipeline:
         self.after_pick(c1, c2, diamond_outs, diamond_shucked, shucked_fasta, uniq_outs,
                         list1, list2, list3, list5, list6, list7, newbies, working_shucked,
                         orp_intermediate, orp_diamond_txt, unique_orp_done, shucked_idx, quant_sf,
-                        filter_done, low_txt, high_txt, orp_fasta, busco_done, transrate_csv,
+                        filter_done, low_txt, high_txt, orp_fasta, busco_done, pytransrate_csv,
                         strandeval_done, qualreport_done, cleanup_done, pipeline_start)
 
     def after_pick(self, c1, c2, diamond_outs, diamond_shucked, shucked_fasta, uniq_outs,
                    list1, list2, list3, list5, list6, list7, newbies, working_shucked,
                    orp_intermediate, orp_diamond_txt, unique_orp_done, shucked_idx, quant_sf,
-                   filter_done, low_txt, high_txt, orp_fasta, busco_done, transrate_csv,
+                   filter_done, low_txt, high_txt, orp_fasta, busco_done, pytransrate_csv,
                    strandeval_done, qualreport_done, cleanup_done, pipeline_start):
         """Everything after good_list exists."""
 
@@ -2621,21 +2635,22 @@ class Pipeline:
             self.secondfilter,
         )
         # BUSCO gets the whole of --cpu/--busco-threads to itself. strandeval
-        # (a few minutes) runs beside transrate (pytransrate over the final
-        # assembly, much longer) on a few threads of its own, rather than
-        # taking half the cores from transrate for transrate's whole run.
+        # (a few minutes) runs beside the final pyTransRate scoring (much
+        # longer) on a few threads of its own, rather than taking half its
+        # cores for the whole of its run.
         self.step("busco", [busco_done], [orp_fasta], self.busco)
+        self.adopt_pre_rename_reports()
         self.run_beside(
-            ("transrate", [transrate_csv], [orp_fasta, c1, c2], self.transrate),
+            ("pytransrate", [pytransrate_csv], [orp_fasta, c1, c2], self.pytransrate),
             ("strandeval", [strandeval_done], [orp_fasta, c1, c2], self.strandeval),
             *self.side_job_budget(),
         )
-        # Everything the report quotes, so a re-scored transrate or BUSCO
+        # Everything the report quotes, so a re-scored pyTransRate or BUSCO
         # (say, against newer reads) rewrites the report rather than leaving
         # the old numbers in it.
         self.step(
             "reportgen", [qualreport_done],
-            [unique_orp_done, orp_fasta, busco_done, transrate_csv, strandeval_done] + uniq_outs,
+            [unique_orp_done, orp_fasta, busco_done, pytransrate_csv, strandeval_done] + uniq_outs,
             self.reportgen,
         )
         # Last, because it deletes inputs several of the steps above declare.
@@ -2675,7 +2690,7 @@ def parse_args():
         "--max-parallel", type=int, default=2,
         help="2 or more (the default) runs a short independent job beside a long "
              "one on a few threads of its own: the remaining diamond passes beside "
-             "score_pool, and strandeval beside transrate. 1 runs them one after "
+             "score_pool, and strandeval beside pyTransRate. 1 runs them one after "
              "the other. The assemblers' two stage-pairings (see "
              "TRINITY_PHASE1_SHARE/TRINITY_PHASE2_SHARE) are unaffected (default: 2)",
     )
@@ -2692,7 +2707,7 @@ def parse_args():
     )
     p.add_argument(
         "--pytransrate-args", default="",
-        help="extra arguments passed verbatim to both pytransrate runs, as one "
+        help="extra arguments passed verbatim to both pyTransRate runs, as one "
              "quoted string, e.g. --pytransrate-args '--location-size 5'. For "
              "the snap index tuning a large merge needs: --location-size skips "
              "the sweep when you already know four byte locations will not hold "

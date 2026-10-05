@@ -43,11 +43,11 @@ python3 chowder.py --assemblies best.fasta other.fasta third.fasta.gz \
         --read1 R1.fq.gz --read2 R2.fq.gz --mem 110 --cpu 24 --runout runname
 ```
 
-It is the same code rather than a copy of it -- `chowder.py` subclasses `oyster.py`'s pipeline and reuses the merge stages wholesale -- so the two-track selection rule, the contig ordering that reaches cd-hit-est's tie-breaks, and the pytransrate scoring are identical to a full ORP run's by construction. The output is a `<run>.ORP.fasta` and a `reports/qualreport.<run>` in the usual layout, with one `UNIQUE GENES` line per input assembly.
+It is the same code rather than a copy of it -- `chowder.py` subclasses `oyster.py`'s pipeline and reuses the merge stages wholesale -- so the two-track selection rule, the contig ordering that reaches cd-hit-est's tie-breaks, and the pyTransRate scoring are identical to a full ORP run's by construction. The output is a `<run>.ORP.fasta` and a `reports/qualreport.<run>` in the usual layout, with one `UNIQUE GENES` line per input assembly.
 
 Three things differ from `oyster.py`, and all three are worth knowing before you run it:
 
-- **The reads are not optional.** The merge scores every contig against them (pytransrate), quantifies the survivors (salmon) and strand-checks the result, so it needs the library the assemblies were built from. It trims and error-corrects that library the way ORP always does; pass `--corrected-reads` if your pair has already been through trimmomatic and rcorrector, and it will use it as-is.
+- **The reads are not optional.** The merge scores every contig against them (pyTransRate), quantifies the survivors (salmon) and strand-checks the result, so it needs the library the assemblies were built from. It trims and error-corrects that library the way ORP always does; pass `--corrected-reads` if your pair has already been through trimmomatic and rcorrector, and it will use it as-is.
 - **Contig names are prefixed with the label of the assembly they came from** (`trinity_TRINITY_DN0_c0_g1_i1`). Two assemblies of one library routinely share contig names -- two Trinity runs both start at `TRINITY_DN0_c0_g1_i1` -- and every stage downstream joins on that name, so without the prefix two different contigs would silently be treated as one. It doubles as provenance: every contig in the final assembly says which input it survived from. Labels come from the filenames unless you pass `--labels`.
 - **Assembly order matters, and by default it is not yours to get wrong.** It sets contig order in the pooled fasta, which reaches cd-hit-est, where input order breaks length ties between near-identical contigs; and it is the order the diamond rescue searches, so for genes the selection missed, earlier assemblies are preferred. Rather than let the sequence you happened to type decide either of those, chowder sorts the assemblies by label and permutes them with a fixed seed, so the order depends on the *set* of assemblies and not on how you listed them. It is a seeded shuffle rather than a random one on purpose: randomising outright would mean the same command gave a different assembly on a different day, and a resumed run disagreeing with the run it resumed. The order used and the seed that produced it are printed when the run starts and written to `assemblies/<run>.ingest.done`.
 
@@ -62,7 +62,7 @@ From 4.1.0 the four assemblies are merged by Swiss-Prot gene, not by OrthoFinder
 - **Contigs with a Swiss-Prot hit** are grouped by the gene of their best hit -- the same gene names the qualreport's UNIQUE GENES counts. Each gene keeps one representative (the longest of the contigs whose hit covers close to the best fraction of the protein), plus up to two more copies that are both distinct from it (it covers under half of them) and expressed (at least 1 TPM): other isoforms, paralogs under the same name.
 - **Contigs without a hit** are deduplicated with cd-hit-est on both strands, and the TPM filter (`--tpm-filt`) later drops those below threshold.
 
-Everything after that -- the diamond rescue, cd-hit-est, salmon, the TPM filter, BUSCO, transrate -- is unchanged. On 10 test samples this cut duplicated BUSCOs by about 90% against ORP 4.0 while keeping complete BUSCOs and raising unique genes; the experiments behind it are in `experiments/redundancy/`. The OrthoFinder merge ORP used through 4.0 was removed in 5.0, so a 5.0 assembly is not directly comparable with a 4.x one.
+Everything after that -- the diamond rescue, cd-hit-est, salmon, the TPM filter, BUSCO, pyTransRate -- is unchanged. On 10 test samples this cut duplicated BUSCOs by about 90% against ORP 4.0 while keeping complete BUSCOs and raising unique genes; the experiments behind it are in `experiments/redundancy/`. The OrthoFinder merge ORP used through 4.0 was removed in 5.0, so a 5.0 assembly is not directly comparable with a 4.x one.
 
 ### Parallel task management
 
@@ -78,7 +78,7 @@ This split is fixed and not affected by `--max-parallel`.
 Two later pairs of steps are independent of each other, and each pairs a short job with a long one. By default (`--max-parallel 2`) the short job runs beside the long one on a few threads of its own (a quarter of `--cpu`, at most 8 for strandeval), while the long job keeps all of `--cpu`:
 
 - the diamond passes not already run in an assembler lane (Trinity's under oyster.py, every assembly's under chowder.py) beside `score_pool`
-- strandeval beside transrate
+- strandeval beside pyTransRate
 
 The short job's memory (a quarter of `--mem`, at most 16 GB) comes out of the long job's budget, so memory is never overcommitted. This used to split the cores evenly, which left the short job's half of the machine idle once it finished while the long job carried on at half speed.
 
@@ -93,10 +93,10 @@ A completed run keeps five things and reclaims the rest:
 | `assemblies/<run>.ORP.fasta` | the assembly — the point of the run, left uncompressed |
 | `assemblies/<run>.{spadesauto,spadeshigh,transabyss,trinity.Trinity}.fasta.gz` | the four individual assemblies, gzipped |
 | `rcorr/<run>.TRIM_{1,2}P.cor.fq.gz` | the trimmed **and error-corrected** reads, gzipped — the pair every assembler actually read |
-| `reports/` | BUSCO, transrate, strand evaluation, `qualreport.<run>`, timings |
+| `reports/` | BUSCO, pyTransRate, strand evaluation, `qualreport.<run>`, timings |
 | `reports/<run>.cleanup.done` | what was reclaimed and what was kept, with sizes |
 
-Everything else goes: the trimmed-but-uncorrected reads (deleted as soon as read correction is done with them — nothing downstream ever reads them again), the `shuck/` tree (the pooled fasta and its transrate scoring, normally the largest directory in a run), `quants/`, `assemblies/diamond/`, `assemblies/working/`, and the chain of working assemblies between `shuck` and `.ORP.fasta`. Every number any of those contributed is already in `reports/qualreport.<run>`.
+Everything else goes: the trimmed-but-uncorrected reads (deleted as soon as read correction is done with them — nothing downstream ever reads them again), the `shuck/` tree (the pooled fasta and its pyTransRate scoring, normally the largest directory in a run), `quants/`, `assemblies/diamond/`, `assemblies/working/`, and the chain of working assemblies between `shuck` and `.ORP.fasta`. Every number any of those contributed is already in `reports/qualreport.<run>`.
 
 The gzipping runs in the background, starting the moment each file is finished being written rather than at the end of the run — the corrected reads compress alongside the assemblers, and each assembly compresses while the next stage runs — so cleanup itself is just an unlink and adds no wall time. Pass `--no-cleanup` to switch all of this off and keep a run exactly as it was, which is what you want when debugging a run rather than shipping its results. It also keeps what individual steps would otherwise delete as they finish: Trinity's working directory (Phase 2 runs without `--full_cleanup`), the rnaSPAdes and Trans-ABySS working directories, and strandeval's BAM and bwa index. Running the same command again later without the flag does the cleanup then. `--keep-intermediates` is an older name for the same flag and still works.
 
@@ -104,9 +104,9 @@ Re-running `oyster.py` on a directory whose run already finished and was cleaned
 
 Re-running on an unfinished run resumes it: a step whose outputs exist and are newer than its inputs is skipped. A step that was killed or failed partway is re-run even if it left output files behind, since tools like rcorrector and diamond write as they go and a half-written file would otherwise look finished. Each step leaves `reports/.<run>.<step>.running` while it runs and removes it when it succeeds.
 
-### Tuning pytransrate
+### Tuning pyTransRate
 
-Both pytransrate runs -- the one that scores the pooled fasta for the two-track selection, and the one that scores the finished assembly for the report -- take a fixed argument list. `--pytransrate-args` appends to both, as one quoted string, `shlex`-split so the arguments arrive separately:
+Both pyTransRate runs -- the one that scores the pooled fasta for the two-track selection, and the one that scores the finished assembly for the report -- take a fixed argument list. `--pytransrate-args` appends to both, as one quoted string, `shlex`-split so the arguments arrive separately:
 
 ```bash
 python3 chowder.py --assemblies a.fasta b.fasta --read1 R1.fq.gz --read2 R2.fq.gz \
@@ -140,7 +140,7 @@ Because it appends, a value given here overrides the same flag ORP passes above 
 | `--transabyss-kmer` | `32` | Trans-ABySS k-mer |
 | `--max-parallel` | `2` | `1` runs the short jobs that would otherwise run beside a long one (see [Parallel task management](#parallel-task-management) above) one after the other |
 | `--no-cleanup` | off | Keep every file a run produces, uncompressed, including each assembler's working directory -- for debugging (see [What a finished run leaves behind](#what-a-finished-run-leaves-behind) below). Alias: `--keep-intermediates` |
-| `--pytransrate-args` | none | Extra arguments passed verbatim to both pytransrate runs, as one quoted string (see [Tuning pytransrate](#tuning-pytransrate) below) |
+| `--pytransrate-args` | none | Extra arguments passed verbatim to both pyTransRate runs, as one quoted string (see [Tuning pyTransRate](#tuning-pytransrate) below) |
 | `--dir` | current directory | Working directory |
 | `--version` | — | Print the installed ORP version and exit |
 | `--help` | — | Print this same flag reference and exit |
@@ -166,7 +166,7 @@ There are no assembler flags — no k-mers, no `--strand`, no `--normalize-reads
 | `--tpm-filt` | `0` | TPM filter threshold |
 | `--max-parallel` | `2` | `1` runs the short jobs that would otherwise run beside a long one (see [Parallel task management](#parallel-task-management) above) one after the other |
 | `--no-cleanup` | off | Keep every file the run produces, uncompressed -- for debugging. Alias: `--keep-intermediates` |
-| `--pytransrate-args` | none | Extra arguments passed verbatim to both pytransrate runs (see [Tuning pytransrate](#tuning-pytransrate) above) |
+| `--pytransrate-args` | none | Extra arguments passed verbatim to both pyTransRate runs (see [Tuning pyTransRate](#tuning-pytransrate) above) |
 | `--dir` | current directory | Working directory |
 | `--version` | — | Print the installed ORP version and exit |
 | `--help` | — | Print this same flag reference and exit |

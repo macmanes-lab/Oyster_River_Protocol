@@ -192,7 +192,7 @@
 
   <figure>
     <div class="diagram-frame">
-      <svg viewBox="0 0 1000 1980" role="img" aria-label="Directed acyclic graph of oyster.py's pipeline at --max-parallel 2: a long sequential chain of steps interrupted by four concurrent stages -- always-on Stage A (Trinity phase 1 vs. spadesauto/spadeshigh, 25/75 split) then Stage B (Trinity phase 2 vs. Trans-ABySS, 95/5 split), the remaining diamond passes running beside pool_branch, and strandeval running beside transrate. The two-track selection joins the pool and the diamond hits. The chain ends at reportgen and then cleanup.">
+      <svg viewBox="0 0 1000 1980" role="img" aria-label="Directed acyclic graph of oyster.py's pipeline at --max-parallel 2: a long sequential chain of steps interrupted by four concurrent stages -- always-on Stage A (Trinity phase 1 vs. spadesauto/spadeshigh, 25/75 split) then Stage B (Trinity phase 2 vs. Trans-ABySS, 95/5 split), the remaining diamond passes running beside pool_branch, and strandeval running beside the final pyTransRate scoring. The two-track selection joins the pool and the diamond hits. The chain ends at reportgen and then cleanup.">
         <defs>
           <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
             <path d="M0,0 L10,5 L0,10 z" fill="currentColor" class="flow-marker"></path>
@@ -442,11 +442,11 @@
         <!-- BAND C -->
         <rect class="band-fixed" x="250" y="1640" width="500" height="160" rx="16"></rect>
         <text class="t-band" x="500" y="1661" text-anchor="middle" font-size="12">SIDE JOB AT --max-parallel 2</text>
-        <text class="t-sub" x="500" y="1675" text-anchor="middle" font-size="10.5">run_beside(transrate, strandeval)</text>
+        <text class="t-sub" x="500" y="1675" text-anchor="middle" font-size="10.5">run_beside(pytransrate, strandeval)</text>
 
         <g class="node-work">
           <rect x="285" y="1692" width="190" height="34" rx="6"></rect>
-          <text x="380" y="1713" text-anchor="middle">transrate</text>
+          <text x="380" y="1713" text-anchor="middle">pytransrate</text>
         </g>
         <text class="t-note" x="380" y="1742" text-anchor="middle" font-size="10">all of --cpu</text>
         <g class="node-side">
@@ -490,8 +490,8 @@
     <ol>
       <li><strong>Stage A: Trinity phase 1 vs. spadesauto/spadeshigh (always on).</strong> Phase 1 is largely insensitive to its CPU share above Inchworm's own <code>--inchworm_cpu=10</code> cap, so it only needs <code>TRINITY_PHASE1_SHARE</code> (25%) of the CPU/mem budget; rnaSPAdes -- fast, but does scale with cores -- gets the rest. Each SPAdes assembly is followed immediately by its own DIAMOND search.</li>
       <li><strong>Stage B: Trinity phase 2 vs. Trans-ABySS (always on).</strong> Phase 2 (thousands of independent per-gene-component ParaFly jobs, by far Trinity's dominant cost -- around 34h on the SRR1789336 benchmark) gets <code>TRINITY_PHASE2_SHARE</code> (95%) of CPU; Trans-ABySS gets the rest, since its own dominant cost -- the initial FASTQ read + De Bruijn graph build -- runs single-threaded no matter how many cores it's given (traced to <code>abyss-pe</code> falling through to the plain, unthreaded <code>ABYSS</code> binary; see NOTES.md 2026-08-19). Its mem share isn't cut the same way, since its memory footprint doesn't shrink with fewer cores.</li>
-      <li><strong>The remaining diamond passes beside pool_branch.</strong> The two-track selection needs every assembly's Swiss-Prot hits as well as the pool's scores, and the two are independent until <code>twotrack_select</code>. Under oyster.py the assembler lanes have already run three of the four searches, so only Trinity's is left (its lane has only just finished); under chowder.py none have run. <code>score_pool</code> (pytransrate over the pool, hours) keeps all of <code>--cpu</code>; the diamond passes run beside it on a quarter of <code>--cpu</code>, with a quarter of <code>--mem</code> (at most 16 GB) taken out of pytransrate's budget.</li>
-      <li><strong>strandeval beside transrate.</strong> strandeval takes minutes and transrate much longer, so splitting the cores evenly, which ORP did through 4.1.0-dev8, left strandeval's half idle for most of transrate's run. transrate now keeps every core and strandeval runs on a quarter of <code>--cpu</code>, at most 8 threads. BUSCO just before them shares its budget with nothing.</li>
+      <li><strong>The remaining diamond passes beside pool_branch.</strong> The two-track selection needs every assembly's Swiss-Prot hits as well as the pool's scores, and the two are independent until <code>twotrack_select</code>. Under oyster.py the assembler lanes have already run three of the four searches, so only Trinity's is left (its lane has only just finished); under chowder.py none have run. <code>score_pool</code> (pyTransRate over the pool, hours) keeps all of <code>--cpu</code>; the diamond passes run beside it on a quarter of <code>--cpu</code>, with a quarter of <code>--mem</code> (at most 16 GB) taken out of pytransrate's budget.</li>
+      <li><strong>strandeval beside the final pyTransRate scoring.</strong> strandeval takes minutes and the <code>pytransrate</code> step over the finished assembly much longer, so splitting the cores evenly, which ORP did through 4.1.0-dev8, left strandeval's half idle for most of pyTransRate's run. pyTransRate now keeps every core and strandeval runs on a quarter of <code>--cpu</code>, at most 8 threads. BUSCO just before them shares its budget with nothing.</li>
     </ol>
 
     <h2>One thing this diagram deliberately doesn't show</h2>

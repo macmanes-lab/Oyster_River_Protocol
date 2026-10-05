@@ -22,7 +22,7 @@
 #exactly what qualreport's UNIQUE GENES counts.
 #  Step 1, the representative: among the gene's contigs whose best hit covers
 #    at least --near (0.9) of the best protein coverage any of them reaches,
-#    the longest; ties to the higher transrate contig score, then TPM, then
+#    the longest; ties to the higher pyTransRate contig score, then TPM, then
 #    name. Protein coverage alone favoured coding-only contigs and lost the
 #    UTRs and ends where many reads land; length among the near-best restores
 #    them without adding a contig.
@@ -46,12 +46,12 @@
 #(the uniprot_sprot.fasta the diamond database was built from). Without it,
 #contigs are ranked by aligned length instead.
 #
-#TPM is pytransrate's salmon estimate on the pool (contigs.csv), split across
+#TPM is pyTransRate's salmon estimate on the pool (contigs.csv), split across
 #redundant copies, so it understates the expression of any one of them.
 #
 #--table writes one row per pooled contig: contig, track, gene, role
 #(representative / rescued / dropped / nohit_kept / nohit_dropped), protein
-#coverage, length, transrate score, TPM.
+#coverage, length, pyTransRate score, TPM.
 
 import argparse
 import csv

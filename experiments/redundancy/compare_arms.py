@@ -65,7 +65,10 @@ def busco(run_dir, run):
 
 
 def transrate(run_dir, run):
-    path = run_dir / "reports" / f"transrate_{run}" / "assemblies.csv"
+    # pytransrate_<run>/ from ORP 4.1.0-dev9, transrate_<run>/ before it.
+    path = next((p for p in (run_dir / "reports" / f"{d}_{run}" / "assemblies.csv"
+                             for d in ("pytransrate", "transrate")) if p.is_file()),
+                run_dir / "reports" / f"pytransrate_{run}" / "assemblies.csv")
     if not path.is_file():
         return {}
     row = next(csv.DictReader(open(path)), {})

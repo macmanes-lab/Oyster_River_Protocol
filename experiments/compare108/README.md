@@ -161,8 +161,9 @@ manifest line, in manifest order, identified four ways:
 `run` and `srr` differ only for the samples that shared an accession and were
 disambiguated: there `run` is `SRR807358_tsa_BBBA` while `srr` stays `SRR807358`.
 
-Then the metrics: every pytransrate column from
-`reports/transrate_<run>/assemblies.csv` (including `score` and `optimal_score`),
+Then the metrics: every pyTransRate column from
+`reports/pytransrate_<run>/assemblies.csv` (`transrate_<run>/` before 4.1.0-dev9;
+including `score` and `optimal_score`),
 BUSCO C/S/D/F/M/n from `reports/run_<run>.ORP/short*.txt`, unique SwissProt genes
 and proper-pair rate. Columns come from the csv header by name, not by position.
 

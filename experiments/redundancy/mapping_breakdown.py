@@ -21,7 +21,7 @@ def main():
     print(f"{'sample':11s}{'arm':11s}{'mapped':>8s}{'good':>8s}{'bad':>8s}{'bridges':>10s}")
     for s in samples:
         for arm in arms:
-            f = glob.glob(f"{vdir}/{s}/{arm}/reports/transrate_*/assemblies.csv")
+            f = glob.glob(f"{vdir}/{s}/{arm}/reports/*transrate_*/assemblies.csv")
             if not f:
                 continue
             r = next(csv.DictReader(open(f[0])))

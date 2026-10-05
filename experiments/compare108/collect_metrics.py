@@ -4,7 +4,8 @@
 Each run made by orp_array.sbatch lives in <runs>/<SRR>/ with the shape oyster.py
 gives it, so everything here is read from where the pipeline actually writes it:
 
-    reports/transrate_<SRR>/**/assemblies.csv   pytransrate, final ORP assembly
+    reports/pytransrate_<SRR>/**/assemblies.csv pyTransRate, final ORP assembly
+                                                (transrate_<SRR>/ before 4.1.0-dev9)
     reports/run_<SRR>.ORP/**/short*.txt         BUSCO
     assemblies/working/<SRR>.unique.ORP.txt     unique SwissProt genes
     assemblies/<SRR>.flagstat                   reads mapped as proper pairs
@@ -60,8 +61,10 @@ def read_busco(reports, srr):
 
 
 def read_transrate(reports, srr):
-    csv_path = first((reports / f"transrate_{srr}").rglob("assemblies.csv")) \
-        if (reports / f"transrate_{srr}").is_dir() else None
+    # pytransrate_<run>/ from ORP 4.1.0-dev9, transrate_<run>/ before it.
+    outdir = next((reports / f"{p}_{srr}" for p in ("pytransrate", "transrate")
+                   if (reports / f"{p}_{srr}").is_dir()), None)
+    csv_path = first(outdir.rglob("assemblies.csv")) if outdir else None
     if csv_path is None:
         return {}, "no transrate csv"
     rows = list(csv.DictReader(csv_path.open()))

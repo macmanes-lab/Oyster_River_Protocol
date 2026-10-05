@@ -33,7 +33,7 @@ From a whole-repo review before cutting v5. One commit each:
 - TPM == `--tpm-filt` now counts as high (it used to be dropped).
 - `run_parallel` -> `run_beside`: the long job keeps all of `--cpu`, and
   the short one gets 1/4 of it (strandeval capped at 8) on top, with memory
-  taken from the long job's budget. Used for strandeval beside transrate,
+  taken from the long job's budget. Used for strandeval beside pyTransRate,
   and for the remaining per-assembly diamonds beside `score_pool` (they used
   to wait for it).
 - `run_filtershort` runs `long.seq.py` on all assemblies in parallel.
@@ -48,9 +48,19 @@ markers, the startup checks, the TPM tie, BUSCO re-runs. The OrthoFinder
 memory/MCL investigation entries (09-19 to 09-21) are collapsed into a
 short closure note.
 
+Also same day: transrate -> pyTransRate throughout the current code and
+docs. Report labels are `PYTRANSRATE SCORE`/`PYTRANSRATE OPTIMAL SCORE`,
+the step is `pytransrate`, and the output is `reports/pytransrate_<run>/`
+(`adopt_pre_rename_reports` renames an old `transrate_<run>/` on resume).
+`collect_metrics.py`, `compare_arms.py`, `mapping_breakdown.py` and
+`run_dup_pairs_all.sh` read either name. Historical changelog/NOTES
+entries and benchmarks.md keep "transrate", which often means the old Ruby
+tool. Anything else that greps qualreports for `TRANSRATE SCORE` needs
+the new label.
+
 **How it was tested.** No conda on the laptop, so a fake-tool harness: a
 stub `conda` that execs fake trimmomatic/rcorrector/assemblers/diamond/
-pytransrate/salmon/busco/etc. Full oyster.py and chowder.py runs,
+pyTransRate/salmon/busco/etc. Full oyster.py and chowder.py runs,
 resume-after-failure cases, BUSCO re-runs, preflight with missing tools and
 databases, `--max-parallel 1`. Final assemblies were compared byte for byte
 against the previous commit for the filtershort and hits_for changes. The

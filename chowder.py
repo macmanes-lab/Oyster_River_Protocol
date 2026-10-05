@@ -7,7 +7,7 @@ Usage:
                --runout myrun
 
 Everything oyster.py does after its four assemblers have finished, run over
-assemblies you already have: pytransrate scores the pooled contigs, they
+assemblies you already have: pyTransRate scores the pooled contigs, they
 are reduced to one assembly (one contig per swissprot gene plus distinct
 expressed copies, and cd-hit-est over contigs without a hit), genes the
 selection missed are rescued by their diamond hits, cd-hit-est collapses
@@ -22,7 +22,7 @@ therefore the same ones by construction, and cannot drift from ORP's.
 Two things to know before running it:
 
   * Reads are not optional. The merge scores every contig against them
-    (pytransrate), quantifies the survivors (salmon), and strand-checks the
+    (pyTransRate), quantifies the survivors (salmon), and strand-checks the
     result -- so a merge needs the library the assemblies came from, and
     trims and error-corrects it the way ORP always does. Pass
     --corrected-reads if you are handing over reads that have already
@@ -330,7 +330,7 @@ class Chowder(Pipeline):
         """Copy each input under assemblies/ingested/, prefixing every contig name.
 
         Prefixing is not cosmetic. Contig names are the key every downstream
-        stage joins on -- the swissprot hits, pytransrate's
+        stage joins on -- the swissprot hits, pyTransRate's
         contigs.csv, filter.py's keep-lists -- and two assemblies of one
         library routinely share them. Unprefixed, two contigs called
         TRINITY_DN0_c0_g1_i1 would be silently treated as one.
@@ -430,7 +430,7 @@ class Chowder(Pipeline):
             return super().prepare_reads()
         # oyster.py's own staging, not a copy of it: this used to symlink
         # unconditionally, so a gzipped pair landed under the .cor.fq name
-        # and snap (in pytransrate) read gzip bytes as FASTQ. The inherited
+        # and snap (in pyTransRate) read gzip bytes as FASTQ. The inherited
         # method decompresses a gzipped pair and symlinks a plain one.
         self.use_corrected_reads()
 
@@ -480,7 +480,7 @@ def parse_args():
         "--max-parallel", type=int, default=2,
         help="2 or more (the default) runs a short independent job beside a long "
              "one on a few threads of its own: the diamond passes beside score_pool, "
-             "and strandeval beside transrate. 1 runs them one after the other "
+             "and strandeval beside pyTransRate. 1 runs them one after the other "
              "(default: 2)",
     )
     p.add_argument(
@@ -493,7 +493,7 @@ def parse_args():
     )
     p.add_argument(
         "--pytransrate-args", default="",
-        help="extra arguments passed verbatim to both pytransrate runs, as one "
+        help="extra arguments passed verbatim to both pyTransRate runs, as one "
              "quoted string, e.g. --pytransrate-args '--location-size 5'. For "
              "the snap index tuning a large merge needs: --location-size skips "
              "the sweep when you already know four byte locations will not hold "
