@@ -15,8 +15,10 @@ file), oyster_options/oyster_resume (their own run_transabyss marker gone at
 unlink) and oyster_killed (marker gone 2 s in) look like two release checks
 sharing one workdir -- oyster.py did not change since dev13's 18/18 -- so
 the harness now takes `<workdir>/.release_check.lock` (O_EXCL, not flock:
-GPFS) and refuses a second run. Unconfirmed that two ran. bad_reads passed:
-trimmomatic does reject a truncated gzip. rcorrector kill delay 2 s -> 1 s.
+GPFS) and refuses a second run. Confirmed: slurm jobs 1320392 and 1320394
+ran together. bad_reads passed: trimmomatic does reject a truncated gzip.
+rcorrector kill delay 2 s -> 1 s. dev15 on the cluster (one job, --jobs 4
+--cpu 10 --mem 32): 22/22 passed, ~20 min wall.
 
 ## 2026-10-05 -- 4.1.0-dev14: release check gains failure, kill and simulated-data cases
 
