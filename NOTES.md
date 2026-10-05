@@ -5,6 +5,30 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-10-05 -- 4.1.0-dev14: release check gains failure, kill and simulated-data cases
+
+Four new full-tier cases in `tests/release_check.py`:
+- `oyster_killed`: SIGKILLs the whole process group 2-5 s into
+  run_rcorrector, run_transabyss and busco in turn, checks each `.running`
+  marker survived, resumes, and compares the corrected-read count with
+  oyster_default's. Also every finished run now fails on a leftover `*.part`.
+- `chowder_failed_step`: `--pytransrate-args=--no-such-flag` -> score_pool
+  retried twice (2 x 60 s), run stops, marker left, nothing downstream ran;
+  the rerun without it redoes score_pool and keeps ingest.
+- `bad_reads`: a gzip truncated at 60% must fail before Stage A.
+- `sim_oyster`: `tests/simulate_reads.py` builds a ~15k-pair RF library from
+  the installed BUSCO lineage's ancestral proteins (16 high / 4 low BUSCO
+  genes, 5 high / 5 low random no-ORF transcripts, adapter read-through,
+  0.2% errors). Checks recovery, BUSCO count, no adapter in ORP.fasta,
+  strandedness in `<run>.dat`, and that `--tpm-filt` drops low no-hit
+  contigs but keeps low contigs with a diamond hit.
+Untested on the cluster. Unknowns: whether odb12.2 ships `ancestral` (falls
+back to refseq_db.faa.gz, else the case skips); whether trimmomatic fails on
+a truncated gzip at all; whether 5x coverage assembles the low class (the case
+says so explicitly if not). Aside: `scripts/examine_strand.pl` shifts
+`@structs` inside `foreach (@structs)`, so `.dat` holds only about half the
+transcripts -- inherited from Trinity's script, not yet fixed.
+
 ## 2026-10-05 -- 4.1.0-dev13: release check (tests/release_check.py)
 
 Pre-release / pre-push test of function on `sampledata/test.{1,2}.fq.gz`.

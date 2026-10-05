@@ -20,7 +20,7 @@ status. Three tiers, each a superset of the cost of the one before:
              assembly.
   full       needs the conda envs and the databases; minutes per run, most of
              an hour in all with --jobs 1. Complete runs through every
-             option, then the resume, rerun and cleanup paths:
+             option, then the resume, rerun, cleanup and failure paths:
 
                oyster_default      defaults; a rerun is a no-op
                oyster_options      --strand RF --normalize-reads --tpm-filt 1
@@ -42,6 +42,20 @@ status. Three tiers, each a superset of the cost of the one before:
                                                                (oyster_default)
                strandeval_standalone  scripts/strandeval.py, with and without
                                    --no-cleanup                (oyster_default)
+               oyster_killed       SIGKILLed mid-rcorrector, mid-assembly and
+                                   mid-BUSCO; each resume picks up the
+                                   unfinished step and the last one finishes
+               chowder_failed_step a step that keeps failing is retried, stops
+                                   the run and leaves its marker; the fixed
+                                   rerun redoes it and finishes (oyster_default)
+               bad_reads           a truncated read file stops the run before
+                                   the assemblers
+               sim_oyster          tests/simulate_reads.py's RF library, whose
+                                   answer is known: genes recovered, BUSCO
+                                   genes found, no adapter in the assembly,
+                                   strandedness detected, and --tpm-filt
+                                   drops low no-hit contigs but keeps low
+                                   contigs with a swissprot hit
 
 Each case works in <workdir>/<case>/ (cleared when the case starts) and logs
 every command and its output to <workdir>/logs/<case>.log. A case is skipped
@@ -65,6 +79,7 @@ import io
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -76,6 +91,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 sys.path.insert(0, str(REPO))
+sys.path.insert(0, str(HERE))
 
 OYSTER = REPO / "oyster.py"
 CHOWDER = REPO / "chowder.py"
@@ -168,6 +184,45 @@ class Runner:
                               f"see {self.log}\n{tail}")
         return proc.stdout
 
+    def watch(self, cmd, trigger=None, delay=0.0, cwd=None):
+        """Run `cmd` in its own process group; once a line containing
+        `trigger` appears, SIGKILL the whole group `delay` seconds later --
+        the way a walltime or OOM kill lands, with no chance to clean up.
+
+        Returns (output, exit status). A killed run's status is -9.
+        """
+        cmd = [str(c) for c in cmd]
+        lines, timer = [], None
+        with open(self.log, "a") as log:
+            log.write(f"\n$ {' '.join(cmd)}\n")
+            log.flush()
+            proc = subprocess.Popen(cmd, cwd=str(cwd or self.ctx.workdir),
+                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                    universal_newlines=True, start_new_session=True)
+
+            def kill():
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError):
+                    pass
+
+            for line in proc.stdout:
+                log.write(line)
+                lines.append(line)
+                if trigger and timer is None and trigger in line:
+                    log.write(f"[release_check: killing the run in {delay}s]\n")
+                    timer = threading.Timer(delay, kill)
+                    timer.start()
+            rc = proc.wait()
+            if timer:
+                timer.cancel()
+                # Anything the group left running (a conda run grandchild)
+                # dies with it, so a resume never races a ghost.
+                kill()
+                time.sleep(2)
+            log.write(f"\n[exit {rc}]\n")
+        return "".join(lines), rc
+
     def oyster(self, d, *args, **kw):
         return self(self.pipeline_cmd(OYSTER, d, args), **kw)
 
@@ -252,6 +307,8 @@ def check_finished(d, runout, kind, cleaned=True, corrected=False, labels=None):
             "pyTransRate assemblies.csv missing")
     timing = (reports / f"{runout}.timing.log").read_text()
     require(re.search(r"^TOTAL\s+\d\d:\d\d:\d\d", timing, re.M), "timing log has no TOTAL")
+    parts = [p for p in d.rglob("*.part") if "reordered" not in p.parts]
+    require(not parts, f"partial files left behind: {[str(p.relative_to(d)) for p in parts]}")
     running = list(reports.glob(f".{runout}.*.running"))
     require(not running, f"unfinished-step markers left behind: {[p.name for p in running]}")
 
@@ -738,6 +795,185 @@ def case_strandeval_standalone(ctx, run):
                "--pairs", "5000", "--cpu", ctx.cpu], cwd=d)
     require((d / "reports" / "oyster_default.strandeval_summary.txt").is_file(),
             "default --runout/--dir should be the assembly name and the cwd")
+
+
+# -- full tier: failure, kill and resume -------------------------------------------
+
+def marker(d, runout, step):
+    return d / "reports" / f".{runout}.{step}.running"
+
+
+@case("full")
+def case_oyster_killed(ctx, run):
+    """SIGKILL mid-rcorrector, mid-assembly and mid-BUSCO; each resume finishes the job"""
+    d = ctx.case_dir("oyster_killed", fresh=True)
+    cmd = run.pipeline_cmd(OYSTER, d, ["--read1", READ1, "--read2", READ2,
+                                       "--runout", "oyster_killed"])
+    # (step whose banner triggers the kill, seconds after it, markers that must survive)
+    prev = None
+    for step, delay, left in (("run_rcorrector", 2, ["run_rcorrector"]),
+                              ("run_transabyss", 3, ["run_transabyss"]),
+                              ("busco", 5, ["busco"])):
+        out, rc = run.watch(cmd, trigger=f"=== {step} -- start", delay=delay)
+        require(rc == -signal.SIGKILL,
+                f"run never reached {step} to be killed (exit {rc}); see {run.log}")
+        for name in left:
+            require(marker(d, "oyster_killed", name).exists(),
+                    f"killed during {name}, but its .running marker is gone -- "
+                    "either the step finished inside the delay or the marker is not written")
+        require(not (d / "assemblies" / "oyster_killed.ORP.fasta").exists() or step == "busco",
+                f"an ORP.fasta exists after a kill at {step}")
+        if prev:
+            log_has(out, f"[{prev}] an attempt started", f"the resume re-ran {prev}")
+        prev = step
+    out, rc = run.watch(cmd)
+    require(rc == 0, f"the final resume failed (exit {rc}); see {run.log}")
+    log_has(out, "[busco] an attempt started", "the resume re-ran busco")
+    log_has(out, "[run_transabyss] up to date, skipping", "finished assemblies are not redone")
+    log_lacks(out, "=== run_trimmomatic -- start", "trimming is not redone")
+    check_finished(d, "oyster_killed", "oyster")
+    # Compare with the uninterrupted run, when there is one: a resume must
+    # not lose or duplicate reads.
+    ref = ctx.workdir / "oyster_default" / "rcorr" / "oyster_default.TRIM_1P.cor.fq.gz"
+    mine = d / "rcorr" / "oyster_killed.TRIM_1P.cor.fq.gz"
+    if ref.is_file():
+        count = lambda p: sum(1 for _ in gzip.open(p, "rt")) // 4
+        require(count(ref) == count(mine),
+                f"corrected reads differ after a killed rcorrector: {count(mine)} vs {count(ref)}")
+
+
+@case("full", needs=("oyster_default",))
+def case_chowder_failed_step(ctx, run):
+    """a step that keeps failing: retried, run stops, marker left; the fixed rerun resumes"""
+    src = finished_run(ctx, "oyster_default")
+    inputs = [src / "assemblies" / f"oyster_default.{a}.gz" for a in OYSTER_ASSEMBLIES[:2]]
+    d = ctx.case_dir("chowder_failed_step", fresh=True)
+    args = ["--read1", READ1, "--read2", READ2, "--runout", "cfail", "--assemblies", *inputs]
+    out = run.chowder(d, *args, "--pytransrate-args=--no-such-flag", expect_rc="nonzero")
+    require(out.count("retrying in") == 2, "the failing step was not retried twice")
+    log_has(out, "*** step failed:", "the failure is reported as a failed step")
+    require(marker(d, "cfail", "score_pool").exists(), "no marker left for the failed score_pool")
+    for later in ("twotrack_select", "busco", "reportgen"):
+        log_lacks(out, f"=== {later} -- start", f"{later} ran after a failure")
+    require(not (d / "assemblies" / "cfail.ORP.fasta").exists(), "a failed run wrote ORP.fasta")
+    out = run.chowder(d, *args)
+    log_has(out, "[score_pool] an attempt started", "the rerun redoes the failed step")
+    log_has(out, "[ingest] up to date, skipping", "the rerun keeps finished steps")
+    check_finished(d, "cfail", "chowder")
+
+
+@case("full")
+def case_bad_reads(ctx, run):
+    """a truncated read file stops the run before anything is assembled"""
+    d = ctx.case_dir("bad_reads", fresh=True)
+    data = READ1.read_bytes()
+    bad = d / "truncated_1.fq.gz"
+    bad.write_bytes(data[: int(len(data) * 0.6)])
+    cmd = run.pipeline_cmd(OYSTER, d, ["--read1", bad, "--read2", READ2, "--runout", "bad"])
+    out, rc = run.watch(cmd, trigger="=== Stage A", delay=0)
+    require(rc != -signal.SIGKILL, "a truncated read1 reached the assemblers")
+    require(rc != 0, "a truncated read1 finished without error")
+    require(not (d / "assemblies" / "bad.ORP.fasta").exists(), "a run on bad reads wrote ORP.fasta")
+
+
+# -- full tier: a simulated library with a known answer ------------------------------
+
+def read_fasta(path):
+    from simulate_reads import read_fasta as rf
+    return rf(path)
+
+
+def kmers(seq, k=31):
+    seq = seq.upper()
+    rc = seq.translate(str.maketrans("ACGTN", "TGCAN"))[::-1]
+    n = len(seq)
+    return {min(seq[i:i + k], rc[n - i - k:n - i]) for i in range(n - k + 1)}
+
+
+@case("full")
+def case_sim_oyster(ctx, run):
+    """oyster.py on a simulated RF library: genes, BUSCO, adapters, strand, TPM filter"""
+    from simulate_reads import ADAPTER_R1, ADAPTER_R2, find_busco_proteins, simulate
+    proteins = find_busco_proteins(REPO / "busco_dbs", "eukaryota_odb12.2")
+    if proteins is None:
+        raise Skip(f"no BUSCO ancestral proteins under {REPO / 'busco_dbs'}")
+    sim = ctx.case_dir("sim_data", fresh=True)
+    _, tpm_filt = simulate(proteins, sim)
+    truth = {}
+    for line in (sim / "truth.tsv").read_text().splitlines()[1:]:
+        tid, cls = line.split("\t")[:2]
+        truth[tid] = cls
+    tx = read_fasta(sim / "transcripts.fa")
+
+    d = ctx.case_dir("sim_oyster", fresh=True)
+    out = run.oyster(d, "--read1", sim / "sim_1.fq.gz", "--read2", sim / "sim_2.fq.gz",
+                     "--runout", "sim", "--strand", "RF", "--tpm-filt", tpm_filt, "--no-cleanup")
+    names, fields = check_finished(d, "sim", "oyster", cleaned=False)
+    asm = d / "assemblies"
+    final = read_fasta(asm / "sim.ORP.fasta")
+    inter = read_fasta(asm / "sim.ORP.intermediate.fasta")
+
+    # Each truth transcript's k-mers, and which transcript each k-mer is from.
+    owner = {}
+    for tid, seq in tx.items():
+        for km in kmers(seq):
+            owner[km] = tid
+    final_kmers = set()
+    for seq in final.values():
+        final_kmers |= kmers(seq)
+
+    def source(seq):
+        counts = {}
+        for km in kmers(seq):
+            if km in owner:
+                counts[owner[km]] = counts.get(owner[km], 0) + 1
+        return max(counts, key=counts.get) if counts else None
+
+    # 1. The highly expressed transcripts come back nearly whole.
+    high = [t for t, c in truth.items() if c.endswith("_high")]
+    covered = {t: len(kmers(tx[t]) & final_kmers) / len(kmers(tx[t])) for t in high}
+    missed = sorted(t for t, f in covered.items() if f < 0.7)
+    require(len(missed) <= 2, f"{len(missed)}/{len(high)} highly expressed transcripts "
+                              f"under 70% recovered: {missed}")
+
+    # 2. BUSCO finds the BUSCO genes.
+    m = re.search(r"C:([\d.]+)%.*F:([\d.]+)%.*n:(\d+)", fields["BUSCO SCORE"])
+    found = round((float(m.group(1)) + float(m.group(2))) * int(m.group(3)) / 100)
+    n_busco = sum(1 for c in truth.values() if c == "busco_high")
+    require(found >= 0.75 * n_busco, f"BUSCO found {found} of the {n_busco} highly "
+                                     f"expressed BUSCO genes ({fields['BUSCO SCORE']})")
+
+    # 3. No adapter survives trimming into the assembly.
+    for name, seq in final.items():
+        for adapter in (ADAPTER_R1, ADAPTER_R2):
+            probe = adapter[:20]
+            rc = probe.translate(str.maketrans("ACGT", "TGCA"))[::-1]
+            require(probe not in seq and rc not in seq, f"adapter sequence in {name}")
+
+    # 4. The library is stranded, and the strand exam says so.
+    dat = d / "sim.dat"
+    ratios = [float(l.split("\t")[4]) for l in dat.read_text().splitlines()[1:]
+              if l.count("\t") >= 4]
+    require(ratios, f"no per-transcript rows in {dat}")
+    strong = sum(1 for r in ratios if abs(r) >= 0.8) / len(ratios)
+    require(strong >= 0.7, f"only {strong:.0%} of transcripts look stranded on an RF library")
+
+    # 5. --tpm-filt: low-expression contigs go, unless they have a swissprot hit.
+    hits = {l.split("\t")[0] for l in (asm / "sim.ORP.diamond.txt").read_text().splitlines()}
+    low_nohit = [n for n, s in inter.items() if truth.get(source(s)) == "nohit_low"]
+    low_hit = [n for n, s in inter.items()
+               if truth.get(source(s)) == "busco_low" and n in hits]
+    require(low_nohit, "no low-expression no-hit contig was assembled, so the TPM "
+                       "filter went untested -- raise LOW_COV in simulate_reads.py")
+    survived = [n for n in low_nohit if n in final]
+    require(len(survived) <= 0.2 * len(low_nohit),
+            f"{len(survived)}/{len(low_nohit)} low-expression no-hit contigs survived "
+            f"--tpm-filt {tpm_filt}: {survived[:5]}")
+    dropped = [n for n in low_hit if n not in final]
+    require(not dropped, f"low-expression contigs with a swissprot hit were dropped: {dropped}")
+    high_nohit = [n for n, s in final.items() if truth.get(source(s)) == "nohit_high"]
+    require(len({source(final[n]) for n in high_nohit}) >= 4,
+            "the no-hit track lost highly expressed transcripts")
 
 
 # -- driver ----------------------------------------------------------------------
