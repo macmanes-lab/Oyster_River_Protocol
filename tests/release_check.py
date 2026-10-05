@@ -80,6 +80,7 @@ import os
 import re
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import tempfile
@@ -811,7 +812,7 @@ def case_oyster_killed(ctx, run):
                                        "--runout", "oyster_killed"])
     # (step whose banner triggers the kill, seconds after it, markers that must survive)
     prev = None
-    for step, delay, left in (("run_rcorrector", 2, ["run_rcorrector"]),
+    for step, delay, left in (("run_rcorrector", 1, ["run_rcorrector"]),
                               ("run_transabyss", 3, ["run_transabyss"]),
                               ("busco", 5, ["busco"])):
         out, rc = run.watch(cmd, trigger=f"=== {step} -- start", delay=delay)
@@ -1029,6 +1030,38 @@ def main():
         selected = [c for c in CASES if c.tier in TIERS[args.tier]]
 
     ctx = Context(args)
+    lock = take_workdir_lock(ctx.workdir)
+    try:
+        run_selected(ctx, args, selected)
+    finally:
+        lock.unlink()
+
+
+def take_workdir_lock(workdir):
+    """One release check per workdir.
+
+    Two at once clear each other's case directories out from under the
+    running pipelines (4.1.0-dev14's first cluster pass: markers vanished
+    mid-step and rmtree raced). A lock file rather than flock, which GPFS
+    does not honour across nodes; a check killed by Slurm leaves it behind,
+    and the message says which run held it.
+    """
+    lock = workdir / ".release_check.lock"
+    holder = f"{socket.gethostname()} pid {os.getpid()}"
+    job = os.environ.get("SLURM_JOB_ID")
+    if job:
+        holder += f" slurm job {job}"
+    try:
+        fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        sys.exit(f"*** {workdir} is in use by another release check ({lock.read_text().strip()}).\n"
+                 f"    Use another --workdir, or if that run is gone, delete {lock} ***")
+    with os.fdopen(fd, "w") as f:
+        f.write(holder + "\n")
+    return lock
+
+
+def run_selected(ctx, args, selected):
     print(f"ORP {VERSION} release check -> {ctx.workdir}")
     print(f"  python {sys.version.split()[0]}, conda {'found' if ctx.conda else 'NOT found'}, "
           f"{len(selected)} case(s), --cpu {args.cpu} --mem {args.mem} --jobs {args.jobs}\n")

@@ -14,8 +14,8 @@ so a run can be judged on what it got right:
   nohit_high    5 random transcripts, 80x  -> kept by the no-hit track
   nohit_low     5 random transcripts, 5x   -> removed by --tpm-filt
 
-Reads are 2x100 bp, dUTP-stranded (RF: read 1 is antisense), with 0.2%
-substitutions, a few Ns, and ~5% of fragments shorter than a read so their
+Reads are 2x100 bp phred+33, dUTP-stranded (RF: read 1 is antisense), with
+0.2% substitutions and a few Ns (both at Q2), quality falling off toward 3', and ~5% of fragments shorter than a read so their
 reads run into the TruSeq adapter -- which must not survive into the
 assembly. Everything is drawn from one seeded RNG, so a given --seed and
 protein file give byte-identical output.
@@ -114,22 +114,31 @@ def no_long_orf(rng, n):
             return s
 
 
+def base_quality(i):
+    """Phred+33, falling off toward the 3' end the way Illumina's does. The
+    tail has to reach below ';' (Q26): a file of nothing but 'I' is valid
+    phred+33 and phred+64 alike, and trimmomatic refuses to guess."""
+    return "I" if i < 70 else "F" if i < 85 else ":" if i < 95 else "5"
+
+
 def mutate(rng, read):
-    out = []
-    for b in read:
+    """Substitutions and Ns, each given quality '#' (Q2): (seq, qual)."""
+    bases = list(read)
+    qual = [base_quality(i) for i in range(len(bases))]
+    for i, b in enumerate(bases):
         if rng.random() < SUB_RATE:
-            b = rng.choice([c for c in "ACGT" if c != b])
-        out.append(b)
+            bases[i], qual[i] = rng.choice([c for c in "ACGT" if c != b]), "#"
     if rng.random() < N_READ_SHARE:
-        out[rng.randrange(len(out))] = "N"
-    return "".join(out)
+        i = rng.randrange(len(bases))
+        bases[i], qual[i] = "N", "#"
+    return "".join(bases), "".join(qual)
 
 
 def to_read(rng, frag, adapter):
     """The first READ_LEN bases off one end, running into adapter (then A)
     when the fragment is shorter than a read."""
     seq = (frag + adapter + "A" * READ_LEN)[:READ_LEN]
-    return mutate(rng, seq)
+    return mutate(rng, seq)  # (seq, qual)
 
 
 def simulate(proteins_path, out, seed=11):
@@ -180,11 +189,10 @@ def simulate(proteins_path, out, seed=11):
     rng.shuffle(reads)
 
     gz = lambda p: gzip.GzipFile(filename="", mode="wb", fileobj=open(p, "wb"), mtime=0)
-    qual = "I" * READ_LEN
     with gz(out / "sim_1.fq.gz") as f1, gz(out / "sim_2.fq.gz") as f2:
-        for n, (r1, r2) in enumerate(reads, start=1):
-            f1.write(f"@sim{n}/1\n{r1}\n+\n{qual}\n".encode())
-            f2.write(f"@sim{n}/2\n{r2}\n+\n{qual}\n".encode())
+        for n, ((s1, q1), (s2, q2)) in enumerate(reads, start=1):
+            f1.write(f"@sim{n}/1\n{s1}\n+\n{q1}\n".encode())
+            f2.write(f"@sim{n}/2\n{s2}\n+\n{q2}\n".encode())
     n_pair = len(reads)
 
     # Expected TPM: pairs per effective base, normalised to a million.

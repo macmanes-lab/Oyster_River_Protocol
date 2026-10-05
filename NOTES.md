@@ -5,6 +5,19 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-10-05 -- 4.1.0-dev15: release check fixes from its first dev14 pass
+
+dev14's cluster pass: 11 pass / 5 fail / 6 skip. sim_oyster failed in
+trimmomatic ("Unable to detect quality encoding": every base was 'I', valid
+phred+33 and +64 alike) -- simulated reads now carry a falling 3' quality
+tail and Q2 at errors/Ns. oyster_default (rmtree raced on a vanishing
+file), oyster_options/oyster_resume (their own run_transabyss marker gone at
+unlink) and oyster_killed (marker gone 2 s in) look like two release checks
+sharing one workdir -- oyster.py did not change since dev13's 18/18 -- so
+the harness now takes `<workdir>/.release_check.lock` (O_EXCL, not flock:
+GPFS) and refuses a second run. Unconfirmed that two ran. bad_reads passed:
+trimmomatic does reject a truncated gzip. rcorrector kill delay 2 s -> 1 s.
+
 ## 2026-10-05 -- 4.1.0-dev14: release check gains failure, kill and simulated-data cases
 
 Four new full-tier cases in `tests/release_check.py`:
