@@ -546,6 +546,107 @@ def resolve_kmers(spec, max_read_len, label=""):
     return kmers
 
 
+# The strand exam's read sample: pairs drawn from each mate file, and the
+# seqtk seed that draws them, so a rerun maps the same reads.
+STRAND_SAMPLE_PAIRS = 400000
+STRAND_SEED = 23894
+STRAND_EXAM_DOC = "https://github.com/macmanes-lab/Oyster_River_Protocol/blob/master/docs/strandexamine.md"
+
+
+def trinity_perllib_dir():
+    """Trinity's PerlLib, which scripts/examine_strand.pl reads SAM with."""
+    result = subprocess.run(
+        ["conda", "run", "-n", "orp_trinity", "which", "Trinity"],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, check=True,
+    )
+    trinity_path = Path(result.stdout.strip()).resolve()
+    return trinity_path.parent / "PerlLib"
+
+
+def strand_exam_scratch(workdir, prefix):
+    """The strand exam's working files: the sampled BAM, its bwa index, the
+    per-transcript table, and the column hist was fed."""
+    workdir = Path(workdir)
+    paths = [workdir / f"{prefix}.hist_input.txt",
+             workdir / f"{prefix}.sorted.bam"]
+    paths += [workdir / f"{prefix}.{ext}"
+              for ext in ("bwt", "pac", "ann", "amb", "sa", "dat")]
+    return paths
+
+
+def strand_exam(run, assembly, r1, r2, prefix, workdir, cpu, flagstat_out,
+                pairs=STRAND_SAMPLE_PAIRS, keep_scratch=False):
+    """The Oyster River Strand Exam Tool (docs/strandexamine.md).
+
+    Maps `pairs` read pairs sampled from r1/r2 to `assembly` with bwa mem,
+    counts the strand each transcript's first reads land on
+    (scripts/examine_strand.pl), and returns the histogram of
+    (plus - minus) / total across transcripts, inside the banner a run
+    prints. The samtools flagstat of the sample goes to `flagstat_out`.
+
+    Shared by the pipeline's strandeval step and scripts/strandeval.py, so
+    the two can't drift. `run(cmd, cwd=...)` runs one command and raises on
+    failure: Pipeline.run from the pipeline, which brings its retries.
+    Working files go in `workdir` under `prefix` (strand_exam_scratch) and
+    are deleted at the end unless keep_scratch.
+    """
+    workdir = Path(workdir)
+    base = workdir / prefix
+    bam = workdir / f"{prefix}.sorted.bam"
+    q = lambda p: shlex.quote(str(p))
+
+    run(["conda", "run", "--no-capture-output", "-n", "orp_trinity",
+         "bwa", "index", "-p", str(base), str(assembly)], cwd=workdir)
+
+    sample = lambda reads: f"<(seqtk sample -s {STRAND_SEED} {q(reads)} {pairs})"
+    bwa_mem = f"bwa mem -t {cpu} {q(base)} {sample(r1)} {sample(r2)}"
+    pipeline_script = (
+        f"conda run --no-capture-output -n orp_trinity bash -c {q(bwa_mem)} "
+        f"| conda run --no-capture-output -n orp samtools view -@{cpu} -Sb - "
+        f"| conda run --no-capture-output -n orp samtools sort -T {q(base)} -O bam -@{cpu} "
+        f"-o {q(bam)} -"
+    )
+    run(["bash", "-o", "pipefail", "-c", pipeline_script], cwd=workdir)
+
+    with open(flagstat_out, "w") as outf:
+        subprocess.run(
+            ["conda", "run", "--no-capture-output", "-n", "orp", "samtools", "flagstat", str(bam)],
+            check=True, stdout=outf, cwd=workdir,
+        )
+
+    run(["conda", "run", "--no-capture-output", "-n", "orp_trinity",
+         "perl", "-I", str(trinity_perllib_dir()),
+         str(HERE / "scripts" / "examine_strand.pl"), str(bam), str(base)], cwd=workdir)
+
+    dat_file = workdir / f"{prefix}.dat"
+    hist_input = workdir / f"{prefix}.hist_input.txt"
+    with open(dat_file) as f, open(hist_input, "w") as out:
+        next(f, None)
+        for line in f:
+            cols = line.rstrip("\n").split()
+            if len(cols) >= 5:
+                out.write(cols[4] + "\n")
+
+    hist_result = subprocess.run(
+        ["conda", "run", "--no-capture-output", "-n", "orp_trinity", "bash", "-c",
+         f"hist -p '#' -c red {q(hist_input)}"],
+        check=True, cwd=workdir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True,
+    )
+
+    if not keep_scratch:
+        for p in strand_exam_scratch(workdir, prefix):
+            if p.exists():
+                p.unlink()
+
+    histogram_text = hist_result.stdout.rstrip("\n")
+    return (
+        "\n*****  STRAND EXAMINATION HISTOGRAM ***** \n"
+        f"{histogram_text}\n"
+        "\n*****  See the following link for interpretation ***** \n"
+        f"*****  {STRAND_EXAM_DOC} ***** \n"
+    )
+
+
 class Pipeline:
     # What a run calls itself in its quality report. chowder.py overrides it:
     # a merge-only run writes a qualreport in exactly the same layout as a
@@ -2139,83 +2240,20 @@ class Pipeline:
             retry_cleanup=partial(self.clear_pytransrate_outdir, outdir, orp_fasta),
         )
 
-    def trinity_perllib_dir(self):
-        result = subprocess.run(
-            ["conda", "run", "-n", "orp_trinity", "which", "Trinity"],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, check=True,
-        )
-        trinity_path = Path(result.stdout.strip()).resolve()
-        return trinity_path.parent / "PerlLib"
-
     def strandeval_scratch(self):
-        """strandeval's working files: the sampled BAM, its bwa index, and
-        the column hist was fed. Removed as soon as strandeval finishes,
-        or by cleanup() after a --no-cleanup run."""
-        paths = [self.dir / f"{self.runout}.hist_input.txt",
-                 self.dir / f"{self.runout}.sorted.bam"]
-        paths += [self.dir / f"{self.runout}.{ext}"
-                  for ext in ("bwt", "pac", "ann", "amb", "sa", "dat")]
-        return paths
+        """strandeval's working files (strand_exam_scratch). Removed as soon
+        as strandeval finishes, or by cleanup() after a --no-cleanup run."""
+        return strand_exam_scratch(self.dir, self.runout)
 
     def strandeval(self, cpu=None, mem=None):
         cpu = self.cpu if cpu is None else cpu
-        orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
-        r1, r2 = self.cor1(), self.cor2()
-        self.conda_run("orp_trinity", "bwa", "index", "-p", self.runout, orp_fasta)
-
-        pipeline_script = (
-            f'conda run --no-capture-output -n orp_trinity bash -c '
-            f'"bwa mem -t {cpu} {self.runout} '
-            f'<(seqtk sample -s 23894 {r1} 400000) <(seqtk sample -s 23894 {r2} 400000)" '
-            f"| conda run --no-capture-output -n orp samtools view -@{cpu} -Sb - "
-            f"| conda run --no-capture-output -n orp samtools sort -T {self.runout} -O bam -@{cpu} "
-            f"-o {self.runout}.sorted.bam -"
+        summary = strand_exam(
+            self.run, self.assemblies_dir / f"{self.runout}.ORP.fasta",
+            self.cor1(), self.cor2(), self.runout, self.dir, cpu,
+            flagstat_out=self.assemblies_dir / f"{self.runout}.flagstat",
+            keep_scratch=self.no_cleanup,
         )
-        self.run(["bash", "-o", "pipefail", "-c", pipeline_script])
-
-        flagstat_out = self.assemblies_dir / f"{self.runout}.flagstat"
-        with open(flagstat_out, "w") as outf:
-            subprocess.run(
-                ["conda", "run", "--no-capture-output", "-n", "orp", "samtools", "flagstat",
-                 f"{self.runout}.sorted.bam"],
-                check=True, stdout=outf, cwd=self.dir,
-            )
-
-        perllib = self.trinity_perllib_dir()
-        self.conda_run(
-            "orp_trinity", "perl", "-I", str(perllib),
-            str(self.makedir / "scripts" / "examine_strand.pl"),
-            f"{self.runout}.sorted.bam", self.runout,
-        )
-
-        dat_file = self.dir / f"{self.runout}.dat"
-        hist_input = self.dir / f"{self.runout}.hist_input.txt"
-        with open(dat_file) as f, open(hist_input, "w") as out:
-            next(f, None)
-            for line in f:
-                cols = line.rstrip("\n").split()
-                if len(cols) >= 5:
-                    out.write(cols[4] + "\n")
-
-        hist_result = subprocess.run(
-            ["conda", "run", "--no-capture-output", "-n", "orp_trinity", "bash", "-c",
-             f"hist -p '#' -c red {hist_input}"],
-            check=True, cwd=self.dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True,
-        )
-
-        if not self.no_cleanup:
-            for p in self.strandeval_scratch():
-                if p.exists():
-                    p.unlink()
-
         (self.reports_dir / f"{self.runout}.strandeval.done").touch()
-        histogram_text = hist_result.stdout.rstrip("\n")
-        summary = (
-            "\n*****  STRAND EXAMINATION HISTOGRAM ***** \n"
-            f"{histogram_text}\n"
-            "\n*****  See the following link for interpretation ***** \n"
-            "*****  https://github.com/macmanes-lab/Oyster_River_Protocol/blob/master/docs/strandexamine.md ***** \n"
-        )
         print(summary)
         (self.reports_dir / f"{self.runout}.strandeval_summary.txt").write_text(summary)
 

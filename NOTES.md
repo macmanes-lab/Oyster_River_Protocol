@@ -5,6 +5,18 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-10-05 -- 4.1.0-dev11: standalone strand exam (scripts/strandeval.py)
+
+`strandeval.mk` (deleted in 24f8648) has a Python replacement:
+`scripts/strandeval.py --assembly --read1 --read2 [--runout --cpu --pairs
+--dir --no-cleanup]`. The work moved out of `Pipeline.strandeval` into
+module-level `strand_exam()` in `oyster.py` (plus `strand_exam_scratch`,
+`trinity_perllib_dir`, `STRAND_SEED`/`STRAND_SAMPLE_PAIRS`), and both call
+it. The pipeline's outputs are unchanged; paths in the bwa/seqtk/samtools
+shell line are now shlex-quoted. Checked only with fake tools on PATH (no
+conda on the laptops) -- still open: one real run on the cluster, both
+standalone and as the pipeline step.
+
 ## 2026-10-04 -- 4.1.0-dev9: pre-v5 review fixes, OrthoFinder removed
 
 From a whole-repo review before cutting v5. One commit each:
