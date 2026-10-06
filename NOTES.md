@@ -5,6 +5,38 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-10-05 -- Trinity phase 2: serial ParaFly, engineering patches
+
+Writeup, code, patches and replay harness all live in the fork
+https://github.com/macmanes-lab/trinityrnaseq_2026 (`PERFORMANCE_2026.md`,
+`perf2026/`, handoff notes in `HANDOFF.md`).
+Headlines:
+- `orp_trinity` (bioconda `trinity=2.15.2` build `_6`, created 2026-08-14)
+  ships a ParaFly built without OpenMP, so phase 2 ran one component at a
+  time: every SRR1789336 timing since 08-14 measured that. Builds `_0`-`_3`
+  are fine, `_4`-`_6` are not. Same conda Trinity with an OpenMP ParaFly:
+  full phase 2 in 2h03m instead of 34h27m.
+- Patches to Trinity, Chrysalis and Butterfly halve the remaining per-
+  component work with byte-identical output: full phase 2 2h06m -> 58m,
+  66,440/66,440 components identical.
+- Trinity output depends on the run directory (SuperTranscripts bubble
+  choice by `id()`) and, for ~0.15% of components, on the JVM identity hash
+  (Butterfly). Fixed in the patches.
+- Trinity's Butterfly submodule points at 2019 `master`; the shipped jar is
+  `devel` (2022-03-10).
+- Not done, needs a decision (ORP side):
+  - pin `trinity=2.15.2=*_3` in `Makefile`/`Dockerfile` (a `mamba create
+    --dry-run` with ORP's other `orp_trinity` packages and `python=3.14`
+    solves, openjdk 23.0.2);
+  - preflight in `oyster.py`: fail if Trinity's ParaFly runs two `sleep 1`
+    commands at `-CPU 2` in more than ~1.8 s;
+  - revisit the lane design (`TRINITY_PHASE1_SHARE`/`PHASE2_SHARE`, pairing
+    phase 2 with Trans-ABySS): tuned against a 34 h serial phase 2; at 1-2 h,
+    Trans-ABySS (4.5 h, mostly single-threaded) is the long pole.
+- Premise: work tree and replay runs in `~/trinity_eng/`; the Trinity clone
+  there has branches `det-fix` and `perf` (with an opt-in profiling commit
+  underneath); `src_upstream` has the same commits on upstream's base.
+
 ## 2026-10-05 -- 4.1.0-dev17: examine_strand.pl kept every other transcript
 
 `foreach my $struct (@structs) { my $struct = shift @structs; ...}` -- the
