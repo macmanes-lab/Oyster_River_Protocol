@@ -1386,7 +1386,7 @@ class Pipeline:
         back rather than timing the call keeps `conda run`'s start-up out of
         the measurement.
         """
-        parafly = self.trinity_perllib_dir().parent / "trinity-plugins" / "BIN" / "ParaFly"
+        parafly = trinity_perllib_dir().parent / "trinity-plugins" / "BIN" / "ParaFly"
         with tempfile.TemporaryDirectory() as tmp:
             cmds, stamps = Path(tmp) / "cmds", Path(tmp) / "stamps"
             cmds.write_text(f"date +%s.%N >> {stamps}; sleep 1\n" * 2)

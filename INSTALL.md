@@ -149,7 +149,10 @@ To move an existing install off bioconda's Trinity, install everything the `orp_
 ```bash
 mamba install -n orp_trinity -c bioconda -c conda-forge --override-channels compilers "cmake<4" make git kmer-jellyfish bowtie2 samtools salmon=1.10.3 "openjdk>=17" perl perl-db_file python numpy bwa=0.7.19 bashplotlib seqtk=1.5 libgomp zlib
 mamba remove -n orp_trinity trinity
+mamba install -n orp_trinity -c bioconda -c conda-forge --override-channels --force-reinstall bashplotlib
 conda run --no-capture-output -n orp_trinity scripts/build_trinity.sh
 ```
+
+The `--force-reinstall` of `bashplotlib` is for envs that change Python version in the first command (3.14 to 3.12 on Premise): the package's files did not follow, `hist` stopped importing it, and strandeval failed at the end of a run. A fresh `mamba create` doesn't need it.
 
 Don't do this while a run is using the env: the build replaces `Trinity`, and a run in its Trinity stage needs its files.
