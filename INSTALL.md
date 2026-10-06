@@ -142,4 +142,14 @@ Removes the conda install and downloaded software directories.
 
 ## Updating Trinity
 
-Change `TRINITY_COMMIT` in `scripts/build_trinity.sh` and re-run the step 3 command; it fetches, checks out the new commit and rebuilds. An existing install that still has bioconda's Trinity in `orp_trinity` needs nothing else: the script replaces that env's `Trinity` with a link to the build. (Its other dependencies are already there, but `compilers "cmake<4" make git` may not be; `mamba install -n orp_trinity compilers "cmake<4" make git` adds them.)
+Change `TRINITY_COMMIT` in `scripts/build_trinity.sh` and re-run the step 3 command; it fetches, checks out the new commit and rebuilds.
+
+To move an existing install off bioconda's Trinity, install everything the `orp_trinity` list in step 2 names, then remove the package and build. Do these in this order, and install the whole list rather than only the build tools: bioconda's `trinity` was what pulled in `kmer-jellyfish`, `bowtie2`, `samtools`, `openjdk` and `perl`, so removing it takes them away unless they are named.
+
+```bash
+mamba install -n orp_trinity -c bioconda -c conda-forge --override-channels compilers "cmake<4" make git kmer-jellyfish bowtie2 samtools salmon=1.10.3 "openjdk>=17" perl perl-db_file python numpy bwa=0.7.19 bashplotlib seqtk=1.5 libgomp zlib
+mamba remove -n orp_trinity trinity
+conda run --no-capture-output -n orp_trinity scripts/build_trinity.sh
+```
+
+Don't do this while a run is using the env: the build replaces `Trinity`, and a run in its Trinity stage needs its files.
