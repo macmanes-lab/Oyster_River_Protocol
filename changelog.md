@@ -151,6 +151,16 @@ ORP Version 4.1.0-dev1
 
 ORP Version 4.1.0-dev0
 
+- **Trinity is built from source with OpenMP** (`scripts/build_trinity.sh`,
+  run by `make`) from upstream's `Trinity-v2.15.2` tag, instead of installing
+  bioconda's `trinity=2.15.2`. Builds `_4` to `_6` of that package ship a
+  ParaFly compiled without OpenMP, which makes Trinity's phase 2 run one
+  component at a time whatever `--cpu` says (34h27m against 2h03m on
+  SRR1789336). `orp_trinity` now holds only Trinity's build tools and
+  dependencies. The build fails, and `oyster.py` refuses to start, if ParaFly
+  runs its commands one at a time. Existing installs: see "Updating Trinity"
+  in INSTALL.md. The assembler itself is the same release.
+
 - **The assemblies are merged by Swiss-Prot gene, not by OrthoFinder
   orthogroup** (`--merge-method twotrack`, the new default; `oyster.py` and
   `chowder.py`). Contigs with a Swiss-Prot hit are grouped by the gene of

@@ -21,6 +21,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import concurrent.futures
@@ -146,6 +147,11 @@ CHECK_TOOLS = (
 SIDE_JOB_CPU_SHARE = 0.25
 SIDE_JOB_MAX_CPU = 8
 SIDE_JOB_MAX_MEM = 16
+
+#: Seconds between the start of ParaFly's two self-test commands (see
+#: check_parafly_parallel) above which it is running them in turn: serial is a
+#: full second, parallel is ~0.
+PARAFLY_SERIAL_GAP = 0.5
 
 # Trinity's own CPU/mem is fixed at launch for however long that stage
 # runs, so which assembler it's paired against matters more than a single
@@ -1317,6 +1323,8 @@ class Pipeline:
         if missing:
             sys.exit("*** not installed, must fix: " + ", ".join(missing) + " ***")
         self.check_databases()
+        if TRINITY_TOOL in self.required_tools():
+            self.check_parafly_parallel()
         self.check_pytransrate_version()
         self.log_provenance()
 
@@ -1363,6 +1371,37 @@ class Pipeline:
                             "--lineage a dataset you have")
         if problems:
             sys.exit("*** missing, must fix:\n  " + "\n  ".join(problems) + "\n***")
+
+    def check_parafly_parallel(self):
+        """Refuse to start on a ParaFly that runs its commands one at a time.
+
+        Bioconda's trinity 2.15.2 builds _4 to _6 ship a ParaFly compiled
+        without OpenMP. It links libgomp, starts, and exits 0, but Trinity's
+        phase 2 then assembles one component at a time whatever --CPU says:
+        34h27m instead of 2h03m on SRR1789336. Nothing else would notice.
+
+        Each of two commands stamps its own start time and then sleeps a
+        second, at -CPU 2. The stamps are a second apart if ParaFly ran them
+        in turn and milliseconds apart if it ran them together. Reading them
+        back rather than timing the call keeps `conda run`'s start-up out of
+        the measurement.
+        """
+        parafly = self.trinity_perllib_dir().parent / "trinity-plugins" / "BIN" / "ParaFly"
+        with tempfile.TemporaryDirectory() as tmp:
+            cmds, stamps = Path(tmp) / "cmds", Path(tmp) / "stamps"
+            cmds.write_text(f"date +%s.%N >> {stamps}; sleep 1\n" * 2)
+            result = subprocess.run(
+                ["conda", "run", "-n", "orp_trinity", str(parafly), "-c", str(cmds), "-CPU", "2"],
+                cwd=tmp, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True,
+            )
+            starts = sorted(float(x) for x in stamps.read_text().split()) if stamps.exists() else []
+        if result.returncode != 0 or len(starts) != 2:
+            sys.exit(f"*** ParaFly ({parafly}) failed its self-test: {result.stderr.strip()} ***")
+        if starts[1] - starts[0] > PARAFLY_SERIAL_GAP:
+            sys.exit(f"*** ParaFly ({parafly}) started two commands {starts[1] - starts[0]:.1f}s "
+                     "apart at -CPU 2: it was built without OpenMP, so Trinity's phase 2 "
+                     "would run one component at a time. Build Trinity from source with "
+                     "scripts/build_trinity.sh (see INSTALL.md) ***")
 
     def log_provenance(self):
         """Print what a later post-mortem needs and cannot recover.

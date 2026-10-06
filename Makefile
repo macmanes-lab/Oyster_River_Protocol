@@ -15,8 +15,15 @@ busco_data := $(shell find ${DIR}/busco_dbs -iname "eukaryota_odb12*" -type d 2>
 conda := $(shell conda info 2>/dev/null)
 orp := $(shell ${DIR}/software/anaconda/install/bin/conda info --envs | grep orp 2>/dev/null)
 VERSION := ${shell cat  ${MAKEDIR}version.txt}
+# Everything Trinity needs to build and run, but not Trinity itself: the
+# bioconda package ships a ParaFly built without OpenMP (see
+# scripts/build_trinity.sh). cmake<4 because Inchworm and Chrysalis declare a
+# cmake_minimum_required that cmake 4 refuses. bwa, seqtk and bashplotlib are for strandeval.
+TRINITY_ENV_PACKAGES = compilers "cmake<4" make git kmer-jellyfish bowtie2 samtools salmon=1.10.3 "openjdk>=17" perl perl-db_file python numpy bwa=0.7.19 bashplotlib seqtk=1.5 libgomp zlib
+TRINITY_DIR := ${DIR}/software/trinityrnaseq
+trinity_built := $(shell nm -D ${TRINITY_DIR}/trinity-plugins/BIN/ParaFly 2>/dev/null | grep -c GOMP_ | grep -v '^0$$')
 
-all: setup conda orp diamond_data busco_data postscript
+all: setup conda orp trinity diamond_data busco_data postscript
 
 .DELETE_ON_ERROR:
 
@@ -46,7 +53,7 @@ else
 				conda config --add channels bioconda; \
 				conda install mamba -n base -yc conda-forge; \
 				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_spades spades=4.3.0 python=3.14; \
-				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_trinity trinity=2.15.2 bwa=0.7.19 bashplotlib seqtk=1.5 salmon=1.10.3; \
+				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_trinity ${TRINITY_ENV_PACKAGES}; \
 				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_busco busco=6.1.0; \
 				mamba create -y -c bioconda -c conda-forge --override-channels --name orp_transabyss transabyss=2.0.1; \
 				mamba env create -f ${DIR}/orp_env.yml; \
@@ -56,6 +63,14 @@ else
 	@echo PATH=\$$PATH:${DIR}/software/anaconda/install/bin >> pathfile;
 endif
 
+
+trinity:orp
+ifdef trinity_built
+		@echo "trinity is already built"
+else
+		source ${DIR}/software/anaconda/install/etc/profile.d/conda.sh; \
+		conda run --no-capture-output -n orp_trinity ${DIR}/scripts/build_trinity.sh ${TRINITY_DIR}
+endif
 
 diamond_data:conda
 ifdef diamond_data
@@ -72,7 +87,7 @@ else
 		${DIR}/software/anaconda/install/envs/orp_busco/bin/busco --download eukaryota_odb12.2 --download_path ${DIR}/busco_dbs
 endif
 
-postscript: setup orp diamond_data busco_data conda
+postscript: setup orp trinity diamond_data busco_data conda
 	@if [ -f pathfile ]; then\
 		printf "\n\n*** The following location(s), if any print, need to be added to your PATH ***";\
 		printf "\n*** They will be automatically to your ~/.profile or ~/.bash_profile ***\n\n";\
@@ -89,5 +104,6 @@ clean:
 	${DIR}/software/anaconda/install/bin/conda remove -y --name orp --all
 	rm -fr ${DIR}/software/anaconda/install
 	rm -fr ${DIR}/software/transabyss
+	rm -fr ${TRINITY_DIR}
 	rm -fr ${DIR}/software/anaconda/
 	rm -fr ${DIR}/pathfile
