@@ -7,6 +7,9 @@ stale.
 
 ## 2026-10-09 -- lane balance: SRR1138704, TRANSABYSS_SHARE 0.25 -> 0.4
 
+The commit that made this change (ee6d1f5) is labelled 4.1.0-dev20, a
+number cb81cbc (cleanup) had already taken; the change is 4.1.0-dev21.
+
 First real run of dev19 (`--cpu 40 --mem 500G`, TOTAL 3h46m48s). Trans-
 ABySS (10 cpu) 22:00:19 -> 01:14:10 (3h14m incl. diamond). Trinity lane
 (30 cpu): phase 1 41m04s on 15, SPAdes pair + diamonds 24m on 15, phase 2
