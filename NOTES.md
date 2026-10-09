@@ -5,6 +5,32 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-10-08 -- assembler lanes: Trans-ABySS from t=0
+
+With Trinity built from source (OpenMP ParaFly), phase 2 is ~2h on 38 cores
+and Trans-ABySS (~4.5h, ~3.2h of it single-threaded) is the long pole. It used
+to start only after Stage A (phase 1, ~1h20m). Now `run_assemblers` runs two
+lanes for the whole assembly stage:
+- Trans-ABySS lane: `TRANSABYSS_SHARE` = 0.25 of `--cpu`/`--mem`, then
+  diamond_transabyss.
+- Trinity lane, the rest: Stage A = phase 1 || SPAdes (cores
+  `TRINITY_PHASE1_SHARE` = 0.5, mem `TRINITY_PHASE1_MEM_SHARE` = 0.25), then
+  Stage B = phase 2 on the whole lane. `TRINITY_PHASE2_SHARE` removed.
+At `--cpu 40 --mem 110`: Trans-ABySS 10 cpu / 28G; phase 1 15 / 20G; SPAdes
+15 / 62G (was 30 / 82G); phase 2 30 / 82G. Expected on SRR1789336: assembly
+stage ~4.6h (Trans-ABySS-bound) vs ~6.5h.
+Checked with stubbed steps only (lane order, budgets, resume with Trans-ABySS
+done) plus `release_check --tier quick`. Not yet run on real data.
+To rebalance from end-to-end timings, read off `timing_log`:
+- Trinity lane = phase1/SPAdes overlap + phase 2; compare with
+  run_transabyss + diamond_transabyss. If phase 2 ends well before
+  Trans-ABySS, the lane has spare cores to give; if it ends after, lower
+  `TRANSABYSS_SHARE` (Trans-ABySS barely scales: 4.5h on ~20, 5h09m on 2).
+- Stage A: if SPAdes finishes well before phase 1, raise
+  `TRINITY_PHASE1_SHARE`; if after, lower it.
+- SPAdes mem is down to 56% of `--mem`; watch for SPAdes memory-cap aborts on
+  big datasets.
+
 ## 2026-10-05 -- Trinity phase 2: serial ParaFly, engineering patches
 
 Writeup, code, patches and replay harness all live in the fork

@@ -21,9 +21,9 @@ A step is skipped when its outputs exist and are newer than its inputs. Each ste
 
 ## Assembly lanes
 
-Two sequential stage-pairings, each a fixed `ThreadPoolExecutor(max_workers=2)`, independent of `--max-parallel` — see [pipeline-schedule.html](pipeline-schedule.html) for why. All assemblers consume `c1`/`c2`.
+Two lanes side by side for the whole assembly stage, a fixed `ThreadPoolExecutor(max_workers=2)` independent of `--max-parallel` — see [pipeline-schedule.html](pipeline-schedule.html) for why. The Trans-ABySS lane gets `TRANSABYSS_SHARE` (25%) of `--cpu`/`--mem` from the start; the Trinity lane gets the rest and runs Stage A, then Stage B. All assemblers consume `c1`/`c2`.
 
-**Stage A** (`TRINITY_PHASE1_SHARE`, 25/75 cpu/mem split):
+**Stage A**, Trinity lane (`TRINITY_PHASE1_SHARE`, cores 50/50; `TRINITY_PHASE1_MEM_SHARE`, mem 25/75):
 
 | Step | Env / tool | Inputs | Outputs | What it does |
 |---|---|---|---|---|
@@ -31,12 +31,12 @@ Two sequential stage-pairings, each a fixed `ThreadPoolExecutor(max_workers=2)`,
 | `run_spadesauto` / `run_spadeshigh` | `orp_spades` rnaspades.py, `--only-assembler` | `c1`, `c2` | `<run>.spades{auto,high}.fasta` | Two rnaSPAdes runs covering different k bands (`--spades1-kmer`/`--spades2-kmer`). `spadesauto` omits `-k` so rnaSPAdes picks its documented default pair (~1/3 and ~1/2 of maximum read length). `spadeshigh` sits above that band at 60%/75% of maximum read length, resolved per dataset. Sequential, slowest first. Each deletes its `<run>.spades_k*/` working directory when done, unless `--no-cleanup`. |
 | `diamond_spadesauto` / `diamond_spadeshigh` | `orp` diamond blastx | the matching spades fasta | `diamond/<run>.spades{auto,high}.diamond.txt` | Blastx against swissprot; fires immediately after each assembly since it only needs its own fasta, not the merge stage below. |
 
-**Stage B** (`TRINITY_PHASE2_SHARE`, 95/5 cpu split; Trans-ABySS's mem share is not cut the same way — see `oyster.py`):
+**Stage B**, Trinity lane (the whole lane), and the **Trans-ABySS lane** (from the start, beside both stages):
 
 | Step | Env / tool | Inputs | Outputs | What it does |
 |---|---|---|---|---|
-| `run_trinity_phase2` | `orp_trinity` Trinity (no stop flag, `--full_cleanup` unless `--no-cleanup`) | Phase 1's sentinel (it still resumes from the on-disk checkpoints inside `<run>.trinity/`; the sentinel is only what `needs_run()` compares) | `<run>.trinity.Trinity.fasta` | Resumes from Phase 1 straight into the actual per-gene-component assembly — thousands of small independent jobs dispatched via ParaFly, and Trinity's dominant cost by far (~34h on the SRR1789336 benchmark). Runs alongside Trans-ABySS rather than waiting for Stage A's short lane to fully clear, since Trans-ABySS's own dominant cost is single-threaded regardless of CPU count (see NOTES.md 2026-08-19). |
-| `run_transabyss` | `orp_transabyss` transabyss | `c1`, `c2` | `assemblies/<run>.transabyss.fasta` | De novo assembly at `--transabyss-kmer` (default 32). Paired with Phase 2 instead of Stage A's SPAdes pair, since its dominant cost (initial FASTQ read + De Bruijn graph build) can't use extra cores anyway. Deletes its `<run>.transabyss/` working directory when done, unless `--no-cleanup`. |
+| `run_trinity_phase2` | `orp_trinity` Trinity (no stop flag, `--full_cleanup` unless `--no-cleanup`) | Phase 1's sentinel (it still resumes from the on-disk checkpoints inside `<run>.trinity/`; the sentinel is only what `needs_run()` compares) | `<run>.trinity.Trinity.fasta` | Resumes from Phase 1 straight into the actual per-gene-component assembly — thousands of small independent jobs dispatched via ParaFly, and Trinity's dominant cost by far (~2h on 38 cores on the SRR1789336 benchmark with an OpenMP ParaFly; ~34h without). Gets the whole Trinity lane once Stage A is done. |
+| `run_transabyss` | `orp_transabyss` transabyss | `c1`, `c2` | `assemblies/<run>.transabyss.fasta` | De novo assembly at `--transabyss-kmer` (default 32). Starts at once in its own lane: its dominant cost (initial FASTQ read + De Bruijn graph build) is single-threaded and can't use extra cores, which makes it the longest assembler. Deletes its `<run>.transabyss/` working directory when done, unless `--no-cleanup`. |
 | `diamond_transabyss` | `orp` diamond blastx | `<run>.transabyss.fasta` | `diamond/<run>.transabyss.diamond.txt` | Blastx against swissprot; fires immediately after the assembly. |
 
 ## Merging into one assembly (two-track)
@@ -59,7 +59,7 @@ This is the least obvious part of the pipeline: a set-algebra pass that finds ge
 | Step | Env / tool | Inputs | Outputs | What it does |
 |---|---|---|---|---|
 | `diamond_shucked` | pure Python (`hits_for`) | `<run>.shucked.fasta`, the per-assembly diamond outputs | `diamond/<run>.shucked.diamond.txt` | The merged assembly's swissprot hits, looked up from the per-assembly blastx outputs rather than searched for again: every contig in it came whole out of one of the assemblies. |
-| `diamond_trinity` | `orp` diamond blastx | `<run>.trinity.Trinity.fasta` | `diamond/<run>.trinity.diamond.txt` | Blastx of the raw (un-filtered, un-merged) Trinity assembly — `diamond_{transabyss,spadesauto,spadeshigh}` already ran earlier, in Stage A/Stage B above. |
+| `diamond_trinity` | `orp` diamond blastx | `<run>.trinity.Trinity.fasta` | `diamond/<run>.trinity.diamond.txt` | Blastx of the raw (un-filtered, un-merged) Trinity assembly — `diamond_{transabyss,spadesauto,spadeshigh}` already ran earlier, in the assembler lanes above. |
 | `diamond_uniq` | pure Python | all 5 diamond outputs | `diamond/<run>.unique.{trinity,spauto,sphigh,transabyss}.txt` | Counts distinct swissprot gene IDs hit by each individual assembler — reporting metrics only, doesn't gate anything downstream. |
 | `make_list1` | pure Python | `diamond_shucked` | `diamond/<run>.list1` | Gene IDs hit by the *merged* assembly. |
 | `make_list2` | pure Python | the 4 individual-assembler diamond outputs | `diamond/<run>.list2` | Union of gene IDs hit by *any* of the four raw assemblies. |

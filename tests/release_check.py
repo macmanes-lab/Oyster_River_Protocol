@@ -887,7 +887,7 @@ def case_bad_reads(ctx, run):
     bad = d / "truncated_1.fq.gz"
     bad.write_bytes(data[: int(len(data) * 0.6)])
     cmd = run.pipeline_cmd(OYSTER, d, ["--read1", bad, "--read2", READ2, "--runout", "bad"])
-    out, rc = run.watch(cmd, trigger="=== Stage A", delay=0)
+    out, rc = run.watch(cmd, trigger="=== Assemblers", delay=0)
     require(rc != -signal.SIGKILL, "a truncated read1 reached the assemblers")
     require(rc != 0, "a truncated read1 finished without error")
     require(not (d / "assemblies" / "bad.ORP.fasta").exists(), "a run on bad reads wrote ORP.fasta")

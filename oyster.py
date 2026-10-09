@@ -153,38 +153,36 @@ SIDE_JOB_MAX_MEM = 16
 #: full second, parallel is ~0.
 PARAFLY_SERIAL_GAP = 0.5
 
-# Trinity's own CPU/mem is fixed at launch for however long that stage
-# runs, so which assembler it's paired against matters more than a single
-# fixed lane ratio -- see main() for the two-stage pairing.
+# The assemblers run as two lanes side by side for the whole assembly stage
+# (see run_assemblers). Trinity's CPU/mem is fixed at launch for however long
+# each of its phases runs, so the lanes are sized up front.
 #
-# Stage A: Phase 1 (Inchworm + Chrysalis prep, see run_trinity_phase1) pairs
-# with SPAdes55/SPAdes75. Phase 1 is largely insensitive to its CPU share
-# above its own --inchworm_cpu=10 cap (Chrysalis's clustering is brief next
-# to Phase 2), while SPAdes is fast but does scale with cores -- so SPAdes
-# gets the bulk of the machine and Phase 1 gets just enough to clear its cap.
-TRINITY_PHASE1_SHARE = 0.25
+# Trans-ABySS lane: Trans-ABySS, then its diamond search, from the start.
+# Its dominant cost (the initial FASTQ read + De Bruijn graph build) runs
+# single-threaded however many cores it gets -- abyss-pe falls through to the
+# plain, unthreaded `ABYSS` binary whenever neither Bloom-filter mode nor MPI
+# is requested, which oyster.py never does (NOTES.md 2026-08-19). On
+# SRR1789336 at --cpu 40 it took 4.5h on ~20 cores (3.2h of it single-
+# threaded) and 5h09m on 2. With an OpenMP ParaFly, Trinity's phase 2 is ~2h
+# on 38 cores rather than ~34h, so Trans-ABySS is now the long pole: it starts
+# first instead of waiting for phase 1, on a quarter of the cores.
+TRANSABYSS_SHARE = 0.25
 #
-# Stage B: Phase 2 (thousands of independent per-gene-component ParaFly
-# jobs, see run_trinity_phase2 -- by far Trinity's dominant cost, and scales
-# close to linearly with cores) pairs with Trans-ABySS instead of running
-# alone after every assembler finishes. Trans-ABySS's own dominant cost
-# (the initial FASTQ read + De Bruijn graph build) runs single-threaded no
-# matter how many cores it's given -- traced to abyss-pe falling through to
-# the plain, unthreaded `ABYSS` binary whenever neither Bloom-filter mode
-# nor MPI is requested, which oyster.py never does (see NOTES.md
-# 2026-08-19). Real-run evidence (TIME2_SRR1789336_norm_py_5050parallel,
-# 2026-08-19): at 40 cores, Trans-ABySS took 4.5h (3.2h of it
-# single-threaded and CPU-invariant) while Phase 2 alone took ~34h -- so
-# Phase 2 gets the large majority of the machine, leaving Trans-ABySS just
-# enough cores to keep its own threaded sub-stages moving. Mem is NOT split
-# by this same ratio (see main()): Trans-ABySS's memory footprint doesn't
-# shrink with its CPU share.
-TRINITY_PHASE2_SHARE = 0.95
+# Trinity lane, on the rest of --cpu: Phase 1 (Inchworm + Chrysalis prep, see
+# run_trinity_phase1) beside SPAdes auto/high, then Phase 2 (the per-gene-
+# component ParaFly jobs, see run_trinity_phase2) on all of the lane once
+# both are done. Stage A is phase-1-bound: phase 1 took 1h20m on 10 threads
+# and 1h09m on 20 (the -t $CPU Chrysalis stages; Inchworm stays at
+# --inchworm_cpu 10), while the SPAdes pair took ~20 min and was flat between
+# 30 and 60 cores -- so the lane's cores split evenly.
+TRINITY_PHASE1_SHARE = 0.5
+# Mem is split separately: Trinity phase 1 only needs --max_memory for
+# jellyfish and its sorts, while SPAdes treats --memory as a hard cap.
+TRINITY_PHASE1_MEM_SHARE = 0.25
 #
-# Not yet validated on a real run -- next run should confirm Trans-ABySS
-# doesn't OOM at its reduced mem share and doesn't become the long pole of
-# Stage B (it shouldn't: even a large slowdown from fewer cores is still
-# small next to Phase 2's ~34h).
+# First set on SRR1789336 timings alone, on a conda Trinity; re-balance once
+# end-to-end timings from the source-built Trinity are in. Phase 2 should
+# finish before Trans-ABySS; if it doesn't, lower TRANSABYSS_SHARE.
 
 # A step that fails on a cluster is often transient (node preemption,
 # filesystem hiccup, scheduler blip) rather than a real bug, so retry before
@@ -1648,8 +1646,8 @@ class Pipeline:
         # builds the whole-transcriptome contig graph, partitions reads per
         # gene component, writes the Phase-2 command list, then stops --
         # doesn't touch the actual per-component assembly (run_trinity_phase2
-        # below). Runs alongside SPAdes55/SPAdes75 (Stage A) at
-        # TRINITY_PHASE1_SHARE of --cpu/--mem.
+        # below). Runs alongside SPAdes auto/high (Stage A) at
+        # TRINITY_PHASE1_SHARE of the Trinity lane's cores.
         cpu = self.cpu if cpu is None else cpu
         mem = self.mem if mem is None else mem
         cmd = self._trinity_base_cmd(cpu, mem) + ["--no_distributed_trinity_exec"]
@@ -1661,10 +1659,9 @@ class Pipeline:
         # from Phase 1's on-disk checkpoints straight into Phase 2 -- the
         # thousands of small, independent, single-threaded per-component
         # assembly jobs dispatched via ParaFly, and by far Trinity's
-        # dominant cost. Runs alongside Trans-ABySS (Stage B) at
-        # TRINITY_PHASE2_SHARE of --cpu/--mem instead of waiting for it to
-        # finish -- see TRINITY_PHASE2_SHARE above for why that pairing is
-        # safe.
+        # dominant cost. Gets the whole Trinity lane once Stage A is done,
+        # while Trans-ABySS keeps running in its own lane -- see
+        # TRANSABYSS_SHARE above.
         cpu = self.cpu if cpu is None else cpu
         mem = self.mem if mem is None else mem
         out = self.assemblies_dir / f"{self.runout}.trinity.Trinity.fasta"
@@ -2492,38 +2489,65 @@ class Pipeline:
         diamond_sphigh = self.diamond_txt(SPADES_HIGH)
         diamond_spauto = self.diamond_txt(SPADES_AUTO)
 
-        # Two sequential stage-pairings rather than one lane split across all
-        # four assemblers for the whole run -- see TRINITY_PHASE1_SHARE and
-        # TRINITY_PHASE2_SHARE above for why each pairing is chosen the way
-        # it is.
-        phase1_cpu = max(1, round(self.cpu * TRINITY_PHASE1_SHARE))
-        phase1_mem = max(1, round(self.mem * TRINITY_PHASE1_SHARE))
-        spades_cpu = max(1, self.cpu - phase1_cpu)
-        spades_mem = max(1, self.mem - phase1_mem)
+        # Two lanes for the whole assembly stage: Trans-ABySS on its own
+        # share from the start, and Trinity on the rest -- phase 1 beside
+        # SPAdes (Stage A), then phase 2 on all of the lane (Stage B). See
+        # TRANSABYSS_SHARE and TRINITY_PHASE1_SHARE above.
+        transabyss_pending = (
+            self.step_marker("run_transabyss").exists()
+            or self.step_marker("diamond_transabyss").exists()
+            or self.needs_run([ta], [c1, c2])
+            or self.needs_run([diamond_ta], [ta])
+        )
+        if transabyss_pending:
+            transabyss_cpu = max(1, round(self.cpu * TRANSABYSS_SHARE))
+            transabyss_mem = max(1, round(self.mem * TRANSABYSS_SHARE))
+        else:
+            # A resumed run with Trans-ABySS already done: its lane would
+            # finish at once, so Trinity's lane takes the whole machine.
+            transabyss_cpu, transabyss_mem = 0, 0
+        # Trans-ABySS's mem is bookkeeping only (it has no memory flag; see
+        # run_transabyss), but its real footprint comes out of --mem all the
+        # same, so it comes out of the Trinity lane's budget here too.
+        lane_cpu = max(1, self.cpu - transabyss_cpu)
+        lane_mem = max(1, self.mem - transabyss_mem)
+        transabyss_cpu = max(1, transabyss_cpu)
+        transabyss_mem = max(1, transabyss_mem)
+
+        phase1_cpu = max(1, round(lane_cpu * TRINITY_PHASE1_SHARE))
+        phase1_mem = max(1, round(lane_mem * TRINITY_PHASE1_MEM_SHARE))
+        spades_cpu = max(1, lane_cpu - phase1_cpu)
+        spades_mem = max(1, lane_mem - phase1_mem)
+        phase2_cpu, phase2_mem = lane_cpu, lane_mem
 
         self.seed_trinity_phase1_sentinel()
 
-        phase2_cpu = max(1, round(self.cpu * TRINITY_PHASE2_SHARE))
-        phase2_mem = max(1, round(self.mem * TRINITY_PHASE2_SHARE))
-        transabyss_cpu = max(1, self.cpu - phase2_cpu)
-        # Not split by TRINITY_PHASE2_SHARE: Trans-ABySS's memory footprint
-        # doesn't shrink along with its CPU share the way SPAdes/Phase 1's
-        # do, so it keeps the same generous share Stage A used rather than
-        # being squeezed down with its CPU. Revisit if this run OOMs or if
-        # it turns out to be more mem than Trans-ABySS actually needs.
-        transabyss_mem = spades_mem
-
         def _lane_failed(lane_name, e):
             # ThreadPoolExecutor.__exit__ (below) calls shutdown(wait=True) even
-            # while an exception unwinds, so the *other* lane's still-running
-            # future keeps blocking the run's exit -- Trinity in particular can
-            # still be tens of hours out. Log the failure the moment it happens
-            # rather than leaving it silent until the other lane finally finishes.
+            # while an exception unwinds, so the other lanes' still-running
+            # futures keep blocking the run's exit -- Trans-ABySS or Trinity
+            # can still be hours out. Log the failure the moment it happens
+            # rather than leaving it silent until the others finally finish.
             print(
-                f"\n*** [{lane_name}] lane failed ({e}) -- other lane keeps running; "
-                "this run will still abort once it finishes ***",
+                f"\n*** [{lane_name}] lane failed ({e}) -- other lanes keep running; "
+                "this run will still abort once they finish ***",
                 flush=True,
             )
+
+        def transabyss_lane():
+            try:
+                self.step(
+                    "run_transabyss", [ta], [c1, c2],
+                    partial(self.run_transabyss, cpu=transabyss_cpu, mem=transabyss_mem),
+                )
+                self.compress_async(ta)
+                self.step(
+                    "diamond_transabyss", [diamond_ta], [ta],
+                    partial(self.run_diamond_one, ta, diamond_ta, cpu=transabyss_cpu),
+                )
+            except Exception as e:
+                _lane_failed("transabyss", e)
+                raise
 
         def trinity_phase1_lane():
             try:
@@ -2558,13 +2582,13 @@ class Pipeline:
                 _lane_failed("spades", e)
                 raise
 
-        print(f"\n=== Stage A: run_trinity_phase1 ({phase1_cpu} cpu) || spadesauto/spadeshigh ({spades_cpu} cpu) -- start {self._ts()} ===")
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
-            for f in concurrent.futures.as_completed([ex.submit(trinity_phase1_lane), ex.submit(spades_lane)]):
-                f.result()
-        print(f"=== Stage A done -- {self._ts()} ===")
-
-        def trinity_phase2_lane():
+        def trinity_lane():
+            print(f"\n=== Stage A: run_trinity_phase1 ({phase1_cpu} cpu) || spadesauto/spadeshigh ({spades_cpu} cpu) -- start {self._ts()} ===")
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
+                for f in concurrent.futures.as_completed([ex.submit(trinity_phase1_lane), ex.submit(spades_lane)]):
+                    f.result()
+            print(f"=== Stage A done -- {self._ts()} ===")
+            print(f"\n=== Stage B: run_trinity_phase2 ({phase2_cpu} cpu) -- start {self._ts()} ===")
             try:
                 self.step(
                     "run_trinity_phase2", [trinity_fa], [phase1_done],
@@ -2574,27 +2598,14 @@ class Pipeline:
             except Exception as e:
                 _lane_failed("run_trinity_phase2", e)
                 raise
+            print(f"=== Stage B done -- {self._ts()} ===")
 
-        def transabyss_lane():
-            try:
-                self.step(
-                    "run_transabyss", [ta], [c1, c2],
-                    partial(self.run_transabyss, cpu=transabyss_cpu, mem=transabyss_mem),
-                )
-                self.compress_async(ta)
-                self.step(
-                    "diamond_transabyss", [diamond_ta], [ta],
-                    partial(self.run_diamond_one, ta, diamond_ta, cpu=transabyss_cpu),
-                )
-            except Exception as e:
-                _lane_failed("transabyss", e)
-                raise
-
-        print(f"\n=== Stage B: run_trinity_phase2 ({phase2_cpu} cpu) || transabyss ({transabyss_cpu} cpu) -- start {self._ts()} ===")
+        ta_budget = f"{transabyss_cpu} cpu" if transabyss_pending else "done"
+        print(f"\n=== Assemblers: transabyss ({ta_budget}) || Trinity + SPAdes ({lane_cpu} cpu) -- start {self._ts()} ===")
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
-            for f in concurrent.futures.as_completed([ex.submit(trinity_phase2_lane), ex.submit(transabyss_lane)]):
+            for f in concurrent.futures.as_completed([ex.submit(transabyss_lane), ex.submit(trinity_lane)]):
                 f.result()
-        print(f"=== Stage B done -- {self._ts()} ===")
+        print(f"=== Assemblers done -- {self._ts()} ===")
 
     def merge_and_report(self, pipeline_start):
         """Fuse the assemblies into one, then score and report on the result.
@@ -2768,8 +2779,8 @@ def parse_args():
         help="2 or more (the default) runs a short independent job beside a long "
              "one on a few threads of its own: the remaining diamond passes beside "
              "score_pool, and strandeval beside pyTransRate. 1 runs them one after "
-             "the other. The assemblers' two stage-pairings (see "
-             "TRINITY_PHASE1_SHARE/TRINITY_PHASE2_SHARE) are unaffected (default: 2)",
+             "the other. The assembler lanes (see TRANSABYSS_SHARE and "
+             "TRINITY_PHASE1_SHARE) are unaffected (default: 2)",
     )
     p.add_argument(
         "--no-cleanup", "--keep-intermediates", dest="no_cleanup", action="store_true",

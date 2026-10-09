@@ -2,6 +2,16 @@
 
 ORP Version 4.1.0-dev1
 
+- **Trans-ABySS starts at the beginning of the assembly stage** (`oyster.py`).
+  With Trinity built from source, phase 2 runs its components in parallel
+  (~2h instead of ~34h on SRR1789336), so Trans-ABySS -- about 4.5h, mostly
+  single-threaded -- became the slowest assembler, and it used to wait for
+  Trinity phase 1 (~1h20m) before starting. It now runs in its own lane on
+  `TRANSABYSS_SHARE` (25%) of `--cpu`/`--mem` from the start. The Trinity lane
+  gets the rest: phase 1 beside the two SPAdes runs (cores 50/50, mem 25/75),
+  then phase 2 on the whole lane. `TRINITY_PHASE2_SHARE` is gone. A resumed
+  run whose Trans-ABySS is already done gives the Trinity lane every core.
+  The log's first assembler banner is now `=== Assemblers: ...`.
 - **The strand exam counts every transcript, not every other one**
   (`scripts/examine_strand.pl`, used by `oyster.py`, `chowder.py` and
   `scripts/strandeval.py`). Inherited from Trinity's
