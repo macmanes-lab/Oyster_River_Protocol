@@ -2,6 +2,15 @@
 
 ORP Version 4.1.0-dev1
 
+- **Cleanup no longer deletes other runs' files** (`oyster.py`).
+  `assemblies/diamond`, `assemblies/working`, `quants` and `shuck` are shared
+  by every run started in the same directory, but cleanup removed each one
+  whole. A run that finished while another was still assembling took that
+  run's `assemblies/diamond` with it, and the second run's next diamond step
+  failed with `Error opening file ... No such file or directory`. Cleanup now
+  removes only this run's `<run>.*` entries, `quants/salmon_shucked_<run>`
+  and `shuck/<run>`, and removes a shared directory only once it is empty.
+  Each step also recreates its output directories before it runs.
 - **Trans-ABySS starts at the beginning of the assembly stage** (`oyster.py`).
   With Trinity built from source, phase 2 runs its components in parallel
   (~2h instead of ~34h on SRR1789336), so Trans-ABySS -- about 4.5h, mostly

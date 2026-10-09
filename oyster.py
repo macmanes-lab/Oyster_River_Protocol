@@ -1014,14 +1014,21 @@ class Pipeline:
             if gz.exists():
                 kept.append(f"{self._rel(gz)}  ({human_size(path_size(gz))})")
 
+        # assemblies/diamond, assemblies/working, quants and shuck are shared
+        # by every run started in this directory, so take only this run's
+        # entries out of them -- removing the whole directory pulled
+        # assemblies/diamond out from under a concurrent run still in its
+        # assembly stage. Everything this run writes there is named
+        # <runout>.*, salmon's quants/salmon_shucked_<runout>, or its own
+        # shuck/<runout> tree.
+        shared = (self.assemblies_working, self.diamond_dir, self.quants_dir)
         for path in (
-            self.dir / "shuck",
+            self.shuck_dir,
             # The same tree under its pre-4.1.0-dev8 name, left behind when a
             # run directory from before the rename was resumed under it.
-            self.dir / "orthofuse",
-            self.assemblies_working,
-            self.diamond_dir,
-            self.quants_dir,
+            self.dir / "orthofuse" / self.runout,
+            *(p for d in shared for p in d.glob(f"{self.runout}.*")),
+            self.quants_dir / f"salmon_shucked_{self.runout}",
             # Trinity's --full_cleanup normally removes this itself; a run
             # that was interrupted and resumed can still leave it behind.
             self.trinity_out_dir(),
@@ -1051,6 +1058,19 @@ class Pipeline:
                 path.unlink()
             freed += size
             removed.append(f"{self._rel(path)}{'/' if is_dir else ''}  ({human_size(size)})")
+
+        # A shared directory goes only once no run has anything left in it.
+        # quants/salmon.version is the one shared file (a stamp of the env's
+        # salmon, not of any run), so it alone doesn't keep quants/ around.
+        salmon_stamp = self.quants_dir / "salmon.version"
+        if salmon_stamp.exists() and [p.name for p in self.quants_dir.iterdir()] == [salmon_stamp.name]:
+            salmon_stamp.unlink()
+        for d in (*shared, self.dir / "shuck", self.dir / "orthofuse"):
+            try:
+                d.rmdir()
+                removed.append(f"{self._rel(d)}/  (empty)")
+            except OSError:
+                pass  # missing, or another run still has files in it
 
         lines = [f"Command: {self.run_cmd}", "",
                  f"Reclaimed {human_size(freed)} of intermediate files "
@@ -1174,6 +1194,13 @@ class Pipeline:
         marker.touch()
         start = time.time()
         print(f"\n=== {name} -- start {self._ts(start)} ===")
+        # setup() made these once at startup, but assemblies/diamond, quants
+        # and assemblies/working are shared by every run in this directory,
+        # and something other than this run can remove one mid-run (a hand
+        # cleanup, or another run's from before cleanup() kept to its own
+        # files). Recreating them costs nothing; losing one cost a 4h lane.
+        for out in outputs:
+            Path(out).parent.mkdir(parents=True, exist_ok=True)
         func()
         # Only on success: a step that raised keeps its marker, so the next
         # run redoes it (see step_marker).
