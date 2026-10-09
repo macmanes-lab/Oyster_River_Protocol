@@ -148,6 +148,25 @@ SIDE_JOB_CPU_SHARE = 0.25
 SIDE_JOB_MAX_CPU = 8
 SIDE_JOB_MAX_MEM = 16
 
+#: The environment run_transabyss runs mpirun in under --transabyss-mpi. One
+#: rank per core of Trans-ABySS's share, inside whatever the scheduler granted:
+#: OpenMPI under slurm counts one task as one slot, so -np 16 in a
+#: --ntasks=1 --cpus-per-task=16 job is refused without oversubscribe, and
+#: binding would stack every rank on that one slot's core. Both spellings, for
+#: OpenMPI 4 (OMPI_) and 5 (PRTE_). The ALLOW_RUN_AS_ROOT pair is for Docker,
+#: where ORP runs as root and mpirun otherwise refuses outright.
+TRANSABYSS_MPI_ENV = {
+    "OMPI_MCA_rmaps_base_oversubscribe": "1",
+    "OMPI_MCA_hwloc_base_binding_policy": "none",
+    "PRTE_MCA_rmaps_default_mapping_policy": ":oversubscribe",
+    "PRTE_MCA_hwloc_default_binding_policy": "none",
+    "OMPI_ALLOW_RUN_AS_ROOT": "1",
+    "OMPI_ALLOW_RUN_AS_ROOT_CONFIRM": "1",
+}
+#: How long preflight's mpirun test may take before it counts as broken: a
+#: misconfigured mpirun can hang waiting for daemons rather than fail.
+TRANSABYSS_MPI_PROBE_TIMEOUT = 120
+
 #: Seconds between the start of ParaFly's two self-test commands (see
 #: check_parafly_parallel) above which it is running them in turn: serial is a
 #: full second, parallel is ~0.
@@ -675,6 +694,10 @@ class Pipeline:
         self.spades1_kmer = getattr(args, "spades1_kmer", None)
         self.spades2_kmer = getattr(args, "spades2_kmer", [0.60, 0.75])
         self.transabyss_kmer = getattr(args, "transabyss_kmer", 32)
+        # off/auto/on as asked; whether Trans-ABySS really runs under MPI is
+        # settled by check_transabyss_mpi at preflight.
+        self.transabyss_mpi = getattr(args, "transabyss_mpi", "off")
+        self.transabyss_use_mpi = False
         self.read1 = Path(args.read1)
         self.read2 = Path(args.read2)
         self.runout = args.runout
@@ -1356,6 +1379,8 @@ class Pipeline:
         self.check_databases()
         if TRINITY_TOOL in self.required_tools():
             self.check_parafly_parallel()
+        if TRANSABYSS_TOOL in self.required_tools() and self.transabyss_mpi != "off":
+            self.check_transabyss_mpi()
         self.check_pytransrate_version()
         self.log_provenance()
 
@@ -1433,6 +1458,39 @@ class Pipeline:
                      "apart at -CPU 2: it was built without OpenMP, so Trinity's phase 2 "
                      "would run one component at a time. Build Trinity from source with "
                      "scripts/build_trinity.sh (see INSTALL.md) ***")
+
+    def check_transabyss_mpi(self):
+        """Decide whether Trans-ABySS runs under MPI (--transabyss-mpi auto/on).
+
+        ABYSS-P and mpirun being installed is not the question -- bioconda's
+        abyss brings both. Whether mpirun can start ranks here is: under a
+        scheduler, in a container, or on a host whose MPI is misconfigured it
+        can refuse or hang. So it starts two, in orp_transabyss with the
+        environment run_transabyss will use, before anything is assembled.
+        `on` refuses to start if that fails; `auto` says so and runs
+        Trans-ABySS threaded, as `off` does.
+        """
+        probe = "command -v ABYSS-P >/dev/null || { echo 'ABYSS-P not found' >&2; exit 1; }; mpirun -np 2 true"
+        try:
+            result = subprocess.run(
+                ["conda", "run", "-n", "orp_transabyss", "bash", "-c", probe],
+                env=dict(os.environ, **TRANSABYSS_MPI_ENV),
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True,
+                timeout=TRANSABYSS_MPI_PROBE_TIMEOUT,
+            )
+            ok, why = result.returncode == 0, (result.stderr.strip() or result.stdout.strip())
+        except subprocess.TimeoutExpired:
+            ok, why = False, f"mpirun -np 2 did not finish in {TRANSABYSS_MPI_PROBE_TIMEOUT}s"
+        if ok:
+            self.transabyss_use_mpi = True
+            print("[preflight] Trans-ABySS will run under MPI (--transabyss-mpi "
+                  f"{self.transabyss_mpi}): mpirun started 2 ranks in orp_transabyss")
+        elif self.transabyss_mpi == "on":
+            sys.exit("*** --transabyss-mpi on, but mpirun could not start 2 ranks in "
+                     f"orp_transabyss: {why} ***")
+        else:
+            print("[preflight] --transabyss-mpi auto: mpirun could not start 2 ranks in "
+                  f"orp_transabyss ({why}); Trans-ABySS will run threaded")
 
     def log_provenance(self):
         """Print what a later post-mortem needs and cannot recover.
@@ -1763,10 +1821,20 @@ class Pipeline:
             "--name", f"{self.runout}.transabyss.fasta",
             "--pe", str(self.cor1()), str(self.cor2()),
         ]
+        # --mpi sets abyss-pe's np: the unitig assembly, otherwise one thread
+        # whatever --threads says, runs as `mpirun -np <cpu> ABYSS-P`.
+        kwargs = {}
+        if self.transabyss_use_mpi:
+            cmd += ["--mpi", str(cpu)]
+            kwargs["env"] = dict(os.environ, **TRANSABYSS_MPI_ENV)
+        mode = f"{'mpi' if self.transabyss_use_mpi else 'threads'} {cpu}"
         shutil.rmtree(workdir, ignore_errors=True)  # see run_spades
-        self.conda_run("orp_transabyss", *cmd, retry_cleanup=workdir)
+        self.conda_run("orp_transabyss", *cmd, retry_cleanup=workdir, **kwargs)
         final = workdir / f"{self.runout}.transabyss.fasta-final.fa"
         awk_first_field(final, out)
+        # ABYSS-P need not build exactly the assembly ABYSS does, so how this
+        # one was built is kept beside the reports, which cleanup leaves.
+        (self.reports_dir / f"{self.runout}.transabyss.mode").write_text(mode + "\n")
         if not self.no_cleanup:
             shutil.rmtree(workdir, ignore_errors=True)
 
@@ -2807,6 +2875,13 @@ def parse_args():
                         "max read length ('60%%,75%%'), an explicit comma-separated list of "
                         "odd sizes under 128, or 'auto' (default: 60%%,75%%)")
     p.add_argument("--transabyss-kmer", type=int, default=32, help="Trans-ABySS k-mer (default: 32)")
+    p.add_argument(
+        "--transabyss-mpi", choices=["off", "auto", "on"], default="off",
+        help="run Trans-ABySS's unitig assembly under MPI (mpirun -np <its cores> "
+             "ABYSS-P) instead of on one thread. 'on' refuses to start if mpirun "
+             "cannot start ranks in orp_transabyss; 'auto' falls back to threaded; "
+             "reports/<run>.transabyss.mode records which ran (default: off)",
+    )
     p.add_argument(
         "--max-parallel", type=int, default=2,
         help="2 or more (the default) runs a short independent job beside a long "

@@ -2,6 +2,15 @@
 
 ORP Version 4.1.0-dev1
 
+- **`--transabyss-mpi off|auto|on`** (`oyster.py`, default `off`). Trans-
+  ABySS's unitig assembly runs on one thread unless `abyss-pe` gets MPI;
+  this passes `--mpi <its cores>` so it runs as `mpirun -np N ABYSS-P`.
+  Preflight starts two ranks in `orp_transabyss` first: `on` refuses to run
+  if that fails or hangs, `auto` falls back to threaded. mpirun gets
+  OpenMPI's oversubscribe/no-binding settings (one slurm task is one slot)
+  and run-as-root (Docker). `reports/<run>.transabyss.mode` records
+  `threads N` or `mpi N`, since ABYSS-P need not build the identical
+  assembly. Not yet validated on real data; see `experiments/transabyss_mpi/`.
 - **Trans-ABySS gets 40% of `--cpu` instead of 25%** (`oyster.py`,
   `TRANSABYSS_SHARE`). On SRR1138704 at `--cpu 40` it took 3h14m while the
   Trinity lane finished 1h11m earlier. Its memory reservation stays at a

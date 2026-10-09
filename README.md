@@ -142,6 +142,7 @@ Because it appends, a value given here overrides the same flag ORP passes above 
 | `--spades1-kmer` | `auto` | rnaSPAdes k-mer(s) for the spadesauto assembly — `auto` lets rnaSPAdes pick its documented default pair (~1/3 and ~1/2 of maximum read length). Also accepts percentages or an explicit list, same forms as `--spades2-kmer` |
 | `--spades2-kmer` | `60%,75%` | rnaSPAdes k-mer(s) for the spadeshigh assembly — percentages of maximum read length, an explicit comma-separated list of odd sizes under 128, or `auto`. Percentages resolve per dataset (61,75 at 101bp reads; 89,113 at 150bp), clamped to rnaSPAdes' 127 ceiling |
 | `--transabyss-kmer` | `32` | Trans-ABySS k-mer |
+| `--transabyss-mpi` | `off` | `auto`/`on` run Trans-ABySS's single-threaded unitig assembly under MPI (`mpirun -np <its cores> ABYSS-P`). Preflight starts two ranks first: `on` refuses to run if that fails, `auto` falls back to threaded. `reports/<run>.transabyss.mode` records which ran |
 | `--max-parallel` | `2` | `1` runs the short jobs that would otherwise run beside a long one (see [Parallel task management](#parallel-task-management) above) one after the other |
 | `--no-cleanup` | off | Keep every file a run produces, uncompressed, including each assembler's working directory -- for debugging (see [What a finished run leaves behind](#what-a-finished-run-leaves-behind) below). Alias: `--keep-intermediates` |
 | `--pytransrate-args` | none | Extra arguments passed verbatim to both pyTransRate runs, as one quoted string (see [Tuning pyTransRate](#tuning-pytransrate) below) |
