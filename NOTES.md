@@ -5,6 +5,21 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-10-09 -- lane balance: SRR1138704, TRANSABYSS_SHARE 0.25 -> 0.4
+
+First real run of dev19 (`--cpu 40 --mem 500G`, TOTAL 3h46m48s). Trans-
+ABySS (10 cpu) 22:00:19 -> 01:14:10 (3h14m incl. diamond). Trinity lane
+(30 cpu): phase 1 41m04s on 15, SPAdes pair + diamonds 24m on 15, phase 2
+1h21m25s on 30 (~41 core-h), lane done 00:02:49 -- idle 1h11m before
+Trans-ABySS finished. Lanes started together and phase 2 began 1 s after
+phase 1, as designed; ~41 min saved against waiting for phase 1.
+Now `TRANSABYSS_SHARE = 0.4` (16 cpu at --cpu 40), its mem split off as
+`TRANSABYSS_MEM_SHARE = 0.25` (unchanged). Trinity lane 24: phase 1 12,
+SPAdes 12, phase 2 24 (~1h42m expected) -> lane ~2h25m, still ~50 min
+inside Trans-ABySS. Unknown: how much Trans-ABySS gains from 10 -> 16 cores
+(SRR1789336: 4.5h on ~20, 5h09m on 2, so expect minutes). Next runs: does
+Trans-ABySS drop, and on bigger datasets does phase 2 stay inside it?
+
 ## 2026-10-08 -- assembler lanes: Trans-ABySS from t=0
 
 With Trinity built from source (OpenMP ParaFly), phase 2 is ~2h on 38 cores

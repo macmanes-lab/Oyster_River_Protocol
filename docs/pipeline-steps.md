@@ -21,7 +21,7 @@ A step is skipped when its outputs exist and are newer than its inputs. Each ste
 
 ## Assembly lanes
 
-Two lanes side by side for the whole assembly stage, a fixed `ThreadPoolExecutor(max_workers=2)` independent of `--max-parallel` — see [pipeline-schedule.html](pipeline-schedule.html) for why. The Trans-ABySS lane gets `TRANSABYSS_SHARE` (25%) of `--cpu`/`--mem` from the start; the Trinity lane gets the rest and runs Stage A, then Stage B. All assemblers consume `c1`/`c2`.
+Two lanes side by side for the whole assembly stage, a fixed `ThreadPoolExecutor(max_workers=2)` independent of `--max-parallel` — see [pipeline-schedule.html](pipeline-schedule.html) for why. The Trans-ABySS lane gets `TRANSABYSS_SHARE` (40%) of `--cpu` and `TRANSABYSS_MEM_SHARE` (25%) of `--mem` from the start; the Trinity lane gets the rest and runs Stage A, then Stage B. All assemblers consume `c1`/`c2`.
 
 **Stage A**, Trinity lane (`TRINITY_PHASE1_SHARE`, cores 50/50; `TRINITY_PHASE1_MEM_SHARE`, mem 25/75):
 

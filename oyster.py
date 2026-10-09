@@ -165,8 +165,14 @@ PARAFLY_SERIAL_GAP = 0.5
 # SRR1789336 at --cpu 40 it took 4.5h on ~20 cores (3.2h of it single-
 # threaded) and 5h09m on 2. With an OpenMP ParaFly, Trinity's phase 2 is ~2h
 # on 38 cores rather than ~34h, so Trans-ABySS is now the long pole: it starts
-# first instead of waiting for phase 1, on a quarter of the cores.
-TRANSABYSS_SHARE = 0.25
+# first instead of waiting for phase 1. SRR1138704 at --cpu 40 on 0.25 (10
+# cores): Trans-ABySS 3h14m, while the Trinity lane (phase 1 41m, then phase
+# 2 1h21m on 30 cores) sat done for its last 1h11m -- so Trans-ABySS gets
+# 40%, which still leaves Phase 2 (~1h42m on 24 cores) well inside its time.
+TRANSABYSS_SHARE = 0.4
+# Its mem is reserved separately and stays at a quarter: its footprint doesn't
+# grow with its cores, and whatever it reserves comes out of SPAdes' hard cap.
+TRANSABYSS_MEM_SHARE = 0.25
 #
 # Trinity lane, on the rest of --cpu: Phase 1 (Inchworm + Chrysalis prep, see
 # run_trinity_phase1) beside SPAdes auto/high, then Phase 2 (the per-gene-
@@ -180,9 +186,9 @@ TRINITY_PHASE1_SHARE = 0.5
 # jellyfish and its sorts, while SPAdes treats --memory as a hard cap.
 TRINITY_PHASE1_MEM_SHARE = 0.25
 #
-# First set on SRR1789336 timings alone, on a conda Trinity; re-balance once
-# end-to-end timings from the source-built Trinity are in. Phase 2 should
-# finish before Trans-ABySS; if it doesn't, lower TRANSABYSS_SHARE.
+# Re-balance as end-to-end timings from the source-built Trinity come in
+# (NOTES.md 2026-10-08). Phase 2 should finish before Trans-ABySS; if it
+# doesn't, lower TRANSABYSS_SHARE.
 
 # A step that fails on a cluster is often transient (node preemption,
 # filesystem hiccup, scheduler blip) rather than a real bug, so retry before
@@ -2528,7 +2534,7 @@ class Pipeline:
         )
         if transabyss_pending:
             transabyss_cpu = max(1, round(self.cpu * TRANSABYSS_SHARE))
-            transabyss_mem = max(1, round(self.mem * TRANSABYSS_SHARE))
+            transabyss_mem = max(1, round(self.mem * TRANSABYSS_MEM_SHARE))
         else:
             # A resumed run with Trans-ABySS already done: its lane would
             # finish at once, so Trinity's lane takes the whole machine.

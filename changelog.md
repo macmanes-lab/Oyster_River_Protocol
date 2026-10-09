@@ -2,6 +2,11 @@
 
 ORP Version 4.1.0-dev1
 
+- **Trans-ABySS gets 40% of `--cpu` instead of 25%** (`oyster.py`,
+  `TRANSABYSS_SHARE`). On SRR1138704 at `--cpu 40` it took 3h14m while the
+  Trinity lane finished 1h11m earlier. Its memory reservation stays at a
+  quarter of `--mem` (new `TRANSABYSS_MEM_SHARE`), so SPAdes' cap doesn't
+  shrink with it.
 - **Cleanup no longer deletes other runs' files** (`oyster.py`).
   `assemblies/diamond`, `assemblies/working`, `quants` and `shuck` are shared
   by every run started in the same directory, but cleanup removed each one
