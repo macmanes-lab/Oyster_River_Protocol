@@ -2,6 +2,15 @@
 
 ORP Version 4.1.0-dev1
 
+- **Under `--transabyss-mpi`, Trans-ABySS's share follows read depth**
+  (`oyster.py`, `transabyss_share`). With `--normalize-reads` only Trinity's
+  reads are normalized, so Trans-ABySS's part of the work grows with depth:
+  the balanced shares on SRR1138704, SRR866209 and DRR031870 were 0.23, 0.28
+  and 0.375 against 3.6, 7.4 and 17.5 GB of uncompressed corrected R1. The
+  share is now 0.198 + 0.0103 x GB, clamped to 0.2-0.45; a fixed 0.33 without
+  `--normalize-reads`, which no run has measured. The log prints the share and
+  why. `OMPI_MCA_mpi_yield_when_idle`, added in dev23, is gone: it slowed
+  Trans-ABySS and did not speed Trinity up.
 - **The assembler split depends on `--transabyss-mpi`** (`oyster.py`).
   Threaded, Trans-ABySS gets 25% of `--cpu` again: 40% made it no faster
   (SRR1138704 3h10m -> 3h32m, SRR866209 3h52m -> 4h59m) while costing

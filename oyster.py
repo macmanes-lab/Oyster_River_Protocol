@@ -162,12 +162,12 @@ TRANSABYSS_MPI_ENV = {
     "PRTE_MCA_hwloc_default_binding_policy": "none",
     "OMPI_ALLOW_RUN_AS_ROOT": "1",
     "OMPI_ALLOW_RUN_AS_ROOT_CONFIRM": "1",
-    # A rank waiting on the others spins at 100% unless told to yield, and
-    # with binding off nothing holds the spinning to Trans-ABySS's share: on
-    # DRR031870 the MPI run's Trinity phase 2 took 1h53m on 24 cores against
-    # 1h31m for a threaded run on the same 24.
-    "OMPI_MCA_mpi_yield_when_idle": "1",
 }
+# Not OMPI_MCA_mpi_yield_when_idle: dev23 set it in case spinning ranks were
+# what slowed Trinity during MPI runs. On DRR031870 it cost Trans-ABySS ~20 min
+# beyond what its fewer cores explain, and Trinity's phase 2 stayed ~16%
+# slower than in threaded runs on a node of the same speed (NOTES.md
+# 2026-10-10).
 #: How long preflight's mpirun test may take before it counts as broken: a
 #: misconfigured mpirun can hang waiting for daemons rather than fail.
 TRANSABYSS_MPI_PROBE_TIMEOUT = 120
@@ -197,10 +197,22 @@ TRANSABYSS_SHARE = 0.25
 #
 # MPI: the unitig assembly runs as `mpirun -np <cores> ABYSS-P`, so both
 # lanes scale and the best split has them finish together -- Trans-ABySS's
-# share of the total CPU work, which varies by dataset. DRR031870 at 16 of 40
-# cores: Trans-ABySS 3h09m (8h55m threaded on 10), Trinity's lane 3h36m on
-# 24, i.e. Trinity now the long pole. A third is provisional, from that one
-# run; more MPI runs will show how much it moves between datasets.
+# share of the total CPU work. That grows with sequencing depth under
+# --normalize-reads, which normalizes Trinity's reads only: Trans-ABySS
+# assembles every read, Trinity a normalized set. Balanced shares at --cpu 40
+# against the uncompressed corrected R1 (NOTES.md 2026-10-10):
+#   SRR1138704  3.64 GB  0.23
+#   SRR866209   7.35 GB  0.28
+#   DRR031870  17.47 GB  0.375 (0.37 and 0.38 from two runs)
+# A least-squares line through them misses each by under 0.01. Clamped,
+# because it is tested only between 3.6 and 17.5 GB. See transabyss_share.
+TRANSABYSS_MPI_SHARE_BASE = 0.198
+TRANSABYSS_MPI_SHARE_PER_GB = 0.0103
+TRANSABYSS_MPI_SHARE_MIN = 0.2
+TRANSABYSS_MPI_SHARE_MAX = 0.45
+# Without --normalize-reads Trinity gets every read too, so both lanes grow
+# with depth and the line above would over-feed Trans-ABySS on deep
+# libraries. No run has measured that case; a third until one does.
 TRANSABYSS_MPI_SHARE = 0.33
 # Its mem is reserved separately and stays at a quarter: its footprint doesn't
 # grow with its cores, and whatever it reserves comes out of SPAdes' hard cap.
@@ -2586,6 +2598,29 @@ class Pipeline:
         print(f"[reads] {self._rel(dst)} decompressed in {int(time.time() - start)}s "
               f"({human_size(path_size(src))} -> {human_size(path_size(dst))})")
 
+    def transabyss_share(self, r1):
+        """(share of --cpu, reason) for the Trans-ABySS lane; see TRANSABYSS_SHARE.
+
+        Under MPI with --normalize-reads the share follows the size of the
+        uncompressed corrected R1 -- the file every assembler is about to
+        read. It is uncompressed here whatever the input was (use_corrected_reads
+        decompresses a gzipped pair, and compress_async writes its .gz beside
+        the original, which stays until cleanup), so measuring it costs a stat.
+        """
+        if not self.transabyss_use_mpi:
+            return TRANSABYSS_SHARE, "threaded"
+        if not self.normalize_reads:
+            return TRANSABYSS_MPI_SHARE, ("MPI without --normalize-reads: fixed, "
+                                          "not yet measured for that case")
+        try:
+            gb = Path(r1).stat().st_size / 1e9
+        except OSError:
+            return TRANSABYSS_MPI_SHARE, f"MPI, but {r1} could not be measured: fixed"
+        fitted = TRANSABYSS_MPI_SHARE_BASE + TRANSABYSS_MPI_SHARE_PER_GB * gb
+        share = min(TRANSABYSS_MPI_SHARE_MAX, max(TRANSABYSS_MPI_SHARE_MIN, fitted))
+        note = "" if share == fitted else f", clamped from {fitted:.3f}"
+        return share, f"MPI, corrected R1 {gb:.2f} GB uncompressed{note}"
+
     def run_assemblers(self):
         """Build the four assemblies this pipeline is named for.
 
@@ -2614,7 +2649,8 @@ class Pipeline:
             or self.needs_run([diamond_ta], [ta])
         )
         if transabyss_pending:
-            share = TRANSABYSS_MPI_SHARE if self.transabyss_use_mpi else TRANSABYSS_SHARE
+            share, why = self.transabyss_share(c1)
+            print(f"[assemblers] Trans-ABySS share {share:.3f} of --cpu: {why}")
             transabyss_cpu = max(1, round(self.cpu * share))
             transabyss_mem = max(1, round(self.mem * TRANSABYSS_MEM_SHARE))
         else:

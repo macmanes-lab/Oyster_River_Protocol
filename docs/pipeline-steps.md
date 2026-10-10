@@ -21,7 +21,7 @@ A step is skipped when its outputs exist and are newer than its inputs. Each ste
 
 ## Assembly lanes
 
-Two lanes side by side for the whole assembly stage, a fixed `ThreadPoolExecutor(max_workers=2)` independent of `--max-parallel` — see [pipeline-schedule.html](pipeline-schedule.html) for why. The Trans-ABySS lane gets `TRANSABYSS_SHARE` (25%) of `--cpu`, or `TRANSABYSS_MPI_SHARE` (33%) under `--transabyss-mpi`, and `TRANSABYSS_MEM_SHARE` (25%) of `--mem`, from the start; the Trinity lane gets the rest and runs Stage A, then Stage B (all of `--cpu` if Trans-ABySS is done by then). All assemblers consume `c1`/`c2`.
+Two lanes side by side for the whole assembly stage, a fixed `ThreadPoolExecutor(max_workers=2)` independent of `--max-parallel` — see [pipeline-schedule.html](pipeline-schedule.html) for why. The Trans-ABySS lane gets `TRANSABYSS_SHARE` (25%) of `--cpu`, or under `--transabyss-mpi` a share fitted to the uncompressed corrected R1's size (0.2–0.45, `transabyss_share()`; a fixed 33% without `--normalize-reads`), and `TRANSABYSS_MEM_SHARE` (25%) of `--mem`, from the start; the Trinity lane gets the rest and runs Stage A, then Stage B (all of `--cpu` if Trans-ABySS is done by then). All assemblers consume `c1`/`c2`.
 
 **Stage A**, Trinity lane (`TRINITY_PHASE1_SHARE`, cores 67/33; `TRINITY_PHASE1_MEM_SHARE`, mem 25/75):
 

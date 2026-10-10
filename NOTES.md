@@ -5,6 +5,40 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-10-10 -- 4.1.0-dev24: MPI share from read depth
+
+dev23 MPI runs (`--cpu 40 --mem 500 --normalize-reads`, 13 TA / 27 Trinity;
+phase 1 18, SPAdes 9). TA = Trans-ABySS lane incl. diamond, lane = Trinity's.
+
+| run | node (rcorrector) | TA | lane (ph1 + ph2) | long pole | TOTAL |
+|---|---|---|---|---|---|
+| SRR1138704_mpi | slow (10m47s vs 8m44s) | 1h41m | 2h44m (54m + 1h49m) | lane by 63m | 3h24m |
+| SRR866209_mpi | slow (17m16s vs 14m21s) | 2h24m | 3h01m (1h29m + 1h32m) | lane by 38m | 3h56m |
+| DRR031870_mpi_new (node139) | normal (25m20s vs 25m18s) | 4h14m | 3h17m (1h29m + 1h48m) | TA by 57m | 5h44m |
+
+Balanced share = TA core-min / (TA + lane core-min), both assumed linear in
+cores: SRR1138704 0.23, SRR866209 0.28, DRR031870 0.38 (dev22's 16/24 run
+gave 0.37). Uncompressed corrected R1 (`pigz -dc | wc -c`): 3.64, 7.35, 17.47
+GB (gz ratios 3.22, 2.80, 3.83 -- so gz size is a poor proxy). Least squares:
+share = 0.1977 + 0.01025 x GB, residuals +0.005, -0.007, +0.002. Mechanism:
+`--normalize-reads` normalizes Trinity's input only; TA assembles every read.
+
+- dev23's `OMPI_MCA_mpi_yield_when_idle`: DRR031870's TA took 4h14m on 13
+  cores where 3h09m on 16 scales to ~3h53m, on a faster node; Trinity phase 2
+  was still ~16% slower than threaded runs on a node of the same speed
+  (1h48m on 27 vs 1h24m on 30). Removed. The Trinity slowdown beside MPI TA
+  is not spinning; memory-bandwidth contention is the guess, unmeasured.
+- MPI quality, DRR031870 (threaded a vs dev22 MPI): BUSCO identical, Trinity
+  and SPAdes gene counts identical, UNIQUE GENES TRANSABYSS 10522 -> 10521,
+  ORP 12877 -> 12875, pyTransRate 0.39595 -> 0.39837, proper pairs 96.71 ->
+  96.73%. SRR866209/SRR1138704 qualreports still to compare before
+  `--transabyss-mpi` defaults to `auto`.
+- dev24: share from `transabyss_share()` under MPI + `--normalize-reads`,
+  clamped 0.2-0.45 (fit tested only 3.6-17.5 GB); fixed 0.33 under MPI
+  without it (unmeasured); threaded 0.25. Refit with each new dataset: needs
+  the run's TA and lane times, its cores, and the uncompressed R1 size (now
+  in the log).
+
 ## 2026-10-10 -- 4.1.0-dev23: split by mode; MPI Trans-ABySS
 
 All `--cpu 40 --mem 500`, `--normalize-reads --tpm-filt 1`. TA = Trans-ABySS.
