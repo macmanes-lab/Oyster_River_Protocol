@@ -16,8 +16,8 @@ threaded 0.25; MPI + `--normalize-reads` = 0.198 + 0.0103 x GB of
 uncompressed corrected R1, clamped 0.2-0.45; MPI without it 0.33 (unmeasured).
 Each run logs `[assemblers] Trans-ABySS share ... R1 X GB`.
 
-**Waiting on:** slurm jobs 1321547, 1321548 and a third -- given as
-"1321548" twice, so probably 1321549. MPI runs on datasets with more reads,
+**Waiting on:** slurm jobs 1321547, 1321548 and 1321549. MPI runs on
+datasets with more reads,
 to extend the fit past 17.5 GB (the line is tested only 3.6-17.5 GB, and the
 0.45 cap starts binding at ~21.5 GB under the refit).
 
