@@ -5,6 +5,41 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-10-10 -- 4.1.0-dev23: split by mode; MPI Trans-ABySS
+
+All `--cpu 40 --mem 500`, `--normalize-reads --tpm-filt 1`. TA = Trans-ABySS.
+
+| run | TA mode/cores | TA | phase 1 | phase 2 | SPAdes pair | TOTAL |
+|---|---|---|---|---|---|---|
+| SRR1138704a | threads 10 | 3h10m | 41m (15) | 1h21m (30) | ~24m (15) | 3h42m |
+| SRR1138704b | threads 16 | 3h32m | 44m (12) | 1h38m (24) | ~29m (12) | 4h06m |
+| SRR866209a | threads 10 | 3h52m | 1h15m (15) | 1h04m (30) | ~28m (15) | 4h38m |
+| SRR866209b | threads 16 | 4h59m | 1h41m (12) | 1h24m (24) | ~38m (12) | 5h55m |
+| DRR031870a | threads 10 | 8h55m | 1h29m (15) | 1h24m (30) | ~50m (15) | 10h24m |
+| DRR031870b | threads 16 | (running) | 1h33m (12) | 1h31m (24) | ~57m (12) | -- |
+| DRR031870_mpi | mpi 16 | 3h09m | 1h43m (12) | 1h53m (24) | ~58m (12) | 5h05m |
+
+- Threaded TA does not use extra cores: 16 was slower than 10 on both
+  finished datasets. SRR866209b's trimmomatic/rcorrector were also 7-24%
+  slower, so that node was likely contended; SRR1138704b's were not.
+  Threaded TA was the long pole by 1-6h every time.
+- MPI: TA 8h55m -> 3h09m on DRR031870 (10 threaded -> 16 MPI, so not all of
+  it is MPI), TOTAL 10h24m -> 5h05m, and Trinity became the long pole by 26
+  min. That run's Trinity was slower than DRR031870b's on the same 12/24
+  cores (phase 2 +22 min) with only a 7% slower rcorrector: suspect OpenMPI
+  ranks busy-waiting outside TA's share (binding is off). dev23 sets
+  `OMPI_MCA_mpi_yield_when_idle=1`; `experiments/transabyss_mpi/run.sbatch`'s
+  cpu.tsv would show it directly.
+- Stage A was phase-1-bound on every dataset, SPAdes 30-60 min ahead.
+
+dev23: `TRANSABYSS_SHARE` 0.25 (threaded), new `TRANSABYSS_MPI_SHARE` 0.33,
+`TRINITY_PHASE1_SHARE` 0.5 -> 0.67, and phase 2 takes all of `--cpu` if TA
+has finished when Stage A ends. Under MPI the best share is TA's fraction of
+the total CPU work, which varies by dataset (~0.3-0.37 on DRR031870). Still
+open: MPI runs on SRR866209 and SRR1138704 to see how far it moves; the
+MPI-vs-threaded qualreports for DRR031870 before `--transabyss-mpi` defaults
+to `auto`; DRR031870b's TA time.
+
 ## 2026-10-09 -- lane balance: SRR1138704, TRANSABYSS_SHARE 0.25 -> 0.4
 
 The commit that made this change (ee6d1f5) is labelled 4.1.0-dev20, a

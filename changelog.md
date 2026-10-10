@@ -2,6 +2,16 @@
 
 ORP Version 4.1.0-dev1
 
+- **The assembler split depends on `--transabyss-mpi`** (`oyster.py`).
+  Threaded, Trans-ABySS gets 25% of `--cpu` again: 40% made it no faster
+  (SRR1138704 3h10m -> 3h32m, SRR866209 3h52m -> 4h59m) while costing
+  Trinity cores. Under MPI it gets `TRANSABYSS_MPI_SHARE` = 33%
+  (provisional; DRR031870 at 40%: Trans-ABySS 3h09m, Trinity's lane 3h36m).
+  Trinity phase 1 gets two thirds of Stage A instead of half -- SPAdes
+  finished 30-60 min ahead of it on every dataset. Phase 2 takes all of
+  `--cpu` when Trans-ABySS has finished before it starts. MPI ranks now yield
+  when idle (`OMPI_MCA_mpi_yield_when_idle`) instead of spinning on cores
+  Trinity is using.
 - **`--transabyss-mpi off|auto|on`** (`oyster.py`, default `off`). Trans-
   ABySS's unitig assembly runs on one thread unless `abyss-pe` gets MPI;
   this passes `--mpi <its cores>` so it runs as `mpirun -np N ABYSS-P`.

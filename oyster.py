@@ -162,6 +162,11 @@ TRANSABYSS_MPI_ENV = {
     "PRTE_MCA_hwloc_default_binding_policy": "none",
     "OMPI_ALLOW_RUN_AS_ROOT": "1",
     "OMPI_ALLOW_RUN_AS_ROOT_CONFIRM": "1",
+    # A rank waiting on the others spins at 100% unless told to yield, and
+    # with binding off nothing holds the spinning to Trans-ABySS's share: on
+    # DRR031870 the MPI run's Trinity phase 2 took 1h53m on 24 cores against
+    # 1h31m for a threaded run on the same 24.
+    "OMPI_MCA_mpi_yield_when_idle": "1",
 }
 #: How long preflight's mpirun test may take before it counts as broken: a
 #: misconfigured mpirun can hang waiting for daemons rather than fail.
@@ -177,18 +182,26 @@ PARAFLY_SERIAL_GAP = 0.5
 # each of its phases runs, so the lanes are sized up front.
 #
 # Trans-ABySS lane: Trans-ABySS, then its diamond search, from the start.
-# Its dominant cost (the initial FASTQ read + De Bruijn graph build) runs
-# single-threaded however many cores it gets -- abyss-pe falls through to the
-# plain, unthreaded `ABYSS` binary whenever neither Bloom-filter mode nor MPI
-# is requested, which oyster.py never does (NOTES.md 2026-08-19). On
-# SRR1789336 at --cpu 40 it took 4.5h on ~20 cores (3.2h of it single-
-# threaded) and 5h09m on 2. With an OpenMP ParaFly, Trinity's phase 2 is ~2h
-# on 38 cores rather than ~34h, so Trans-ABySS is now the long pole: it starts
-# first instead of waiting for phase 1. SRR1138704 at --cpu 40 on 0.25 (10
-# cores): Trans-ABySS 3h14m, while the Trinity lane (phase 1 41m, then phase
-# 2 1h21m on 30 cores) sat done for its last 1h11m -- so Trans-ABySS gets
-# 40%, which still leaves Phase 2 (~1h42m on 24 cores) well inside its time.
-TRANSABYSS_SHARE = 0.4
+# How many cores it should hold depends on --transabyss-mpi, because the two
+# modes use cores differently (NOTES.md 2026-10-10).
+#
+# Threaded (the default): its dominant cost, the unitig assembly, runs on one
+# thread however many cores it gets -- abyss-pe falls through to the plain
+# `ABYSS` binary without Bloom-filter mode or MPI (NOTES.md 2026-08-19) -- so
+# for hours its share is a reservation, not use. Extra cores bought nothing:
+# 10 -> 16 cores took SRR1138704 from 3h10m to 3h32m and SRR866209 from 3h52m
+# to 4h59m, while Trinity's lane, which lost those cores, still finished 1-6h
+# ahead of it on every dataset. A quarter is enough for its threaded stages
+# and leaves Trinity the rest, in case a dataset makes Trinity the long pole.
+TRANSABYSS_SHARE = 0.25
+#
+# MPI: the unitig assembly runs as `mpirun -np <cores> ABYSS-P`, so both
+# lanes scale and the best split has them finish together -- Trans-ABySS's
+# share of the total CPU work, which varies by dataset. DRR031870 at 16 of 40
+# cores: Trans-ABySS 3h09m (8h55m threaded on 10), Trinity's lane 3h36m on
+# 24, i.e. Trinity now the long pole. A third is provisional, from that one
+# run; more MPI runs will show how much it moves between datasets.
+TRANSABYSS_MPI_SHARE = 0.33
 # Its mem is reserved separately and stays at a quarter: its footprint doesn't
 # grow with its cores, and whatever it reserves comes out of SPAdes' hard cap.
 TRANSABYSS_MEM_SHARE = 0.25
@@ -196,18 +209,18 @@ TRANSABYSS_MEM_SHARE = 0.25
 # Trinity lane, on the rest of --cpu: Phase 1 (Inchworm + Chrysalis prep, see
 # run_trinity_phase1) beside SPAdes auto/high, then Phase 2 (the per-gene-
 # component ParaFly jobs, see run_trinity_phase2) on all of the lane once
-# both are done. Stage A is phase-1-bound: phase 1 took 1h20m on 10 threads
-# and 1h09m on 20 (the -t $CPU Chrysalis stages; Inchworm stays at
-# --inchworm_cpu 10), while the SPAdes pair took ~20 min and was flat between
-# 30 and 60 cores -- so the lane's cores split evenly.
-TRINITY_PHASE1_SHARE = 0.5
+# both are done -- or on all of --cpu if Trans-ABySS has finished by then.
+# Stage A has been phase-1-bound on every dataset: SPAdes finished 30-60 min
+# ahead of phase 1 in all the dev20/dev21 runs, and phase 1 does use cores
+# (DRR031870: 1h29m on 15, 1h33m-1h43m on 12; the -t $CPU Chrysalis stages,
+# Inchworm stays at --inchworm_cpu 10). So phase 1 gets two thirds.
+TRINITY_PHASE1_SHARE = 0.67
 # Mem is split separately: Trinity phase 1 only needs --max_memory for
 # jellyfish and its sorts, while SPAdes treats --memory as a hard cap.
 TRINITY_PHASE1_MEM_SHARE = 0.25
 #
-# Re-balance as end-to-end timings from the source-built Trinity come in
-# (NOTES.md 2026-10-08). Phase 2 should finish before Trans-ABySS; if it
-# doesn't, lower TRANSABYSS_SHARE.
+# Timings behind these: NOTES.md 2026-10-08 onwards. Re-balance from a run's
+# timing log by which lane finished last and by how much.
 
 # A step that fails on a cluster is often transient (node preemption,
 # filesystem hiccup, scheduler blip) rather than a real bug, so retry before
@@ -2601,7 +2614,8 @@ class Pipeline:
             or self.needs_run([diamond_ta], [ta])
         )
         if transabyss_pending:
-            transabyss_cpu = max(1, round(self.cpu * TRANSABYSS_SHARE))
+            share = TRANSABYSS_MPI_SHARE if self.transabyss_use_mpi else TRANSABYSS_SHARE
+            transabyss_cpu = max(1, round(self.cpu * share))
             transabyss_mem = max(1, round(self.mem * TRANSABYSS_MEM_SHARE))
         else:
             # A resumed run with Trans-ABySS already done: its lane would
@@ -2619,7 +2633,12 @@ class Pipeline:
         phase1_mem = max(1, round(lane_mem * TRINITY_PHASE1_MEM_SHARE))
         spades_cpu = max(1, lane_cpu - phase1_cpu)
         spades_mem = max(1, lane_mem - phase1_mem)
-        phase2_cpu, phase2_mem = lane_cpu, lane_mem
+        # Set once the Trans-ABySS lane has finished (or had nothing to do), so
+        # phase 2, whose size is fixed at launch, can take the whole machine
+        # instead of a lane share nothing is using any more.
+        transabyss_done = threading.Event()
+        if not transabyss_pending:
+            transabyss_done.set()
 
         self.seed_trinity_phase1_sentinel()
 
@@ -2649,6 +2668,7 @@ class Pipeline:
             except Exception as e:
                 _lane_failed("transabyss", e)
                 raise
+            transabyss_done.set()
 
         def trinity_phase1_lane():
             try:
@@ -2689,7 +2709,11 @@ class Pipeline:
                 for f in concurrent.futures.as_completed([ex.submit(trinity_phase1_lane), ex.submit(spades_lane)]):
                     f.result()
             print(f"=== Stage A done -- {self._ts()} ===")
-            print(f"\n=== Stage B: run_trinity_phase2 ({phase2_cpu} cpu) -- start {self._ts()} ===")
+            if transabyss_done.is_set():
+                phase2_cpu, phase2_mem, note = self.cpu, self.mem, "all of --cpu: Trans-ABySS is done"
+            else:
+                phase2_cpu, phase2_mem, note = lane_cpu, lane_mem, "Trinity lane"
+            print(f"\n=== Stage B: run_trinity_phase2 ({phase2_cpu} cpu, {note}) -- start {self._ts()} ===")
             try:
                 self.step(
                     "run_trinity_phase2", [trinity_fa], [phase1_done],
@@ -2701,7 +2725,8 @@ class Pipeline:
                 raise
             print(f"=== Stage B done -- {self._ts()} ===")
 
-        ta_budget = f"{transabyss_cpu} cpu" if transabyss_pending else "done"
+        ta_budget = (f"{transabyss_cpu} cpu{', mpi' if self.transabyss_use_mpi else ''}"
+                     if transabyss_pending else "done")
         print(f"\n=== Assemblers: transabyss ({ta_budget}) || Trinity + SPAdes ({lane_cpu} cpu) -- start {self._ts()} ===")
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
             for f in concurrent.futures.as_completed([ex.submit(transabyss_lane), ex.submit(trinity_lane)]):
