@@ -5,6 +5,70 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-10-10 -- HANDOFF: MPI Trans-ABySS share, waiting on 3 runs
+
+**Where things stand (4.1.0-dev25, code = dev24).** Assemblers run as two
+lanes (`run_assemblers`): Trans-ABySS (TA) from t=0, and Trinity (phase 1 ||
+SPAdes, then phase 2; phase 2 takes all of `--cpu` if TA is already done).
+`--transabyss-mpi off|auto|on` (default **off**) runs TA's unitig assembly as
+`mpirun -np N ABYSS-P`. TA's share of `--cpu` (`transabyss_share()`):
+threaded 0.25; MPI + `--normalize-reads` = 0.198 + 0.0103 x GB of
+uncompressed corrected R1, clamped 0.2-0.45; MPI without it 0.33 (unmeasured).
+Each run logs `[assemblers] Trans-ABySS share ... R1 X GB`.
+
+**Waiting on:** slurm jobs 1321547, 1321548 and a third -- given as
+"1321548" twice, so probably 1321549. MPI runs on datasets with more reads,
+to extend the fit past 17.5 GB (the line is tested only 3.6-17.5 GB, and the
+0.45 cap starts binding at ~21.5 GB under the refit).
+
+**Decisions pending, to make together in dev26:**
+1. Refit the MPI share line. Candidate from the no-yield runs (dev24 x3 +
+   dev22 DRR031870): **share = 0.142 + 0.0143 x GB**, vs dev24's 0.198 +
+   0.0103. Steeper: dev24 gave small libraries too much TA (balanced 0.19 and
+   0.255 against 0.235 and 0.274) and DRR031870 too little (0.41 vs 0.378).
+   Add the 3 new runs, refit, and revisit the 0.45 cap if they sit above it.
+2. Default `--transabyss-mpi` to `auto`. Quality passed on all three datasets
+   (TA unique genes +1, 0, -1; SPAdes identical; BUSCO complete identical;
+   pyTransRate +0.0014 to +0.0024 under MPI). The Trinity/ORP gene-count
+   differences (SRR1138704 ORP -30, SRR866209 +9) are Trinity's own run-to-run
+   variation (run dir, Butterfly JVM hash; see 2026-10-05), not MPI.
+3. Then: one MPI run *without* `--normalize-reads` to replace the 0.33.
+
+**To process each finished run** (`experiments/transabyss_mpi/balance.py`):
+
+    python3 experiments/transabyss_mpi/balance.py --points \
+        <dir>/reports/<run>.timing.log:orp_ta_mpi_<jobid>.log [...]
+
+prints each run's lane times, which lane was slower, rcorrector (node-speed
+yardstick: ~8m45s SRR1138704, ~14m20s SRR866209, ~25m20s DRR031870 on a
+normal node), the balanced share, and the line refitted over `POINTS` plus the
+new runs. Add the new runs to `POINTS` once checked. Also worth having per run:
+the qualreport (vs a threaded run of the same reads, if one exists) and
+`sacct -j <id> --format=JobID,NodeList,AllocCPUS,Start,End`. To change the
+line: `TRANSABYSS_MPI_SHARE_BASE` / `_PER_GB` in oyster.py, the README's
+lane paragraph, docs/pipeline-steps.md, docs/pipeline-schedule.html.
+
+**Caveats learned the hard way:**
+- Node speed varies ~20% (node138 ~13% slow). It cancels out of the
+  balanced share (both lanes slow alike) but not out of raw times: compare
+  raw times only with rcorrector in view.
+- Same-dataset balanced share spreads +-0.02 (DRR031870: 0.37, 0.38, 0.41),
+  about one core at --cpu 40. No fit gets tighter than that.
+- Trinity runs ~16-30% slower beside MPI TA than beside threaded TA on the
+  same cores and node speed. Not spinning (yield didn't fix it; removed in
+  dev24); memory bandwidth is the guess. Part of why balanced shares sit
+  below what TA alone would suggest.
+- Make sure each run has its own `--dir`/`--runout`: a reused one skips
+  every step and reports the old timings.
+
+dev24 results (MPI, `--cpu 40 --mem 500 --normalize-reads`):
+
+| run | node | rcorrector | TA cpu | TA lane | Trinity lane | balanced | TOTAL | threaded a |
+|---|---|---|---|---|---|---|---|---|
+| SRR1138704_dev24 (1321504) | node139 | 8m54s | 9 | 1h54m | 2h22m | 0.188 | 2h57m | 3h42m |
+| SRR866209_dev24 (1321505) | node141 | 14m56s | 11 | 2h21m | 2h36m | 0.255 | 3h24m | 4h38m |
+| DRR31870_dev24 (1321506) | node138 | 28m33s | 15 | 4h41m | 4h01m | 0.412 | 6h23m | 10h24m |
+
 ## 2026-10-10 -- 4.1.0-dev24: MPI share from read depth
 
 dev23 MPI runs (`--cpu 40 --mem 500 --normalize-reads`, 13 TA / 27 Trinity;

@@ -42,3 +42,16 @@ If `mpirun` refuses to start 16 ranks under a one-task allocation, the log
 says so in the first minute. The script sets OpenMPI's oversubscribe options
 for that, but a site build can override them; resubmitting with
 `--ntasks=16 --cpus-per-task=1` is the other way round it.
+
+## Balancing the lanes
+
+`balance.py` takes finished runs' timing logs (and their slurm logs, for the
+core counts and R1 size) and prints the Trans-ABySS share at which the two
+assembler lanes would have finished together, then refits the line
+`transabyss_share()` in `oyster.py` uses. `POINTS` in the script holds the
+runs the current candidate fit came from; see NOTES.md 2026-10-10.
+
+```bash
+python3 experiments/transabyss_mpi/balance.py --points \
+    SRR1138704_dev24/reports/SRR1138704_dev24.timing.log:orp_ta_mpi_1321504.log
+```
