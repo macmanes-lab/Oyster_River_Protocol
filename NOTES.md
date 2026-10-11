@@ -5,6 +5,28 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-10-11 -- dev26 step 1: ParaFly resume test written, not yet run
+
+`experiments/transabyss_mpi/parafly_resume.sbatch` (README there) runs
+DEV26_PLAN.md step 1 on SRR1138704's corrected reads: phase 1 as oyster.py
+runs it, phase 2 at --CPU 8 in its own session stopped after 15 min, relaunch
+on all cores, and an uninterrupted phase 2 on a copy of the same phase 1. It
+prints PASS/FAIL per check plus counts and restart overhead. Things found
+reading Trinity/ParaFly source (fork, ~/trinityrnaseq_2026) while writing it:
+- ParaFly skips any cmds line found verbatim in `<cmds>.completed`, which it
+  appends one line per success (flushed per line); on a rerun it prints
+  `Number of Commands: <remaining>`. The cmds file is written once
+  (`recursive_trinity.cmds.ok`) and has no outer --CPU in it, so a relaunch
+  at a different --CPU sees identical lines.
+- A component killed by SIGTERM is neither completed nor failed if ParaFly
+  dies with it (whole session signalled). ParaFly only exits early itself on
+  a child's SIGINT/SIGQUIT.
+- recursive_trinity.cmds and partitioned_reads.files.list hold absolute
+  paths into the output dir, so a copied phase-1 dir must be rewritten (the
+  script does); Trinity's checkpoints are named files, so nothing else.
+**Next:** the user submits it; judge the summary; dev26 code only if it passes.
+`version.txt` stays 4.1.0-dev25: no pipeline change, and step 2 is dev26.
+
 ## 2026-10-11 -- MPI share: read size does not predict it; grow phase 2 instead
 
 All eight dev24 MPI runs are in (1321547-9, 1321562-6). The size-based fit

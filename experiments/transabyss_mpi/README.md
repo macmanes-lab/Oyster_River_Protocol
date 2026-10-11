@@ -55,3 +55,24 @@ runs the current candidate fit came from; see NOTES.md 2026-10-10.
 python3 experiments/transabyss_mpi/balance.py --points \
     SRR1138704_dev24/reports/SRR1138704_dev24.timing.log:orp_ta_mpi_1321504.log
 ```
+
+## Does phase 2 resume? (dev26, step 1)
+
+dev26 (`DEV26_PLAN.md`) stops Trinity's phase 2 when Trans-ABySS finishes and
+relaunches it on all of `--cpu`, relying on ParaFly to skip the commands
+listed in `recursive_trinity.cmds.completed`. `parafly_resume.sbatch` tests
+that on one node: phase 1 as `run_trinity_phase1` runs it, then phase 2 at
+`--CPU 8` stopped after 15 min (SIGTERM to its session, SIGKILL after 30 s)
+and relaunched on all cores, against an uninterrupted phase 2 of a copy of
+the same phase 1.
+
+```bash
+sbatch --export=ALL,R1=<run>/rcorr/<run>.TRIM_1P.cor.fq.gz,R2=<run>/rcorr/<run>.TRIM_2P.cor.fq.gz \
+    experiments/transabyss_mpi/parafly_resume.sbatch
+```
+
+The log ends with a summary (also `parafly_resume_<jobid>/summary.txt`):
+commands total and completed at the stop, what ParaFly skipped on the
+relaunch, whether any finished component ran again, restart overhead, and
+transcript/gene counts of both assemblies, with PASS/FAIL per check.
+`PHASE1=<OUT>/phase1/<name>.trinity` reruns the test without phase 1.
