@@ -15,6 +15,11 @@ diamond_transabyss, and to the end of run_trinity_phase2. The slurm log's
 `[assemblers] Trans-ABySS share ... R1 X GB` lines give the cores and the
 corrected R1's size. Without a slurm log, pass --ta-cpu, --lane-cpu, --gb.
 
+Each row leads with the run's TOTAL wall time -- the number users see, and
+the one every change here is for -- and what a balanced split would have
+saved off it: both lanes finishing together at (TA core-min + lane core-min)
+/ (TA + lane cores), against the later of the two as run.
+
 Balanced share = TA core-minutes / (TA + Trinity-lane core-minutes): the split
 under which both lanes, each taken to scale linearly with its cores, finish
 together. It is independent of node speed (both lanes slow alike), so runs on
@@ -26,6 +31,7 @@ NOTES.md 2026-10-10 has the runs behind POINTS.
 """
 
 import argparse
+import math
 import re
 import sys
 from datetime import datetime, timedelta
@@ -38,8 +44,18 @@ POINTS = [
     ("SRR866209 dev24", 7.35, 0.255),
     ("DRR031870 dev24", 17.47, 0.412),
     ("DRR031870 dev22", 17.47, 0.370),
+    ("DRR046632 dev24", 18.44, 0.399),
+    ("DRR30368 dev24", 21.83, 0.447),
+    ("DRR053698 dev24", 33.23, 0.511),
 ]
 
+#: Shapes tried for share against GB. Square root fit best over POINTS
+#: (rms 0.014 vs 0.026 linear, 0.018 log): the share flattens with depth,
+#: since normalization keeps more of a deep library's reads for Trinity too.
+MODELS = (("linear", lambda gb: gb), ("sqrt", math.sqrt), ("log", math.log))
+CLAMP = (0.2, 0.6)
+
+TOTAL = re.compile(r"^TOTAL\s+(\d+):(\d\d):(\d\d)")
 PRETTY = re.compile(r"^(\S+)\s+(\d+):(\d\d):(\d\d)\s+\(started ([\d-]+ [\d:]+)\)")
 ASSEMBLERS = re.compile(r"=== Assemblers: transabyss \((\d+) cpu[^)]*\) \|\| Trinity \+ SPAdes \((\d+) cpu\)")
 SHARE = re.compile(r"Trans-ABySS share [\d.]+ of --cpu: .*R1 ([\d.]+) GB")
@@ -47,10 +63,15 @@ STAGE_B = re.compile(r"=== Stage B: run_trinity_phase2 \((\d+) cpu, ([^)]*)\)")
 
 
 def read_timing(path):
-    """{step: (start datetime, seconds)} from either form of the timing log."""
+    """{step: (start datetime, seconds)} from either form of the timing log,
+    with the run's wall-clock TOTAL in seconds under "TOTAL" once it has one."""
     steps = {}
     for line in open(path):
         line = line.rstrip("\n")
+        m = TOTAL.match(line)
+        if m:
+            steps["TOTAL"] = int(m.group(1)) * 3600 + int(m.group(2)) * 60 + int(m.group(3))
+            continue
         if "\t" in line:
             parts = line.split("\t")
             if len(parts) >= 3 and parts[1].isdigit():
@@ -88,9 +109,8 @@ def fmt(minutes):
     return f"{int(minutes // 60)}h{int(minutes % 60):02d}m"
 
 
-def fit(points):
-    xs = [p[1] for p in points]
-    ys = [p[2] for p in points]
+def fit(xs, ys):
+    """(a, b) of the least-squares line y = a + b*x, or None for one x."""
     mx, my = sum(xs) / len(xs), sum(ys) / len(ys)
     sxx = sum((x - mx) ** 2 for x in xs)
     if sxx == 0:
@@ -124,11 +144,18 @@ def main():
         lane_min = (end(steps, "run_trinity_phase2") - t0).total_seconds() / 60
         share = ta * ta_min / (ta * ta_min + lane * lane_min)
         rc = steps.get("run_rcorrector", (None, 0))[1]
+        balanced_min = (ta * ta_min + lane * lane_min) / (ta + lane)
+        saving = max(ta_min, lane_min) - balanced_min
+        if "TOTAL" in steps:
+            total = steps["TOTAL"] / 60
+            total_s = f"TOTAL {fmt(total)}, ~{fmt(total - saving)} if balanced (-{fmt(saving)})"
+        else:
+            total_s = f"TOTAL not yet (still running); balanced would save ~{fmt(saving)}"
         note = ""
         if phase2 and phase2[0] != lane:
             note = f"  ! phase 2 ran on {phase2[0]} cpu ({phase2[1]}): share overstated"
         slower = "TA" if ta_min > lane_min else "Trinity"
-        print(f"{timing}\n    cores TA/lane {ta}/{lane}  R1 {gb if gb else '?'} GB  rcorrector {rc // 60}m{rc % 60:02d}s\n"
+        print(f"{timing}\n    {total_s}\n    cores TA/lane {ta}/{lane}  R1 {gb if gb else '?'} GB  rcorrector {rc // 60}m{rc % 60:02d}s\n"
               f"    TA lane {fmt(ta_min)}  Trinity lane {fmt(lane_min)}  "
               f"slower: {slower} by {fmt(abs(ta_min - lane_min))}\n"
               f"    balanced share {share:.3f}{note}")
@@ -139,16 +166,18 @@ def main():
     print(f"\nfit over {len(points)} point(s):")
     for label, gb, share in points:
         print(f"    {gb:6.2f} GB  {share:.3f}  {label}")
-    line = fit(points)
-    if line:
-        a, b = line
-        print(f"    share = {a:.3f} + {b:.4f} * GB   (oyster.py: TRANSABYSS_MPI_SHARE_BASE, _PER_GB)")
-        for gb in (2, 5, 10, 15, 20, 25, 30):
-            s = a + b * gb
-            print(f"      {gb:3d} GB -> {s:.3f}, {min(0.45, max(0.2, s)):.3f} clamped, "
-                  f"{round(40 * min(0.45, max(0.2, s)))} of 40 cpu")
-    else:
-        print("    need two or more read sizes to fit a line")
+    if len({gb for _, gb, _ in points}) < 2:
+        print("    need two or more read sizes to fit")
+        return
+    ys = [share for _, _, share in points]
+    lo, hi = CLAMP
+    for name, f in MODELS:
+        a, b = fit([f(gb) for _, gb, _ in points], ys)
+        resid = [y - (a + b * f(gb)) for (_, gb, _), y in zip(points, ys)]
+        rms = math.sqrt(sum(e * e for e in resid) / len(resid))
+        at = "  ".join(f"{gb}GB:{min(hi, max(lo, a + b * f(gb))):.2f}" for gb in (3, 7, 15, 20, 30, 50))
+        print(f"    {name:6s} share = {a:.3f} + {b:.4f} * {name}(GB)  rms {rms:.3f}  "
+              f"max {max(map(abs, resid)):.3f}\n           clamped {lo}-{hi}: {at}")
 
 
 if __name__ == "__main__":

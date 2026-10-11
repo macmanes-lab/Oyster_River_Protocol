@@ -5,7 +5,7 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
-## 2026-10-10 -- HANDOFF: MPI Trans-ABySS share, waiting on 3 runs
+## 2026-10-11 -- HANDOFF: MPI Trans-ABySS share, waiting on 5 runs
 
 **Where things stand (4.1.0-dev25, code = dev24).** Assemblers run as two
 lanes (`run_assemblers`): Trans-ABySS (TA) from t=0, and Trinity (phase 1 ||
@@ -16,17 +16,55 @@ threaded 0.25; MPI + `--normalize-reads` = 0.198 + 0.0103 x GB of
 uncompressed corrected R1, clamped 0.2-0.45; MPI without it 0.33 (unmeasured).
 Each run logs `[assemblers] Trans-ABySS share ... R1 X GB`.
 
-**Waiting on:** slurm jobs 1321547, 1321548 and 1321549, then 1321562-1321566
-(five more, started 2026-10-10). MPI runs on datasets with more reads,
-to extend the fit past 17.5 GB (the line is tested only 3.6-17.5 GB, and the
-0.45 cap starts binding at ~21.5 GB under the refit).
+**Waiting on:** slurm jobs 1321562-1321566 (five more MPI runs, started
+2026-10-10). 1321547-1321549 are in (2026-10-11, below).
+
+**The metric that matters is each run's TOTAL wall time** -- what users see.
+Balanced shares are only the means; judge every change by TOTAL. balance.py
+prints TOTAL first, and what a balanced split would have saved off it.
+
+TOTAL by dataset and version (`--cpu 40 --mem 500 --normalize-reads`):
+
+| dataset (R1) | threaded 25% (dev19-20) | threaded 40% (dev21) | MPI dev22 | MPI dev23 | MPI dev24 |
+|---|---|---|---|---|---|
+| SRR1138704 (3.64 GB) | 3h42m-3h47m | 4h06m | -- | 3h24m* | **2h57m** |
+| SRR866209 (7.35 GB) | 4h38m | 5h55m* | -- | 3h56m* | **3h24m** |
+| DRR031870 (17.47 GB) | 10h24m | -- | **5h05m** | 5h44m | 6h23m* |
+| DRR046632 (18.44 GB) | -- | -- | -- | -- | ? |
+| DRR30368 (21.83 GB) | -- | -- | -- | -- | ? |
+| DRR053698 (33.23 GB) | -- | -- | -- | -- | ? |
+
+\* slow or contended node (rcorrector 13-24% over its normal time). DRR031870
+dev24 ran on node138, ~13-20% slow throughout; on a normal node ~5h30m. The
+three new runs' TOTALs: rerun balance.py on them (it prints TOTAL now).
+Old reference: SRR1789336 took 37h06m on conda Trinity (serial ParaFly).
+
+**2026-10-11, runs 1321547-1321549** (balance.py output):
+
+| run | R1 | TA/lane cpu | TA lane | Trinity lane | slower | balanced | balanced saves |
+|---|---|---|---|---|---|---|---|
+| DRR046632_dev24 | 18.44 GB | 16/24 | 4h39m | 4h41m | Trinity by 1m | 0.399 | ~1m |
+| DRR30368_dev24 | 21.83 GB | 17/23 | 5h07m | 4h41m | TA by 25m | 0.447 | ~14m |
+| DRR053698_dev24 | 33.23 GB | 18/22 | 8h06m | 6h20m | TA by 1h45m | 0.511 | ~58m |
+
+- **The 0.45 cap was too low**: it held DRR053698 to 18 cores where ~20-21
+  balance, the biggest imbalance of any dev24 run (~58 min of TOTAL). Raise
+  it; candidate clamp 0.2-0.6.
+- **The share curves, flattening with depth** (normalization keeps more of a
+  deep library's reads for Trinity too). Over the 7 no-yield points: linear
+  rms 0.026 (max 0.039), **sqrt rms 0.014 (max 0.024)**, log 0.018 (0.031).
+  Candidate: **share = 0.025 + 0.0868 x sqrt(GB)**, clamped 0.2-0.6 -- within
+  the +-0.02 same-dataset noise. Refit after the last five runs.
+- A gap between lanes costs much less TOTAL than it looks when the slower
+  lane already has most of the cores: SRR1138704's 28-min gap is worth ~6
+  min. The big wins are on deep libraries, where TA is short of cores.
 
 **Decisions pending, to make together in dev26:**
-1. Refit the MPI share line. Candidate from the no-yield runs (dev24 x3 +
-   dev22 DRR031870): **share = 0.142 + 0.0143 x GB**, vs dev24's 0.198 +
-   0.0103. Steeper: dev24 gave small libraries too much TA (balanced 0.19 and
-   0.255 against 0.235 and 0.274) and DRR031870 too little (0.41 vs 0.378).
-   Add the 3 new runs, refit, and revisit the 0.45 cap if they sit above it.
+1. Refit the MPI share. With 1321547-9 in, the candidate is a square-root
+   curve, **0.025 + 0.0868 x sqrt(GB), clamped 0.2-0.6** (see 2026-10-11
+   below), replacing dev24's 0.198 + 0.0103 x GB clamped 0.2-0.45. In
+   oyster.py that means a sqrt in `transabyss_share()` as well as new
+   constants. Refit over the last five runs first.
 2. Default `--transabyss-mpi` to `auto`. Quality passed on all three datasets
    (TA unique genes +1, 0, -1; SPAdes identical; BUSCO complete identical;
    pyTransRate +0.0014 to +0.0024 under MPI). The Trinity/ORP gene-count
@@ -39,10 +77,10 @@ to extend the fit past 17.5 GB (the line is tested only 3.6-17.5 GB, and the
     python3 experiments/transabyss_mpi/balance.py --points \
         <dir>/reports/<run>.timing.log:orp_ta_mpi_<jobid>.log [...]
 
-prints each run's lane times, which lane was slower, rcorrector (node-speed
+prints each run's TOTAL and what a balanced split would have saved, its lane
+times, which lane was slower, rcorrector (node-speed
 yardstick: ~8m45s SRR1138704, ~14m20s SRR866209, ~25m20s DRR031870 on a
-normal node), the balanced share, and the line refitted over `POINTS` plus the
-new runs. Add the new runs to `POINTS` once checked. Also worth having per run:
+normal node), the balanced share, and linear/sqrt/log fits over `POINTS` plus the new runs. Add the new runs to `POINTS` once checked. Also worth having per run:
 the qualreport (vs a threaded run of the same reads, if one exists) and
 `sacct -j <id> --format=JobID,NodeList,AllocCPUS,Start,End`. To change the
 line: `TRANSABYSS_MPI_SHARE_BASE` / `_PER_GB` in oyster.py, the README's
