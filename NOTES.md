@@ -29,7 +29,9 @@ lane 3.8-22.3**, with no trend in size (SRR1139191 20.2 at 10.9 GB, DRR031870
 reads' size can't show. The first 7 points fitted well because 5 of them
 were the DRR libraries, all at ~4-6 Trinity core-h/GB.
 
-**Proposal (not implemented): stop predicting; let phase 2 grow.** Phase 2's
+**Proposal (not implemented; full plan, test procedure and implementation
+steps in `experiments/transabyss_mpi/DEV26_PLAN.md`): stop predicting; let
+phase 2 grow.** Phase 2's
 cores are fixed at launch, but ParaFly records finished commands in
 recursive_trinity.cmds.completed and skips them when re-run (to verify on
 the cluster). So when the TA lane finishes while phase 2 is running, kill
