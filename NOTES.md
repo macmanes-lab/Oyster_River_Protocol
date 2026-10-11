@@ -5,7 +5,49 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
-## 2026-10-11 -- HANDOFF: MPI Trans-ABySS share, waiting on 5 runs
+## 2026-10-11 -- MPI share: read size does not predict it; grow phase 2 instead
+
+All eight dev24 MPI runs are in (1321547-9, 1321562-6). The size-based fit
+fell apart: rms 0.014 over the first 7 points, 0.05 over all 12, and the
+misses cost TOTAL in both directions.
+
+| run | R1 GB | TA/lane cpu | TA lane | Trinity lane | slower | balanced share | TOTAL | if balanced |
+|---|---|---|---|---|---|---|---|---|
+| SRR796576 | 3.73 | 9/31 | 1h52m | 2h41m | Trinity 49m | 0.168 | 3h16m | 3h05m |
+| SRR1138707 | 6.24 | 10/30 | 3h31m | 4h22m | Trinity 50m | 0.212 | 5h27m | 5h14m |
+| SRR1139191 | 10.90 | 12/28 | 5h04m | 7h51m | Trinity 2h47m | 0.217 | 9h33m | 8h43m |
+| DRR046632 | 18.44 | 16/24 | 4h39m | 4h41m | Trinity 1m | 0.399 | 6h42m | 6h41m |
+| DRR30368 | 21.83 | 17/23 | 5h07m | 4h41m | TA 25m | 0.447 | 7h31m | 7h16m |
+| SRR868662 | 25.54 | 18/22 | 5h34m | 9h32m | Trinity 3h57m | 0.323 | 11h49m | 10h02m |
+| DRR053698 | 33.23 | 18/22 (cap) | 8h06m | 6h20m | TA 1h45m | 0.511 | 11h29m | 10h31m |
+| SRR802670 | 53.42 | 18/22 (cap) | 11h03m | 9h09m | TA 1h53m | 0.497 | 15h27m | 14h24m |
+
+**Why:** TA's work is predictable from R1 size, Trinity's is not. Core-hours
+per GB of R1, all 11 dev24-era runs: **TA 3.5-5.6** (mean ~4.3); **Trinity's
+lane 3.8-22.3**, with no trend in size (SRR1139191 20.2 at 10.9 GB, DRR031870
+5.7 at 17.5 GB). Trinity's cost follows transcriptome complexity, which the
+reads' size can't show. The first 7 points fitted well because 5 of them
+were the DRR libraries, all at ~4-6 Trinity core-h/GB.
+
+**Proposal (not implemented): stop predicting; let phase 2 grow.** Phase 2's
+cores are fixed at launch, but ParaFly records finished commands in
+recursive_trinity.cmds.completed and skips them when re-run (to verify on
+the cluster). So when the TA lane finishes while phase 2 is running, kill
+phase 2 and relaunch it on all of --cpu: Trinity then gets TA's cores
+instead of leaving them idle. Only worth it with a fair amount of phase 2
+left (compare .completed against recursive_trinity.cmds; in-flight
+components are lost and rerun).
+With that in place, the share only has to keep TA from being the long pole,
+since cores TA doesn't need come back to Trinity. A fixed **0.5** under MPI
+covers every run so far (max balanced share 0.511), and estimates put each
+run near its "if balanced" TOTAL above: ~5h saved over these eight, the
+largest SRR868662 (~1h47m), SRR802670 (~1h02m), DRR053698 (~57m),
+SRR1139191 (~50m). Caveats: the estimate assumes Trinity scales linearly
+with cores, and phase 1 (Inchworm capped at 10 threads) gets fewer cores
+under 0.5 (lane 20: phase 1 ~13). Trinity also runs ~16-30% slower beside
+MPI TA, which no split fixes.
+
+## 2026-10-11 -- HANDOFF: MPI Trans-ABySS share (superseded by the entry above)
 
 **Where things stand (4.1.0-dev25, code = dev24).** Assemblers run as two
 lanes (`run_assemblers`): Trans-ABySS (TA) from t=0, and Trinity (phase 1 ||
@@ -16,8 +58,8 @@ threaded 0.25; MPI + `--normalize-reads` = 0.198 + 0.0103 x GB of
 uncompressed corrected R1, clamped 0.2-0.45; MPI without it 0.33 (unmeasured).
 Each run logs `[assemblers] Trans-ABySS share ... R1 X GB`.
 
-**Waiting on:** slurm jobs 1321562-1321566 (five more MPI runs, started
-2026-10-10). 1321547-1321549 are in (2026-10-11, below).
+**All runs are in** -- see the entry above: the size-based share does not
+hold up, and the proposal there replaces decision 1 below.
 
 **The metric that matters is each run's TOTAL wall time** -- what users see.
 Balanced shares are only the means; judge every change by TOTAL. balance.py

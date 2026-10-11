@@ -47,7 +47,15 @@ POINTS = [
     ("DRR046632 dev24", 18.44, 0.399),
     ("DRR30368 dev24", 21.83, 0.447),
     ("DRR053698 dev24", 33.23, 0.511),
+    ("SRR796576 dev24", 3.73, 0.168),
+    ("SRR1138707 dev24", 6.24, 0.212),
+    ("SRR1139191 dev24", 10.90, 0.217),
+    ("SRR868662 dev24", 25.54, 0.323),
+    ("SRR802670 dev24", 53.42, 0.497),
 ]
+# With the SRR runs in, no shape fits (rms ~0.05): Trinity's work per GB of
+# reads varies 5-fold between datasets while Trans-ABySS's is ~constant.
+# NOTES.md 2026-10-11, "read size does not predict it".
 
 #: Shapes tried for share against GB. Square root fit best over POINTS
 #: (rms 0.014 vs 0.026 linear, 0.018 log): the share flattens with depth,
