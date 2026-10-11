@@ -20,7 +20,8 @@
 #   cores before the stop, default 8), KILL_AFTER (seconds of that phase 2
 #   before the stop, default 900), GRACE (seconds from SIGTERM to SIGKILL,
 #   default 30), PHASE1=<OUT>/phase1/<NAME>.trinity from an earlier run of
-#   this script, to skip phase 1.
+#   this script, to skip phase 1. TRINITY_CMD replaces `conda run
+#   --no-capture-output -n orp_trinity Trinity` (to try the script on a stub).
 #
 # What it does, all on this one node:
 #   1. phase 1 as run_trinity_phase1 runs it (--no_distributed_trinity_exec)
@@ -45,6 +46,7 @@ SMALL_CPU="${SMALL_CPU:-8}"
 KILL_AFTER="${KILL_AFTER:-900}"
 GRACE="${GRACE:-30}"
 PHASE1="${PHASE1:-}"
+TRINITY_CMD="${TRINITY_CMD:-conda run --no-capture-output -n orp_trinity Trinity}"
 CPU="${SLURM_CPUS_PER_TASK:-40}"
 MEM=$(( ${SLURM_MEM_PER_NODE:-256000} / 1024 ))
 MAXMEM=$(( MEM * 9 / 10 ))
@@ -64,7 +66,7 @@ log() { echo "[$(date '+%F %T')] $*"; }
 trinity_cmd() {
     local outdir=$1 cpu=$2
     shift 2
-    TCMD=(conda run --no-capture-output -n orp_trinity Trinity)
+    read -r -a TCMD <<< "$TRINITY_CMD"
     case "$STRAND" in RF|FR) TCMD+=(--SS_lib_type "$STRAND") ;; esac
     TCMD+=(--no_version_check --bypass_java_version_check)
     [ "$NORMALIZE" = 1 ] || TCMD+=(--no_normalize_reads)
@@ -211,7 +213,9 @@ log "R1=$R1"
 log "R2=$R2"
 log "OUT=$OUT  SMALL_CPU=$SMALL_CPU  KILL_AFTER=${KILL_AFTER}s  GRACE=${GRACE}s  NORMALIZE=$NORMALIZE  STRAND=${STRAND:-none}"
 
-TRINITY_BIN=$(conda run -n orp_trinity bash -c 'readlink -f "$(command -v Trinity)"')
+# (conda run re-splits arguments that contain spaces, so no `bash -c '...'`;
+# and without --no-capture-output it adds a blank line after the output)
+TRINITY_BIN=$(readlink -f "$(conda run --no-capture-output -n orp_trinity which Trinity | grep -m1 /)")
 TRINITY_HOME=$(dirname "$TRINITY_BIN")
 PARAFLY="$TRINITY_HOME/trinity-plugins/BIN/ParaFly"
 log "Trinity: $TRINITY_BIN ($(git -C "$TRINITY_HOME" describe --always --dirty 2>/dev/null || echo 'not a git checkout'))"
@@ -225,7 +229,7 @@ cat > "$pfcheck/time.sh" <<'EOF2'
 s=$(date +%s%N); "$1" -c "$2" -CPU 2 > /dev/null 2>&1; e=$(date +%s%N)
 echo $(( (e - s) / 1000000 ))
 EOF2
-pf_ms=$(conda run -n orp_trinity bash "$pfcheck/time.sh" "$PARAFLY" "$pfcheck/cmds" | tail -1)
+pf_ms=$(conda run --no-capture-output -n orp_trinity bash "$pfcheck/time.sh" "$PARAFLY" "$pfcheck/cmds" | grep -m1 -E '^[0-9]+$' || true)
 log "ParaFly: $PARAFLY; GOMP symbols: ${gomp:-?}; two 'sleep 2' at -CPU 2: ${pf_ms} ms"
 if ! [ "${pf_ms:-x}" -eq "${pf_ms:-x}" ] 2>/dev/null || [ "$pf_ms" -gt 3600 ]; then
     echo "ParaFly runs its commands one at a time (no OpenMP): every timing here would be wrong" >&2
