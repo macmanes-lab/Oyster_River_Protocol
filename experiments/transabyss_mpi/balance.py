@@ -162,7 +162,14 @@ def main():
         if gb:
             rows.append((timing, gb, share))
 
-    points = (POINTS if (args.points or not args.runs) else []) + rows
+    points = list(POINTS) if (args.points or not args.runs) else []
+    for label, gb, share in rows:
+        # A run already in POINTS (same R1 size and share) would count twice.
+        known = next((k for k, g, sh in points if abs(g - gb) < 0.01 and abs(sh - share) < 0.0015), None)
+        if known:
+            print(f"    ({label} is POINTS' {known!r}: counted once)")
+        else:
+            points.append((label, gb, share))
     print(f"\nfit over {len(points)} point(s):")
     for label, gb, share in points:
         print(f"    {gb:6.2f} GB  {share:.3f}  {label}")

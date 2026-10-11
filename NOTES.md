@@ -30,13 +30,14 @@ TOTAL by dataset and version (`--cpu 40 --mem 500 --normalize-reads`):
 | SRR1138704 (3.64 GB) | 3h42m-3h47m | 4h06m | -- | 3h24m* | **2h57m** |
 | SRR866209 (7.35 GB) | 4h38m | 5h55m* | -- | 3h56m* | **3h24m** |
 | DRR031870 (17.47 GB) | 10h24m | -- | **5h05m** | 5h44m | 6h23m* |
-| DRR046632 (18.44 GB) | -- | -- | -- | -- | ? |
-| DRR30368 (21.83 GB) | -- | -- | -- | -- | ? |
-| DRR053698 (33.23 GB) | -- | -- | -- | -- | ? |
+| DRR046632 (18.44 GB) | -- | -- | -- | -- | 6h42m |
+| DRR30368 (21.83 GB) | -- | -- | -- | -- | 7h31m |
+| DRR053698 (33.23 GB) | -- | -- | -- | -- | 11h29m (cap-bound) |
 
 \* slow or contended node (rcorrector 13-24% over its normal time). DRR031870
 dev24 ran on node138, ~13-20% slow throughout; on a normal node ~5h30m. The
-three new runs' TOTALs: rerun balance.py on them (it prints TOTAL now).
+three DRR runs had no threaded baseline. Balanced would have given 6h41m,
+7h16m and 10h31m: the cap cost DRR053698 ~57 min.
 Old reference: SRR1789336 took 37h06m on conda Trinity (serial ParaFly).
 
 **2026-10-11, runs 1321547-1321549** (balance.py output):
