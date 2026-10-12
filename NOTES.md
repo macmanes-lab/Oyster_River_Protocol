@@ -5,6 +5,68 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-10-12 -- HANDOFF: dev26 cluster runs in flight (step 3)
+
+**State.** 4.1.0-dev26 (pipeline code; the repo is 4.1.0-dev27, a notes-only
+bump) is on master and on Premise's `~/Oyster_River_Protocol`. Five MPI runs
+were submitted 2026-10-12 ~06:37 from `~` on Premise with
+`experiments/transabyss_mpi/oyster_mpi.sbatch` (`--cpu 40 --mem 500
+--normalize-reads --tpm-filt 1 --transabyss-mpi on`, same reads as dev24):
+
+| job | run (dir `~/<run>`) | dev24 TOTAL | dev24 if balanced | dev24 slower lane |
+|---|---|---|---|---|
+| 1321775 | SRR802670_dev26 | 15h27m | 14h24m | TA by 1h53m |
+| 1321776 | SRR868662_dev26 | 11h49m | 10h02m | Trinity by 3h57m |
+| 1321777 | SRR1139191_dev26 | 9h33m | 8h43m | Trinity by 2h47m |
+| 1321778 | SRR1138707_dev26 | 5h27m | 5h14m | Trinity by 50m |
+| 1321779 | SRR796576_dev26 | 3h16m | 3h05m | Trinity by 49m |
+
+DRR053698 (the plan's second TA-bound run) was not submitted; add it if
+SRR802670 alone isn't enough to judge the TA-bound side. A first submission
+reused the `_dev24` names and exited in 2 s ("already finished"), harmlessly.
+
+**Watching.** From either laptop (needs `ssh premise` working; see below):
+
+    experiments/transabyss_mpi/watch_dev26.sh           # state + Stage lines per run
+    experiments/transabyss_mpi/watch_dev26.sh --report  # + balance.py, qualreports vs dev24
+
+It prints each run's slurm state, banner version, and its `[assemblers]` /
+`=== Stage` lines -- `run_trinity_phase2 grows to 40 cpu (...left)` or
+`stays at` -- and, once every run has a TOTAL, copies the logs to
+$TMPDIR/watch_dev26, runs balance.py locally (Premise's python3 is 3.6) and
+lines up each qualreport's metrics against the dev24 run's (`*` = differs).
+Expect each run ~10-16 h; SRR796576/SRR1138707 were pending at submission.
+
+**Judging (DEV26_PLAN.md):** TOTAL is the metric. Each run against its dev24
+TOTAL and its "if balanced" figure above:
+- Trinity-bound (SRR868662, SRR1139191, SRR1138707, SRR796576): Stage A
+  now has 20 lane cores instead of 22-31 (phase 1 13), so expect phase 2 to
+  grow when TA finishes, and TOTAL near "if balanced" -- if not, check how
+  long phase 1 took on fewer cores (the plan's caveat) and the grow line's
+  components left.
+- TA-bound (SRR802670): TA now 20 cores (was 18, capped). Expect TOTAL near
+  14h24m; phase 2 likely `stays at` or never needs to grow.
+- Qualreports: BUSCO, unique genes, pyTransRate within Trinity's run-to-run
+  noise (NOTES 2026-10-10: tens of genes, ~0.002 pyTransRate).
+- Then: `tests/release_check.sbatch` (full tier) before calling dev26 done,
+  and the `--transabyss-mpi auto` default decision.
+
+**`ssh premise` on another machine** -- `~/.ssh/config`:
+
+    Host premise
+        HostName premise.sr.unh.edu
+        User macmanes
+        IdentityFile ~/.ssh/id_ed25519_premise
+        IdentitiesOnly yes
+        AddKeysToAgent yes
+        UseKeychain yes
+
+with that key (or another one authorized on Premise) loaded: `ssh-add
+--apple-use-keychain ~/.ssh/id_ed25519_premise`, then `ssh -o BatchMode=yes
+premise hostname` should print `login01.rcchpc`. Compute nodes can't be
+ssh'd into without a job on them. Premise's `/mnt/home` is a symlink to
+`/mnt/gpfs01/home`; compare paths with `pwd -P`.
+
 ## 2026-10-12 -- 4.1.0-dev26: phase 2 grows onto Trans-ABySS's cores
 
 **Step 1 (DEV26_PLAN.md) passed: ParaFly resumes cleanly.** Premise job

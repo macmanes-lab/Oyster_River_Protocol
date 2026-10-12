@@ -1,0 +1,43 @@
+From 3b3c03ed4eb6111f596496d24e4bd2580b6454f8 Mon Sep 17 00:00:00 2001
+From: macmanes <macmanes@gmail.com>
+Date: Mon, 5 Oct 2026 16:12:34 -0400
+Subject: [PATCH 1/5] det-fix: deterministic scaffold ordering and SNP-bubble
+ representative
+
+---
+ Analysis/SuperTranscripts/pylib/Compact_graph_pruner.py | 5 ++++-
+ util/support_scripts/scaffold_iworm_contigs.pl          | 2 +-
+ 2 files changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/Analysis/SuperTranscripts/pylib/Compact_graph_pruner.py b/Analysis/SuperTranscripts/pylib/Compact_graph_pruner.py
+index 56a48a2..2fc4625 100755
+--- a/Analysis/SuperTranscripts/pylib/Compact_graph_pruner.py
++++ b/Analysis/SuperTranscripts/pylib/Compact_graph_pruner.py
+@@ -57,7 +57,10 @@ class Compact_graph_pruner:
+         bubble_node_lists = self._get_bubbles(tgraph, max_bubble_node_length)
+ 
+         for bubble_node_list in bubble_node_lists:
+-            # TODO: should sort by expression, select representative node based on highest expr
++            # Keep the node in the most isoforms; ties go to the highest loc id. The
++            # list comes from a set of nodes hashed by id(), so popping it unsorted
++            # picked the allele by memory address.
++            bubble_node_list.sort(key=lambda n: (len(n.get_transcripts()), n.get_loc_id()))
+             repr_node = bubble_node_list.pop()
+             for sister_bubble_node in bubble_node_list:
+                 repr_node.add_transcripts(sister_bubble_node.get_transcripts())
+diff --git a/util/support_scripts/scaffold_iworm_contigs.pl b/util/support_scripts/scaffold_iworm_contigs.pl
+index bb49892..fea6741 100755
+--- a/util/support_scripts/scaffold_iworm_contigs.pl
++++ b/util/support_scripts/scaffold_iworm_contigs.pl
+@@ -129,7 +129,7 @@ main: {
+         print STDERR "WARNING: note, there were $num_unrecognized_iworm_contig_names inchworm contig names in the SAM file that were ignored due to the inchworm contig accession not being recognized.\n";
+     }
+     
+-    foreach my $pairing (reverse sort {$paired_iworm_contigs{$a}<=>$paired_iworm_contigs{$b}} keys %paired_iworm_contigs) {
++    foreach my $pairing (sort {$paired_iworm_contigs{$b}<=>$paired_iworm_contigs{$a} or $a cmp $b} keys %paired_iworm_contigs) {
+ 
+         my ($iworm_acc_A, $iworm_acc_B) = split(/\t/, $pairing);
+       
+-- 
+2.43.7
+

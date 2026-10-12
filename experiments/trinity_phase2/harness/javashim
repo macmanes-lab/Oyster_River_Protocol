@@ -1,0 +1,3 @@
+#!/bin/bash
+# times every java call; TRINITY_PROF_JAVA is the log, REAL_JAVA the binary
+exec /usr/bin/time -a -o "$TRINITY_PROF_JAVA" -f "JAVA	%e	%U	%S	%M	$$" "$REAL_JAVA" "$@"

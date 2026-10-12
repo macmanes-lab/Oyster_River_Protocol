@@ -1,0 +1,440 @@
+From 50d83154811bbc173e5f8eecff21185ab5199e7b Mon Sep 17 00:00:00 2001
+From: macmanes <macmanes@gmail.com>
+Date: Mon, 5 Oct 2026 16:14:04 -0400
+Subject: [PATCH 4/5] perf: component runs spawn fewer processes
+
+- PATH lookups in Perl instead of sh -c command -v
+- --trinity_complete runs skip the tool version probes the parent already did
+- sort --parallel probe made once per run tree (TRINITY_SORT_HAS_PARALLEL)
+- touch / mkdir -p / Pipeliner checkpoints in Perl
+- component runs call bowtie2-build-s / bowtie2-align-s directly
+- read-pair scaffolding skipped when fewer than two contigs pass min100
+---
+ PerlLib/COMMON.pm    |  32 +++++++++---
+ PerlLib/Pipeliner.pm |   7 +--
+ Trinity              | 121 ++++++++++++++++++++++++++++++++-----------
+ 3 files changed, 120 insertions(+), 40 deletions(-)
+
+diff --git a/PerlLib/COMMON.pm b/PerlLib/COMMON.pm
+index ff5a394..87689ec 100644
+--- a/PerlLib/COMMON.pm
++++ b/PerlLib/COMMON.pm
+@@ -13,14 +13,17 @@ sub get_sort_exec {
+     # check it like so:
+     #  perl -MCOMMON -e 'print COMMON::get_sort_exec(4);'
+ 
+-    my $sort_exec = `sh -c "command -v sort"`;
+-    unless ($sort_exec =~ /\w/) {
++    my $sort_exec = &find_in_path("sort");
++    unless ($sort_exec) {
+         confess "Error, cannot find sort utility";
+     }
+-    $sort_exec =~ s/\s//g;
+-    
+-    my $help_text = `$sort_exec --help`;  
+-    if ($help_text =~ m|--parallel|) {
++
++    # probed once; the phase-2 Trinity runs inherit the answer through the environment
++    unless (defined $ENV{TRINITY_SORT_HAS_PARALLEL}) {
++        my $help_text = `$sort_exec --help`;
++        $ENV{TRINITY_SORT_HAS_PARALLEL} = ($help_text =~ m|--parallel|) ? 1 : 0;
++    }
++    if ($ENV{TRINITY_SORT_HAS_PARALLEL}) {
+         ## could do simple versioning check, but I don't remember which version started using parallel
+         $sort_exec = "$sort_exec --parallel=$num_threads";
+     }
+@@ -28,4 +31,21 @@ sub get_sort_exec {
+     return($sort_exec);
+ }
+ 
++####
++sub find_in_path {
++    my ($prog) = @_;
++
++    # like 'command -v', without forking a shell: phase 2 runs this tens of
++    # thousands of times
++    if ($prog =~ m|/|) {
++        return (-f $prog && -x _) ? $prog : undef;
++    }
++    foreach my $dir (split(/:/, $ENV{PATH} || "")) {
++        next unless length($dir);
++        my $path = "$dir/$prog";
++        return $path if (-f $path && -x _);
++    }
++    return undef;
++}
++
+ 1; #EOM
+diff --git a/PerlLib/Pipeliner.pm b/PerlLib/Pipeliner.pm
+index 15e92be..48a1c9e 100644
+--- a/PerlLib/Pipeliner.pm
++++ b/PerlLib/Pipeliner.pm
+@@ -187,10 +187,11 @@ sub run {
+                 confess "Error, cmd: $cmdstr died with ret $ret $!";
+             }
+             else {
+-                `touch $checkpoint_file`;
+-                if ($?) {
++                my $ckpt_ok = open(my $ckpt_fh, ">>", $checkpoint_file);
++                $ckpt_ok = $ckpt_ok && close($ckpt_fh) && utime(undef, undef, $checkpoint_file);
++                unless ($ckpt_ok) {
+                     
+-                    confess "Error creating checkpoint file: $checkpoint_file";
++                    confess "Error creating checkpoint file: $checkpoint_file: $!";
+                 }
+             }
+ 
+diff --git a/Trinity b/Trinity
+index d94f9a0..e658cdb 100755
+--- a/Trinity
++++ b/Trinity
+@@ -8,6 +8,7 @@ no strict qw(subs refs);
+ use FindBin;
+ use lib ("$FindBin::RealBin/PerlLib");
+ use File::Basename;
++use File::Path ();
+ use Time::localtime;
+ use Cwd;
+ use Carp;
+@@ -993,8 +994,8 @@ unless ($max_memory &&
+ ## make sure properly installed
+ {
+     foreach my $trinity_tool ("ParaFly", "seqtk-trinity") {
+-        my $loc = `sh -c "command -v $trinity_tool"`;
+-        unless ($loc =~ /\w/) {
++        my $loc = &COMMON::find_in_path($trinity_tool);
++        unless ($loc) {
+             die "\n\n\tError, cannot locate Trinity-specific tool: $trinity_tool in the PATH setting: $ENV{PATH},  be sure to install Trinity by running 'make' in the base installation directory\n\n";
+         }
+     }
+@@ -1318,7 +1319,7 @@ main: {
+     }
+ 
+     if (! -d $TRINITY_PHASE1_OUTDIR) {
+-        &process_cmd("mkdir -p $TRINITY_PHASE1_OUTDIR");
++        &mkdir_p("$TRINITY_PHASE1_OUTDIR");
+         $MKDIR_PHASE1_OUTDIR_FLAG = 1;
+     }
+     
+@@ -1337,7 +1338,7 @@ main: {
+         $output_directory = $WORKDIR . "-" . time(); # make unique
+         
+         unless (-d $output_directory) {
+-            &process_cmd("mkdir -p $output_directory");
++            &mkdir_p("$output_directory");
+             $MKDIR_OUTDIR_FLAG = 1;
+         }
+     }
+@@ -1380,12 +1381,12 @@ main: {
+     
+     if ( (! $TRINITY_COMPLETE_FLAG) && (! -d $output_directory)) {
+         # phase - 1 mode.
+-        &process_cmd("mkdir -p $output_directory");
++        &mkdir_p("$output_directory");
+         $MKDIR_OUTDIR_FLAG = 1;
+     }
+     
+     if ((! $genome_guided_bam) && (! -d $chrysalis_output_dir)) {
+-        &process_cmd("mkdir -p $chrysalis_output_dir"); # note, won't be auto-cleaned up if not in the trinity_out_dir/
++        &mkdir_p("$chrysalis_output_dir"); # note, won't be auto-cleaned up if not in the trinity_out_dir/
+     }
+ 
+     print STDERR "-changing dir to output dir: $output_directory\n" if $VERBOSE;
+@@ -1632,7 +1633,7 @@ sub run_Trinity {
+                 if ($thr1->error() || $thr2->error()) {
+                     die "Error prepping sequences.";
+                 }
+-                &process_cmd("touch left.fa.ok right.fa.ok");
++                &touch_files("left.fa.ok", "right.fa.ok");
+                 
+                 print("Done converting input files.") if $VERBOSE;
+                 ## Calculate input file sizes for performance monitoring
+@@ -1650,7 +1651,7 @@ sub run_Trinity {
+                 unless (-s $trinity_target_fa == ((-s "left.fa") + (-s "right.fa"))) {
+                     die "$trinity_target_fa is smaller (".(-s $trinity_target_fa)." bytes) than the combined size of left.fa and right.fa (".((-s "left.fa") + (-s "right.fa"))." bytes)\n";
+                 }
+-                &process_cmd("touch $trinity_target_fa.ok") unless (-e "$trinity_target_fa.ok");
++                &touch_files("$trinity_target_fa.ok") unless (-e "$trinity_target_fa.ok");
+                 
+                 # we keep if we have jaccard; delete later
+                 unlink ("left.fa", "right.fa") unless $jaccard_clip; # no longer needed now that we have 'both.fa', which is needed by chrysalis
+@@ -1673,7 +1674,7 @@ sub run_Trinity {
+         elsif (@single_files) {
+             unless (-s $trinity_target_fa && -e "single.fa.ok") {
+                 &prep_seqs(\@single_files, $seqType, "single", $SS_lib_type);
+-                &process_cmd("touch single.fa.ok");
++                &touch_files("single.fa.ok");
+             }
+             ## Calculate input file sizes for performance monitoring
+             my $pm_temp = -s "single.fa";
+@@ -1733,7 +1734,7 @@ sub run_Trinity {
+             &process_cmd("cp $trinity_target_fa $trinity_target_fa_wLR");
+             &process_cmd("cat $long_reads | sed 's/>/>LR\\\$\\\|/' >> $trinity_target_fa_wLR"); #  
+             
+-            &process_cmd("touch $trinity_target_fa_wLR.ok");
++            &touch_files("$trinity_target_fa_wLR.ok");
+         
+ 
+         }
+@@ -1806,7 +1807,7 @@ sub run_Trinity {
+             unless ($NO_CLEANUP) {
+                 &process_cmd("rm -f @super_read_files");
+             }
+-            &process_cmd("touch $super_reads_checkpoint");
++            &touch_files("$super_reads_checkpoint");
+         }
+ 
+         #print "Chrys reads before: $chrysalis_reads_fa\n";
+@@ -1840,7 +1841,7 @@ sub run_Trinity {
+     $pm_inchworm_start = time();
+     unless (-s $inchworm_file && -e $inchworm_finished_checkpoint_file) {
+         &run_inchworm($inchworm_file, $inchworm_target_fa, $SS_lib_type, $kmer_method, $KMER_SIZE, 0);
+-        &process_cmd("touch $inchworm_finished_checkpoint_file");
++        &touch_files("$inchworm_finished_checkpoint_file");
+     }
+     $pm_inchworm_end = time();
+         
+@@ -2064,7 +2065,7 @@ sub run_chrysalis {
+                         }
+                     }
+                     close $ofh_LR;
+-                    &process_cmd("touch $only_LR_fa_checkpoint");
++                    &touch_files("$only_LR_fa_checkpoint");
+                 }
+                 
+             }
+@@ -2091,7 +2092,9 @@ sub run_chrysalis {
+     }
+     
+     my $iworm_scaffolds_file = "$chrysalis_output_dir/iworm_scaffolds.txt";
+-    if ( $PAIRED_MODE && -s $bowtie_reads_fa && ! $NO_BOWTIE) {
++    # pair links join two contigs: with fewer, the scaffold file would be empty
++    if ( $PAIRED_MODE && -s $bowtie_reads_fa && ! $NO_BOWTIE
++         && &fasta_has_at_least($iworm_min100_fa_file, 2) ) {
+ 
+         ##################################################
+         ## Define iworm links via paired-end read mappings:
+@@ -2488,7 +2491,7 @@ sub run_recursive_trinity {
+                 close $ofh if $ofh;
+                 my $base_dir = &create_full_path("read_partitions/Fb_" . (int($component_counter/$file_bins_per_dir)) . "/CBin_" . (int($component_counter/$target_files_per_dir)));
+                 if (! -d $base_dir) {
+-                    &process_cmd("mkdir -p $base_dir");
++                    &mkdir_p("$base_dir");
+                 }
+                 my $readsfile = "$base_dir/c$component_id.trinity.reads.fa";
+                 
+@@ -2507,7 +2510,7 @@ sub run_recursive_trinity {
+         close $ofh if $ofh;
+         close $ofh_read_filenames;
+         
+-        &process_cmd("touch $read_filenames_ok");
++        &touch_files("$read_filenames_ok");
+     }
+     
+     
+@@ -2519,7 +2522,7 @@ sub run_recursive_trinity {
+         
+     if (! -e "recursive_trinity.cmds.ok") {
+         &write_trinity_partitioned_cmds($read_filenames, "recursive_trinity.cmds", "GENOME-FREE_MODE");
+-        &process_cmd("touch recursive_trinity.cmds.ok");
++        &touch_files("recursive_trinity.cmds.ok");
+         print STDERR "Done prepping partitioned cmds." if $VERBOSE;
+     }
+ 
+@@ -2880,7 +2883,7 @@ sub prep_seqs {
+         die $@;
+     }
+     else {
+-        &process_cmd("touch $file_prefix.fa.ok"); # leave checkpoint
++        &touch_files("$file_prefix.fa.ok"); # leave checkpoint
+     }
+         
+     return \@initial_files;
+@@ -2915,6 +2918,42 @@ sub create_full_path {
+ 
+ 
+ 
++####
++sub touch_files {
++    # checkpoints: Perl rather than a 'touch' process per file
++    foreach my $file (@_) {
++        open(my $ofh, ">>", $file) or confess "Error, cannot touch $file: $!";
++        close $ofh;
++        utime(undef, undef, $file) or confess "Error, cannot touch $file: $!";
++    }
++    return;
++}
++
++####
++sub mkdir_p {
++    my ($dir) = @_;
++    unless (-d $dir) {
++        File::Path::make_path($dir);
++        -d $dir or confess "Error, cannot mkdir $dir";
++    }
++    return;
++}
++
++####
++sub fasta_has_at_least {
++    my ($file, $min_records) = @_;
++    open(my $fh, $file) or return 0;
++    my $count = 0;
++    while (<$fh>) {
++        if (/^>/ && ++$count >= $min_records) {
++            close $fh;
++            return 1;
++        }
++    }
++    close $fh;
++    return 0;
++}
++
+ ####
+ sub process_cmd {
+     my ($cmd) = @_;
+@@ -3325,7 +3364,7 @@ sub run_trimmomatic_PE {
+         &process_cmd("cat $trimmed_right_file_base.P.qtrim $trimmed_right_file_base.U.qtrim > $trimmed_right_fq");
+     }
+     
+-    &process_cmd("touch $checkpoint");
++    &touch_files("$checkpoint");
+     
+     # compress the trimmomatic direct outputs to conserve space:
+     &process_cmd("gzip $trimmed_left_file_base.P.qtrim $trimmed_left_file_base.U.qtrim $trimmed_right_file_base.P.qtrim $trimmed_right_file_base.U.qtrim &");
+@@ -3361,7 +3400,7 @@ sub run_trimmomatic_SE {
+     
+     &process_cmd($cmd);
+ 
+-    &process_cmd("touch $checkpoint");
++    &touch_files("$checkpoint");
+     
+     return($trimmed_fq);
+ }
+@@ -3480,7 +3519,7 @@ sub normalize {
+ 
+         &process_cmd($cmd);
+         
+-        &process_cmd("touch $checkpoint");
++        &touch_files("$checkpoint");
+     }
+     
+ 
+@@ -3519,7 +3558,7 @@ sub run_genome_guided_Trinity {
+         my $normalized_cov_bam = "$output_directory/" . basename($genome_guided_bam) . ".norm_${normalize_max_read_cov}.bam";
+         my $cmd = "$TRINITY_PLUGINS_DIR/bamsifter/bamsifter -c $normalize_max_read_cov -o $normalized_cov_bam --keep_secondary $genome_guided_bam"; 
+         &process_cmd($cmd) if ! -e "$normalized_cov_bam.ok";
+-        &process_cmd("touch $normalized_cov_bam.ok") if ! -e "$normalized_cov_bam.ok";
++        &touch_files("$normalized_cov_bam.ok") if ! -e "$normalized_cov_bam.ok";
+         
+         $genome_guided_bam = $normalized_cov_bam;
+     }
+@@ -3589,13 +3628,13 @@ sub run_genome_guided_Trinity {
+     }
+     &process_cmd($cmd) unless (-e "partitions.ok");
+ 
+-    &process_cmd("touch partitions.ok") unless (-e "partitions.ok");
++    &touch_files("partitions.ok") unless (-e "partitions.ok");
+     
+     ## generate list of the read files:
+     $cmd = "find Dir_\* -name '*reads' > read_files.list";
+     
+     &process_cmd($cmd) unless (-s "read_files.list" && -e "read_files.list.ok");
+-    &process_cmd("touch read_files.list.ok") unless (-e "read_files.list.ok"); # checkpoint
++    &touch_files("read_files.list.ok") unless (-e "read_files.list.ok"); # checkpoint
+ 
+ 
+     if ($ANANAS_DIR) {
+@@ -3607,7 +3646,7 @@ sub run_genome_guided_Trinity {
+ 
+     unless (-e "trinity_GG.cmds.ok") {
+         &write_trinity_partitioned_cmds("read_files.list", "trinity_GG.cmds", "GENOME_GUIDED_MODE");
+-        &process_cmd("touch trinity_GG.cmds.ok");
++        &touch_files("trinity_GG.cmds.ok");
+     }
+     
+     if ($NO_DISTRIBUTED_TRINITY_EXEC) {
+@@ -3737,7 +3776,7 @@ sub write_trinity_partitioned_cmds {
+     $cmd .= " > $cmds_file";
+     
+     &process_cmd($cmd) unless (-e "$cmds_file.ok");
+-    &process_cmd("touch $cmds_file.ok") unless (-e "$cmds_file.ok");
++    &touch_files("$cmds_file.ok") unless (-e "$cmds_file.ok");
+ 
+     
+     return;
+@@ -3861,7 +3900,7 @@ sub run_ANANAS {
+         close $fh;
+         close $ofh;
+ 
+-        &process_cmd("touch $ananas_cmds_checkpoint");
++        &touch_files("$ananas_cmds_checkpoint");
+     }
+     
+     if ($NO_DISTRIBUTED_TRINITY_EXEC) {
+@@ -3924,7 +3963,7 @@ sub append_long_reads_to_iworm_contigs {
+         }
+         close $ofh;
+     
+-        &process_cmd("touch $long_reads_fa_checkpoint_file");
++        &touch_files("$long_reads_fa_checkpoint_file");
+     }
+     
+     unless (-s $long_reads_fa) {
+@@ -3940,7 +3979,7 @@ sub append_long_reads_to_iworm_contigs {
+     my $LR_kmer_checkpoint_file = "$LR_kmer_abundances_file.ok";
+     unless (-s $LR_kmer_abundances_file && -e $LR_kmer_checkpoint_file) {
+         &process_cmd($cmd);
+-        &process_cmd("touch $LR_kmer_checkpoint_file");
++        &touch_files("$LR_kmer_checkpoint_file");
+     }
+     
+ 
+@@ -3989,7 +4028,7 @@ sub append_long_reads_to_iworm_contigs {
+     close $ofh;
+     
+ 
+-    &process_cmd("touch $new_inchworm_checkpoint_file");
++    &touch_files("$new_inchworm_checkpoint_file");
+     return($new_inchworm_file);
+ }
+ 
+@@ -4053,6 +4092,26 @@ sub parse_samples_file {
+ ####
+ sub check_required_3rd_party_tool_installations {
+ 
++    if ($TRINITY_COMPLETE_FLAG) {
++        # a phase-2 component run: the parent Trinity checked the tool versions,
++        # so only resolve what this run uses, without a shell per lookup.
++        unless ($NO_BOWTIE) {
++            $bowtie2_path = &COMMON::find_in_path("bowtie2");
++            $bowtie2_build_path = &COMMON::find_in_path("bowtie2-build");
++            unless ($bowtie2_path && $bowtie2_build_path) {
++                die "Error, cannot find bowtie2 and bowtie2-build in PATH: $ENV{PATH}\n";
++            }
++            # The indexes here are tiny: call the bowtie2 binaries directly rather
++            # than through the python and perl wrappers (~0.1 CPU-s each).
++            my ($bt2_dir) = ($bowtie2_path =~ m|^(.*)/[^/]+$|);
++            if (-x "$bt2_dir/bowtie2-align-s" && -x "$bt2_dir/bowtie2-build-s") {
++                $bowtie2_path = "$bt2_dir/bowtie2-align-s --wrapper basic-0";
++                $bowtie2_build_path = "$bt2_dir/bowtie2-build-s";
++            }
++        }
++        return;
++    }
++
+ 
+     # samtools
+     my $samtools_path = `sh -c "command -v samtools"`;
+@@ -4238,7 +4297,7 @@ sub run_singularity_Trinity {
+     
+     for my $outdir ($output_directory, $WORKDIR) {
+         if (! -d $outdir) {
+-            &process_cmd("mkdir -p $outdir");
++            &mkdir_p("$outdir");
+         }
+     }
+         
+-- 
+2.43.7
+

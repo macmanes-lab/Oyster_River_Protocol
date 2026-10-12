@@ -15,3 +15,6 @@ orthofuse/
 quants/
 rcorr/
 reports/
+
+# tests/release_check.py output
+orp_release_check/

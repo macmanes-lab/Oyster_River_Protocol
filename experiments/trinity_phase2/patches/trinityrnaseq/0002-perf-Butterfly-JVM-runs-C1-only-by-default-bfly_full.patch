@@ -1,0 +1,54 @@
+From 945603e72bfe953de640be7457beb66f69334097 Mon Sep 17 00:00:00 2001
+From: macmanes <macmanes@gmail.com>
+Date: Mon, 5 Oct 2026 16:12:02 -0400
+Subject: [PATCH 2/5] perf: Butterfly JVM runs C1-only by default
+ (--bfly_full_jit to restore)
+
+---
+ Trinity | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/Trinity b/Trinity
+index 9ae7bd4..d94f9a0 100755
+--- a/Trinity
++++ b/Trinity
+@@ -126,6 +126,9 @@ my $mpiexec = "mpiexec";
+ my $bflyCPU;
+ my $bflyCalculateCPU = 0;
+ my $bflyGCThreads = 2;
++# Butterfly runs once per component graph, mostly for well under a second, where
++# C2 compiler threads cost several CPU-seconds and never pay back.
++my $BFLY_FULL_JIT = 0;
+ 
+ my $long_reads = "";
+ my $LONG_READS_MODE = 0;
+@@ -428,6 +431,8 @@ my $full_usage = qq^
+ #                  'java -Xms$bflyHeapSpaceInit -jar Butterfly.jar ... \$bfly_opts'
+ #  --bflyGCThreads <int>           :threads for garbage collection
+ #                                   (default: $bflyGCThreads))
++#  --bfly_full_jit                 :run Butterfly with the JVM's full tiered JIT
++#                                   (default: C1 only, -XX:TieredStopAtLevel=1)
+ #  --bflyCPU <int>                 :CPUs to use (default will be normal 
+ #                                   number of CPUs; e.g., $CPU)
+ #  --bflyCalculateCPU              :Calculate CPUs based on 80% of max_memory
+@@ -714,6 +719,7 @@ my $ALREADY_SALMON_FILTERED = 0;
+     'bflyHeapSpaceMax=s'    => \$bflyHeapSpaceMax,
+     'bflyHeapSpaceInit=s'   => \$bflyHeapSpaceInit,
+     'bflyGCThreads=i'       => \$bflyGCThreads,
++    'bfly_full_jit'         => \$BFLY_FULL_JIT,
+     'bflyCPU=i'             => \$bflyCPU,
+     'bflyCalculateCPU'      => \$bflyCalculateCPU,
+     'bfly_jar=s' => \$BFLY_JAR,
+@@ -2375,6 +2381,9 @@ sub run_chrysalis {
+                 if (defined($bflyGCThreads)) {
+                     $bfly_cmd .= " -XX:ParallelGCThreads=$bflyGCThreads ";
+                 }
++                unless ($BFLY_FULL_JIT) {
++                    $bfly_cmd .= " -XX:TieredStopAtLevel=1 ";
++                }
+                 
+                 $bfly_cmd .= " -jar $BFLY_JAR -N 100000 -L $min_contig_length -F $group_pairs_distance -C $base_filename.graph ";
+                 
+-- 
+2.43.7
+

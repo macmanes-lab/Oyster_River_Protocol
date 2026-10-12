@@ -1,0 +1,198 @@
+From d4a020a792d01b1e3b4beab1d60562e5617cc78e Mon Sep 17 00:00:00 2001
+From: macmanes <macmanes@gmail.com>
+Date: Mon, 5 Oct 2026 18:05:20 -0400
+Subject: [PATCH 1/2] Reproducible hash codes for identity-compared hash keys
+
+SimpleEdge, Path, PathWithOrig, PathOverlap, SimplePathNodeEdge,
+Path_n_MM_count, AlignmentStats and My_DFS are HashMap/HashSet keys
+(jung keys its edge maps by SimpleEdge) but had no hashCode, so map order
+followed the JVM's identity hash. That hash is handed out in request order,
+so any code path that asked for one first, such as Object.toString in a
+debug message, changed the assembly.
+
+Hash a per-instance creation counter through a mixing function instead:
+deterministic, and random-like as the identity hash was. (Plain creation
+order also made runs reproducible but moved total assembled bases by
+several percent, so the order matters to Butterfly.) equals stays identity.
+---
+ src/src/AlignmentStats.java     |  6 ++++++
+ src/src/My_DFS.java             |  6 ++++++
+ src/src/Path.java               |  6 ++++++
+ src/src/PathOverlap.java        |  6 ++++++
+ src/src/PathWithOrig.java       |  6 ++++++
+ src/src/Path_n_MM_count.java    |  6 ++++++
+ src/src/SimpleEdge.java         |  6 ++++++
+ src/src/SimplePathNodeEdge.java |  6 ++++++
+ src/src/StableHash.java         | 26 ++++++++++++++++++++++++++
+ 9 files changed, 74 insertions(+)
+ create mode 100644 src/src/StableHash.java
+
+diff --git a/src/src/AlignmentStats.java b/src/src/AlignmentStats.java
+index cc02293..606f79b 100644
+--- a/src/src/AlignmentStats.java
++++ b/src/src/AlignmentStats.java
+@@ -2,6 +2,12 @@ import jaligner.Alignment;
+ import java.util.*;
+ 
+ public class AlignmentStats {
++	private final int _stable_hash = StableHash.next();
++
++	public int hashCode() {
++		return _stable_hash;
++	}
++
+ 
+ 	boolean local_DEBUG = false;  //FIXME: use a debuglevel var that transcends all code
+ 	
+diff --git a/src/src/My_DFS.java b/src/src/My_DFS.java
+index 6940926..72e744b 100644
+--- a/src/src/My_DFS.java
++++ b/src/src/My_DFS.java
+@@ -6,6 +6,12 @@ import edu.uci.ics.jung.graph.DirectedSparseGraph;
+ 
+ public class My_DFS
+ {
++	private final int _stable_hash = StableHash.next();
++
++	public int hashCode() {
++		return _stable_hash;
++	}
++
+ 	private Map<SeqVertex,Integer> _colors;
+ 	public final static int WHITE = 0;
+ 	public final static int BLACK = 1;
+diff --git a/src/src/Path.java b/src/src/Path.java
+index c44e017..4701c8f 100644
+--- a/src/src/Path.java
++++ b/src/src/Path.java
+@@ -6,6 +6,12 @@ import edu.uci.ics.jung.graph.DirectedSparseGraph;
+ 
+ 
+ public class Path {
++	private final int _stable_hash = StableHash.next();
++
++	public int hashCode() {
++		return _stable_hash;
++	}
++
+ 
+ 	private List<Integer> vertex_id_listing;
+ 	
+diff --git a/src/src/PathOverlap.java b/src/src/PathOverlap.java
+index 2979070..b6876c9 100644
+--- a/src/src/PathOverlap.java
++++ b/src/src/PathOverlap.java
+@@ -2,6 +2,12 @@
+ import java.util.*;
+ 
+ public class PathOverlap {
++	private final int _stable_hash = StableHash.next();
++
++	public int hashCode() {
++		return _stable_hash;
++	}
++
+ 
+ 	
+ 	List<Integer> path_A;
+diff --git a/src/src/PathWithOrig.java b/src/src/PathWithOrig.java
+index 4014184..60b9717 100644
+--- a/src/src/PathWithOrig.java
++++ b/src/src/PathWithOrig.java
+@@ -2,6 +2,12 @@ import java.util.*;
+ 
+ 
+ public class PathWithOrig {
++	private final int _stable_hash = StableHash.next();
++
++	public int hashCode() {
++		return _stable_hash;
++	}
++
+ 
+ 	private String pathNodeID = null;
+ 	private List<Integer> vertex_id_list;
+diff --git a/src/src/Path_n_MM_count.java b/src/src/Path_n_MM_count.java
+index f5908f1..1392430 100644
+--- a/src/src/Path_n_MM_count.java
++++ b/src/src/Path_n_MM_count.java
+@@ -4,6 +4,12 @@ import java.util.Vector;
+ 
+ 
+ public class Path_n_MM_count {
++	private final int _stable_hash = StableHash.next();
++
++	public int hashCode() {
++		return _stable_hash;
++	}
++
+ 
+ 	Integer mismatch_count = 0;
+ 	Vector<Integer> path;
+diff --git a/src/src/SimpleEdge.java b/src/src/SimpleEdge.java
+index 8bb5855..863d78c 100644
+--- a/src/src/SimpleEdge.java
++++ b/src/src/SimpleEdge.java
+@@ -1,5 +1,11 @@
+ 
+ public class SimpleEdge {
++	private final int _stable_hash = StableHash.next();
++
++	public int hashCode() {
++		return _stable_hash;
++	}
++
+ 	public double _wei;
+ 	public boolean _isInCircle;
+ 	protected int _numberOfLoopsInvolved;
+diff --git a/src/src/SimplePathNodeEdge.java b/src/src/SimplePathNodeEdge.java
+index 5ccac5e..cfe4919 100644
+--- a/src/src/SimplePathNodeEdge.java
++++ b/src/src/SimplePathNodeEdge.java
+@@ -1,5 +1,11 @@
+ 
+ public class SimplePathNodeEdge {
++	private final int _stable_hash = StableHash.next();
++
++	public int hashCode() {
++		return _stable_hash;
++	}
++
+ 
+ 	float weight;
+ 	String from_PathNodeID;
+diff --git a/src/src/StableHash.java b/src/src/StableHash.java
+new file mode 100644
+index 0000000..f5d3f94
+--- /dev/null
++++ b/src/src/StableHash.java
+@@ -0,0 +1,26 @@
++import java.util.concurrent.atomic.AtomicInteger;
++
++/**
++ * Reproducible hash codes for classes that compare by identity but are used
++ * as HashMap/HashSet keys. With the JVM's identity hash, the iteration order
++ * of those maps (and so the assembly) shifted whenever unrelated code, such as
++ * building a debug message, consumed an identity hash first.
++ *
++ * The creation counter is scrambled (MurmurHash3 fmix32) so map order stays
++ * random-like, as the identity hash order was, instead of following creation
++ * order: Butterfly's output is sensitive to that order, and creation order
++ * shifted assembly size by several percent in either direction.
++ */
++public class StableHash {
++	private static final AtomicInteger next = new AtomicInteger();
++
++	public static int next() {
++		int h = next.getAndIncrement();
++		h ^= h >>> 16;
++		h *= 0x85ebca6b;
++		h ^= h >>> 13;
++		h *= 0xc2b2ae35;
++		h ^= h >>> 16;
++		return h;
++	}
++}
+-- 
+2.43.7
+

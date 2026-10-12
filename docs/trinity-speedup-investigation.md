@@ -1,5 +1,13 @@
 # Trinity Phase 1 / Phase 2 speedup investigation
 
+> **Superseded for Phase 2, 2026-10-05:** see `PERFORMANCE_2026.md` in
+> https://github.com/macmanes-lab/trinityrnaseq_2026.
+> Every Phase 2 measurement below ran with bioconda's `trinity=2.15.2` build
+> `_6`, whose ParaFly was compiled without OpenMP: Phase 2 ran one component
+> at a time. With a working ParaFly the same Phase 2 takes about 2 h, not
+> 34 h. The "CPU-bound" conclusion (3.3), the 3.4 downgrade and the
+> "nothing order-of-magnitude remains" summary do not hold.
+
 **Status:** written 2026-08-21 as research only. **Updated 2026-08-24** with
 results from the first run that actually tested any of it -- the `--cpu 80`
 oversubscription run (`sampledata/benchmarks.md`, 2026-08-24). Section 3.3 is

@@ -1,0 +1,2 @@
+#!/bin/bash
+exec /usr/bin/time -a -o "$TRINITY_PROF_JAVA" -f "PY	%e	%U	%S	%M	$$	$(basename "$1")" "$REAL_PYTHON" "$@"

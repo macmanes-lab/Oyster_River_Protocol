@@ -1,0 +1,168 @@
+From 439546d60169dcf731eaa55ed5897a09b097bd7b Mon Sep 17 00:00:00 2001
+From: macmanes <macmanes@gmail.com>
+Date: Mon, 5 Oct 2026 16:12:02 -0400
+Subject: [PATCH 3/5] perf: SuperTranscripts polish without numpy (import cost
+ ~0.1 s per component)
+
+---
+ .../SuperTranscripts/Trinity_gene_splice_modeler.py  |  1 -
+ Analysis/SuperTranscripts/pylib/DP_matrix.py         |  1 -
+ .../SuperTranscripts/pylib/Gene_splice_modeler.py    | 12 +++++++++---
+ .../SuperTranscripts/pylib/GraphCycleException.py    |  1 -
+ Analysis/SuperTranscripts/pylib/Node_alignment.py    |  1 -
+ Analysis/SuperTranscripts/pylib/Node_path.py         |  1 -
+ Analysis/SuperTranscripts/pylib/TGraph.py            |  1 -
+ Analysis/SuperTranscripts/pylib/TNode.py             |  1 -
+ Analysis/SuperTranscripts/pylib/Topological_sort.py  |  1 -
+ .../SuperTranscripts/pylib/Trinity_fasta_parser.py   |  1 -
+ 10 files changed, 9 insertions(+), 12 deletions(-)
+
+diff --git a/Analysis/SuperTranscripts/Trinity_gene_splice_modeler.py b/Analysis/SuperTranscripts/Trinity_gene_splice_modeler.py
+index c5efdec..f9d8871 100755
+--- a/Analysis/SuperTranscripts/Trinity_gene_splice_modeler.py
++++ b/Analysis/SuperTranscripts/Trinity_gene_splice_modeler.py
+@@ -8,7 +8,6 @@ import os, sys, re
+ import logging
+ import argparse
+ import collections
+-import numpy
+ import time
+ 
+ logging.basicConfig(stream=sys.stderr, level=logging.INFO)
+diff --git a/Analysis/SuperTranscripts/pylib/DP_matrix.py b/Analysis/SuperTranscripts/pylib/DP_matrix.py
+index 7bf04b3..d9dfa88 100755
+--- a/Analysis/SuperTranscripts/pylib/DP_matrix.py
++++ b/Analysis/SuperTranscripts/pylib/DP_matrix.py
+@@ -8,7 +8,6 @@ import os, sys, re
+ import logging
+ import argparse
+ import collections
+-import numpy
+ import time
+ 
+ 
+diff --git a/Analysis/SuperTranscripts/pylib/Gene_splice_modeler.py b/Analysis/SuperTranscripts/pylib/Gene_splice_modeler.py
+index b33f167..9d0dc36 100755
+--- a/Analysis/SuperTranscripts/pylib/Gene_splice_modeler.py
++++ b/Analysis/SuperTranscripts/pylib/Gene_splice_modeler.py
+@@ -8,7 +8,6 @@ import os, sys, re
+ import logging
+ import argparse
+ import collections
+-import numpy
+ import time
+ 
+ import TGraph
+@@ -196,8 +195,15 @@ class Gene_splice_modeler:
+                 similarity_matrix[ i ][ i ] = -1
+             
+             ## find best pair
+-            best_pair_idx = int(numpy.argmax(similarity_matrix))
++            # first maximum in row-major order, as numpy.argmax gave
+             num_alignments = len(similarity_matrix)
++            best_pair_idx = 0
++            best_val = None
++            for i, row in enumerate(similarity_matrix):
++                for j, val in enumerate(row):
++                    if best_val is None or val > best_val:
++                        best_val = val
++                        best_pair_idx = i * num_alignments + j
+             best_pair_idx_1 = int(best_pair_idx / num_alignments)
+             best_pair_idx_2 = best_pair_idx % num_alignments
+             
+@@ -235,7 +241,7 @@ class Gene_splice_modeler:
+         """
+         
+         num_alignments = len(alignments_list)
+-        sim_matrix = numpy.zeros( (num_alignments, num_alignments), dtype='int_' )
++        sim_matrix = [[0] * num_alignments for _ in range(num_alignments)]
+ 
+         for i in range(0, num_alignments-1):
+             align_i = alignments_list[i]
+diff --git a/Analysis/SuperTranscripts/pylib/GraphCycleException.py b/Analysis/SuperTranscripts/pylib/GraphCycleException.py
+index fa099a7..7ef8463 100755
+--- a/Analysis/SuperTranscripts/pylib/GraphCycleException.py
++++ b/Analysis/SuperTranscripts/pylib/GraphCycleException.py
+@@ -8,7 +8,6 @@ import os, sys, re
+ import logging
+ import argparse
+ import collections
+-import numpy
+ import time
+ 
+ 
+diff --git a/Analysis/SuperTranscripts/pylib/Node_alignment.py b/Analysis/SuperTranscripts/pylib/Node_alignment.py
+index 02c7c52..ae42304 100755
+--- a/Analysis/SuperTranscripts/pylib/Node_alignment.py
++++ b/Analysis/SuperTranscripts/pylib/Node_alignment.py
+@@ -8,7 +8,6 @@ import os, sys, re
+ import logging
+ import argparse
+ import collections
+-import numpy
+ import time
+ 
+ import TNode
+diff --git a/Analysis/SuperTranscripts/pylib/Node_path.py b/Analysis/SuperTranscripts/pylib/Node_path.py
+index c3d11c1..af00558 100755
+--- a/Analysis/SuperTranscripts/pylib/Node_path.py
++++ b/Analysis/SuperTranscripts/pylib/Node_path.py
+@@ -8,7 +8,6 @@ import os, sys, re
+ import logging
+ import argparse
+ import collections
+-import numpy
+ import time
+ 
+ import TNode
+diff --git a/Analysis/SuperTranscripts/pylib/TGraph.py b/Analysis/SuperTranscripts/pylib/TGraph.py
+index 4bbfe2e..f0d0df3 100755
+--- a/Analysis/SuperTranscripts/pylib/TGraph.py
++++ b/Analysis/SuperTranscripts/pylib/TGraph.py
+@@ -8,7 +8,6 @@ import os, sys, re
+ import logging
+ import argparse
+ import collections
+-import numpy
+ import time
+ 
+ import TNode
+diff --git a/Analysis/SuperTranscripts/pylib/TNode.py b/Analysis/SuperTranscripts/pylib/TNode.py
+index baaa8e1..cf59a90 100755
+--- a/Analysis/SuperTranscripts/pylib/TNode.py
++++ b/Analysis/SuperTranscripts/pylib/TNode.py
+@@ -8,7 +8,6 @@ import os, sys, re
+ import logging
+ import argparse
+ import collections
+-import numpy
+ import time
+ 
+ import TGraph
+diff --git a/Analysis/SuperTranscripts/pylib/Topological_sort.py b/Analysis/SuperTranscripts/pylib/Topological_sort.py
+index c24b152..a90f335 100755
+--- a/Analysis/SuperTranscripts/pylib/Topological_sort.py
++++ b/Analysis/SuperTranscripts/pylib/Topological_sort.py
+@@ -8,7 +8,6 @@ import os, sys, re
+ import logging
+ import argparse
+ import collections
+-import numpy
+ import time
+ 
+ import TNode
+diff --git a/Analysis/SuperTranscripts/pylib/Trinity_fasta_parser.py b/Analysis/SuperTranscripts/pylib/Trinity_fasta_parser.py
+index 5cca0d2..9530173 100755
+--- a/Analysis/SuperTranscripts/pylib/Trinity_fasta_parser.py
++++ b/Analysis/SuperTranscripts/pylib/Trinity_fasta_parser.py
+@@ -8,7 +8,6 @@ import os, sys, re
+ import logging
+ import argparse
+ import collections
+-import numpy
+ import time
+ import hashlib
+ 
+-- 
+2.43.7
+

@@ -1,0 +1,106 @@
+From 4096749ad711bb98bbe82e6b486d2d5fee6991af Mon Sep 17 00:00:00 2001
+From: macmanes <macmanes@gmail.com>
+Date: Mon, 5 Oct 2026 16:01:33 -0400
+Subject: [PATCH] prof: opt-in per-command timing log (TRINITY_PROF_LOG)
+
+---
+ PerlLib/Pipeliner.pm |  3 ++-
+ PerlLib/TrinProf.pm  | 43 +++++++++++++++++++++++++++++++++++++++++++
+ Trinity              |  3 ++-
+ 3 files changed, 47 insertions(+), 2 deletions(-)
+ create mode 100644 PerlLib/TrinProf.pm
+
+diff --git a/PerlLib/Pipeliner.pm b/PerlLib/Pipeliner.pm
+index 15e92be..1cf36c8 100644
+--- a/PerlLib/Pipeliner.pm
++++ b/PerlLib/Pipeliner.pm
+@@ -1,6 +1,7 @@
+ package Pipeliner;
+ 
+ use strict;
++use TrinProf;
+ use warnings;
+ use Carp;
+ use Cwd;
+@@ -173,7 +174,7 @@ sub run {
+             
+             print STDERR $msg if $msg;
+             
+-            my $ret = system($cmdstr);
++            my $ret = TrinProf::timed($cmdstr, sub { system($cmdstr) });
+             if ($ret) {
+                                 
+                 if (-e $tmp_stderr) {
+diff --git a/PerlLib/TrinProf.pm b/PerlLib/TrinProf.pm
+new file mode 100644
+index 0000000..3f90e05
+--- /dev/null
++++ b/PerlLib/TrinProf.pm
+@@ -0,0 +1,43 @@
++package TrinProf;
++# Opt-in profiling: set TRINITY_PROF_LOG=/path to append one line per
++# child command (wall, child user, child sys) plus a TOTAL line at exit.
++use strict;
++use warnings;
++use Time::HiRes ();
++our $LOG = $ENV{TRINITY_PROF_LOG};
++my $T0 = Time::HiRes::time();
++
++sub timed {
++    my ($label, $code) = @_;
++    return $code->() unless $LOG;
++    my @t0 = times();
++    my $w0 = Time::HiRes::time();
++    my $ret = $code->();
++    my @t1 = times();
++    my $w1 = Time::HiRes::time();
++    _log(join("\t", "CMD", sprintf("%.4f", $w1 - $w0),
++              sprintf("%.3f", $t1[2] - $t0[2]), sprintf("%.3f", $t1[3] - $t0[3]),
++              _label($label)));
++    return $ret;
++}
++
++sub _label {
++    my $c = shift;
++    $c =~ s/\s+/ /g;
++    return substr($c, 0, 400);
++}
++
++sub _log {
++    open(my $fh, ">>", $LOG) or return;
++    print $fh "$$\t$_[0]\n";
++    close $fh;
++}
++
++END {
++    if ($LOG) {
++        my @t = times();
++        _log(join("\t", "TOTAL", sprintf("%.4f", Time::HiRes::time() - $T0),
++                  map { sprintf("%.3f", $_) } @t));
++    }
++}
++1;
+diff --git a/Trinity b/Trinity
+index 9ae7bd4..bd646d8 100755
+--- a/Trinity
++++ b/Trinity
+@@ -14,6 +14,7 @@ use Carp;
+ use COMMON;
+ use Getopt::Long qw(:config posix_default no_ignore_case pass_through gnu_compat no_auto_abbrev); 
+ use Pipeliner;
++use TrinProf;
+ use Fasta_reader;
+ use SAM_reader;
+ use SAM_entry;
+@@ -2913,7 +2914,7 @@ sub process_cmd {
+     print STDERR &mytime."CMD: $cmd\n" if ($VERBOSE || ! $TRINITY_COMPLETE_FLAG);
+     
+     my $start_time = time();
+-    my $ret = system("bash", "-c", $cmd);
++    my $ret = TrinProf::timed($cmd, sub { system("bash", "-c", $cmd) });
+     my $end_time = time();
+ 
+     if ($ret) {
+-- 
+2.43.7
+
