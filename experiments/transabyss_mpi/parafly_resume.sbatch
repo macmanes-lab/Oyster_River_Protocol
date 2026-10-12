@@ -4,6 +4,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=40
 #SBATCH --mem 250G
+#SBATCH --exclude=node117,node118
 #SBATCH --output=parafly_resume_%j.log
 # Step 1 of DEV26_PLAN.md: when a Trinity phase 2 is stopped part way and
 # started again on more cores, does it pick up where it left off? dev26 rests

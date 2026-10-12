@@ -2,6 +2,7 @@
 #SBATCH -p macmanes
 #SBATCH -N 1
 #SBATCH --exclusive
+#SBATCH --exclude=node117,node118
 #SBATCH -J trin_replay
 #SBATCH -o %x.%j.out
 # usage: sbatch replay.sbatch TAG WORKROOT SLOTS [extra trinity flags...]

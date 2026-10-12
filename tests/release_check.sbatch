@@ -3,6 +3,7 @@
 #SBATCH -J orp_release_check
 #SBATCH --cpus-per-task=32
 #SBATCH --mem 140G
+#SBATCH --exclude=node117,node118
 #SBATCH --output=orp_release_check.%j.out
 # The release check (tests/release_check.py) on one node: every tier, four
 # full runs at a time on 8 cores and 32 GB each. Submit from the directory

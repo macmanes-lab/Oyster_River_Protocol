@@ -2,6 +2,7 @@
 #SBATCH -p macmanes
 #SBATCH -N 1
 #SBATCH --exclusive
+#SBATCH --exclude=node117,node118
 #SBATCH -J trin_full
 #SBATCH -o %x.%j.out
 # Full Phase 2 replay with the production (conda) Trinity, launched the way

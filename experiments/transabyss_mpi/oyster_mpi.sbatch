@@ -4,6 +4,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=40
 #SBATCH --mem 500G
+#SBATCH --exclude=node117,node118
 #SBATCH --output=orp_ta_mpi_%j.log
 # A full oyster.py run with Trans-ABySS under MPI. With --transabyss-mpi on,
 # preflight stops the run in its first minute if mpirun cannot start ranks

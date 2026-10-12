@@ -4,6 +4,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem 200G
+#SBATCH --exclude=node117,node118
 #SBATCH --array=1-2
 #SBATCH --output=ta_mpi_%A_%a.log
 # Trans-ABySS as oyster.py runs it (task 1, "threads") against the same
