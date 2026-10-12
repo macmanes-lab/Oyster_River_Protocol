@@ -53,7 +53,11 @@ MAXMEM=$(( MEM * 9 / 10 ))
 
 for f in "$R1" "$R2"; do [ -f "$f" ] || { echo "missing read file: $f" >&2; exit 1; }; done
 mkdir -p "$OUT"
-OUT="$(cd "$OUT" && pwd)"
+# Physical path: Trinity resolves its output dir (cwd()) and writes that into
+# recursive_trinity.cmds, so a logical path through a symlink (Premise's
+# /mnt/home -> /mnt/gpfs01/home) would not match when the copies are
+# rewritten, and both copies would assemble into phase1/.
+OUT="$(cd "$OUT" && pwd -P)"
 SUMMARY="$OUT/summary.txt"
 
 module load anaconda/colsa
@@ -204,6 +208,12 @@ copy_phase1() {     # src dst -> COPY_FIXED
         echo "copy $dst still refers to $src (files above)" >&2
         exit 1
     fi
+    # and positively: the copy's commands assemble inside the copy
+    if ! head -1 "$dst/recursive_trinity.cmds" | grep -qF "\"$dst/read_partitions/"; then
+        echo "copy $dst: recursive_trinity.cmds does not point into it:" >&2
+        head -c 400 "$dst/recursive_trinity.cmds" >&2
+        exit 1
+    fi
 }
 
 # -- environment -------------------------------------------------------------
@@ -242,7 +252,7 @@ P1="$OUT/phase1/$NAME.trinity"
 if [ -n "$PHASE1" ]; then
     [ -f "$PHASE1/recursive_trinity.cmds.ok" ] || { echo "$PHASE1: no recursive_trinity.cmds.ok, not a finished phase 1" >&2; exit 1; }
     [ ! -e "$PHASE1/recursive_trinity.cmds.completed" ] || { echo "$PHASE1 has run phase 2; give a phase-1-only dir" >&2; exit 1; }
-    P1="$PHASE1"
+    P1="$(cd "$PHASE1" && pwd -P)"
     P1_SECS=0
     log "phase 1: reusing $P1"
 else
