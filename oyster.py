@@ -11,6 +11,7 @@ can be re-invoked to resume where it left off.
 """
 
 import argparse
+import atexit
 import csv
 import gzip
 import io
@@ -18,6 +19,7 @@ import os
 import re
 import shlex
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -178,8 +180,9 @@ TRANSABYSS_MPI_PROBE_TIMEOUT = 120
 PARAFLY_SERIAL_GAP = 0.5
 
 # The assemblers run as two lanes side by side for the whole assembly stage
-# (see run_assemblers). Trinity's CPU/mem is fixed at launch for however long
-# each of its phases runs, so the lanes are sized up front.
+# (see run_assemblers). Each Trinity phase's CPU/mem is fixed at launch, so
+# the lanes are sized up front -- except that phase 2 grows onto Trans-
+# ABySS's cores if Trans-ABySS finishes first (TRINITY_GROW_MIN_LEFT below).
 #
 # Trans-ABySS lane: Trans-ABySS, then its diamond search, from the start.
 # How many cores it should hold depends on --transabyss-mpi, because the two
@@ -196,24 +199,17 @@ PARAFLY_SERIAL_GAP = 0.5
 TRANSABYSS_SHARE = 0.25
 #
 # MPI: the unitig assembly runs as `mpirun -np <cores> ABYSS-P`, so both
-# lanes scale and the best split has them finish together -- Trans-ABySS's
-# share of the total CPU work. That grows with sequencing depth under
-# --normalize-reads, which normalizes Trinity's reads only: Trans-ABySS
-# assembles every read, Trinity a normalized set. Balanced shares at --cpu 40
-# against the uncompressed corrected R1 (NOTES.md 2026-10-10):
-#   SRR1138704  3.64 GB  0.23
-#   SRR866209   7.35 GB  0.28
-#   DRR031870  17.47 GB  0.375 (0.37 and 0.38 from two runs)
-# A least-squares line through them misses each by under 0.01. Clamped,
-# because it is tested only between 3.6 and 17.5 GB. See transabyss_share.
-TRANSABYSS_MPI_SHARE_BASE = 0.198
-TRANSABYSS_MPI_SHARE_PER_GB = 0.0103
-TRANSABYSS_MPI_SHARE_MIN = 0.2
-TRANSABYSS_MPI_SHARE_MAX = 0.45
-# Without --normalize-reads Trinity gets every read too, so both lanes grow
-# with depth and the line above would over-feed Trans-ABySS on deep
-# libraries. No run has measured that case; a third until one does.
-TRANSABYSS_MPI_SHARE = 0.33
+# lanes scale, and the best split would have them finish together. That
+# can't be set up front: Trans-ABySS's work follows the reads (3.5-5.6
+# core-hours per GB of uncompressed corrected R1 over 11 runs), Trinity's
+# follows the transcriptome (3.8-22.3 core-hours per GB, no trend with size),
+# and dev24's share-from-R1-size missed by up to 4h either way (NOTES.md
+# 2026-10-11). So nothing is predicted: when the Trans-ABySS lane finishes
+# first, phase 2 grows onto its cores, and the share only has to keep
+# Trans-ABySS from being the long pole. The largest balanced share measured
+# is 0.511 (DRR053698, 33 GB), so half. transabyss_share still logs the R1
+# size, for balance.py.
+TRANSABYSS_MPI_SHARE = 0.5
 # Its mem is reserved separately and stays at a quarter: its footprint doesn't
 # grow with its cores, and whatever it reserves comes out of SPAdes' hard cap.
 TRANSABYSS_MEM_SHARE = 0.25
@@ -231,6 +227,26 @@ TRINITY_PHASE1_SHARE = 0.67
 # jellyfish and its sorts, while SPAdes treats --memory as a hard cap.
 TRINITY_PHASE1_MEM_SHARE = 0.25
 #
+# Phase 2 grows: ParaFly records each finished component in
+# recursive_trinity.cmds.completed and skips those when re-run, so when the
+# Trans-ABySS lane finishes while phase 2 is still running on the Trinity
+# lane, run_trinity_phase2 stops it and relaunches it on all of --cpu
+# (once). Measured on SRR1138704 (experiments/transabyss_mpi/
+# parafly_resume.sbatch, NOTES.md 2026-10-12): stopped 1 s after SIGTERM,
+# ParaFly running again 1 s after the relaunch, exactly the unfinished
+# 54405/58463 commands rerun, the 8 components in flight at the stop
+# assembled once each, transcripts within 0.04% of an uninterrupted run.
+# The restart itself costs seconds; what it does cost is the in-flight
+# components, which start over. Near the end those are the long stragglers,
+# so only grow while at least this share of the components is still to run.
+TRINITY_GROW_MIN_LEFT = 0.15
+# Stopping phase 2 (to grow it, or because oyster.py is being stopped):
+# SIGTERM to its session, SIGKILL after this many seconds.
+TRINITY_STOP_GRACE = 30
+# How often the Trinity lane checks whether Trans-ABySS has finished; also
+# the most phase 2's end can go unnoticed.
+TRINITY_GROW_POLL = 2
+#
 # Timings behind these: NOTES.md 2026-10-08 onwards. Re-balance from a run's
 # timing log by which lane finished last and by how much.
 
@@ -242,6 +258,106 @@ TRINITY_PHASE1_MEM_SHARE = 0.25
 # missing dependency), which will just fail the same way on every attempt.
 STEP_RETRIES = 2
 STEP_RETRY_DELAY = 60
+
+# -- sessions ----------------------------------------------------------------
+# Trinity phase 2 runs in a session of its own (start_new_session), so that
+# growing it can stop the whole tree -- Trinity, ParaFly, every per-component
+# Trinity, Chrysalis and Butterfly's JVM -- with one signal. The price is that
+# a signal aimed at oyster.py's process group (Ctrl-C, `kill -- -<pgid>`) no
+# longer reaches it, so oyster.py forwards: see forward_signals_to_sessions.
+_live_sessions = {}
+_live_sessions_lock = threading.RLock()
+
+
+def start_session(cmd, **kwargs):
+    """Popen `cmd` as the leader of a new session, registered for stop_live_sessions."""
+    proc = subprocess.Popen(cmd, start_new_session=True, **kwargs)
+    with _live_sessions_lock:
+        _live_sessions[proc.pid] = proc
+    return proc
+
+
+def _session_alive(proc):
+    proc.poll()  # reap the leader if it has exited, or killpg(…, 0) still finds it
+    try:
+        os.killpg(proc.pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def stop_session(proc, grace=TRINITY_STOP_GRACE):
+    """Stop every process in `proc`'s session; return how, for the log.
+
+    SIGTERM to the process group the session leader heads (nothing in
+    Trinity's tree starts a group of its own), then SIGKILL to whatever is
+    left after `grace` seconds.
+    """
+    start = time.time()
+    how = "SIGTERM"
+    try:
+        os.killpg(proc.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    while _session_alive(proc):
+        if time.time() - start >= grace:
+            how = f"SIGKILL after {grace}s"
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            grace = float("inf")
+        time.sleep(0.2)
+    proc.wait()
+    with _live_sessions_lock:
+        _live_sessions.pop(proc.pid, None)
+    return f"{how}, {time.time() - start:.0f}s"
+
+
+def end_session(proc):
+    """Forget a session whose leader has exited on its own."""
+    with _live_sessions_lock:
+        _live_sessions.pop(proc.pid, None)
+
+
+def stop_live_sessions():
+    with _live_sessions_lock:
+        procs = list(_live_sessions.values())
+    for proc in procs:
+        print(f"[oyster] stopping session {proc.pid}: {stop_session(proc)}", flush=True)
+
+
+_previous_handlers = {}
+
+
+def _forward_signal(signum, frame):
+    stop_live_sessions()
+    previous = _previous_handlers.get(signum, signal.SIG_DFL)
+    if callable(previous):
+        previous(signum, frame)  # SIGINT: KeyboardInterrupt, as before
+    else:
+        signal.signal(signum, signal.SIG_DFL)
+        os.kill(os.getpid(), signum)
+
+
+def forward_signals_to_sessions():
+    """Stop live sessions on SIGTERM/SIGINT/SIGHUP and at exit, then carry on as before.
+
+    Each handler stops the sessions and then hands the signal to whatever
+    would have had it -- for SIGTERM and SIGHUP the default, so oyster.py
+    still dies at once as it always has. A signal already ignored (nohup's
+    SIGHUP) is left ignored. Under slurm, scancel and walltime kills take
+    the job's whole cgroup anyway; this is for everything else.
+    """
+    for signum in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+        previous = signal.getsignal(signum)
+        if previous is signal.SIG_IGN:
+            continue
+        _previous_handlers[signum] = previous
+        signal.signal(signum, _forward_signal)
+    atexit.register(stop_live_sessions)
 
 def line_buffer_stdio():
     """Make our own output appear where it happened in a redirected log.
@@ -317,6 +433,11 @@ def write_sorted(path: Path, ids) -> None:
     with open(path, "w") as f:
         for i in sorted(ids):
             f.write(i + "\n")
+
+
+def count_lines(path) -> int:
+    with open(path, "rb") as f:
+        return sum(block.count(b"\n") for block in iter(lambda: f.read(1 << 20), b""))
 
 
 def human_size(nbytes) -> str:
@@ -1770,34 +1891,100 @@ class Pipeline:
         self.conda_run("orp_trinity", *cmd, retries=0)
         self.trinity_phase1_done().touch()
 
-    def run_trinity_phase2(self, cpu=None, mem=None):
-        # Same command, no stop flag: per the docs above, Trinity resumes
-        # from Phase 1's on-disk checkpoints straight into Phase 2 -- the
-        # thousands of small, independent, single-threaded per-component
-        # assembly jobs dispatched via ParaFly, and by far Trinity's
-        # dominant cost. Gets the whole Trinity lane once Stage A is done,
-        # while Trans-ABySS keeps running in its own lane -- see
-        # TRANSABYSS_SHARE above.
-        cpu = self.cpu if cpu is None else cpu
-        mem = self.mem if mem is None else mem
-        out = self.assemblies_dir / f"{self.runout}.trinity.Trinity.fasta"
+    def _trinity_phase2_cmd(self, cpu, mem):
         cmd = self._trinity_base_cmd(cpu, mem)
         # Trinity writes <outdir>.Trinity.fasta either way; --full_cleanup
         # only decides whether <outdir>/ survives it.
         if not self.no_cleanup:
             cmd.append("--full_cleanup")
-        # No retries: this step's wall time dwarfs every other (hours to
-        # days), so blindly retrying a deterministic failure could multiply
-        # the wall time before finally giving up. It also resumes from its
-        # own checkpoints in-place (same as Phase 1 above), so a manual
-        # re-run of oyster.py after a transient failure loses little anyway.
-        self.conda_run("orp_trinity", *cmd, retries=0)
+        return ["conda", "run", "--no-capture-output", "-n", "orp_trinity", *[str(c) for c in cmd]]
+
+    def _start_trinity_phase2(self, cpu, mem):
+        cmd = self._trinity_phase2_cmd(cpu, mem)
+        print("+", " ".join(cmd), flush=True)
+        return start_session(cmd, cwd=str(self.dir))
+
+    def trinity_phase2_left(self):
+        """(components not yet assembled, total), from ParaFly's command list
+        and its record of finished commands; (None, None) without the list."""
+        cmds = self.trinity_out_dir() / "recursive_trinity.cmds"
+        done = cmds.with_name(cmds.name + ".completed")
+        try:
+            total = count_lines(cmds)
+        except OSError:
+            return None, None
+        finished = count_lines(done) if done.exists() else 0
+        return max(0, total - finished), total
+
+    def run_trinity_phase2(self, cpu=None, mem=None, grow_when=None):
+        """Same command as phase 1, no stop flag: per the docs above, Trinity
+        resumes from Phase 1's on-disk checkpoints straight into Phase 2 --
+        the thousands of small, independent, single-threaded per-component
+        assembly jobs dispatched via ParaFly, and by far Trinity's dominant
+        cost. Runs on the Trinity lane once Stage A is done, while
+        Trans-ABySS keeps running in its own lane.
+
+        grow_when: an Event (the Trans-ABySS lane's) that, once set while
+        this runs on fewer than --cpu cores, stops phase 2 and relaunches it
+        on all of --cpu/--mem, if at least TRINITY_GROW_MIN_LEFT of its
+        components are still to run. ParaFly skips what the first launch
+        finished. Once only.
+
+        No retries: this step's wall time dwarfs every other (hours to
+        days), so blindly retrying a deterministic failure could multiply
+        the wall time before finally giving up. It also resumes from its own
+        checkpoints in-place (same as Phase 1 above), so a manual re-run of
+        oyster.py after a transient failure loses little anyway.
+        """
+        cpu = self.cpu if cpu is None else cpu
+        mem = self.mem if mem is None else mem
+        out = self.assemblies_dir / f"{self.runout}.trinity.Trinity.fasta"
+        start = time.time()
+        proc = self._start_trinity_phase2(cpu, mem)
+        try:
+            if grow_when is not None and cpu < self.cpu:
+                proc = self._grow_trinity_phase2(proc, cpu, grow_when, start)
+            returncode = proc.wait()
+        finally:
+            # Anything raised here (in this worker thread) must not leave
+            # phase 2 running on its own: it is outside our process group.
+            if proc.poll() is None:
+                stop_session(proc)
+            end_session(proc)
+        if returncode:
+            raise subprocess.CalledProcessError(returncode, proc.args)
         tmp = out.with_suffix(".fa")
         awk_first_field(out, tmp)
         tmp.replace(out)
         if not self.no_cleanup:
             for f in self.assemblies_dir.glob("*gene_trans_map"):
                 f.unlink()
+
+    def _grow_trinity_phase2(self, proc, cpu, grow_when, start):
+        """Wait for `grow_when` while `proc` runs; then maybe relaunch on all of
+        --cpu. Returns the phase 2 process to wait for."""
+        while proc.poll() is None:
+            if not grow_when.wait(timeout=TRINITY_GROW_POLL):
+                continue
+            left, total = self.trinity_phase2_left()
+            if proc.poll() is not None:
+                break
+            counts = f"{left}/{total}" if total else "?"
+            if total and left < TRINITY_GROW_MIN_LEFT * total:
+                print(f"\n=== Stage B: run_trinity_phase2 stays at {cpu} cpu (Trans-ABySS done; "
+                      f"{counts} components left, under {TRINITY_GROW_MIN_LEFT:.0%}) -- {self._ts()} ===",
+                      flush=True)
+                break
+            print(f"\n=== Stage B: run_trinity_phase2 grows to {self.cpu} cpu (Trans-ABySS done; "
+                  f"{counts} components left) -- {self._ts()} ===", flush=True)
+            how = stop_session(proc)
+            print(f"[run_trinity_phase2] stopped at {cpu} cpu ({how}); relaunching on {self.cpu}",
+                  flush=True)
+            # Seconds phase 2 ran on the lane before growing, from its start:
+            # balance.py reads this to split phase 2 into its two sizes.
+            self._record_timing("run_trinity_phase2_grow", int(time.time() - start), start)
+            return self._start_trinity_phase2(self.cpu, self.mem)
+        return proc
 
     def run_spades(self, kmers, outname, workdir_suffix, cpu=None, mem=None):
         """kmers: a list of k-mer sizes, or None to leave -k off the command
@@ -2601,25 +2788,19 @@ class Pipeline:
     def transabyss_share(self, r1):
         """(share of --cpu, reason) for the Trans-ABySS lane; see TRANSABYSS_SHARE.
 
-        Under MPI with --normalize-reads the share follows the size of the
-        uncompressed corrected R1 -- the file every assembler is about to
-        read. It is uncompressed here whatever the input was (use_corrected_reads
+        Fixed in either mode; the reason carries the size of the uncompressed
+        corrected R1, which balance.py and later analysis use. It is
+        uncompressed here whatever the input was (use_corrected_reads
         decompresses a gzipped pair, and compress_async writes its .gz beside
         the original, which stays until cleanup), so measuring it costs a stat.
         """
-        if not self.transabyss_use_mpi:
-            return TRANSABYSS_SHARE, "threaded"
-        if not self.normalize_reads:
-            return TRANSABYSS_MPI_SHARE, ("MPI without --normalize-reads: fixed, "
-                                          "not yet measured for that case")
+        share, mode = ((TRANSABYSS_MPI_SHARE, "MPI") if self.transabyss_use_mpi
+                       else (TRANSABYSS_SHARE, "threaded"))
         try:
             gb = Path(r1).stat().st_size / 1e9
         except OSError:
-            return TRANSABYSS_MPI_SHARE, f"MPI, but {r1} could not be measured: fixed"
-        fitted = TRANSABYSS_MPI_SHARE_BASE + TRANSABYSS_MPI_SHARE_PER_GB * gb
-        share = min(TRANSABYSS_MPI_SHARE_MAX, max(TRANSABYSS_MPI_SHARE_MIN, fitted))
-        note = "" if share == fitted else f", clamped from {fitted:.3f}"
-        return share, f"MPI, corrected R1 {gb:.2f} GB uncompressed{note}"
+            return share, f"{mode}; {r1} could not be measured"
+        return share, f"{mode}; corrected R1 {gb:.2f} GB uncompressed"
 
     def run_assemblers(self):
         """Build the four assemblies this pipeline is named for.
@@ -2670,8 +2851,9 @@ class Pipeline:
         spades_cpu = max(1, lane_cpu - phase1_cpu)
         spades_mem = max(1, lane_mem - phase1_mem)
         # Set once the Trans-ABySS lane has finished (or had nothing to do), so
-        # phase 2, whose size is fixed at launch, can take the whole machine
-        # instead of a lane share nothing is using any more.
+        # phase 2 can take the whole machine instead of a lane share nothing
+        # is using any more: from its start if Trans-ABySS is done by then,
+        # otherwise by growing when it is (TRINITY_GROW_MIN_LEFT).
         transabyss_done = threading.Event()
         if not transabyss_pending:
             transabyss_done.set()
@@ -2753,7 +2935,8 @@ class Pipeline:
             try:
                 self.step(
                     "run_trinity_phase2", [trinity_fa], [phase1_done],
-                    partial(self.run_trinity_phase2, cpu=phase2_cpu, mem=phase2_mem),
+                    partial(self.run_trinity_phase2, cpu=phase2_cpu, mem=phase2_mem,
+                            grow_when=transabyss_done),
                 )
                 self.compress_async(trinity_fa)
             except Exception as e:
@@ -2982,6 +3165,7 @@ def parse_args():
 def main():
     line_buffer_stdio()
     args = parse_args()
+    forward_signals_to_sessions()
     pipeline = Pipeline(args)
     try:
         pipeline.main()

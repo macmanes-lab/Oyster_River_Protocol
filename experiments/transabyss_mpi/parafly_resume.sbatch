@@ -356,6 +356,14 @@ REDONE=$(awk -F'\t' 'FILENAME == ARGV[1] {after[$1] = $2 "\t" $3; next}
                      END {print n + 0}' "$OUT/resume/outputs_final.tsv" "$OUT/resume/outputs_at_kill.tsv")
 LEFT_A=$(out_dirs "$A")
 LEFT_B=$(out_dirs "$B")
+# A component's Trinity --full_cleanup only removes an output dir that same
+# run created, so the dirs of components interrupted by the stop survive
+# their rerun. Harmless if each one's command did complete (once): count the
+# ones that didn't.
+LEFT_UNDONE=0
+while IFS= read -r d; do
+    [ "$(grep -cF "\"${d%.out}\"" "$CF" || true)" = 1 ] || LEFT_UNDONE=$(( LEFT_UNDONE + 1 ))
+done < <(find "$A/read_partitions" -type d -name '*.out' 2>/dev/null || true)
 B_DONE=$(lines "$B/recursive_trinity.cmds.completed")
 FA_A="$A.Trinity.fasta"
 FA_B="$B.Trinity.fasta"
@@ -374,7 +382,7 @@ c_clean=$([ -z "$SURV_SESSION$SURV_JOB" ] && echo 1 || echo 0)
 c_skip=$([ "${RL_NCMDS:-x}" = "$EXPECT_NCMDS" ] && { [ "$DONE_KILL" = 0 ] || [ "$RL_SKIPMSG" -gt 0 ]; } && echo 1 || echo 0)
 c_once=$([ "$DUPS" = 0 ] && [ "$REDONE" = 0 ] && [ "$PREFIX_OK" = yes ] && echo 1 || echo 0)
 c_finish=$([ "$RL_RC" = 0 ] && [ -s "$FA_A" ] && [ "$DONE_FINAL" = "$TOTAL" ] && echo 1 || echo 0)
-c_partial=$([ "$LEFT_A" = "$LEFT_B" ] && echo 1 || echo 0)
+c_partial=$([ "$LEFT_UNDONE" = 0 ] && echo 1 || echo 0)
 c_straight=$([ "$ST_RC" = 0 ] && [ -s "$FA_B" ] && echo 1 || echo 0)
 
 # ParaFly's own time on the remaining commands, against the uninterrupted
@@ -403,7 +411,7 @@ echo "ParaFly 'Number of Commands'     ${RL_NCMDS:-not printed} (expected $TOTAL
 echo "ParaFly skip warnings            $RL_SKIPMSG (it prints at most 9)"
 echo ".completed at the end            $DONE_FINAL of $TOTAL, duplicate lines $DUPS, starts with the pre-stop list: $PREFIX_OK"
 echo "pre-stop outputs rewritten       $REDONE of $OUTPUTS_KILL"
-echo "partial dirs left at the end     $LEFT_A (uninterrupted run: $LEFT_B)"
+echo "partial dirs left at the end     $LEFT_A, of which $LEFT_UNDONE not completed exactly once (uninterrupted run: $LEFT_B)"
 echo "exit                             $RL_RC; $(if [ -s "$FA_A" ]; then echo "wrote $(basename "$FA_A")"; else echo "NO $(basename "$FA_A")"; fi)"
 echo
 echo "-- restart overhead"
@@ -423,7 +431,7 @@ echo "$(pass "$c_clean")  stop leaves no Trinity/ParaFly/java/Chrysalis processe
 echo "$(pass "$c_skip")  relaunch skips the completed commands"
 echo "$(pass "$c_once")  no command ran twice (no duplicate .completed lines, pre-stop outputs untouched)"
 echo "$(pass "$c_finish")  relaunch finishes: exit 0, Trinity.fasta, every command completed"
-echo "$(pass "$c_partial")  partial component dirs don't survive the relaunch"
+echo "$(pass "$c_partial")  components interrupted by the stop complete once on the relaunch"
 echo "$(pass "$c_straight")  uninterrupted run finishes"
 [ "$P1_LEAK" = 0 ] || echo "FAIL  $P1_LEAK files in the pristine phase-1 dir changed after the copies: a copy ran into it"
 echo

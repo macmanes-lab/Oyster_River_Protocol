@@ -76,3 +76,7 @@ commands total and completed at the stop, what ParaFly skipped on the
 relaunch, whether any finished component ran again, restart overhead, and
 transcript/gene counts of both assemblies, with PASS/FAIL per check.
 `PHASE1=<OUT>/phase1/<name>.trinity` reruns the test without phase 1.
+
+Result (job 1321673, NOTES.md 2026-10-12): it resumes cleanly -- exactly
+the unfinished commands rerun, restart in seconds, transcripts within 0.04%
+of an uninterrupted run. dev26 builds on it.

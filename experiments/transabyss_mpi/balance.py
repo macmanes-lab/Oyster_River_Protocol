@@ -27,6 +27,13 @@ slow nodes count. It assumes Trinity's lane is the whole lane for its span;
 phase 2 taking all of --cpu (when Trans-ABySS finished before Stage A did)
 breaks that, and the row says so. Same-dataset runs have spread +-0.02.
 
+From dev26 phase 2 grows onto Trans-ABySS's cores when Trans-ABySS finishes
+first (the timing log's run_trinity_phase2_grow entry: seconds phase 2 ran
+on the lane, from its start). The lanes are then no longer fixed, so a grown
+run's balanced share means nothing and stays out of the fit; what counts is
+its TOTAL against dev24's for the same dataset (DEV24 below), and against
+what a balanced dev24 split would have given.
+
 NOTES.md 2026-10-10 has the runs behind POINTS.
 """
 
@@ -57,6 +64,23 @@ POINTS = [
 # reads varies 5-fold between datasets while Trans-ABySS's is ~constant.
 # NOTES.md 2026-10-11, "read size does not predict it".
 
+#: dev24 MPI TOTAL by dataset, minutes, and what a balanced split would have
+#: given (None where not worked out), --cpu 40 --mem 500 --normalize-reads.
+#: The yardstick for dev26: NOTES.md 2026-10-11, DEV26_PLAN.md.
+DEV24 = {
+    "SRR868662": (11 * 60 + 49, 10 * 60 + 2),
+    "SRR802670": (15 * 60 + 27, 14 * 60 + 24),
+    "DRR053698": (11 * 60 + 29, 10 * 60 + 31),
+    "SRR1139191": (9 * 60 + 33, 8 * 60 + 43),
+    "SRR1138707": (5 * 60 + 27, 5 * 60 + 14),
+    "SRR796576": (3 * 60 + 16, 3 * 60 + 5),
+    "DRR30368": (7 * 60 + 31, 7 * 60 + 16),
+    "DRR046632": (6 * 60 + 42, 6 * 60 + 41),
+    "SRR1138704": (2 * 60 + 57, None),
+    "SRR866209": (3 * 60 + 24, None),
+    "DRR031870": (6 * 60 + 23, None),  # node138, ~13-20% slow
+}
+
 #: Shapes tried for share against GB. Square root fit best over POINTS
 #: (rms 0.014 vs 0.026 linear, 0.018 log): the share flattens with depth,
 #: since normalization keeps more of a deep library's reads for Trinity too.
@@ -68,6 +92,8 @@ PRETTY = re.compile(r"^(\S+)\s+(\d+):(\d\d):(\d\d)\s+\(started ([\d-]+ [\d:]+)\)
 ASSEMBLERS = re.compile(r"=== Assemblers: transabyss \((\d+) cpu[^)]*\) \|\| Trinity \+ SPAdes \((\d+) cpu\)")
 SHARE = re.compile(r"Trans-ABySS share [\d.]+ of --cpu: .*R1 ([\d.]+) GB")
 STAGE_B = re.compile(r"=== Stage B: run_trinity_phase2 \((\d+) cpu, ([^)]*)\)")
+GROW = re.compile(r"=== Stage B: run_trinity_phase2 (grows to (\d+) cpu|stays at (\d+) cpu) "
+                  r"\(Trans-ABySS done; (\S+) components left")
 
 
 def read_timing(path):
@@ -94,8 +120,11 @@ def read_timing(path):
 
 def read_slurm(path):
     ta = lane = gb = None
-    phase2 = None
+    phase2 = grow = None
     for line in open(path):
+        m = GROW.search(line)
+        if m:
+            grow = (m.group(1).split()[0], m.group(4))  # ("grows"|"stays", "left/total")
         m = ASSEMBLERS.search(line)
         if m:
             ta, lane = int(m.group(1)), int(m.group(2))
@@ -105,7 +134,13 @@ def read_slurm(path):
         m = STAGE_B.search(line)
         if m:
             phase2 = (int(m.group(1)), m.group(2))
-    return ta, lane, gb, phase2
+    return ta, lane, gb, phase2, grow
+
+
+def dataset(timing_path):
+    """SRR868662 from .../SRR868662_dev26.timing.log."""
+    name = re.sub(r"\.timing\.log$", "", timing_path.rsplit("/", 1)[-1])
+    return re.split(r"[_.]", name)[0]
 
 
 def end(steps, name):
@@ -139,7 +174,7 @@ def main():
     rows = []
     for spec in args.runs:
         timing, _, slurm = spec.partition(":")
-        ta, lane, gb, phase2 = read_slurm(slurm) if slurm else (None, None, None, None)
+        ta, lane, gb, phase2, grow = read_slurm(slurm) if slurm else (None, None, None, None, None)
         ta, lane, gb = ta or args.ta_cpu, lane or args.lane_cpu, gb or args.gb
         if not (ta and lane):
             sys.exit(f"{spec}: no core counts; give its slurm log or --ta-cpu/--lane-cpu")
@@ -162,12 +197,32 @@ def main():
         note = ""
         if phase2 and phase2[0] != lane:
             note = f"  ! phase 2 ran on {phase2[0]} cpu ({phase2[1]}): share overstated"
+        grown = "run_trinity_phase2_grow" in steps
+        if grown:
+            total_s = (f"TOTAL {fmt(steps['TOTAL'] / 60)}" if "TOTAL" in steps
+                       else "TOTAL not yet (still running)")
+            p2_start, ran = steps["run_trinity_phase2_grow"]
+            p2_secs = steps["run_trinity_phase2"][1]
+            left = f", {grow[1]} components left" if grow else ""
+            note = (f"  (lanes not fixed: means nothing)\n"
+                    f"    phase 2 grew at {(p2_start + timedelta(seconds=ran)).strftime('%H:%M')}: "
+                    f"{fmt(ran / 60)} on the lane{left}, then {fmt((p2_secs - ran) / 60)} on all of --cpu")
+        elif grow:
+            note += f"\n    phase 2 stayed on the lane when Trans-ABySS finished ({grow[1]} components left)"
         slower = "TA" if ta_min > lane_min else "Trinity"
-        print(f"{timing}\n    {total_s}\n    cores TA/lane {ta}/{lane}  R1 {gb if gb else '?'} GB  rcorrector {rc // 60}m{rc % 60:02d}s\n"
+        ref = DEV24.get(dataset(timing))
+        if ref and "TOTAL" in steps:
+            total = steps["TOTAL"] / 60
+            bal = f", if balanced {fmt(ref[1])} ({fmt(abs(total - ref[1]))} {'over' if total > ref[1] else 'under'})" if ref[1] else ""
+            vs = (f"\n    vs dev24 {dataset(timing)}: TOTAL {fmt(ref[0])} -> {fmt(total)} "
+                  f"({'-' if total < ref[0] else '+'}{fmt(abs(ref[0] - total))}){bal}")
+        else:
+            vs = ""
+        print(f"{timing}\n    {total_s}{vs}\n    cores TA/lane {ta}/{lane}  R1 {gb if gb else '?'} GB  rcorrector {rc // 60}m{rc % 60:02d}s\n"
               f"    TA lane {fmt(ta_min)}  Trinity lane {fmt(lane_min)}  "
               f"slower: {slower} by {fmt(abs(ta_min - lane_min))}\n"
               f"    balanced share {share:.3f}{note}")
-        if gb:
+        if gb and not grown:
             rows.append((timing, gb, share))
 
     points = list(POINTS) if (args.points or not args.runs) else []

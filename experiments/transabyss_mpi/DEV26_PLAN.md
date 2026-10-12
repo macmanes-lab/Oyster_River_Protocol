@@ -1,5 +1,8 @@
 # dev26 plan: phase 2 grows onto Trans-ABySS's cores
 
+**Status 2026-10-12:** step 1 passed (Premise job 1321673), step 2 is
+4.1.0-dev26, step 3's cluster runs are next. NOTES.md 2026-10-12.
+
 Written 2026-10-11 at 4.1.0-dev25 (pipeline code = dev24). Background and
 every number below: NOTES.md, entries from 2026-10-08 to 2026-10-11.
 

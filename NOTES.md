@@ -5,27 +5,65 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
-## 2026-10-11 -- dev26 step 1: ParaFly resume test written, not yet run
+## 2026-10-12 -- 4.1.0-dev26: phase 2 grows onto Trans-ABySS's cores
 
-`experiments/transabyss_mpi/parafly_resume.sbatch` (README there) runs
-DEV26_PLAN.md step 1 on SRR1138704's corrected reads: phase 1 as oyster.py
-runs it, phase 2 at --CPU 8 in its own session stopped after 15 min, relaunch
-on all cores, and an uninterrupted phase 2 on a copy of the same phase 1. It
-prints PASS/FAIL per check plus counts and restart overhead. Things found
-reading Trinity/ParaFly source (fork, ~/trinityrnaseq_2026) while writing it:
-- ParaFly skips any cmds line found verbatim in `<cmds>.completed`, which it
-  appends one line per success (flushed per line); on a rerun it prints
-  `Number of Commands: <remaining>`. The cmds file is written once
-  (`recursive_trinity.cmds.ok`) and has no outer --CPU in it, so a relaunch
-  at a different --CPU sees identical lines.
-- A component killed by SIGTERM is neither completed nor failed if ParaFly
-  dies with it (whole session signalled). ParaFly only exits early itself on
-  a child's SIGINT/SIGQUIT.
-- recursive_trinity.cmds and partitioned_reads.files.list hold absolute
-  paths into the output dir, so a copied phase-1 dir must be rewritten (the
-  script does); Trinity's checkpoints are named files, so nothing else.
-**Next:** the user submits it; judge the summary; dev26 code only if it passes.
-`version.txt` stays 4.1.0-dev25: no pipeline change, and step 2 is dev26.
+**Step 1 (DEV26_PLAN.md) passed: ParaFly resumes cleanly.** Premise job
+1321673 (node139, `experiments/transabyss_mpi/parafly_resume.sbatch`,
+SRR1138704_dev24's corrected reads, --normalize-reads, 40 cpu):
+- phase 1 38m22s, 58463 commands. Phase 2 at --CPU 8 stopped after 15m:
+  4058 completed, 8 components in flight; SIGTERM to the session, all gone
+  in 1 s, nothing left in the job.
+- relaunch at --CPU 40: ParaFly `Number of Commands: 54405` (= 58463 -
+  4058); .completed ends at 58463 lines, no duplicates, the pre-stop list as
+  its prefix; 0 of 3029 pre-stop component outputs rewritten. ParaFly up 1 s
+  after the relaunch, first new completion at 4 s; ParaFly on the remaining
+  93.1% 1h29m33s vs 1h38m04s x 0.931 = 1h31m15s uninterrupted. No measurable
+  restart cost.
+- the 8 interrupted components each completed once, transcript counts
+  identical to the uninterrupted run's. Their `.out` dirs survive (a
+  component's --full_cleanup only removes a dir that run created); harmless,
+  oyster.py's outer --full_cleanup removes the whole Trinity dir.
+- assemblies: resumed 90354 transcripts / 66624 genes, uninterrupted 90392 /
+  66621 (-0.04%, +3). Within Trinity's run-to-run noise.
+- First attempt (1321663) was void: Premise's /mnt/home is a symlink to
+  /mnt/gpfs01/home, Trinity writes physical paths into recursive_trinity.cmds,
+  and the script rewrote the copies against the logical one, so both phase
+  2s assembled into phase1/. Fixed (pwd -P, plus a check). Its ParaFly
+  bookkeeping matched 1321673's (54455 = 58521 - 4066, relaunch 1h29m).
+
+**Step 2, implemented (dev26):**
+- `run_trinity_phase2` launches Trinity in its own session
+  (`start_session`) and, given the Trans-ABySS lane's `transabyss_done`
+  event, polls it every `TRINITY_GROW_POLL` (2 s). When it is set while
+  phase 2 runs on fewer than --cpu cores with >= `TRINITY_GROW_MIN_LEFT`
+  (0.15) of recursive_trinity.cmds not in .completed, it stops the session
+  (`stop_session`: SIGTERM, SIGKILL after `TRINITY_STOP_GRACE` 30 s) and
+  relaunches on --cpu/--mem, once. Logs `=== Stage B: run_trinity_phase2
+  grows to N cpu (Trans-ABySS done; L/T components left) ===` (or `stays
+  at`), and the timing log gets `run_trinity_phase2_grow` (seconds on the
+  lane, from phase 2's start). A failed relaunch fails the step as before.
+- `forward_signals_to_sessions()` (module `main`): SIGTERM/SIGINT/SIGHUP and
+  atexit stop live sessions, then the signal goes where it went before.
+- `TRANSABYSS_MPI_SHARE = 0.5`, under MPI with or without --normalize-reads
+  (the latter was an unmeasured 0.33); the R1-size fit constants are gone;
+  `transabyss_share()` still logs `corrected R1 X GB` in both modes.
+- Growth isn't MPI-only: threaded Trans-ABySS has always been the long pole,
+  so it won't trigger there in practice, but would help if it did.
+- `balance.py`: a grown run says when phase 2 grew and how much was left,
+  stays out of the fit (its balanced share means nothing), and prints TOTAL
+  against dev24's for the same dataset and its "if balanced" (`DEV24`).
+- Tested: `tests/stub_assemblers.py` (new; drives the real run_assemblers /
+  run_trinity_phase2 with stubbed assemblers and a fake ParaFly-like
+  Trinity): TA done before Stage A ends, mid-phase 2 (one restart, finished
+  components skipped), near the end (stays), relaunch failing, threaded,
+  SIGTERM to oyster.py alone (phase 2's session and grandchild die). 6/6.
+  `tests/release_check.py --tier quick`: 7 pass, 1 skip (no conda).
+
+**Next (step 3):** `tests/release_check.sbatch` full tier on the cluster,
+then dev26 MPI runs of SRR868662, SRR1139191 (Trinity-bound in dev24) and
+DRR053698, SRR802670 (TA-bound), each in a fresh --dir. Judge by TOTAL
+against dev24 and "if balanced" (DEV26_PLAN.md table; balance.py prints
+both). Expected: near "if balanced", Trinity-bound runs gaining most.
 
 ## 2026-10-11 -- MPI share: read size does not predict it; grow phase 2 instead
 

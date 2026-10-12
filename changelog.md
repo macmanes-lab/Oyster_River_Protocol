@@ -2,6 +2,23 @@
 
 ORP Version 4.1.0-dev1
 
+- **Trinity phase 2 grows onto Trans-ABySS's cores** (`oyster.py`, 4.1.0-dev26,
+  `run_trinity_phase2`). Phase 2's cores were fixed at launch, so whichever
+  assembler lane finished first left its cores idle until the other was done
+  -- about 5 h of wall time over eight dev24 runs. Now, when the Trans-ABySS
+  lane finishes while phase 2 is running with at least 15% of its components
+  left, phase 2 is stopped and relaunched on all of `--cpu`; ParaFly skips
+  the components already finished (verified on SRR1138704: restart in
+  seconds, transcripts within 0.04% of an uninterrupted run). Phase 2 runs in
+  its own session, and oyster.py passes SIGTERM/SIGINT/SIGHUP on to it. The
+  timing log gains a `run_trinity_phase2_grow` line when it happens.
+- **Under `--transabyss-mpi`, Trans-ABySS gets a fixed half of `--cpu`**
+  (`TRANSABYSS_MPI_SHARE`), replacing dev24's share fitted to read size: eight
+  more datasets showed Trinity's work doesn't follow read size (3.8-22.3
+  core-hours per GB), so the fit missed by up to 4 h either way. Half keeps
+  Trans-ABySS from being the long pole on every dataset so far, and with
+  phase 2 growing, cores it doesn't need go back to Trinity. Threaded mode
+  keeps 25%.
 - **Under `--transabyss-mpi`, Trans-ABySS's share follows read depth**
   (`oyster.py`, `transabyss_share`). With `--normalize-reads` only Trinity's
   reads are normalized, so Trans-ABySS's part of the work grows with depth:
