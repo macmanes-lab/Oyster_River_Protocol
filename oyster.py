@@ -239,7 +239,11 @@ TRINITY_PHASE1_MEM_SHARE = 0.25
 # The restart itself costs seconds; what it does cost is the in-flight
 # components, which start over. Near the end those are the long stragglers,
 # so only grow while at least this share of the components is still to run.
+# Their dirs are removed before the relaunch, since a component stopped at
+# the wrong moment cannot resume (clear_unfinished_trinity_components).
 TRINITY_GROW_MIN_LEFT = 0.15
+# A component's dir in ParaFly's command lines (recursive_trinity.cmds).
+TRINITY_COMPONENT_OUTPUT = re.compile(r'--output "([^"]+)"')
 # Stopping phase 2 (to grow it, or because oyster.py is being stopped):
 # SIGTERM to its session, SIGKILL after this many seconds.
 TRINITY_STOP_GRACE = 30
@@ -1901,8 +1905,54 @@ class Pipeline:
 
     def _start_trinity_phase2(self, cpu, mem):
         cmd = self._trinity_phase2_cmd(cpu, mem)
+        cleared = self.clear_unfinished_trinity_components()
+        if cleared:
+            print(f"[run_trinity_phase2] removed {cleared} unfinished component dir(s) "
+                  f"left by an earlier launch; they start over", flush=True)
         print("+", " ".join(cmd), flush=True)
         return start_session(cmd, cwd=str(self.dir))
+
+    def clear_unfinished_trinity_components(self):
+        """Delete the working dir of every component that started but never
+        finished; return how many.
+
+        A component's Trinity checkpoints are not crash-safe: its super-reads
+        step deletes its inputs (inchworm.DS.fa.SR.*) before writing the
+        checkpoint that says the step is done, while their own checkpoints
+        stay. Stopped in between, the component can never finish -- every
+        rerun skips to `cat` the deleted files and fails, and phase 2 with
+        it. The steps before take well under a second on most components,
+        so a stop often lands there: 3 of the 6 dev26 runs that grew lost
+        phase 2 this way (NOTES.md 2026-10-13). A stopped component starts
+        over in any case, so its dir is worth nothing; removing it makes the
+        rerun a clean one. Finished components (in ParaFly's .completed)
+        are left alone, cleaned up or not.
+        """
+        parts = self.trinity_out_dir() / "read_partitions"
+        if not parts.is_dir():
+            return 0
+        done_f = self.trinity_out_dir() / "recursive_trinity.cmds.completed"
+        finished = set()
+        if done_f.exists():
+            with open(done_f, errors="replace") as f:
+                for line in f:
+                    m = TRINITY_COMPONENT_OUTPUT.search(line)
+                    if m:
+                        # Fb_*/CBin_*/c*.out: the same on /mnt/home and /mnt/gpfs01.
+                        finished.add(Path(m.group(1)).parts[-3:])
+        cleared = 0
+        for fb in os.scandir(parts):
+            if not fb.is_dir(follow_symlinks=False):
+                continue
+            for cbin in os.scandir(fb.path):
+                if not cbin.is_dir(follow_symlinks=False):
+                    continue
+                for e in os.scandir(cbin.path):
+                    if (e.name.endswith(".out") and e.is_dir(follow_symlinks=False)
+                            and (fb.name, cbin.name, e.name) not in finished):
+                        shutil.rmtree(e.path, ignore_errors=True)
+                        cleared += 1
+        return cleared
 
     def trinity_phase2_left(self):
         """(components not yet assembled, total), from ParaFly's command list

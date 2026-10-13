@@ -2,6 +2,16 @@
 
 ORP Version 4.1.0-dev1
 
+- **A phase 2 grow no longer leaves a component that cannot finish**
+  (`oyster.py`, 4.1.0-dev29, `clear_unfinished_trinity_components`).
+  Trinity's per-component super-reads step deletes its `inchworm.DS.fa.SR.*`
+  files before writing the checkpoint that says it is done; a component
+  stopped in between fails on every rerun (`cat: ...SR.18: No such file`),
+  and phase 2 with it. That hit 3 of the 6 dev26 runs that grew (SRR1138704,
+  SRR796576, SRR1138707). Before every phase 2 launch -- first, after a grow,
+  or on a resumed run -- oyster.py now deletes the dir of each component that
+  started but is not in ParaFly's `.completed`, so it reruns from scratch,
+  as a stopped component did anyway.
 - **Trinity phase 2 grows onto Trans-ABySS's cores** (`oyster.py`, 4.1.0-dev26,
   `run_trinity_phase2`). Phase 2's cores were fixed at launch, so whichever
   assembler lane finished first left its cores idle until the other was done

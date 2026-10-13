@@ -45,6 +45,17 @@ Findings (detail in DEV27_PLAN.md):
   pyTransRate within ~0.005).
 - The three failed runs weren't resubmitted: re-running them in place with
   the fix is DEV27_PLAN.md's step 1 cluster test.
+- **Step 1's code is in, as 4.1.0-dev29** (`clear_unfinished_trinity_components`,
+  called by `_start_trinity_phase2`). It matches components by the
+  `Fb_*/CBin_*/c*.out` tail of `--output` in `.completed`, not by the whole
+  line, so `/mnt/home` vs `/mnt/gpfs01` spellings agree. Dry run on
+  SRR1138707's dir: removes only `c2094`, keeps the 16 finished dirs whose
+  `--full_cleanup` never ran (`c70502` among them -- it is in `.completed`,
+  not broken). Root cause in Trinity 2.15.2 (`Trinity` ~l.1780): the
+  super-reads block runs `rm -f` on `inchworm.DS.fa.SR.*` before touching
+  `SR_supp.checkpoint.ok`. Stub tests 6/6 (and `grow` fails with the call
+  disabled); `release_check.py --tier quick` and the cluster re-runs not
+  done yet. Matt: no need to recover the three failed runs.
 
 **Ops, 2026-10-12.** Premise went down ~19:00-22:00 (login node rebooted
 ~19:41, slurmctld/slurmdbd down until ~22:00). Jobs 1321775 (SRR802670),

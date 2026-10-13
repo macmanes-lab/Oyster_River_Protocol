@@ -6,8 +6,12 @@ except Trinity phase 2, which goes through the real run_trinity_phase2 --
 session, grow, stop -- with a fake Trinity (this file, --fake-trinity) that
 works through recursive_trinity.cmds the way ParaFly does: it skips the
 lines already in recursive_trinity.cmds.completed and appends each one it
-finishes, faster the more cores it is given. It also starts a grandchild
-(`sleep`), so a stop that missed the rest of the session would show.
+finishes, faster the more cores it is given. Like ParaFly's components, it
+keeps a working dir (read_partitions/.../c<i>.trinity.reads.fa.out) while on
+a command and removes it when done, and it notes any it finds left over --
+a half-done component the real Trinity could not resume. It also starts a
+grandchild (`sleep`), so a stop that missed the rest of the session would
+show.
 
     python3 tests/stub_assemblers.py            # all cases
     python3 tests/stub_assemblers.py grow fail  # some
@@ -20,6 +24,7 @@ ParaFly's own resume behaviour is tested on the cluster instead
 import contextlib
 import io
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -44,8 +49,10 @@ def fake_trinity(outdir, cpu, fasta, launches, fail_on_cpu):
     done = set(done_f.read_text().splitlines()) if done_f.exists() else set()
     todo = [c for c in cmds.read_text().splitlines() if c not in done]
     unit = float(os.environ.get("STUB_UNIT", UNIT))
+    workdirs = [Path(re.search(r'--output "([^"]+)"', c).group(1)) for c in todo]
+    stale = sum(d.is_dir() for d in workdirs)
     with open(launches, "a") as f:
-        f.write(f"skipped {len(done)} ran {len(todo)}\n")
+        f.write(f"skipped {len(done)} ran {len(todo)} stale {stale}\n")
     # A grandchild, as ParaFly's components are: Trinity waits for them on
     # its way out, so only a stop can leave one behind -- and the stop must
     # reach it.
@@ -56,10 +63,12 @@ def fake_trinity(outdir, cpu, fasta, launches, fail_on_cpu):
             time.sleep(0.2)
             sys.exit(3)
         with open(done_f, "a") as out:
-            for c in todo:
+            for c, workdir in zip(todo, workdirs):
+                workdir.mkdir(parents=True, exist_ok=True)
                 time.sleep(unit / cpu)
                 out.write(c + "\n")
                 out.flush()
+                workdir.rmdir()
         Path(fasta).write_text(">TRINITY_DN1_c0_g1_i1 len=4\nACGT\n")
     finally:
         grandchild.kill()
@@ -105,8 +114,11 @@ def make_pipeline(work, mpi, ta_secs, phase1_secs, launches, fail_on_cpu=0, cpu=
         time.sleep(phase1_secs)
         out = p.trinity_out_dir()
         out.mkdir(parents=True, exist_ok=True)
-        (out / "recursive_trinity.cmds").write_text(
-            "".join(f"Trinity --single c{i}.fa\n" for i in range(COMMANDS)))
+        parts = out / "read_partitions" / "Fb_0"
+        (out / "recursive_trinity.cmds").write_text("".join(
+            f'Trinity --single "{parts}/CBin_{i // 100}/c{i}.trinity.reads.fa" '
+            f'--output "{parts}/CBin_{i // 100}/c{i}.trinity.reads.fa.out" --CPU 1\n'
+            for i in range(COMMANDS)))
         p.trinity_phase1_done().touch()
 
     def spades(outname):
@@ -187,10 +199,13 @@ def case_grow():
     """Trans-ABySS done early in phase 2: one restart, on all cores, skipping what finished."""
     p, cpus, skips, timing, marker, error, left = run_case("grow", True, ("components", COMMANDS // 10), 0.2)
     ran_first = int(skips[1].split()[1]) if len(skips) > 1 else -1
+    stale = int(skips[1].split()[5]) if len(skips) > 1 else -1
     return all([
         check("no error", error is None, repr(error)),
         check("launches 20 then 40", cpus == [20, 40], str(cpus)),
         check("relaunch skipped the finished ones", 0 < ran_first < COMMANDS, " | ".join(skips)),
+        check("relaunch found no half-done component dirs", stale == 0, " | ".join(skips)),
+        check("the stopped one's dir removal logged", "unfinished component dir(s)" in p.log_text),
         check("grow entry in timing log", "run_trinity_phase2_grow\t" in timing),
         check("grow logged", "run_trinity_phase2 grows to 40 cpu (Trans-ABySS done; " in p.log_text),
         check("phase 2 finished", "run_trinity_phase2\t" in timing and not marker),
