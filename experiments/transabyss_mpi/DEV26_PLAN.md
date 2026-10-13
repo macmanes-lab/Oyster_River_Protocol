@@ -1,7 +1,9 @@
 # dev26 plan: phase 2 grows onto Trans-ABySS's cores
 
-**Status 2026-10-12:** step 1 passed (Premise job 1321673), step 2 is
-4.1.0-dev26, step 3's cluster runs are next. NOTES.md 2026-10-12.
+**Status 2026-10-13:** step 1 passed (Premise job 1321673), step 2 is
+4.1.0-dev26, step 3's cluster runs are done: the grow restart failed 3 of 6
+runs that grew, and phase 2 barely scales past ~20-25 cores, so TOTAL came
+out a wash. Next: DEV27_PLAN.md. Results in NOTES.md 2026-10-13.
 
 Written 2026-10-11 at 4.1.0-dev25 (pipeline code = dev24). Background and
 every number below: NOTES.md, entries from 2026-10-08 to 2026-10-11.

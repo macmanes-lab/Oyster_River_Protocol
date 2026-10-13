@@ -5,67 +5,66 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
-## 2026-10-12 -- HANDOFF: dev26 cluster runs in flight (step 3)
+## 2026-10-13 -- HANDOFF: dev26 cluster results; the grow restart breaks runs
 
-**State.** 4.1.0-dev26 (pipeline code; the repo is 4.1.0-dev27, a notes-only
-bump) is on master and on Premise's `~/Oyster_River_Protocol`. Five MPI runs
-were submitted 2026-10-12 ~06:37 from `~` on Premise with
-`experiments/transabyss_mpi/oyster_mpi.sbatch` (`--cpu 40 --mem 500
---normalize-reads --tpm-filt 1 --transabyss-mpi on`, same reads as dev24):
+**Plan for next: `experiments/transabyss_mpi/DEV27_PLAN.md`.** In short: make
+phase 2 safe to restart (step 1, small), measure why phase 2 doesn't scale
+(step 2), then decide whether growth stays (step 3).
 
-| job | run (dir `~/<run>`) | dev24 TOTAL | dev24 if balanced | dev24 slower lane |
-|---|---|---|---|---|
-| 1321775 | SRR802670_dev26 | 15h27m | 14h24m | TA by 1h53m |
-| 1321776 | SRR868662_dev26 | 11h49m | 10h02m | Trinity by 3h57m |
-| 1321777 | SRR1139191_dev26 | 9h33m | 8h43m | Trinity by 2h47m |
-| 1321778 | SRR1138707_dev26 | 5h27m | 5h14m | Trinity by 50m |
-| 1321779 | SRR796576_dev26 | 3h16m | 3h05m | Trinity by 49m |
+**Runs** (4.1.0-dev26 code, `--cpu 40 --mem 500 --normalize-reads --tpm-filt 1
+--transabyss-mpi on`, each in `~/<run>`, log `~/orp_ta_mpi_<job>.log`). Times
+dev24 -> dev26; P1/P2 = Trinity phase 1/2 with cores:
 
-DRR053698 (the plan's second TA-bound run) was not submitted; add it if
-SRR802670 alone isn't enough to judge the TA-bound side. A first submission
-reused the `_dev24` names and exited in 2 s ("already finished"), harmlessly.
+| run | job | nodes 24/26 | TOTAL | P1 | P2 | TA | phase 2 |
+|---|---|---|---|---|---|---|---|
+| SRR1139191 | 1321777 | 138/138 | 9h33m -> 9h55m (+22m) | 2h54m (19) -> 3h42m (13) | 4h58m (28) -> 4h32m (40) | 5h04m -> 3h31m | started on 40, no grow |
+| SRR868662 | 1321776 | 139/141 | 11h49m -> 11h08m (-40m) | 4h08m (15) -> 3h27m (13) | 5h24m (22) -> 5h23m (20, 40 after 2h16m) | 5h34m -> 5h43m | grew, 68% left |
+| SRR866209 | 1321789 | 141/142 | 3h24m -> 3h34m (+10m) | 1h12m (19) -> 1h30m (13) | 1h24m (29) -> 1h14m (20, 40 after 4m) | 2h20m -> 1h34m | grew, 95% left |
+| DRR031870 | 1321788 | 138/143 | 6h23m -> 5h22m (-1h00m) | 1h56m (17) -> 1h39m (13) | 2h04m (25) -> 2h14m (20) | 4h41m -> 3h51m | stayed, 0% left |
+| DRR046632 | 1321785 | 141/141 | 6h42m -> 6h46m (+4m) | 2h04m (16) -> 2h10m (13) | 2h38m (24) -> 2h39m (20, 40 after 1h55m) | 4h40m -> 4h05m | grew, 34% left |
+| DRR030368 | 1321786 | 139/138 | 7h31m -> 8h12m (+41m) | 1h43m (15) -> 2h10m (13) | 1h33m (23) -> 1h49m (20) | 5h08m -> 5h30m | never needed |
+| SRR1138704 | 1321787 | | FAILED | | | | grew 23:09:25, broken c40573 |
+| SRR796576 | 1321943 | | FAILED | | | | grew 23:26:43, broken c10651 |
+| SRR1138707 | 1321947 | | FAILED | | | | grew 00:33:47, broken c2094 (+ c70502) |
+| SRR802670 | 1321944 | -/181 | running at 06:42 10-13 | | | | P2 on 20 since 05:41; TA still running |
+| DRR053698 | 1321946 | -/187 | running at 06:42 10-13 | | | | P2 done 05:01 on 20, no grow; post-assembly |
 
-**Watching.** From either laptop (needs `ssh premise` working; see below):
+Findings (detail in DEV27_PLAN.md):
+- **Grow bug.** 3 of 6 grows failed the run: a component in flight at the
+  SIGTERM keeps its inchworm `.ok` checkpoints but not
+  `inchworm.DS.fa.SR.N`; the relaunch skips to the merge, `cat` fails, and
+  so does every retry. Broken dirs are still on disk under each failed run's
+  `assemblies/<run>.trinity/read_partitions/` for testing the fix.
+- **Phase 2 barely scales** past ~20-25 cores (SRR1139191: 28 -> 40 cores
+  gave -9%). Not the serial ParaFly: the repo's `trinity-plugins/BIN/ParaFly`
+  has OpenMP (6 GOMP symbols) and the relaunch ran `-CPU 40`. Cause unknown:
+  node sharing, GPFS small-file I/O, or a long tail of big components.
+- **TOTAL is a wash** (net -23m over six), within node noise (node138 slow).
+  The 0.5 share balanced the lanes on its own (DRR031870, DRR030368).
+- **Quality unchanged** in all six (BUSCO same, unique genes within tens,
+  pyTransRate within ~0.005).
+- The three failed runs weren't resubmitted: re-running them in place with
+  the fix is DEV27_PLAN.md's step 1 cluster test.
 
-    experiments/transabyss_mpi/watch_dev26.sh           # state + Stage lines per run
-    experiments/transabyss_mpi/watch_dev26.sh --report  # + balance.py, qualreports vs dev24
+**Ops, 2026-10-12.** Premise went down ~19:00-22:00 (login node rebooted
+~19:41, slurmctld/slurmdbd down until ~22:00). Jobs 1321775 (SRR802670),
+1321778 (SRR1138707), 1321779 (SRR796576) and 1321784 (DRR053698) were lost
+or cancelled and resubmitted as 1321944, 1321947, 1321943, 1321946. 1321775
+showed RUNNING after the outage with no processes left (`srun --jobid
+--overlap ps`); check for ghost jobs after an outage. Premise's repo copy of
+`oyster_mpi.sbatch` lacks `0ba2e6c`'s `--exclude=node117,node118`
+(`~/oyster_mpi.sbatch` has it), so the first resubmits went without it; two
+landed on node118 and were redone with `--exclude` on the sbatch line.
+Premise also resets ssh connections opened in quick succession
+(`kex_exchange_identification: Connection reset`); wait and retry.
 
-It prints each run's slurm state, banner version, and its `[assemblers]` /
-`=== Stage` lines -- `run_trinity_phase2 grows to 40 cpu (...left)` or
-`stays at` -- and, once every run has a TOTAL, copies the logs to
-$TMPDIR/watch_dev26, runs balance.py locally (Premise's python3 is 3.6) and
-lines up each qualreport's metrics against the dev24 run's (`*` = differs).
-Expect each run ~10-16 h; SRR796576/SRR1138707 were pending at submission.
+**Watching the last two** from either laptop:
 
-**Judging (DEV26_PLAN.md):** TOTAL is the metric. Each run against its dev24
-TOTAL and its "if balanced" figure above:
-- Trinity-bound (SRR868662, SRR1139191, SRR1138707, SRR796576): Stage A
-  now has 20 lane cores instead of 22-31 (phase 1 13), so expect phase 2 to
-  grow when TA finishes, and TOTAL near "if balanced" -- if not, check how
-  long phase 1 took on fewer cores (the plan's caveat) and the grow line's
-  components left.
-- TA-bound (SRR802670): TA now 20 cores (was 18, capped). Expect TOTAL near
-  14h24m; phase 2 likely `stays at` or never needs to grow.
-- Qualreports: BUSCO, unique genes, pyTransRate within Trinity's run-to-run
-  noise (NOTES 2026-10-10: tens of genes, ~0.002 pyTransRate).
-- Then: `tests/release_check.sbatch` (full tier) before calling dev26 done,
-  and the `--transabyss-mpi auto` default decision.
+    WATCH_RUNS="1321944:SRR802670_dev26 1321946:DRR053698_dev26" \
+        experiments/transabyss_mpi/watch_dev26.sh --report
 
-**`ssh premise` on another machine** -- `~/.ssh/config`:
-
-    Host premise
-        HostName premise.sr.unh.edu
-        User macmanes
-        IdentityFile ~/.ssh/id_ed25519_premise
-        IdentitiesOnly yes
-        AddKeysToAgent yes
-        UseKeychain yes
-
-with that key (or another one authorized on Premise) loaded: `ssh-add
---apple-use-keychain ~/.ssh/id_ed25519_premise`, then `ssh -o BatchMode=yes
-premise hostname` should print `login01.rcchpc`. Compute nodes can't be
-ssh'd into without a job on them. Premise's `/mnt/home` is a symlink to
-`/mnt/gpfs01/home`; compare paths with `pwd -P`.
+SRR802670 is TA-bound. If TA finishes while its phase 2 has >= 15% left it
+will grow, with the same chance of failing.
 
 ## 2026-10-12 -- 4.1.0-dev26: phase 2 grows onto Trans-ABySS's cores
 
