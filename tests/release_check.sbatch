@@ -1,12 +1,12 @@
 #!/bin/bash
 #SBATCH --partition=macmanes,shared
 #SBATCH -J orp_release_check
-#SBATCH --cpus-per-task=32
+#SBATCH --cpus-per-task=40
 #SBATCH --mem 140G
 #SBATCH --exclude=node117,node118
 #SBATCH --output=orp_release_check.%j.out
 # The release check (tests/release_check.py) on one node: every tier, four
-# full runs at a time on 8 cores and 32 GB each. Submit from the directory
+# full runs at a time on 10 cores and 32 GB each. Submit from the directory
 # the runs should go in; anything after the script name is passed on.
 #
 #     sbatch /path/to/Oyster_River_Protocol/tests/release_check.sbatch
@@ -16,4 +16,4 @@
 
 set -euo pipefail
 REPO="$(cd "$(dirname "$(scontrol show job "$SLURM_JOB_ID" | awk -F= '/Command=/{print $2}')")/.." && pwd)"
-python3 "$REPO/tests/release_check.py" --jobs 4 --cpu 8 --mem 32 "$@"
+python3 "$REPO/tests/release_check.py" --jobs 4 --cpu 10 --mem 32 "$@"
