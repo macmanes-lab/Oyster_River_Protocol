@@ -2,6 +2,20 @@
 
 ORP Version 4.1.0-dev1
 
+- **`--min-cov`, a coverage filter beside `--tpm-filt`** (`oyster.py`,
+  `chowder.py`, 4.1.0-dev29.cov1, `filter_tpm`). A contig with no swissprot
+  hit is now dropped unless its TPM is at least `--tpm-filt` *and* its
+  coverage (salmon NumReads x mean fragment length / contig length) is at
+  least `--min-cov`. TPM is a share of a million, so a fixed cutoff asks for
+  4-183 reads per kb depending on the sample (119 final assemblies of the
+  108-sample set) -- mostly a matter of depth -- and its effective-length
+  correction lets a short contig pass on a couple of reads. Coverage means
+  the same thing in every sample. Default 0, so nothing changes unless it is
+  given. Every run now also writes `reports/<run>.filter_candidates.tsv`
+  (what each of a range of TPM, coverage and read-count thresholds would
+  keep) and `reports/<run>.quant.sf.gz` (cleanup removes `quants/`), and
+  changing either threshold on a resumed run re-filters
+  (`<run>.filter.settings`) rather than keeping the old split.
 - **A phase 2 grow no longer leaves a component that cannot finish**
   (`oyster.py`, 4.1.0-dev29, `clear_unfinished_trinity_components`).
   Trinity's per-component super-reads step deletes its `inchworm.DS.fa.SR.*`

@@ -60,7 +60,7 @@ Three things differ from `oyster.py`, and all three are worth knowing before you
 From 4.1.0 the four assemblies are merged by Swiss-Prot gene, not by OrthoFinder orthogroup:
 
 - **Contigs with a Swiss-Prot hit** are grouped by the gene of their best hit -- the same gene names the qualreport's UNIQUE GENES counts. Each gene keeps one representative (the longest of the contigs whose hit covers close to the best fraction of the protein), plus up to two more copies that are both distinct from it (it covers under half of them) and expressed (at least 1 TPM): other isoforms, paralogs under the same name.
-- **Contigs without a hit** are deduplicated with cd-hit-est on both strands, and the TPM filter (`--tpm-filt`) later drops those below threshold.
+- **Contigs without a hit** are deduplicated with cd-hit-est on both strands, and the expression filter (`--tpm-filt`, `--min-cov`) later drops those below threshold.
 
 Everything after that -- the diamond rescue, cd-hit-est, salmon, the TPM filter, BUSCO, pyTransRate -- is unchanged. On 10 test samples this cut duplicated BUSCOs by about 90% against ORP 4.0 while keeping complete BUSCOs and raising unique genes; the experiments behind it are in `experiments/redundancy/`. The OrthoFinder merge ORP used through 4.0 was removed in 5.0, so a 5.0 assembly is not directly comparable with a 4.x one.
 
@@ -138,6 +138,7 @@ Because it appends, a value given here overrides the same flag ORP passes above 
 | `--lineage` | `eukaryota_odb12.2` | BUSCO lineage |
 | `--normalize-reads` | off | Let Trinity normalize reads (default is `--no_normalize_reads`) |
 | `--tpm-filt` | `0` | TPM filter threshold |
+| `--min-cov` | `0` | coverage filter threshold (NumReads x mean fragment length / contig length); a contig must also pass `--tpm-filt` |
 | `--trimmed-corrected-reads` | off | Treat `--read1`/`--read2` as already trimmed and error-corrected, and skip trimmomatic and rcorrector (see [Reads you have already corrected](#reads-you-have-already-corrected) above) |
 | `--spades1-kmer` | `auto` | rnaSPAdes k-mer(s) for the spadesauto assembly — `auto` lets rnaSPAdes pick its documented default pair (~1/3 and ~1/2 of maximum read length). Also accepts percentages or an explicit list, same forms as `--spades2-kmer` |
 | `--spades2-kmer` | `60%,75%` | rnaSPAdes k-mer(s) for the spadeshigh assembly — percentages of maximum read length, an explicit comma-separated list of odd sizes under 128, or `auto`. Percentages resolve per dataset (61,75 at 101bp reads; 89,113 at 150bp), clamped to rnaSPAdes' 127 ceiling |
@@ -169,6 +170,7 @@ There are no assembler flags — no k-mers, no `--strand`, no `--normalize-reads
 | `--runout` | `USER_RUN` | Run name prefix |
 | `--lineage` | `eukaryota_odb12.2` | BUSCO lineage |
 | `--tpm-filt` | `0` | TPM filter threshold |
+| `--min-cov` | `0` | coverage filter threshold (NumReads x mean fragment length / contig length); a contig must also pass `--tpm-filt` |
 | `--max-parallel` | `2` | `1` runs the short jobs that would otherwise run beside a long one (see [Parallel task management](#parallel-task-management) above) one after the other |
 | `--no-cleanup` | off | Keep every file the run produces, uncompressed -- for debugging. Alias: `--keep-intermediates` |
 | `--pytransrate-args` | none | Extra arguments passed verbatim to both pyTransRate runs (see [Tuning pyTransRate](#tuning-pytransrate) above) |

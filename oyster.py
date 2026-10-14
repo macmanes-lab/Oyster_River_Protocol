@@ -15,6 +15,7 @@ import atexit
 import csv
 import gzip
 import io
+import json
 import os
 import re
 import shlex
@@ -484,6 +485,41 @@ BGZF_EOF = bytes.fromhex("1f8b08040000000000ff0600424302001b0003" + "00" * 9)
 #: NumReads. pyTransRate rejects any other count as a version mismatch.
 QUANT_COLUMNS = 5
 
+#: Thresholds filter_tpm reports on beside the one it applies, so one run
+#: shows what each would have kept (reports/<run>.filter_candidates.tsv).
+#: Each is the minimum TPM, coverage and NumReads a contig needs; a missing
+#: key is no minimum.
+FILTER_CANDIDATES = (
+    {"tpm": 0.5}, {"tpm": 1}, {"tpm": 2}, {"tpm": 5},
+    {"cov": 0.5}, {"cov": 1}, {"cov": 2}, {"cov": 5}, {"cov": 10},
+    {"reads": 5}, {"reads": 10},
+    {"cov": 1, "reads": 5}, {"cov": 2, "reads": 5},
+)
+
+
+def filter_rule_label(rule):
+    """'tpm>=1', 'cov>=2,reads>=5', or 'none' for a rule with no minimum."""
+    parts = [f"{k}>={rule[k]:g}" for k in ("tpm", "cov", "reads") if rule.get(k, 0) > 0]
+    return ",".join(parts) or "none"
+
+
+def median(values):
+    if not values:
+        return None
+    values = sorted(values)
+    mid = len(values) // 2
+    return values[mid] if len(values) % 2 else (values[mid - 1] + values[mid]) / 2
+
+
+def salmon_frag_length(quant_dir):
+    """salmon's mean fragment length for a quant, or None if it didn't say."""
+    try:
+        with open(Path(quant_dir) / "aux_info" / "meta_info.json") as f:
+            value = json.load(f).get("frag_length_mean")
+    except (OSError, ValueError):
+        return None
+    return float(value) if value else None
+
 
 def version_below(version: str, minimum: str) -> bool:
     """Is ``version`` older than ``minimum``, comparing release numbers only?
@@ -855,6 +891,7 @@ class Pipeline:
         self.strand = getattr(args, "strand", "")
         self.normalize_reads = getattr(args, "normalize_reads", False)
         self.tpm_filt = args.tpm_filt
+        self.min_cov = getattr(args, "min_cov", 0)
         self.max_parallel = max(1, args.max_parallel)
         self.no_cleanup = args.no_cleanup
         # oyster.py spells it --trimmed-corrected-reads, chowder.py
@@ -2506,29 +2543,137 @@ class Pipeline:
             "-1", self.cor1(), "-2", self.cor2(), "-o", outdir,
         )
 
+    def filter_settings_stamp(self, filter_done):
+        """--tpm-filt and --min-cov, recorded so that changing either re-filters.
+
+        needs_run only compares mtimes, so without this a resumed run given a
+        new threshold would find filter.done up to date and keep the old
+        split. Rewritten only when the settings change, like
+        stamp_tool_version. A run from before this stamp existed gets one
+        dated to its filter.done, so resuming it doesn't redo BUSCO and
+        pyTransRate over an identical assembly; what it ran with can't be
+        known, so a changed threshold there still goes unnoticed, as before.
+        """
+        stamp = self.assemblies_working / f"{self.runout}.filter.settings"
+        settings = f"tpm_filt={self.tpm_filt:g} min_cov={self.min_cov:g}\n"
+        if stamp.exists() and stamp.read_text() == settings:
+            return stamp
+        existed = stamp.exists()
+        stamp.parent.mkdir(parents=True, exist_ok=True)
+        stamp.write_text(settings)
+        if not existed and Path(filter_done).exists():
+            t = Path(filter_done).stat().st_mtime
+            os.utime(stamp, (t, t))
+        return stamp
+
     def filter_tpm(self):
-        quant = self.quants_dir / f"salmon_shucked_{self.runout}" / "quant.sf"
+        """Split the intermediate's contigs into HIGHEXP and LOWEXP.
+
+        A contig is high when its TPM is at least --tpm-filt *and* its
+        coverage is at least --min-cov; secondfilter then drops the low ones
+        that have no swissprot hit. Coverage is fragments per base,
+        NumReads x salmon's mean fragment length / contig length: the
+        average depth of read-pair fragments over the contig. Unlike TPM it
+        doesn't depend on how many other contigs share the million, and it
+        divides by the real length rather than salmon's effective length,
+        which for a contig near the fragment length is small enough to turn
+        a couple of reads into a high TPM.
+
+        Whatever is applied, reports/<run>.filter_candidates.tsv says how
+        many contigs a range of other thresholds would have kept, and the
+        quantification itself is kept as reports/<run>.quant.sf.gz, since
+        cleanup removes quants/.
+        """
+        quant_dir = self.quants_dir / f"salmon_shucked_{self.runout}"
+        quant = quant_dir / "quant.sf"
         high = self.assemblies_working / f"{self.runout}.HIGHEXP.txt"
         low = self.assemblies_working / f"{self.runout}.LOWEXP.txt"
+        diamond_txt = self.assemblies_dir / f"{self.runout}.ORP.diamond.txt"
+        frag_len = salmon_frag_length(quant_dir)
+        if frag_len is None and self.min_cov > 0:
+            raise RuntimeError(
+                f"--min-cov needs salmon's mean fragment length, and "
+                f"{quant_dir / 'aux_info' / 'meta_info.json'} has none")
+        hits = set()
+        if diamond_txt.exists():
+            with open(diamond_txt) as f:
+                hits = {line.split("\t", 1)[0] for line in f if line.strip()}
+        rows = []
         with open(quant) as f, open(high, "w") as hf, open(low, "w") as lf:
             next(f, None)
             for line in f:
                 cols = line.rstrip("\n").split("\t")
-                if len(cols) < 4:
+                if len(cols) < QUANT_COLUMNS:
                     continue
                 try:
-                    tpm = float(cols[3])
+                    length, tpm, reads = float(cols[1]), float(cols[3]), float(cols[4])
                 except ValueError:
                     continue
+                cov = reads * frag_len / length if frag_len and length > 0 else 0.0
                 # At-threshold counts as high: with `>` and `<` a contig whose
                 # TPM equalled --tpm-filt landed in neither list and so was
                 # dropped from .ORP.fasta whenever LOWEXP was non-empty.
-                if tpm >= self.tpm_filt:
+                if tpm >= self.tpm_filt and cov >= self.min_cov:
                     hf.write(cols[0] + "\n")
                 else:
                     lf.write(cols[0] + "\n")
+                rows.append((cols[0] in hits, tpm, cov, reads, length))
+        self.write_filter_candidates(rows, frag_len)
+        with open(quant, "rb") as src, gzip.open(self.reports_dir / f"{self.runout}.quant.sf.gz", "wb") as dst:
+            shutil.copyfileobj(src, dst)
         (self.assemblies_dir / f"{self.runout}.filter.done").touch()
         print("\n\n\n\n PART: TPM_FILT MAKE LOW AND HIGH\n\n\n\n")
+
+    def write_filter_candidates(self, rows, frag_len):
+        """reports/<run>.filter_candidates.tsv: what each filter would keep.
+
+        `rows` is (has_hit, tpm, cov, reads, length) per contig. A contig
+        with a swissprot hit survives any threshold (secondfilter rescues
+        it), so `final` is the contigs passing plus the hit contigs that
+        don't, and `nohit_pass` is the part of the assembly a threshold
+        actually decides.
+        """
+        out = self.reports_dir / f"{self.runout}.filter_candidates.tsv"
+        n = len(rows)
+        n_hit = sum(1 for r in rows if r[0])
+        total_reads = sum(r[3] for r in rows) or 1.0
+        near_1tpm = [r for r in rows if 0.9 <= r[1] <= 1.1]
+        rpk_1tpm = median([r[3] * 1000 / r[4] for r in near_1tpm if r[4] > 0])
+        cov_1tpm = median([r[2] for r in near_1tpm])
+        applied = {"tpm": self.tpm_filt, "cov": self.min_cov}
+        lines = [
+            f"# contigs\t{n}",
+            f"# with_swissprot_hit\t{n_hit}",
+            f"# reads_assigned\t{total_reads:.0f}",
+            f"# frag_length_mean\t{frag_len if frag_len is not None else 'NA'}",
+            f"# reads_per_kb_at_1tpm\t{rpk_1tpm if rpk_1tpm is not None else 'NA'}",
+            f"# cov_at_1tpm\t{cov_1tpm if cov_1tpm is not None else 'NA'}",
+            "rule\tpass\tnohit_pass\thit_rescued\tfinal\tfrac_reads_in_final",
+        ]
+        for label, rule in [(f"applied:{filter_rule_label(applied)}", applied)] + [
+            (filter_rule_label(r), r) for r in FILTER_CANDIDATES
+        ]:
+            tpm_min, cov_min, reads_min = rule.get("tpm", 0), rule.get("cov", 0), rule.get("reads", 0)
+            if cov_min > 0 and frag_len is None:
+                lines.append(f"{label}\tNA\tNA\tNA\tNA\tNA")
+                continue
+            passing = nohit = rescued = 0
+            final_reads = 0.0
+            for has_hit, tpm, cov, reads, _ in rows:
+                if tpm >= tpm_min and cov >= cov_min and reads >= reads_min:
+                    passing += 1
+                    nohit += not has_hit
+                elif has_hit:
+                    rescued += 1
+                else:
+                    continue
+                final_reads += reads
+            lines.append(f"{label}\t{passing}\t{nohit}\t{rescued}\t{passing + rescued}\t"
+                         f"{final_reads / total_reads:.4f}")
+        out.write_text("\n".join(lines) + "\n")
+        print(f"[filter] what each threshold would keep ({self._rel(out)}):")
+        for line in lines:
+            print(f"    {line}")
 
     def secondfilter(self):
         intermediate = self.assemblies_dir / f"{self.runout}.ORP.intermediate.fasta"
@@ -3111,7 +3256,9 @@ class Pipeline:
         salmon_stamp = self.stamp_tool_version("orp", "salmon", self.quants_dir / "salmon.version")
         self.step("salmon_index", [shucked_idx], [orp_intermediate, salmon_stamp], self.salmon_index)
         self.step("salmon", [quant_sf], [shucked_idx, c1, c2], self.salmon)
-        self.step("filter", [filter_done], [orp_intermediate, quant_sf, orp_diamond_txt], self.filter_tpm)
+        filter_stamp = self.filter_settings_stamp(filter_done)
+        self.step("filter", [filter_done], [orp_intermediate, quant_sf, orp_diamond_txt, filter_stamp],
+                  self.filter_tpm)
         self.step(
             "secondfilter", [orp_fasta],
             [filter_done, low_txt, high_txt, orp_intermediate, quant_sf, orp_diamond_txt],
@@ -3156,6 +3303,10 @@ def parse_args():
     p.add_argument("--lineage", default="eukaryota_odb12.2", help="BUSCO lineage (default: eukaryota_odb12.2)")
     p.add_argument("--normalize-reads", action="store_true", help="let Trinity normalize reads (default: off, i.e. --no_normalize_reads)")
     p.add_argument("--tpm-filt", type=float, default=0, help="TPM filter threshold (default: 0)")
+    p.add_argument("--min-cov", type=float, default=0,
+                   help="drop contigs with no swissprot hit whose coverage (salmon NumReads x "
+                        "mean fragment length / contig length) is below this; combines with "
+                        "--tpm-filt, a contig must pass both (default: 0)")
     p.add_argument("--trimmed-corrected-reads", dest="corrected_reads", action="store_true",
                    help="the reads have already been through trimmomatic and "
                         "rcorrector; skip both and assemble them as they are "

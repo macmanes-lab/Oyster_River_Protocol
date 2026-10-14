@@ -476,6 +476,10 @@ def parse_args():
     p.add_argument("--runout", default="USER_RUN", help="run name prefix (default: USER_RUN)")
     p.add_argument("--lineage", default="eukaryota_odb12.2", help="BUSCO lineage (default: eukaryota_odb12.2)")
     p.add_argument("--tpm-filt", type=float, default=0, help="TPM filter threshold (default: 0)")
+    p.add_argument("--min-cov", type=float, default=0,
+                   help="drop contigs with no swissprot hit whose coverage (salmon NumReads x "
+                        "mean fragment length / contig length) is below this; combines with "
+                        "--tpm-filt, a contig must pass both (default: 0)")
     p.add_argument(
         "--max-parallel", type=int, default=2,
         help="2 or more (the default) runs a short independent job beside a long "
