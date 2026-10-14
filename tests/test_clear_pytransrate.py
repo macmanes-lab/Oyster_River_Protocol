@@ -47,6 +47,11 @@ def build(tmp):
     (out / "logs").mkdir()
     (out / "logs" / "snap.log").write_text("log")
     (out / "assemblies.csv").write_text("old")
+    # Dated explicitly, a minute after the assembly: filesystems with coarse
+    # timestamps (GPFS) would otherwise give a just-rewritten assembly the
+    # same mtime as files made a moment before it.
+    for path in [out, *out.rglob("*")]:
+        os.utime(path, (old + 60, old + 60))
     return assembly, out
 
 
