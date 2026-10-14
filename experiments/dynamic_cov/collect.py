@@ -23,6 +23,10 @@ at the contigs without a hit instead:
   nohit_removed_orf150  of those removed, the share with an ORF over 149
       codons (pyTransRate's n_with_orf rule): candidate real genes that are
       just not in swissprot.
+  *_shuf  the same share over each contig's bases shuffled (fixed seed):
+      what length and base composition alone give. A random 200 bp contig
+      is open 80% of its length far more often than a random 600 bp one, so
+      only the excess over *_shuf says a set holds coding sequence.
 
 ORF lengths are pyTransRate's own (pytransrate.sequence.longest_orf, so run
 this in the orp env), computed once per dataset over the intermediate's
@@ -31,6 +35,7 @@ no-hit contigs and cached in <dataset>/nohit_orfs.tsv.
 
 import argparse
 import csv
+import random
 import re
 from pathlib import Path
 
@@ -45,7 +50,8 @@ QUAL = {
 }
 PYTR = ["n_seqs", "n_bases", "n50", "p_fragments_mapped", "p_good_mapping",
         "p_contigs_uncovered", "p_contigs_lowcovered", "p_contigs_segmented"]
-ORF_COLUMNS = ["nohit_kept_orf80", "nohit_removed", "nohit_removed_orf80", "nohit_removed_orf150"]
+ORF_COLUMNS = ["nohit_kept_orf80", "nohit_kept_orf80_shuf", "nohit_removed", "nohit_removed_orf80",
+               "nohit_removed_orf80_shuf", "nohit_removed_orf150"]
 COLUMNS = (["dataset", "level", "nohit_kept", "C", "S", "D", "F", "M", "unique_genes",
             "score", "optimal"] + PYTR + ["n_with_orf", "mean_orf_percent", "proper_pairs"]
            + ORF_COLUMNS)
@@ -112,7 +118,9 @@ def nohit_orfs(ds):
     cache = ds / "nohit_orfs.tsv"
     if cache.exists():
         with open(cache) as f:
-            return {n: (int(l), int(o)) for n, l, o in (line.split() for line in f)}
+            rows = [line.split() for line in f]
+        if rows and len(rows[0]) == 4:
+            return {n: (int(l), int(o), int(sh)) for n, l, o, sh in rows}
     inter = next((ds / "assemblies").glob("*.ORP.intermediate.fasta"), None)
     diamond = next((ds / "assemblies").glob("*.ORP.diamond.txt"), None)
     if inter is None or diamond is None:
@@ -120,11 +128,19 @@ def nohit_orfs(ds):
     from pytransrate.sequence import longest_orf
     with open(diamond) as f:
         hits = {line.split("\t", 1)[0] for line in f if line.strip()}
-    orfs = {n: (len(s), longest_orf(s.upper())) for n, s in fasta_records(inter) if n not in hits}
+    rng = random.Random(1)
+    orfs = {}
+    for n, s in fasta_records(inter):
+        if n in hits:
+            continue
+        s = s.upper()
+        shuffled = list(s)
+        rng.shuffle(shuffled)
+        orfs[n] = (len(s), longest_orf(s), longest_orf("".join(shuffled)))
     part = cache.with_suffix(".part")
     with open(part, "w") as f:
-        for n, (length, orf) in orfs.items():
-            f.write(f"{n}\t{length}\t{orf}\n")
+        for n, (length, orf, shuf) in orfs.items():
+            f.write(f"{n}\t{length}\t{orf}\t{shuf}\n")
     part.rename(cache)
     return orfs
 
@@ -134,12 +150,15 @@ def orf_columns(orfs, kept_ids):
         return f"{sum(1 for n in names if test(*orfs[n])) / len(names):.3f}" if names else ""
     kept = [n for n in orfs if n in kept_ids]
     removed = [n for n in orfs if n not in kept_ids]
-    is_open = lambda length, orf: orf * 3 >= ORF_SPAN * length
-    is_long = lambda length, orf: orf > LONG_ORF_CODONS
+    is_open = lambda length, orf, shuf: orf * 3 >= ORF_SPAN * length
+    is_open_shuf = lambda length, orf, shuf: shuf * 3 >= ORF_SPAN * length
+    is_long = lambda length, orf, shuf: orf > LONG_ORF_CODONS
     return {
         "nohit_kept_orf80": share(kept, is_open),
+        "nohit_kept_orf80_shuf": share(kept, is_open_shuf),
         "nohit_removed": len(removed),
         "nohit_removed_orf80": share(removed, is_open),
+        "nohit_removed_orf80_shuf": share(removed, is_open_shuf),
         "nohit_removed_orf150": share(removed, is_long),
     }
 
