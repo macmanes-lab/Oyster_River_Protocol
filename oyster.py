@@ -2253,17 +2253,30 @@ class Pipeline:
         optimisation csv are the outputs being recomputed, and anything a
         future pyTransRate leaves behind that this does not recognise is
         cleared rather than assumed safe.
+
+        **None of it survives a newer assembly.** Whole is not the same as
+        current: an index, BAM or quant.sf older than the assembly was built
+        from a previous one -- a resumed run whose secondfilter rewrote
+        .ORP.fasta, say after a changed --min-cov. pyTransRate checks only
+        that they exist, so it mapped against the old index, and every
+        contig the new assembly added got no reads and the 0.01 score floor
+        (the first dynamic_cov sweep, SRR868662: 34,694 such contigs, score
+        0.23 where 0.50 was due).
         """
         outdir = Path(outdir)
         assembly = Path(assembly)
         if not outdir.is_dir():
             return
+        assembly_mtime = assembly.stat().st_mtime if assembly.is_file() else None
+
+        def current(path):
+            return assembly_mtime is None or path.stat().st_mtime >= assembly_mtime
 
         keep = {outdir / "logs"}
         keep.update(outdir.glob("*.index.lock"))
         kept_bam = False
         for bam in outdir.glob("*.bam"):
-            if bam_is_complete(bam):
+            if bam_is_complete(bam) and current(bam):
                 kept_bam = True
                 keep.add(bam)
                 keep.add(bam.with_name(bam.name + ".align.done"))
@@ -2283,7 +2296,7 @@ class Pipeline:
                 survived.append(path)
                 continue
             if path.is_dir():
-                if (path / "GenomeIndex").is_file():
+                if (path / "GenomeIndex").is_file() and current(path / "GenomeIndex"):
                     survived.append(path)
                     continue
                 shutil.rmtree(path, ignore_errors=True)

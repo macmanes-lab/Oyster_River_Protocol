@@ -2,6 +2,15 @@
 
 ORP Version 4.1.0-dev1
 
+- **pyTransRate no longer scores a rewritten assembly against the old one's
+  index** (`oyster.py`, 4.1.0-dev29.cov1, `clear_pytransrate_outdir`). The
+  snap index, BAM and salmon quant left in `reports/pytransrate_<run>/`
+  were kept whenever they were whole, including after `.ORP.fasta` had been
+  rewritten -- which a changed `--tpm-filt`/`--min-cov` on a resumed run now
+  does. Contigs the new assembly added were never in the index, got no
+  reads, and sat at pyTransRate's 0.01 floor (SRR868662: 34,694 contigs,
+  score 0.23 instead of about 0.5). Anything older than the assembly is now
+  discarded and rebuilt.
 - **`--min-cov`, a coverage filter beside `--tpm-filt`** (`oyster.py`,
   `chowder.py`, 4.1.0-dev29.cov1, `filter_tpm`). A contig with no swissprot
   hit is now dropped unless its TPM is at least `--tpm-filt` *and* its
