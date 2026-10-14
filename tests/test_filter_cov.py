@@ -70,6 +70,9 @@ def run(tmp, tpm_filt, min_cov, frag_len=200.0):
         if line.startswith("#") or line.startswith("rule\t"):
             continue
         cols = line.split("\t")
+        if cols[1] == "NA":
+            cand[cols[0]] = None
+            continue
         cand[cols[0]] = [int(c) for c in cols[1:5]] + [float(cols[5])]
     with gzip.open(p.reports_dir / "t.quant.sf.gz", "rt") as f:
         check(len(f.read().splitlines()) == len(QUANT) + 1, "quant.sf.gz is not the whole quant.sf")
@@ -103,8 +106,10 @@ with tempfile.TemporaryDirectory() as tmp:
         check(False, "--min-cov without a fragment length should fail")
     except RuntimeError:
         pass
-    high, low, _ = run(tmp, 0, 0, frag_len=None)
+    high, low, cand = run(tmp, 0, 0, frag_len=None)
     check(not low, "no fragment length is fine when --min-cov is 0")
+    check(cand["cov>=1"] is None and cand["tpm>=1"] is not None,
+          "without a fragment length, coverage rows are NA and the rest are not")
 
 if failures:
     print(f"{len(failures)} failure(s)")
