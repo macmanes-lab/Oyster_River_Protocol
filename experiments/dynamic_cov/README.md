@@ -66,7 +66,7 @@ contigs removed and those among them with an ORF > 149 codons:
 - On the deep libraries every coverage level maps more fragments than tpm1
   (+0.1 to +0.45%), and keeps pyTransRate's optimal score as high or
   higher (tpm1 lowers it, e.g. DRR053698 0.490 vs 0.510).
-- cov5 matches or beats tpm1's score everywhere but DRR030368 (-0.001) and
-  removes about half the long-ORF contigs tpm1 does there, but on the
-  shallow libraries it costs mapping (SRR1138704 -0.5%) and removes the
-  most long-ORF contigs of any rule.
+- cov5 matches or beats tpm1's score everywhere but DRR030368 (-0.001),
+  and on the deep libraries removes a third to a half as many long-ORF
+  contigs as tpm1. On the shallow ones it costs mapping (SRR1138704
+  -0.5%) and removes the most long-ORF contigs of any rule.
