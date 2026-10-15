@@ -8,7 +8,7 @@
 #SBATCH --output=/mnt/home/macmaneslab/macmanes/compare/orp_insecta/logs/orp_%A_%a.log
 
 # ORP 4.1.0 on ten insect pairs, one per species, scored against
-# insecta_odb12.2 instead of the default eukaryota_odb12.2. The companion to
+# insecta_odb12 instead of the default eukaryota_odb12.2. The companion to
 # orp_mammalia.sbatch and orp_vertebrata.sbatch; only the pairs, the run tree
 # and the lineage differ.
 #
@@ -18,10 +18,13 @@
 # Siphonaptera (Archaeopsylla). ERR489297 (Anopheles gambiae, 35.7 GB) is the
 # largest sample in the set by far and will run longest.
 #
-# insecta_odb12.2 must be in the ORP checkout's busco_dbs first; ORP's
-# preflight refuses to start without it:
+# insecta_odb12 (OrthoDB 12.1, 3114 BUSCOs), not insecta_odb12.2 (12.2, 2708):
+# the same release as the mammalia_odb12 and vertebrata_odb12 the other two
+# arrays use, so the three groups are scored from one OrthoDB version. It
+# must be in the ORP checkout's busco_dbs first; ORP's preflight refuses to
+# start without it:
 #
-#   conda run -n orp_busco busco --download insecta_odb12.2 \
+#   conda run -n orp_busco busco --download insecta_odb12 \
 #       --download_path ~/Oyster_River_Protocol/busco_dbs
 #
 # Same manifest format and per-task logic as orp_array.sbatch. What differs:
@@ -44,7 +47,7 @@ set -euo pipefail
 MANIFEST="${MANIFEST:-/mnt/home/macmaneslab/macmanes/compare/orp_insecta/manifest.tsv}"
 RUNS="${RUNS:-/mnt/home/macmaneslab/macmanes/compare/orp_insecta}"
 ORP="${ORP:-$HOME/Oyster_River_Protocol/oyster.py}"
-LINEAGE="${LINEAGE:-insecta_odb12.2}"
+LINEAGE="${LINEAGE:-insecta_odb12}"
 LOGDIR="$RUNS/logs"
 
 echo "=== task ${SLURM_ARRAY_TASK_ID} of ${SLURM_ARRAY_JOB_ID} on $(hostname) at $(date) ==="
