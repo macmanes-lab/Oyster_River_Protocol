@@ -46,9 +46,12 @@ import shlex
 import shutil
 import subprocess
 import sys
+import textwrap
 import threading
 import time
 from pathlib import Path
+
+from oyster import RED, RESET, line_buffer_stdio
 
 HERE = Path(__file__).resolve().parent
 
@@ -58,6 +61,15 @@ STRAND_SEED = 23894
 STRAND_READS = 400000
 
 STEPS = ("transrate", "busco", "strandeval")
+
+#: Steps whose tool output is echoed to the screen as well as logged, each
+#: line prefixed with the step so the two concurrent streams stay legible.
+#: strandeval is a handful of short bwa/samtools calls whose chatter says
+#: nothing a reader needs; it stays in its log.
+LOUD_STEPS = ("transrate", "busco")
+
+#: One lock for every echoed line, so two tools never interleave mid-line.
+_PRINT_LOCK = threading.Lock()
 
 
 def read_version():
@@ -89,6 +101,41 @@ class Eval:
             HERE / "busco_dbs")
         self.strand_script = Path(args.examine_strand).resolve() if args.examine_strand else (
             HERE / "scripts" / "examine_strand.pl")
+        # Quoted, as in oyster.py, so the echoed line can be pasted back.
+        self.run_cmd = " ".join(
+            shlex.quote(a) for a in [Path(sys.argv[0]).name] + sys.argv[1:])
+
+    def welcome(self):
+        """Say what is being scored, with what, and where the output goes."""
+        print(RED)
+        print("    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+        print("                    _.-~~~~~-._")
+        print("                 .-~   o   o   ~-.        OYSTER RIVER PROTOCOL")
+        print("                (   .-'~~~~~'-.   )         .--.")
+        print("                 '-.___________.-'         ( () )--  assembly_eval")
+        print("                     '-.___.-'              '--'")
+        print("    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + RESET + "\n")
+        print(f"    version   {self.version} (assembly_eval)")
+        print(textwrap.fill(
+            self.run_cmd, width=78, break_long_words=False, break_on_hyphens=False,
+            initial_indent="    command   ", subsequent_indent=" " * 14))
+        print()
+        print(f"    assembly  {self.assembly}")
+        print(f"    read1     {self.read1}")
+        print(f"    read2     {self.read2}")
+        print(f"    runout    {self.runout}")
+        print(f"    outdir    {self.outdir}")
+        print(f"    cpu/mem   {self.cpu} threads, {self.mem}G (split across the steps)")
+        print(f"    steps     {', '.join(self.steps) or 'none'}"
+              + (f"   (skipped: {', '.join(self.args.skip)})" if self.args.skip else ""))
+        if "busco" in self.steps:
+            print(f"    lineage   {self.lineage}")
+        if self.pytransrate_args:
+            print(f"    pytransrate args  {' '.join(self.pytransrate_args)}")
+        print(f"    conda     {'off (tools from PATH)' if self.args.no_conda else f'envs {self.args.env}, {self.args.env_busco}, {self.args.env_trinity}'}")
+        print("\n    This scores an assembly you already have, NOT a full ORP run: nothing")
+        print("    is assembled, trimmed, corrected or filtered. The reads are used as")
+        print("    given, and the report has no UNIQUE GENES lines.\n")
 
     # -- plumbing ------------------------------------------------------------
 
@@ -98,13 +145,32 @@ class Eval:
             return cmd
         return ["conda", "run", "--no-capture-output", "-n", env, *cmd]
 
-    def run(self, step, cmd, cwd=None, stdout=None):
-        """Run cmd, appending its output to logs/<step>.log (or `stdout`)."""
+    def run(self, step, cmd, cwd=None, stdout=None, env=None):
+        """Run cmd, appending its output to logs/<step>.log (or `stdout`).
+
+        For a LOUD_STEPS step, stdout and stderr are also echoed to the
+        screen line by line, prefixed with `[step]`.
+        """
+        cmd = [str(c) for c in cmd]
         with open(self.logs / f"{step}.log", "a") as log:
-            log.write(f"$ {' '.join(str(c) for c in cmd)}\n")
+            log.write(f"$ {' '.join(cmd)}\n")
             log.flush()
-            subprocess.run(cmd, cwd=cwd, check=True,
-                           stdout=stdout or log, stderr=log)
+            if step not in LOUD_STEPS or stdout is not None:
+                subprocess.run(cmd, cwd=cwd, env=env, check=True,
+                               stdout=stdout or log, stderr=log)
+                return
+            with _PRINT_LOCK:
+                print(f"[{step}] + {' '.join(cmd)}")
+            proc = subprocess.Popen(cmd, cwd=cwd, env=env, stdout=subprocess.PIPE,
+                                    stderr=subprocess.STDOUT, universal_newlines=True,
+                                    errors="replace", bufsize=1)
+            for line in proc.stdout:
+                log.write(line)
+                log.flush()
+                with _PRINT_LOCK:
+                    print(f"[{step}] {line.rstrip()}")
+            if proc.wait():
+                raise subprocess.CalledProcessError(proc.returncode, cmd)
 
     def sentinel(self, step):
         return self.reports / f"{self.runout}.{step}.done"
@@ -154,12 +220,8 @@ class Eval:
         env = os.environ.copy()
         if self.busco_config.is_file():
             env["BUSCO_CONFIG_FILE"] = str(self.busco_config)
-        with open(self.logs / "busco.log", "a") as log:
-            full = self.conda_cmd(self.args.env_busco, cmd)
-            log.write(f"$ {' '.join(str(c) for c in full)}\n")
-            log.flush()
-            subprocess.run(full, cwd=self.reports, env=env, check=True,
-                           stdout=log, stderr=log)
+        self.run("busco", self.conda_cmd(self.args.env_busco, cmd),
+                 cwd=self.reports, env=env)
 
     def trinity_perllib(self):
         res = subprocess.run(
@@ -271,6 +333,7 @@ class Eval:
     def main(self):
         start = time.time()
         self.steps = [s for s in STEPS if s not in self.args.skip]
+        self.welcome()
         self.preflight()
         for d in (self.reports, self.logs, self.work):
             d.mkdir(parents=True, exist_ok=True)
@@ -351,6 +414,9 @@ def parse_args():
 
 
 def main():
+    # Before anything prints: block-buffered stdout puts the banner and the
+    # [step] lines out of order with the tools' output in a redirected log.
+    line_buffer_stdio()
     Eval(parse_args()).main()
 
 
