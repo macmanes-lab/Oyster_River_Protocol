@@ -339,7 +339,10 @@ class Eval:
             d.mkdir(parents=True, exist_ok=True)
         if self.args.force:
             for s in STEPS:
-                self.sentinel(s).unlink(missing_ok=True)
+                # Not unlink(missing_ok=True): that is 3.8+, and this runs
+                # under the cluster's system python3, 3.6.
+                if self.sentinel(s).exists():
+                    self.sentinel(s).unlink()
 
         todo = [s for s in self.steps if not self.sentinel(s).exists()]
         for s in self.steps:

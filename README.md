@@ -55,6 +55,43 @@ Three things differ from `oyster.py`, and all three are worth knowing before you
 
 `python3 chowder.py --help` prints the full flag reference, and [All flags (`chowder.py`)](#all-flags-chowderpy) below is the same list. There are no assembler flags -- no k-mers, no `--strand`, no `--normalize-reads` -- and preflight does not require SPAdes, Trinity or Trans-ABySS, since a merge never runs them. It does check for `bwa`, which `strandeval` runs.
 
+### Scoring an assembly you already have (`assembly_eval.py`)
+
+`assembly_eval.py` scores one transcriptome assembly the way an ORP run scores its own, without assembling or merging anything. Use it to put an assembly from another pipeline, a published transcriptome, or an older ORP run on the same scale as a new one:
+
+```bash
+python3 assembly_eval.py --assembly my.fasta --read1 R1.fq.gz --read2 R2.fq.gz \
+        --cpu 24 --mem 110 --runout myrun
+```
+
+It runs the three evaluations an ORP run ends with:
+
+- **pyTransRate**, the contig-level read-mapping score (`TRANSRATE SCORE` and `TRANSRATE OPTIMAL SCORE`)
+- **BUSCO** completeness against `--lineage` (default `eukaryota_odb12.2`)
+- **strandeval**, the strand-specificity histogram, plus the proper-pair rate from the same mapping
+
+These are the same commands, conda envs and seeds `oyster.py` uses, and the result is a `reports/qualreport.<run>` in the same layout, so a report from each diffs cleanly. The only lines missing are `UNIQUE GENES`, because those compare the assemblers inside one ORP run and a single assembly has nothing to compare against.
+
+Some things to know before you run it:
+
+- **The reads are used as given.** Nothing is trimmed or error-corrected, so pass the pair you want the assembly scored against, normally the one it was built from. The assembly must be uncompressed fasta.
+- **The three steps run at the same time**, with `--cpu` and `--mem` split between them: pyTransRate gets half, and BUSCO and strandeval a quarter each. pyTransRate is the slow step, and BUSCO gains little past a few threads.
+- **It prints as it goes.** The run opens with a banner, the command line, and the inputs and settings. pyTransRate and BUSCO output then streams to the screen, each line marked `[transrate]` or `[busco]` because the two run together. Every tool's full output is also kept in `logs/<step>.log`.
+- **Interrupted runs resume.** Each step that finishes leaves `reports/<run>.<step>.done`, and a re-run skips steps that have one. `--force` redoes all of them, and `--skip transrate busco strandeval` leaves out any you don't need. If a step fails, the report is still written, with that step's lines blank.
+
+Output goes to `--outdir` (default `./<runout>_eval`):
+
+| Path | What it holds |
+|------|---------------|
+| `reports/qualreport.<run>` | the quality report |
+| `reports/transrate_<run>/` | pyTransRate's output |
+| `reports/run_<run>.ORP/` | BUSCO's output |
+| `reports/<run>.strandeval_summary.txt` | the strand histogram |
+| `reports/<run>.flagstat` | `samtools flagstat` of the sampled mapping |
+| `logs/<step>.log` | each tool's full output |
+
+[All flags (`assembly_eval.py`)](#all-flags-assembly_evalpy) below lists every option, and `python3 assembly_eval.py --help` prints the same list.
+
 ### How the assemblies are merged
 
 From 4.1.0 the four assemblies are merged by Swiss-Prot gene, not by OrthoFinder orthogroup:
@@ -197,4 +234,29 @@ There are no assembler flags — no k-mers, no `--strand`, no `--normalize-reads
 | `--pytransrate-args` | none | Extra arguments passed verbatim to both pyTransRate runs (see [Tuning pyTransRate](#tuning-pytransrate) above) |
 | `--dir` | current directory | Working directory |
 | `--version` | — | Print the installed ORP version and exit |
+| `--help` | — | Print this same flag reference and exit |
+
+### All flags (`assembly_eval.py`)
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--assembly` | *(required)* | Assembly fasta to score; must not be gzipped |
+| `--read1` | *(required)* | Path to R1 fastq(.gz), used as given |
+| `--read2` | *(required)* | Path to R2 fastq(.gz) |
+| `--runout` | assembly filename up to the first `.` | Run name used in output file names |
+| `--outdir` | `./<runout>_eval` | Output directory |
+| `--cpu` | all cores | Total threads, split across the steps |
+| `--mem` | `32` | Total memory in GB, split across the steps |
+| `--lineage` | `eukaryota_odb12.2` | BUSCO lineage |
+| `--skip` | none | Steps not to run: any of `transrate`, `busco`, `strandeval` |
+| `--force` | off | Redo steps already marked done |
+| `--no-cleanup` | off | Keep strandeval's BAM and bwa index |
+| `--pytransrate-args` | none | Extra pyTransRate arguments as one quoted string (see [Tuning pyTransRate](#tuning-pytransrate)) |
+| `--busco-config` | `software/config.ini` if present | BUSCO `config.ini` |
+| `--busco-download-path` | `busco_dbs/` beside the script if present | BUSCO lineage dataset directory |
+| `--examine-strand` | `scripts/examine_strand.pl` | Path to `examine_strand.pl` |
+| `--no-conda` | off | Run tools from `PATH` instead of the conda envs; preflight checks they are all there |
+| `--env` | `orp` | Conda env with pyTransRate and samtools |
+| `--env-busco` | `orp_busco` | Conda env with BUSCO |
+| `--env-trinity` | `orp_trinity` | Conda env with Trinity, bwa, seqtk and hist |
 | `--help` | — | Print this same flag reference and exit |

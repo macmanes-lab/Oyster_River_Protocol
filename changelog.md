@@ -2,6 +2,15 @@
 
 ORP Version 4.1.0-dev1
 
+- **`assembly_eval.py` prints what it is doing, and is documented**
+  (`assembly_eval.py`, `README.md`, `INSTALL.md`). It now starts with a
+  banner, the command line, and the inputs and settings, as `chowder.py`
+  does. pyTransRate and BUSCO output streams to the screen, each line marked
+  `[transrate]` or `[busco]`, and is still kept in `logs/<step>.log`. The
+  README has a section on what it runs, what it writes and how it resumes,
+  plus a full flag table. `--force` no longer uses `unlink(missing_ok=True)`,
+  which needs Python 3.8 and would have crashed under a cluster's system
+  python3 3.6.
 - **`--min-cov 2` is the default filter** (`oyster.py`, `chowder.py`,
   4.1.0-dev30). A contig without a swissprot hit now needs at least 2x
   coverage to stay in `.ORP.fasta`; before, nothing was filtered unless
