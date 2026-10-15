@@ -3316,10 +3316,11 @@ def parse_args():
     p.add_argument("--lineage", default="eukaryota_odb12.2", help="BUSCO lineage (default: eukaryota_odb12.2)")
     p.add_argument("--normalize-reads", action="store_true", help="let Trinity normalize reads (default: off, i.e. --no_normalize_reads)")
     p.add_argument("--tpm-filt", type=float, default=0, help="TPM filter threshold (default: 0)")
-    p.add_argument("--min-cov", type=float, default=0,
+    p.add_argument("--min-cov", type=float, default=2,
                    help="drop contigs with no swissprot hit whose coverage (salmon NumReads x "
                         "mean fragment length / contig length) is below this; combines with "
-                        "--tpm-filt, a contig must pass both (default: 0)")
+                        "--tpm-filt, a contig must pass both. Raise it for deep libraries "
+                        "(hundreds of millions of reads); 0 turns it off (default: 2)")
     p.add_argument("--trimmed-corrected-reads", dest="corrected_reads", action="store_true",
                    help="the reads have already been through trimmomatic and "
                         "rcorrector; skip both and assemble them as they are "

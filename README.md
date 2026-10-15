@@ -108,6 +108,27 @@ Re-running `oyster.py` on a directory whose run already finished and was cleaned
 
 Re-running on an unfinished run resumes it: a step whose outputs exist and are newer than its inputs is skipped. A step that was killed or failed partway is re-run even if it left output files behind, since tools like rcorrector and diamond write as they go and a half-written file would otherwise look finished. Each step leaves `reports/.<run>.<step>.running` while it runs and removes it when it succeeds.
 
+### The expression filter (`--min-cov`, `--tpm-filt`)
+
+After salmon quantifies the merged assembly, contigs **without a Swiss-Prot hit** are dropped if they look like noise; a contig with a hit is never dropped by this step. Two thresholds decide it, and a contig has to pass both:
+
+- **`--min-cov`** (default `2`): coverage, salmon's NumReads x mean fragment length / contig length -- the average number of read-pair fragments over each base of the contig.
+- **`--tpm-filt`** (default `0`, off): TPM.
+
+Before 4.1.0-dev30 nothing was filtered unless you gave `--tpm-filt` (1 was the usual value); now coverage is filtered by default. Coverage rather than TPM because TPM is a share of a million, so a fixed TPM cutoff means something different in every library: across the 119 final assemblies of the 108-sample test set, 1 TPM was anywhere from 4 to 183 reads per kb, mostly following sequencing depth. On a deep library `--tpm-filt 1` removes far more than intended (on a 451M-read tuco library, 1 TPM is 41x coverage, and it removed 91% of the contigs without a hit); on a shallow one it removes almost nothing. TPM also divides by salmon's effective length, which lets a short contig pass on a couple of reads. Coverage means the same thing in every library.
+
+**`--min-cov 2` is a floor, not a recommendation for every library -- raise it with sequencing depth.** It was chosen on five libraries of 16-123 million read pairs, where it removed fewer no-hit contigs than `--tpm-filt 1`, mapped as many or more reads back to the assembly, and kept BUSCO and unique genes unchanged (the filter never touches a contig with a hit). But the same number of noise fragments becomes more coverage the deeper you sequence, so on a much deeper library 2x keeps a lot of noise: on the 451M-read tuco library it removed only 10% of the no-hit contigs. As a rough, provisional guide (the deep-library end rests on one library so far):
+
+| read pairs | `--min-cov` |
+|---|---|
+| up to ~100M | `2` (default) |
+| a few hundred million | `5`-`10` |
+| more, or many tissues pooled | `10`-`20`, chosen from `filter_candidates.tsv` |
+
+You do not have to guess blind. Every run writes `reports/<run>.filter_candidates.tsv`, which lists how many contigs, and how many without a hit, each of a range of coverage, TPM and read-count thresholds would keep, from the same quantification, and its header gives the library's `cov_at_1tpm` (how much coverage 1 TPM is here). If the applied threshold looks too loose or too strict, re-run the same command with a new `--min-cov`: the threshold is recorded in `assemblies/working/<run>.filter.settings`, so a resumed run re-filters and redoes only the steps from the filter on (BUSCO, pyTransRate, the report), not the assemblers or the merge. That needs the run's intermediates, which cleanup removes, so on a deep library you expect to tune, run with `--no-cleanup` and then re-run without it once you've settled on a value. Pass `--min-cov 0 --tpm-filt 1` to get the old TPM behaviour back, or `--min-cov 0` to switch filtering off.
+
+The experiments behind this are in [experiments/dynamic_cov/](experiments/dynamic_cov/README.md).
+
 ### Tuning pyTransRate
 
 Both pyTransRate runs -- the one that scores the pooled fasta for the two-track selection, and the one that scores the finished assembly for the report -- take a fixed argument list. `--pytransrate-args` appends to both, as one quoted string, `shlex`-split so the arguments arrive separately:
@@ -138,7 +159,7 @@ Because it appends, a value given here overrides the same flag ORP passes above 
 | `--lineage` | `eukaryota_odb12.2` | BUSCO lineage |
 | `--normalize-reads` | off | Let Trinity normalize reads (default is `--no_normalize_reads`) |
 | `--tpm-filt` | `0` | TPM filter threshold |
-| `--min-cov` | `0` | coverage filter threshold (NumReads x mean fragment length / contig length); a contig must also pass `--tpm-filt` |
+| `--min-cov` | `2` | coverage filter threshold (NumReads x mean fragment length / contig length); a contig must also pass `--tpm-filt`. Raise it for deep libraries -- see [The expression filter](#the-expression-filter---min-cov---tpm-filt) |
 | `--trimmed-corrected-reads` | off | Treat `--read1`/`--read2` as already trimmed and error-corrected, and skip trimmomatic and rcorrector (see [Reads you have already corrected](#reads-you-have-already-corrected) above) |
 | `--spades1-kmer` | `auto` | rnaSPAdes k-mer(s) for the spadesauto assembly — `auto` lets rnaSPAdes pick its documented default pair (~1/3 and ~1/2 of maximum read length). Also accepts percentages or an explicit list, same forms as `--spades2-kmer` |
 | `--spades2-kmer` | `60%,75%` | rnaSPAdes k-mer(s) for the spadeshigh assembly — percentages of maximum read length, an explicit comma-separated list of odd sizes under 128, or `auto`. Percentages resolve per dataset (61,75 at 101bp reads; 89,113 at 150bp), clamped to rnaSPAdes' 127 ceiling |
@@ -170,7 +191,7 @@ There are no assembler flags — no k-mers, no `--strand`, no `--normalize-reads
 | `--runout` | `USER_RUN` | Run name prefix |
 | `--lineage` | `eukaryota_odb12.2` | BUSCO lineage |
 | `--tpm-filt` | `0` | TPM filter threshold |
-| `--min-cov` | `0` | coverage filter threshold (NumReads x mean fragment length / contig length); a contig must also pass `--tpm-filt` |
+| `--min-cov` | `2` | coverage filter threshold (NumReads x mean fragment length / contig length); a contig must also pass `--tpm-filt`. Raise it for deep libraries -- see [The expression filter](#the-expression-filter---min-cov---tpm-filt) |
 | `--max-parallel` | `2` | `1` runs the short jobs that would otherwise run beside a long one (see [Parallel task management](#parallel-task-management) above) one after the other |
 | `--no-cleanup` | off | Keep every file the run produces, uncompressed -- for debugging. Alias: `--keep-intermediates` |
 | `--pytransrate-args` | none | Extra arguments passed verbatim to both pyTransRate runs (see [Tuning pyTransRate](#tuning-pytransrate) above) |

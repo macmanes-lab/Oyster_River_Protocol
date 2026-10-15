@@ -70,3 +70,35 @@ contigs removed and those among them with an ORF > 149 codons:
   and on the deep libraries removes a third to a half as many long-ORF
   contigs as tpm1. On the shallow ones it costs mapping (SRR1138704
   -0.5%) and removes the most long-ORF contigs of any rule.
+
+## A deep library: tuco (2026-10-15)
+
+The tuco chowder merge (451M read pairs, Premise `~/tuco/assembly`, run
+`380C_0C5D_001F_chowder`) is far deeper than any sweep dataset: there, 1 TPM
+is 41x coverage. `preview.py` on its quant (`results/tuco_removed_by_rule.tsv`;
+inputs in `~/dyncov/tuco_cov`), of 1,553,257 contigs without a hit:
+
+| rule | removed | of those, ORF > 149 codons |
+|---|---|---|
+| tpm1 | 1,415,196 (91%) | 33,399 |
+| cov2 | 161,889 (10%) | 2,948 |
+| cov5 | 457,493 (29%) | 5,815 |
+| cov10 | 893,211 (58%) | 11,380 |
+| cov20 | 1,206,963 (78%) | 19,715 |
+
+So at this depth tpm1 is very aggressive and cov2 barely filters: a noise
+contig with a fixed share of reads has 20x the coverage it would have at 20M
+pairs. Assemblies at cov2, cov5 and cov10 are being scored (mammalia_odb12
+BUSCO and pyTransRate; jobs 1322721, 1322723, 1322724 when this was
+written); add the numbers here when they land.
+
+## Decision
+
+`--min-cov 2` became the default in 4.1.0-dev30 (before, nothing was filtered
+unless `--tpm-filt` was given). On the five sweep libraries it
+does what the filter is for -- BUSCO and unique genes never move, and
+pyTransRate is within 0.03 of tpm1 either way -- while removing several
+times fewer contigs with a long ORF than tpm1 on the deep ones. 2 is a
+floor for libraries of roughly the sweep's depth (16-123M pairs); the
+README's usage section tells users to raise it with depth and to pick a
+value from `reports/<run>.filter_candidates.tsv`, as tuco shows they must.

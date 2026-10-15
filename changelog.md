@@ -2,6 +2,21 @@
 
 ORP Version 4.1.0-dev1
 
+- **`--min-cov 2` is the default filter** (`oyster.py`, `chowder.py`,
+  4.1.0-dev30). A contig without a swissprot hit now needs at least 2x
+  coverage to stay in `.ORP.fasta`; before, nothing was filtered unless
+  `--tpm-filt` was given, and `--tpm-filt` still defaults to 0. On five dev29
+  libraries of 16-123M read pairs (`experiments/dynamic_cov/`), cov2 removed
+  4-6x fewer no-hit contigs than `--tpm-filt 1` on the deep ones (2-5x fewer
+  with an ORF over 149 codons), left BUSCO and unique genes unchanged, and
+  scored within 0.03 of tpm1 on pyTransRate either way. The default is a
+  floor: noise contigs gain coverage with depth, so deep libraries should
+  raise it (on the 451M-read tuco library cov2 removed 10% of no-hit
+  contigs, tpm1 91%). This changes the output of any run that doesn't pass
+  `--min-cov`. A resumed dev29.cov1 run re-filters (its `filter.settings`
+  stamp read `min_cov=0`); a run from before the stamp existed is dated to
+  its filter.done and keeps its old split, as `filter_settings_stamp`
+  documents. `--min-cov 0` restores the old behaviour.
 - **pyTransRate no longer scores a rewritten assembly against the old one's
   index** (`oyster.py`, 4.1.0-dev29.cov1, `clear_pytransrate_outdir`). The
   snap index, BAM and salmon quant left in `reports/pytransrate_<run>/`
@@ -19,8 +34,8 @@ ORP Version 4.1.0-dev1
   4-183 reads per kb depending on the sample (119 final assemblies of the
   108-sample set) -- mostly a matter of depth -- and its effective-length
   correction lets a short contig pass on a couple of reads. Coverage means
-  the same thing in every sample. Default 0, so nothing changes unless it is
-  given. Every run now also writes `reports/<run>.filter_candidates.tsv`
+  the same thing in every sample. (Default 0 as first added; 2 from
+  4.1.0-dev30, see above.) Every run now also writes `reports/<run>.filter_candidates.tsv`
   (what each of a range of TPM, coverage and read-count thresholds would
   keep) and `reports/<run>.quant.sf.gz` (cleanup removes `quants/`), and
   changing either threshold on a resumed run re-filters
