@@ -20,7 +20,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import collect  # noqa: E402
 
 RULES = [("tpm0.5", "tpm", 0.5), ("tpm1", "tpm", 1), ("cov0.5", "cov", 0.5), ("cov1", "cov", 1),
-         ("cov2", "cov", 2), ("cov5", "cov", 5)]
+         ("cov2", "cov", 2), ("cov5", "cov", 5), ("cov10", "cov", 10), ("cov20", "cov", 20),
+         ("reads10", "reads", 10)]
+COLUMN = {"tpm": 0, "cov": 1, "reads": 2}
 
 
 def main():
@@ -38,9 +40,9 @@ def main():
             for line in f:
                 n, length, _, tpm, reads = line.rstrip("\n").split("\t")
                 if n in orfs:
-                    q[n] = (float(tpm), float(reads) * fl / float(length))
+                    q[n] = (float(tpm), float(reads) * fl / float(length), float(reads))
         for label, kind, x in RULES:
-            kept = {n for n, (tpm, cov) in q.items() if (tpm if kind == "tpm" else cov) >= x}
+            kept = {n for n, v in q.items() if v[COLUMN[kind]] >= x}
             c = collect.orf_columns(orfs, kept)
             long_removed = sum(1 for n in orfs if n not in kept and orfs[n][1] > collect.LONG_ORF_CODONS)
             print(f"{name}\t{label}\t{len(orfs)}\t{c['nohit_removed']}\t{long_removed}\t"
