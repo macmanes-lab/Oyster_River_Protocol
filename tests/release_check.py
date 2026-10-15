@@ -22,7 +22,7 @@ status. Three tiers, each a superset of the cost of the one before:
              an hour in all with --jobs 1. Complete runs through every
              option, then the resume, rerun, cleanup and failure paths:
 
-               oyster_default      defaults; a rerun is a no-op
+               oyster_default      defaults (--min-cov 2); a rerun is a no-op
                oyster_options      --strand RF --normalize-reads --tpm-filt 1
                                    explicit k-mers, --transabyss-kmer,
                                    --max-parallel 1, --busco-threads,
@@ -38,6 +38,11 @@ status. Three tiers, each a superset of the cost of the one before:
                                    --corrected-reads --tpm-filt 1
                                    --max-parallel 1 --no-cleanup
                                                                (oyster_default)
+               chowder_refilter    chowder_options resumed with --tpm-filt 0
+                                   --min-cov 0: re-filters and re-scores
+                                   against a fresh index, redoes nothing
+                                   earlier; a second rerun is a no-op
+                                                               (chowder_options)
                chowder_collide     two inputs with one filename, --seed
                                                                (oyster_default)
                strandeval_standalone  scripts/strandeval.py, with and without
@@ -74,6 +79,7 @@ tests/release_check.sbatch wraps it.
 
 import argparse
 import concurrent.futures
+import csv
 import contextlib
 import gzip
 import io
@@ -347,6 +353,31 @@ def check_finished(d, runout, kind, cleaned=True, corrected=False, labels=None):
     return names, fields
 
 
+def filter_candidates(d, runout):
+    """reports/<run>.filter_candidates.tsv as (header, {rule: [pass, nohit_pass,
+    hit_rescued, final]})."""
+    path = d / "reports" / f"{runout}.filter_candidates.tsv"
+    require(path.is_file(), f"no {path.name} in reports/")
+    header, rows = {}, {}
+    for line in path.read_text().splitlines():
+        cols = line.split("\t")
+        if line.startswith("# "):
+            header[cols[0][2:]] = cols[1]
+        elif cols[0] != "rule" and cols[1] != "NA":
+            rows[cols[0]] = [int(c) for c in cols[1:5]]
+    return header, rows
+
+
+def check_applied_filter(d, runout, names, label):
+    """The filter applied `label`, and the assembly is what it says it kept."""
+    require((d / "reports" / f"{runout}.quant.sf.gz").is_file(), "no quant.sf.gz in reports/")
+    _, rows = filter_candidates(d, runout)
+    applied = rows.get(f"applied:{label}")
+    require(applied, f"filter_candidates.tsv has no applied:{label} row: {sorted(rows)}")
+    require(applied[3] == len(names), f"applied:{label} says {applied[3]} contigs are kept, "
+                                      f"the assembly has {len(names)}")
+
+
 def log_has(log, text, why):
     require(text in log, f"{why}: {text!r} not in the log")
 
@@ -519,6 +550,13 @@ def case_twotrack_select(ctx, run):
         raise Skip("its tools are not on PATH")
 
 
+@case("quick")
+def case_filter_units(ctx, run):
+    """tests/test_filter_cov.py and tests/test_clear_pytransrate.py"""
+    for name in ("test_filter_cov.py", "test_clear_pytransrate.py"):
+        run([sys.executable, HERE / name])
+
+
 # -- preflight tier: conda, no real work -------------------------------------------
 
 def tiny_fasta(path, names=("c1", "c2")):
@@ -591,7 +629,9 @@ def case_oyster_default(ctx, run):
     log_has(out, "[kmer] spadeshigh: k = 59,75", "default spades2 k (60%,75% of 100)")
     require(all("--kmer 32" in c for c in commands(out, "transabyss")), "default Trans-ABySS k")
     log_has(out, "with strandeval beside it", "--max-parallel 2 runs strandeval beside")
-    log_has(out, "THERE IS NO LOW STUFF", "--tpm-filt 0 drops nothing")
+    log_has(out, "PART: TPM_FILT MAKE LOW AND HIGH", "the filter ran")
+    names = fasta_names(d / "assemblies" / "oyster_default.ORP.fasta")
+    check_applied_filter(d, "oyster_default", names, "cov>=2")
 
     orp = d / "assemblies" / "oyster_default.ORP.fasta"
     mtime = orp.stat().st_mtime
@@ -755,6 +795,66 @@ def case_chowder_options(ctx, run):
     require(low.exists(), "no LOWEXP list")
     stray = [n for n in names if n not in keep]
     require(not stray, f"{len(stray)} contigs below TPM 1 with no hit kept, e.g. {stray[:3]}")
+    check_applied_filter(d, "chowder_options", names, "tpm>=1,cov>=2")
+
+
+@case("full", needs=("chowder_options",))
+def case_chowder_refilter(ctx, run):
+    """a resumed run given a new --min-cov re-filters and re-scores, nothing earlier"""
+    src = ctx.workdir / "chowder_options"
+    if not (src / "reports" / "qualreport.chowder_options").is_file():
+        raise Skip(f"needs a finished chowder_options run in {ctx.workdir}")
+    d = ctx.case_dir("chowder_refilter", fresh=True)
+    shutil.rmtree(d)
+    shutil.copytree(src, d, symlinks=True)
+    asm = d / "assemblies"
+    orp = asm / "chowder_options.ORP.fasta"
+    before = set(fasta_names(orp))
+    inter = asm / "chowder_options.ORP.intermediate.fasta"
+    inter_mtime = inter.stat().st_mtime
+
+    # chowder_options' own command, with the filter off: the assembly can only grow.
+    o = ctx.workdir / "oyster_default"
+    inputs = [o / "assemblies" / f"oyster_default.{a}" for a in
+              ("trinity.Trinity.fasta.gz", "transabyss.fasta.gz",
+               "spadeshigh.fasta.gz", "spadesauto.fasta.gz")]
+    c1, c2 = (o / "rcorr" / f"oyster_default.TRIM_{i}P.cor.fq.gz" for i in (1, 2))
+    args = ["--read1", c1, "--read2", c2, "--runout", "chowder_options",
+            "--assemblies", *inputs, "--labels", "tri", "tab", "sphi", "spauto",
+            "--assembly-order", "given", "--corrected-reads", "--tpm-filt", "0",
+            "--min-cov", "0", "--max-parallel", "1", "--no-cleanup", "--busco-threads", "2"]
+    out = run.chowder(d, *args)
+    names, _ = check_finished(d, "chowder_options", "chowder", cleaned=False,
+                              corrected=True, labels=["tri", "tab", "sphi", "spauto"])
+    log_has(out, "PART: TPM_FILT MAKE LOW AND HIGH", "a changed threshold re-filters")
+    log_has(out, "THERE IS NO LOW STUFF", "--tpm-filt 0 --min-cov 0 drops nothing")
+    for tool in ("cd-hit-est", "salmon"):
+        require(not commands(out, tool), f"re-filtering re-ran {tool}")
+    require(inter.stat().st_mtime == inter_mtime, "re-filtering rewrote the intermediate")
+    settings = (asm / "working" / "chowder_options.filter.settings").read_text()
+    require(settings == "tpm_filt=0 min_cov=0\n", f"filter.settings says {settings!r}")
+    added = set(names) - before
+    require(added and before <= set(names),
+            f"the unfiltered assembly should be a superset: +{len(added)}, "
+            f"-{len(before - set(names))}")
+    check_applied_filter(d, "chowder_options", names, "none")
+
+    # pyTransRate scored the new assembly, not the old one's index: every
+    # contig is in contigs.csv, and the added ones got reads.
+    csv_path = next((d / "reports" / "pytransrate_chowder_options").rglob("contigs.csv"), None)
+    require(csv_path, "no pyTransRate contigs.csv")
+    with open(csv_path) as f:
+        cov = {r["contig_name"]: float(r["coverage"] or 0) for r in csv.DictReader(f)}
+    require(set(cov) == set(names), f"contigs.csv has {len(cov)} contigs, the assembly {len(names)}")
+    zero = [n for n in added if cov[n] == 0]
+    require(len(zero) < len(added) / 2, f"{len(zero)}/{len(added)} added contigs have no "
+                                        "pyTransRate coverage -- scored against a stale index?")
+
+    # The same command again changes nothing.
+    mtime = orp.stat().st_mtime
+    out = run.chowder(d, *args)
+    log_lacks(out, "PART: TPM_FILT MAKE LOW AND HIGH", "unchanged thresholds re-filtered")
+    require(orp.stat().st_mtime == mtime, "unchanged thresholds rewrote the assembly")
 
 
 @case("full", needs=("oyster_default",))

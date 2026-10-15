@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Test oyster.py's filter_tpm: --tpm-filt, --min-cov, and what it reports.
+"""Test oyster.py's filter_tpm: --tpm-filt, --min-cov, and what it reports;
+filter_settings_stamp; and the --min-cov default.
 
 usage: python tests/test_filter_cov.py
 
@@ -18,6 +19,7 @@ Exits non-zero on a failure.
 
 import gzip
 import json
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -110,6 +112,52 @@ with tempfile.TemporaryDirectory() as tmp:
     check(not low, "no fragment length is fine when --min-cov is 0")
     check(cand["cov>=1"] is None and cand["tpm>=1"] is not None,
           "without a fragment length, coverage rows are NA and the rest are not")
+
+# filter_settings_stamp: a changed threshold must make the filter step stale.
+def stamper(tmp, tpm_filt, min_cov):
+    p = object.__new__(Pipeline)
+    p.runout = "t"
+    p.assemblies_working = Path(tmp) / "assemblies" / "working"
+    p.tpm_filt, p.min_cov = tpm_filt, min_cov
+    return p
+
+
+with tempfile.TemporaryDirectory() as tmp:
+    done = Path(tmp) / "assemblies" / "t.filter.done"
+    stamp = stamper(tmp, 0, 2).filter_settings_stamp(done)
+    check(stamp.read_text() == "tpm_filt=0 min_cov=2\n", f"new stamp says {stamp.read_text()!r}")
+    os.utime(stamp, (1000, 1000))
+    stamper(tmp, 0, 2).filter_settings_stamp(done)
+    check(stamp.stat().st_mtime == 1000, "unchanged settings rewrote the stamp")
+    done.touch()
+    os.utime(done, (2000, 2000))
+    stamper(tmp, 0, 5).filter_settings_stamp(done)
+    check(stamp.read_text() == "tpm_filt=0 min_cov=5\n", f"changed stamp says {stamp.read_text()!r}")
+    check(stamp.stat().st_mtime > done.stat().st_mtime,
+          "a changed --min-cov left the stamp older than filter.done, so no re-filter")
+
+with tempfile.TemporaryDirectory() as tmp:
+    # A run filtered before the stamp existed: dated to its filter.done, so
+    # resuming it doesn't redo everything after the filter.
+    done = Path(tmp) / "assemblies" / "t.filter.done"
+    done.parent.mkdir(parents=True)
+    done.touch()
+    os.utime(done, (3000, 3000))
+    stamp = stamper(tmp, 0, 2).filter_settings_stamp(done)
+    check(stamp.stat().st_mtime == 3000, "a first stamp on an old run is not dated to filter.done")
+
+# The default is --min-cov 2 on both entry points.
+import chowder  # noqa: E402
+import oyster  # noqa: E402
+
+argv = sys.argv
+try:
+    sys.argv = ["oyster.py", "--read1", "a.fq", "--read2", "b.fq"]
+    check(oyster.parse_args().min_cov == 2, "oyster.py --min-cov default is not 2")
+    sys.argv = ["chowder.py", "--read1", "a.fq", "--read2", "b.fq", "--assemblies", "x.fa", "y.fa"]
+    check(chowder.parse_args().min_cov == 2, "chowder.py --min-cov default is not 2")
+finally:
+    sys.argv = argv
 
 if failures:
     print(f"{len(failures)} failure(s)")
