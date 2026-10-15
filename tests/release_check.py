@@ -255,9 +255,14 @@ def fasta_names(path):
 
 
 def commands(log, tool):
-    """The `+ ...` command lines oyster.py printed that run `tool`."""
-    return [l for l in log.splitlines()
-            if l.startswith("+ ") and re.search(rf"(^|[\s/]){re.escape(tool)}(\s|$)", l)]
+    """The `+ ...` command lines oyster.py printed that run `tool`.
+
+    A command echoed from one thread can land on the end of another's
+    `=== step -- start ===` header (print writes the text and the newline
+    separately), so a `+ ` straight after `===` starts a command too.
+    """
+    lines = (m.group(1) for m in re.finditer(r"^(?:.*===)?(\+ .*)$", log, re.M))
+    return [l for l in lines if re.search(rf"(^|[\s/]){re.escape(tool)}(\s|$)", l)]
 
 
 def qualreport(d, runout):
