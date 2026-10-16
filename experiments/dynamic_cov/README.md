@@ -102,3 +102,27 @@ times fewer contigs with a long ORF than tpm1 on the deep ones. 2 is a
 floor for libraries of roughly the sweep's depth (16-123M pairs); the
 README's usage section tells users to raise it with depth and to pick a
 value from `reports/<run>.filter_candidates.tsv`, as tuco shows they must.
+
+## How the threshold should move with depth (in progress, 2026-10-16)
+
+For a `--min-cov auto`: salmon over one run's pre-filter index on nested
+subsamples of its trimmed + corrected reads (`subsample.sbatch`), then
+`depth_curve.py`, which bins the no-hit contigs by coverage and gives each
+bin's excess of long ORFs (> 149 codons) over shuffled sequence. Noise has
+none; the noise floor is where the excess bottoms out. Matching removed
+sets across depths would be circular: every contig's coverage grows with
+depth, so that always says "scale linearly", i.e. TPM.
+
+A full-depth dataset directory, `~/dyncov/<NAME>_cov`, has to exist first:
+`assemblies/<NAME>.ORP.{intermediate.fasta,diamond.txt}`,
+`reports/<NAME>.{quant.sf.gz,filter_candidates.tsv}` (links to the run's)
+and `depth.txt` (salmon's `num_processed`). Run `depth_curve.py ROOT <NAME>`
+on it once to cache `nohit_orfs.tsv`, which the subsample dirs link to.
+
+tuco, 15-120M of 480M pairs (jobs 1323242, 240M rerunning as 1323270): the
+noise floor and the coverage at which the excess plateaus both move almost
+in proportion to depth, an exponent of about 0.8-0.9. cov2 at 60M removes
+68% of no-hit contigs; the same share at 480M takes cov ~14. That suggests
+roughly `max(2, 2 x (pairs / 60M) ^ 0.85)`. The script's single
+`crossover_cov` number is unreliable (10, 5, 2, 3, 10 down the depths);
+read the bins. ERR489297 (Anopheles, 200M pairs) is the second library.
