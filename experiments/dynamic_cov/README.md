@@ -119,10 +119,30 @@ A full-depth dataset directory, `~/dyncov/<NAME>_cov`, has to exist first:
 and `depth.txt` (salmon's `num_processed`). Run `depth_curve.py ROOT <NAME>`
 on it once to cache `nohit_orfs.tsv`, which the subsample dirs link to.
 
-tuco, 15-120M of 480M pairs (jobs 1323242, 240M rerunning as 1323270): the
-noise floor and the coverage at which the excess plateaus both move almost
-in proportion to depth, an exponent of about 0.8-0.9. cov2 at 60M removes
-68% of no-hit contigs; the same share at 480M takes cov ~14. That suggests
-roughly `max(2, 2 x (pairs / 60M) ^ 0.85)`. The script's single
-`crossover_cov` number is unreliable (10, 5, 2, 3, 10 down the depths);
-read the bins. ERR489297 (Anopheles, 200M pairs) is the second library.
+Results (`results/{tuco,ERR489297}_depth.{bins,summary}.tsv`): tuco at
+15/30/60/120/240M of 480M pairs (jobs 1323242, 1323270), ERR489297
+(Anopheles) at 15/30/60/120M of 200.8M (job 1323292). The script's single
+`crossover_cov` number is unreliable (tuco 10, 5, 2, 3, 10, 10 down the
+depths); read the bins. One yardstick for both: the coverage at which the
+long-ORF excess reaches half its full-depth plateau (tuco ~0.021, ERR489297
+~0.19).
+
+| pairs | ERR489297 | tuco | 2 x (pairs / 60M) ^ 0.85 |
+|---|---|---|---|
+| 15M | ~1.5 | < 0.5 | 0.6 |
+| 30M | ~2 | ~1.2 | 1.1 |
+| 60M | ~3 | ~2 | 2.0 |
+| 120M | ~6 | ~3.5 | 3.6 |
+| 200-240M | ~8 | ~7 | 5.6-6.5 |
+| 480M | | ~12 | 11.7 |
+
+Within each library the threshold moves almost in proportion to depth
+(exponent 0.8-0.9; ERR489297 0.65-0.8, tuco 0.85-1.0), and the noise floor
+moves with it (ERR489297: under 0.5 at 60M, 1.5 at 120M, 2-3 at 200M).
+The two libraries sit within a factor of about 1.5 of each other at the same
+depth. So a depth-scaled rule, close to a reads-per-kb-per-million cutoff,
+fits. It keeps coverage's advantage over TPM: no effective-length
+correction, so short contigs can't pass on a couple of reads. Below about
+60M pairs the rule asks for less than 2. At 15M pairs cov2 already removes
+78% of ERR489297's no-hit contigs, well into the signal, as the sweep saw on
+SRR1138704 (17M). Whether `auto` should stop at 2 or go lower is open.
