@@ -17,7 +17,9 @@
 #
 # Task i quantifies DEPTHS[i] million read pairs, drawn with seqtk sample at
 # one seed. One seed means R1 and R2 keep the same pairs, and each depth's
-# pairs are a subset of the next one's. The full library (480,093,281 pairs)
+# pairs are a subset of the next one's. salmon 2.7.0 can't read a pipe
+# (it seeks: "Illegal seek"), so the subsample is written to $SCRATCH
+# (the fast fileset; up to ~190 GB for 240M pairs) and deleted after. The full library (480,093,281 pairs)
 # is the chowder run's own quant, already in $ROOT/tuco_cov. Each task
 # writes $ROOT/tuco_d<NNN>_cov laid out like tuco_cov, so preview.py and
 # depth_curve.py read it as is:
@@ -37,6 +39,7 @@ ROOT="${ROOT:-$HOME/dyncov}"
 TUCO="${TUCO:-$HOME/tuco/assembly}"
 RUN=380C_0C5D_001F_chowder
 BIN="${BIN:-$HOME/orp_envs/orp/bin}"
+SCRATCH="${SCRATCH:-/mnt/gpfs01/fast/macmaneslab/macmanes/scratch}"
 
 d=${DEPTHS[$(( SLURM_ARRAY_TASK_ID - 1 ))]}
 name=$(printf "tuco_d%03d" "$d")
@@ -50,23 +53,23 @@ ln -sfn "$TUCO/assemblies/$RUN.ORP.intermediate.fasta" "$DIR/assemblies/$name.OR
 ln -sfn "$TUCO/assemblies/$RUN.ORP.diamond.txt" "$DIR/assemblies/$name.ORP.diamond.txt"
 ln -sfn "$ROOT/tuco_cov/nohit_orfs.tsv" "$DIR/nohit_orfs.tsv"
 
-fifo=$(mktemp -d "${TMPDIR:-/tmp}/tuco_sub.XXXXXX")
-trap 'rm -rf "$fifo"' EXIT
-mkfifo "$fifo/r1.fq" "$fifo/r2.fq"
-"$BIN/seqtk" sample -s "$SEED" "$TUCO/rcorr/$RUN.TRIM_1P.cor.fq" "$frac" > "$fifo/r1.fq" &
+sub="$SCRATCH/$name"
+mkdir -p "$sub"
+trap 'rm -rf "$sub"' EXIT
+"$BIN/seqtk" sample -s "$SEED" "$TUCO/rcorr/$RUN.TRIM_1P.cor.fq" "$frac" > "$sub/r1.fq" &
 pid1=$!
-"$BIN/seqtk" sample -s "$SEED" "$TUCO/rcorr/$RUN.TRIM_2P.cor.fq" "$frac" > "$fifo/r2.fq" &
+"$BIN/seqtk" sample -s "$SEED" "$TUCO/rcorr/$RUN.TRIM_2P.cor.fq" "$frac" > "$sub/r2.fq" &
 pid2=$!
+wait "$pid1"
+wait "$pid2"
+echo "subsample written: $(du -sh "$sub" | cut -f1) -- $(date '+%F %T')"
 
 # ORP's own salmon quant (oyster.py, Oyster.salmon), on the subsample.
 rm -rf "$DIR/quant"
 "$BIN/salmon" quant --no-version-check \
     -p "$CPU" -i "$TUCO/quants/$RUN.shucked.idx" --seqBias --gcBias --libType A \
-    -1 "$fifo/r1.fq" -2 "$fifo/r2.fq" -o "$DIR/quant"
-# A seqtk that died early would hand salmon a short read stream and a
-# plausible-looking quant; its exit status is the only sign.
-wait "$pid1"
-wait "$pid2"
+    -1 "$sub/r1.fq" -2 "$sub/r2.fq" -o "$DIR/quant"
+rm -rf "$sub"
 
 meta="$DIR/quant/aux_info/meta_info.json"
 python3 - "$meta" "$DIR" "$name" <<'EOF'
