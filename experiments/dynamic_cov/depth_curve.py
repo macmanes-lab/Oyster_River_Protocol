@@ -6,10 +6,12 @@ usage: conda run -n orp python depth_curve.py ROOT NAME [NAME ...] [--tsv PREFIX
 For ROOT/<NAME>_cov (subsample.sbatch's tuco_d<NNN>_cov, tuco_cov, or a
 sweep.sbatch dataset), bins the intermediate's contigs without a swissprot
 hit by coverage (salmon NumReads x mean fragment length / length, as
---min-cov computes it) and gives each bin's coding signal: the share open
-over >= 80% of their length, against the same share for their bases
-shuffled (collect.py's ORF columns). The excess of one over the other is
-the signal; noise has none.
+--min-cov computes it) and gives each bin's coding signal: the share with an
+ORF over 149 codons, against the same share for their bases shuffled
+(collect.py's ORF columns). The excess of one over the other is the signal;
+noise has none. (collect.py's other column, open over >= 80% of the
+length, is no use here: short contigs are open end to end by chance, and on
+the sweep and tuco quants its excess is highest in the lowest bins.)
 
 Why not just match removed sets across depths: every expressed contig's
 coverage grows in proportion to depth, so the threshold that removes the
@@ -17,11 +19,18 @@ same contigs at every depth always scales linearly -- that is a TPM cutoff
 again. What should set the threshold is the coverage where the signal
 appears, and how that point moves with depth is the question:
 
-  crossover  the lower edge of the first bin, from the bottom, whose excess
-             reaches half the reference excess and stays there in the next
-             bin. The reference is the excess of the 5% of no-hit contigs
-             with the most coverage, which is at every depth the same
-             mostly-real set.
+  floor      the lowest excess of any bin at coverage >= 1: the noise.
+             On the sweep and tuco quants it sits at coverage 2-3.
+  crossover  the lower edge of the first bin at or above the floor's whose
+             excess, and that of the next two bins, is at least twice the
+             floor: where the signal clears the noise for good. (Searching
+             from coverage 1 instead found 1 on SRR868662, whose floor is
+             at 5 and whose bins below it are already over twice that.)
+  Bins under MIN_BIN contigs are skipped. Bins under coverage 1 are left
+  out of both: their excess is erratic (a few thousand contigs, some of
+  them copies of real genes whose reads salmon gave to the other copy).
+  top5_excess, the excess of the 5% of no-hit contigs with the most
+  coverage, is printed for scale.
 
 With three or more datasets with a known depth, fits
 crossover = a x (pairs / 100M) ^ alpha. alpha near 0 says a fixed --min-cov
@@ -49,6 +58,7 @@ import collect  # noqa: E402
 EDGES = [0, 0.25, 0.5, 1, 1.5, 2, 3, 5, 7, 10, 15, 20, 30, 50, 100, math.inf]
 REMOVED_AT = [1, 2, 5, 10, 20]
 TOP_SHARE = 0.05
+MIN_BIN = 200
 
 
 def depth(ds, cand):
@@ -78,14 +88,14 @@ def coverage(ds, orfs):
 
 
 def signal(names, orfs):
-    """(n, open share, shuffled open share, long-ORF share) of a set of no-hit contigs."""
+    """(n, long-ORF share, shuffled long-ORF share, open-80% share) of a set of no-hit contigs."""
     if not names:
         return 0, None, None, None
-    is_open = sum(1 for n in names if orfs[n][1] * 3 >= collect.ORF_SPAN * orfs[n][0])
-    is_open_shuf = sum(1 for n in names if orfs[n][2] * 3 >= collect.ORF_SPAN * orfs[n][0])
     is_long = sum(1 for n in names if orfs[n][1] > collect.LONG_ORF_CODONS)
+    is_long_shuf = sum(1 for n in names if orfs[n][2] > collect.LONG_ORF_CODONS)
+    is_open = sum(1 for n in names if orfs[n][1] * 3 >= collect.ORF_SPAN * orfs[n][0])
     k = len(names)
-    return k, is_open / k, is_open_shuf / k, is_long / k
+    return k, is_long / k, is_long_shuf / k, is_open / k
 
 
 def fmt(x, nd=3):
@@ -113,27 +123,34 @@ def main():
 
         excess = []
         for lo, hi in zip(EDGES, EDGES[1:]):
-            k, o, s, lng = signal([n for n, c in cov.items() if lo <= c < hi], orfs)
-            ex = None if o is None else o - s
+            k, o, s, opn = signal([n for n, c in cov.items() if lo <= c < hi], orfs)
+            ex = None if k < MIN_BIN else o - s
             excess.append((lo, ex))
-            bin_rows.append([name, pairs, lo, hi, k, fmt(o), fmt(s), fmt(ex), fmt(lng)])
+            bin_rows.append([name, pairs, lo, hi, k, fmt(o), fmt(s), fmt(None if o is None else o - s),
+                             fmt(opn)])
 
+        upper = [(lo, ex) for lo, ex in excess if lo >= 1]
+        floor = min((ex for _, ex in upper if ex is not None), default=None)
         crossover = None
-        for (lo, ex), (_, nxt) in zip(excess, excess[1:]):
-            if ex is not None and nxt is not None and ex >= ref / 2 and nxt >= ref / 2:
-                crossover = lo
-                break
+        if floor is not None:
+            start = next(i for i, (_, ex) in enumerate(upper) if ex == floor)
+            for i, (lo, _) in enumerate(upper[start:], start):
+                run = [ex for _, ex in upper[i:i + 3]]
+                if len(run) == 3 and all(ex is not None and ex >= 2 * floor for ex in run):
+                    crossover = lo
+                    break
 
         removed = [sum(1 for c in cov.values() if c < t) / len(cov) for t in REMOVED_AT]
-        summary.append([name, pairs, len(cov), fmt(ref), crossover] + [fmt(r) for r in removed])
+        summary.append([name, pairs, len(cov), fmt(ref), fmt(floor), crossover]
+                       + [fmt(r) for r in removed])
 
-    head = (["dataset", "pairs", "nohit", "top5_excess", "crossover_cov"]
+    head = (["dataset", "pairs", "nohit", "top5_excess", "floor", "crossover_cov"]
             + [f"removed_cov{t}" for t in REMOVED_AT])
     print("\t".join(head))
     for row in summary:
         print("\t".join("" if v is None else str(v) for v in row))
 
-    pts = [(math.log(p / 1e8), math.log(c)) for _, p, _, _, c, *_ in summary if p and c]
+    pts = [(math.log(p / 1e8), math.log(c)) for _, p, _, _, _, c, *_ in summary if p and c]
     if len(pts) >= 3:
         mx = sum(x for x, _ in pts) / len(pts)
         my = sum(y for _, y in pts) / len(pts)
@@ -146,7 +163,7 @@ def main():
 
     if args.tsv:
         with open(f"{args.tsv}.bins.tsv", "w") as f:
-            f.write("dataset\tpairs\tcov_lo\tcov_hi\tn\topen80\topen80_shuf\texcess\torf150\n")
+            f.write("dataset\tpairs\tcov_lo\tcov_hi\tn\torf150\torf150_shuf\texcess\topen80\n")
             for row in bin_rows:
                 f.write("\t".join(str(v) for v in row) + "\n")
         with open(f"{args.tsv}.summary.tsv", "w") as f:
