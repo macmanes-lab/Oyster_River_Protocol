@@ -2,6 +2,23 @@
 
 ORP Version 4.1.0-dev1
 
+- **`--min-cov auto` is the default** (`oyster.py`, `chowder.py`,
+  4.1.0-dev31, `min_cov_auto`). The coverage threshold for contigs without a
+  swissprot hit now scales with the read pairs salmon quantified (its
+  `num_processed`; trimmed and corrected reads, never normalized ones):
+  `max(1, 2 x (pairs / 60M) ^ 0.85)`, so 1 up to about 27M pairs, 2 at 60M,
+  3.6 at 120M, 11.7 at 480M. `--min-cov` still takes a number, used as
+  given. The rule comes from nested read subsamples of two finished
+  assemblies (tuco, 480M pairs; ERR489297, 200M;
+  `experiments/dynamic_cov/subsample.sbatch`, `depth_curve.py`): the
+  coverage where no-hit contigs' long-ORF excess over shuffled sequence
+  climbs out of the noise rose with depth at an exponent of 0.8-0.9 in
+  both. This changes the output of any run that doesn't pass `--min-cov`
+  (a library under about 27M pairs filters less than dev30's fixed 2, a
+  deeper one more). The log and `filter_candidates.tsv` (`# min_cov`,
+  `# num_processed`) say what `auto` chose. `filter.settings` records
+  `min_cov=auto`, so a resumed dev30 run re-filters. `--min-cov 2` gives
+  dev30's behaviour.
 - **`assembly_eval.py` prints what it is doing, and is documented**
   (`assembly_eval.py`, `README.md`, `INSTALL.md`). It now starts with a
   banner, the command line, and the inputs and settings, as `chowder.py`

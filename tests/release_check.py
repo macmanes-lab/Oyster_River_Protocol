@@ -22,7 +22,7 @@ status. Three tiers, each a superset of the cost of the one before:
              an hour in all with --jobs 1. Complete runs through every
              option, then the resume, rerun, cleanup and failure paths:
 
-               oyster_default      defaults (--min-cov 2); a rerun is a no-op
+               oyster_default      defaults (--min-cov auto); a rerun is a no-op
                oyster_options      --strand RF --normalize-reads --tpm-filt 1
                                    explicit k-mers, --transabyss-kmer,
                                    --max-parallel 1, --busco-threads,
@@ -636,7 +636,9 @@ def case_oyster_default(ctx, run):
     log_has(out, "with strandeval beside it", "--max-parallel 2 runs strandeval beside")
     log_has(out, "PART: TPM_FILT MAKE LOW AND HIGH", "the filter ran")
     names = fasta_names(d / "assemblies" / "oyster_default.ORP.fasta")
-    check_applied_filter(d, "oyster_default", names, "cov>=2")
+    # The sample data is far under 60M pairs, so auto resolves to its floor of 1.
+    log_has(out, "[filter] --min-cov auto:", "--min-cov auto by default")
+    check_applied_filter(d, "oyster_default", names, "cov>=1")
 
     orp = d / "assemblies" / "oyster_default.ORP.fasta"
     mtime = orp.stat().st_mtime
@@ -800,7 +802,7 @@ def case_chowder_options(ctx, run):
     require(low.exists(), "no LOWEXP list")
     stray = [n for n in names if n not in keep]
     require(not stray, f"{len(stray)} contigs below TPM 1 with no hit kept, e.g. {stray[:3]}")
-    check_applied_filter(d, "chowder_options", names, "tpm>=1,cov>=2")
+    check_applied_filter(d, "chowder_options", names, "tpm>=1,cov>=1")
 
 
 @case("full", needs=("chowder_options",))

@@ -521,6 +521,61 @@ def salmon_frag_length(quant_dir):
     return float(value) if value else None
 
 
+def salmon_num_processed(quant_dir):
+    """How many read pairs salmon was given for a quant, or None if it didn't say."""
+    try:
+        with open(Path(quant_dir) / "aux_info" / "meta_info.json") as f:
+            value = json.load(f).get("num_processed")
+    except (OSError, ValueError):
+        return None
+    return int(value) if value else None
+
+
+#: --min-cov auto: the threshold at MIN_COV_AUTO_REF_PAIRS read pairs, how
+#: it scales with depth, and the lowest it goes. Noise contigs gain
+#: coverage almost in proportion to depth: on nested read subsamples of two
+#: libraries (tuco, 15-480M pairs; ERR489297, 15-200M), the coverage where
+#: no-hit contigs' long-ORF excess over shuffled sequence reaches half its
+#: plateau rose with an exponent of 0.8-0.9 (experiments/dynamic_cov/README.md,
+#: "How the threshold should move with depth").
+MIN_COV_AUTO_REF_PAIRS = 60e6
+MIN_COV_AUTO_AT_REF = 2.0
+MIN_COV_AUTO_EXPONENT = 0.85
+MIN_COV_AUTO_FLOOR = 1.0
+
+
+def min_cov_auto(pairs):
+    """--min-cov auto's threshold for `pairs` read pairs: max(1, 2 x (pairs / 60M) ^ 0.85).
+
+    Rounded to two decimals, so the value logged and recorded in
+    filter_candidates.tsv is the one applied.
+    """
+    scaled = MIN_COV_AUTO_AT_REF * (pairs / MIN_COV_AUTO_REF_PAIRS) ** MIN_COV_AUTO_EXPONENT
+    return round(max(MIN_COV_AUTO_FLOOR, scaled), 2)
+
+
+def parse_min_cov(value):
+    """A --min-cov value: 'auto', or a coverage of 0 or more."""
+    if str(value).strip().lower() == "auto":
+        return "auto"
+    try:
+        cov = float(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"--min-cov must be 'auto' or a number, not {value!r}")
+    if not cov >= 0 or cov == float("inf"):
+        raise argparse.ArgumentTypeError(f"--min-cov must be 0 or more, not {value!r}")
+    return cov
+
+
+MIN_COV_HELP = (
+    "drop contigs with no swissprot hit whose coverage (salmon NumReads x mean fragment "
+    "length / contig length) is below this; combines with --tpm-filt, a contig must pass "
+    "both. 'auto' scales it with the read pairs salmon quantifies (trimmed and corrected, "
+    "never normalized): max(1, 2 x (pairs / 60M) ^ 0.85), so 2 at 60M pairs, 3.6 at "
+    "120M, 11.7 at 480M. A number is used as given; 0 turns it off (default: auto)"
+)
+
+
 def version_below(version: str, minimum: str) -> bool:
     """Is ``version`` older than ``minimum``, comparing release numbers only?
 
@@ -2568,7 +2623,8 @@ class Pipeline:
         known, so a changed threshold there still goes unnoticed, as before.
         """
         stamp = self.assemblies_working / f"{self.runout}.filter.settings"
-        settings = f"tpm_filt={self.tpm_filt:g} min_cov={self.min_cov:g}\n"
+        min_cov = self.min_cov if self.min_cov == "auto" else f"{self.min_cov:g}"
+        settings = f"tpm_filt={self.tpm_filt:g} min_cov={min_cov}\n"
         if stamp.exists() and stamp.read_text() == settings:
             return stamp
         existed = stamp.exists()
@@ -2583,7 +2639,8 @@ class Pipeline:
         """Split the intermediate's contigs into HIGHEXP and LOWEXP.
 
         A contig is high when its TPM is at least --tpm-filt *and* its
-        coverage is at least --min-cov; secondfilter then drops the low ones
+        coverage is at least --min-cov (for 'auto', min_cov_auto of the read
+        pairs salmon quantified); secondfilter then drops the low ones
         that have no swissprot hit. Coverage is fragments per base,
         NumReads x salmon's mean fragment length / contig length: the
         average depth of read-pair fragments over the contig. Unlike TPM it
@@ -2603,7 +2660,17 @@ class Pipeline:
         low = self.assemblies_working / f"{self.runout}.LOWEXP.txt"
         diamond_txt = self.assemblies_dir / f"{self.runout}.ORP.diamond.txt"
         frag_len = salmon_frag_length(quant_dir)
-        if frag_len is None and self.min_cov > 0:
+        pairs = salmon_num_processed(quant_dir)
+        min_cov = self.min_cov
+        if min_cov == "auto":
+            if pairs is None:
+                raise RuntimeError(
+                    f"--min-cov auto needs the read pairs salmon quantified, and "
+                    f"{quant_dir / 'aux_info' / 'meta_info.json'} has no num_processed; "
+                    f"give --min-cov a number")
+            min_cov = min_cov_auto(pairs)
+            print(f"[filter] --min-cov auto: {pairs:,} read pairs -> --min-cov {min_cov:g}")
+        if frag_len is None and min_cov > 0:
             raise RuntimeError(
                 f"--min-cov needs salmon's mean fragment length, and "
                 f"{quant_dir / 'aux_info' / 'meta_info.json'} has none")
@@ -2626,25 +2693,27 @@ class Pipeline:
                 # At-threshold counts as high: with `>` and `<` a contig whose
                 # TPM equalled --tpm-filt landed in neither list and so was
                 # dropped from .ORP.fasta whenever LOWEXP was non-empty.
-                if tpm >= self.tpm_filt and cov >= self.min_cov:
+                if tpm >= self.tpm_filt and cov >= min_cov:
                     hf.write(cols[0] + "\n")
                 else:
                     lf.write(cols[0] + "\n")
                 rows.append((cols[0] in hits, tpm, cov, reads, length))
-        self.write_filter_candidates(rows, frag_len)
+        self.write_filter_candidates(rows, frag_len, min_cov, pairs)
         with open(quant, "rb") as src, gzip.open(self.reports_dir / f"{self.runout}.quant.sf.gz", "wb") as dst:
             shutil.copyfileobj(src, dst)
         (self.assemblies_dir / f"{self.runout}.filter.done").touch()
         print("\n\n\n\n PART: TPM_FILT MAKE LOW AND HIGH\n\n\n\n")
 
-    def write_filter_candidates(self, rows, frag_len):
+    def write_filter_candidates(self, rows, frag_len, min_cov, pairs=None):
         """reports/<run>.filter_candidates.tsv: what each filter would keep.
 
         `rows` is (has_hit, tpm, cov, reads, length) per contig. A contig
         with a swissprot hit survives any threshold (secondfilter rescues
         it), so `final` is the contigs passing plus the hit contigs that
         don't, and `nohit_pass` is the part of the assembly a threshold
-        actually decides.
+        actually decides. `min_cov` is the coverage threshold applied (for
+        --min-cov auto, the one it resolved to) and `pairs` salmon's
+        num_processed.
         """
         out = self.reports_dir / f"{self.runout}.filter_candidates.tsv"
         n = len(rows)
@@ -2653,12 +2722,14 @@ class Pipeline:
         near_1tpm = [r for r in rows if 0.9 <= r[1] <= 1.1]
         rpk_1tpm = median([r[3] * 1000 / r[4] for r in near_1tpm if r[4] > 0])
         cov_1tpm = median([r[2] for r in near_1tpm])
-        applied = {"tpm": self.tpm_filt, "cov": self.min_cov}
+        applied = {"tpm": self.tpm_filt, "cov": min_cov}
         lines = [
             f"# contigs\t{n}",
             f"# with_swissprot_hit\t{n_hit}",
             f"# reads_assigned\t{total_reads:.0f}",
             f"# frag_length_mean\t{frag_len if frag_len is not None else 'NA'}",
+            f"# num_processed\t{pairs if pairs is not None else 'NA'}",
+            f"# min_cov\t{min_cov:g}" + ("\tauto" if self.min_cov == "auto" else ""),
             f"# reads_per_kb_at_1tpm\t{rpk_1tpm if rpk_1tpm is not None else 'NA'}",
             f"# cov_at_1tpm\t{cov_1tpm if cov_1tpm is not None else 'NA'}",
             "rule\tpass\tnohit_pass\thit_rescued\tfinal\tfrac_reads_in_final",
@@ -3316,11 +3387,7 @@ def parse_args():
     p.add_argument("--lineage", default="eukaryota_odb12.2", help="BUSCO lineage (default: eukaryota_odb12.2)")
     p.add_argument("--normalize-reads", action="store_true", help="let Trinity normalize reads (default: off, i.e. --no_normalize_reads)")
     p.add_argument("--tpm-filt", type=float, default=0, help="TPM filter threshold (default: 0)")
-    p.add_argument("--min-cov", type=float, default=2,
-                   help="drop contigs with no swissprot hit whose coverage (salmon NumReads x "
-                        "mean fragment length / contig length) is below this; combines with "
-                        "--tpm-filt, a contig must pass both. Raise it for deep libraries "
-                        "(hundreds of millions of reads); 0 turns it off (default: 2)")
+    p.add_argument("--min-cov", type=parse_min_cov, default="auto", help=MIN_COV_HELP)
     p.add_argument("--trimmed-corrected-reads", dest="corrected_reads", action="store_true",
                    help="the reads have already been through trimmomatic and "
                         "rcorrector; skip both and assemble them as they are "

@@ -149,20 +149,26 @@ Re-running on an unfinished run resumes it: a step whose outputs exist and are n
 
 After salmon quantifies the merged assembly, contigs **without a Swiss-Prot hit** are dropped if they look like noise; a contig with a hit is never dropped by this step. Two thresholds decide it, and a contig has to pass both:
 
-- **`--min-cov`** (default `2`): coverage, salmon's NumReads x mean fragment length / contig length -- the average number of read-pair fragments over each base of the contig.
+- **`--min-cov`** (default `auto`): coverage, salmon's NumReads x mean fragment length / contig length -- the average number of read-pair fragments over each base of the contig. `auto` picks the threshold from sequencing depth (below); a number is used as given.
 - **`--tpm-filt`** (default `0`, off): TPM.
 
 Before 4.1.0-dev30 nothing was filtered unless you gave `--tpm-filt` (1 was the usual value); now coverage is filtered by default. Coverage rather than TPM because TPM is a share of a million, so a fixed TPM cutoff means something different in every library: across the 119 final assemblies of the 108-sample test set, 1 TPM was anywhere from 4 to 183 reads per kb, mostly following sequencing depth. On a deep library `--tpm-filt 1` removes far more than intended (on a 451M-read tuco library, 1 TPM is 41x coverage, and it removed 91% of the contigs without a hit); on a shallow one it removes almost nothing. TPM also divides by salmon's effective length, which lets a short contig pass on a couple of reads. Coverage means the same thing in every library.
 
-**`--min-cov 2` is a floor, not a recommendation for every library -- raise it with sequencing depth.** It was chosen on five libraries of 16-123 million read pairs, where it removed fewer no-hit contigs than `--tpm-filt 1`, mapped as many or more reads back to the assembly, and kept BUSCO and unique genes unchanged (the filter never touches a contig with a hit). But the same number of noise fragments becomes more coverage the deeper you sequence, so on a much deeper library 2x keeps a lot of noise: on the 451M-read tuco library it removed only 10% of the no-hit contigs. As a rough, provisional guide (the deep-library end rests on one library so far):
+**`--min-cov auto` scales the threshold with sequencing depth.** The same share of noise fragments becomes more coverage the deeper you sequence: on the 451M-read tuco library a fixed `--min-cov 2` removed only 10% of the no-hit contigs. So `auto` (the default since 4.1.0-dev31) counts the read pairs salmon quantified -- the trimmed and corrected reads, never Trinity's normalized ones -- and applies
 
-| read pairs | `--min-cov` |
+    min-cov = max(1, 2 x (read pairs / 60M) ^ 0.85)
+
+| read pairs | `--min-cov auto` resolves to |
 |---|---|
-| up to ~100M | `2` (default) |
-| a few hundred million | `5`-`10` |
-| more, or many tissues pooled | `10`-`20`, chosen from `filter_candidates.tsv` |
+| 30M or fewer | `1` |
+| 60M | `2` |
+| 120M | `3.6` |
+| 240M | `6.5` |
+| 480M | `11.7` |
 
-You do not have to guess blind. Every run writes `reports/<run>.filter_candidates.tsv`, which lists how many contigs, and how many without a hit, each of a range of coverage, TPM and read-count thresholds would keep, from the same quantification, and its header gives the library's `cov_at_1tpm` (how much coverage 1 TPM is here). If the applied threshold looks too loose or too strict, re-run the same command with a new `--min-cov`: the threshold is recorded in `assemblies/working/<run>.filter.settings`, so a resumed run re-filters and redoes only the steps from the filter on (BUSCO, pyTransRate, the report), not the assemblers or the merge. That needs the run's intermediates, which cleanup removes, so on a deep library you expect to tune, run with `--no-cleanup` and then re-run without it once you've settled on a value. Pass `--min-cov 0 --tpm-filt 1` to get the old TPM behaviour back, or `--min-cov 0` to switch filtering off.
+The rule comes from re-quantifying two finished assemblies (tuco, 480M pairs; *Anopheles* ERR489297, 200M) on nested subsamples of their own reads, 15M pairs up. At every depth, the contigs without a hit were binned by coverage and compared with their own shuffled sequence: noise has no excess of long open reading frames, real coding sequence does. The coverage where that excess climbs out of the noise rose with depth at an exponent of 0.8-0.9 in both libraries, and the two sat within a factor of about 1.5 of each other at the same depth. The value 2 at 60M pairs is where the earlier five-library sweep (16-123M pairs) found `--min-cov 2` removed fewer no-hit contigs than `--tpm-filt 1` while keeping BUSCO and unique genes unchanged; the floor of 1 is there because at 15M pairs a threshold of 2 already cuts into the real signal. The log says what `auto` chose (`[filter] --min-cov auto: N read pairs -> --min-cov X`), and so does the `# min_cov` line of `reports/<run>.filter_candidates.tsv`. Two libraries is still a small basis: for an unusual library, or many tissues pooled, check the choice against `filter_candidates.tsv`.
+
+To check or override the choice: every run writes `reports/<run>.filter_candidates.tsv`, which lists how many contigs, and how many without a hit, each of a range of coverage, TPM and read-count thresholds would keep, from the same quantification, and its header gives the library's `cov_at_1tpm` (how much coverage 1 TPM is here). If the applied threshold looks too loose or too strict, re-run the same command with a new `--min-cov`: the threshold is recorded in `assemblies/working/<run>.filter.settings`, so a resumed run re-filters and redoes only the steps from the filter on (BUSCO, pyTransRate, the report), not the assemblers or the merge. That needs the run's intermediates, which cleanup removes, so on a deep library you expect to tune, run with `--no-cleanup` and then re-run without it once you've settled on a value. Pass `--min-cov 2` for 4.1.0-dev30's fixed default, `--min-cov 0 --tpm-filt 1` for the old TPM behaviour, or `--min-cov 0` to switch filtering off.
 
 The experiments behind this are in [experiments/dynamic_cov/](experiments/dynamic_cov/README.md).
 
@@ -196,7 +202,7 @@ Because it appends, a value given here overrides the same flag ORP passes above 
 | `--lineage` | `eukaryota_odb12.2` | BUSCO lineage |
 | `--normalize-reads` | off | Let Trinity normalize reads (default is `--no_normalize_reads`) |
 | `--tpm-filt` | `0` | TPM filter threshold |
-| `--min-cov` | `2` | coverage filter threshold (NumReads x mean fragment length / contig length); a contig must also pass `--tpm-filt`. Raise it for deep libraries -- see [The expression filter](#the-expression-filter---min-cov---tpm-filt) |
+| `--min-cov` | `auto` | coverage filter threshold (NumReads x mean fragment length / contig length); a contig must also pass `--tpm-filt`. `auto` scales it with read pairs, `max(1, 2 x (pairs / 60M) ^ 0.85)`; a number is used as given -- see [The expression filter](#the-expression-filter---min-cov---tpm-filt) |
 | `--trimmed-corrected-reads` | off | Treat `--read1`/`--read2` as already trimmed and error-corrected, and skip trimmomatic and rcorrector (see [Reads you have already corrected](#reads-you-have-already-corrected) above) |
 | `--spades1-kmer` | `auto` | rnaSPAdes k-mer(s) for the spadesauto assembly — `auto` lets rnaSPAdes pick its documented default pair (~1/3 and ~1/2 of maximum read length). Also accepts percentages or an explicit list, same forms as `--spades2-kmer` |
 | `--spades2-kmer` | `60%,75%` | rnaSPAdes k-mer(s) for the spadeshigh assembly — percentages of maximum read length, an explicit comma-separated list of odd sizes under 128, or `auto`. Percentages resolve per dataset (61,75 at 101bp reads; 89,113 at 150bp), clamped to rnaSPAdes' 127 ceiling |
@@ -228,7 +234,7 @@ There are no assembler flags — no k-mers, no `--strand`, no `--normalize-reads
 | `--runout` | `USER_RUN` | Run name prefix |
 | `--lineage` | `eukaryota_odb12.2` | BUSCO lineage |
 | `--tpm-filt` | `0` | TPM filter threshold |
-| `--min-cov` | `2` | coverage filter threshold (NumReads x mean fragment length / contig length); a contig must also pass `--tpm-filt`. Raise it for deep libraries -- see [The expression filter](#the-expression-filter---min-cov---tpm-filt) |
+| `--min-cov` | `auto` | coverage filter threshold (NumReads x mean fragment length / contig length); a contig must also pass `--tpm-filt`. `auto` scales it with read pairs, `max(1, 2 x (pairs / 60M) ^ 0.85)`; a number is used as given -- see [The expression filter](#the-expression-filter---min-cov---tpm-filt) |
 | `--max-parallel` | `2` | `1` runs the short jobs that would otherwise run beside a long one (see [Parallel task management](#parallel-task-management) above) one after the other |
 | `--no-cleanup` | off | Keep every file the run produces, uncompressed -- for debugging. Alias: `--keep-intermediates` |
 | `--pytransrate-args` | none | Extra arguments passed verbatim to both pyTransRate runs (see [Tuning pyTransRate](#tuning-pytransrate) above) |

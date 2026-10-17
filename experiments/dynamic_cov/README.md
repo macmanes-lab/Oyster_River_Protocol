@@ -146,3 +146,7 @@ correction, so short contigs can't pass on a couple of reads. Below about
 60M pairs the rule asks for less than 2. At 15M pairs cov2 already removes
 78% of ERR489297's no-hit contigs, well into the signal, as the sweep saw on
 SRR1138704 (17M). Whether `auto` should stop at 2 or go lower is open.
+
+Built as the default in 4.1.0-dev31: `--min-cov auto`, `max(1, 2 x (pairs /
+60M) ^ 0.85)` from salmon's `num_processed`. The floor is 1, not 2, because
+at 15M pairs cov2 already cuts into the signal.
