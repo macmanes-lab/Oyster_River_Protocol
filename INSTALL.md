@@ -4,9 +4,9 @@ These directions cover installing ORP 3.0+ (the `oyster.py` pipeline) on Linux. 
 
 ## Prerequisites
 
-- Linux (the installer's Anaconda bootstrap is Linux x86_64 specific)
+- Linux (the installer's Anaconda bootstrap, used only when no `conda` is on `PATH`, is Linux x86_64 specific)
 - `git`, `curl`, `bash`, and a system `python3` already available. **`oyster.py`, `chowder.py` and `assembly_eval.py` run under that interpreter, not under a conda env**, so it sets the language floor: 3.6, which is what a cluster's `/usr/bin/python3` still commonly is. Everything they orchestrate runs inside the conda environments and is unaffected by it.
-- Internet access on the install machine — it pulls down Anaconda, the UniProt/Swiss-Prot diamond database, and the BUSCO lineage database
+- Internet access on the install machine — it pulls down the UniProt/Swiss-Prot diamond database, the BUSCO lineage database, and Anaconda if you have no conda
 - A working internet connection to GitHub as well: Trinity is built from a git clone (with submodules)
 - Several GB of free disk space (Swiss-Prot + Anaconda + 6 conda environments + BUSCO database adds up)
 
@@ -18,9 +18,9 @@ cd Oyster_River_Protocol
 make
 ```
 
-`make` chains through everything: creates the conda environments, builds Trinity from source, builds the diamond search database, downloads the BUSCO lineage database, and appends any needed PATH entries to `~/.profile`/`~/.bash_profile`. Each step checks whether it's already done and skips itself if so, so re-running `make` after a partial or failed install picks up where it left off rather than starting over.
+`make` chains through everything: creates the conda environments, builds Trinity from source, builds the diamond search database, and downloads the BUSCO lineage database. Each step checks whether it's already done and skips itself if so -- each of the five environments separately, by its exact name -- so re-running `make` after a partial or failed install picks up where it left off rather than starting over.
 
-When it finishes, run:
+If `conda` is already on your `PATH` (a system install, a cluster module, Miniforge), `make` creates the environments in it and leaves it otherwise alone: it doesn't update its base, install anything into base, or change its channel configuration. It uses `mamba` to solve when the base has one, and `conda` otherwise. With no `conda` on `PATH`, it installs Anaconda under `software/anaconda/install` first and adds it to your `~/.profile` (and `~/.bash_profile`, if you have one) and `~/.bashrc`, once each however many times `make` runs. In that case, when it finishes, run:
 
 ```bash
 source ~/.profile
@@ -78,7 +78,7 @@ mamba env create -f orp_env.yml
 ```bash
 mkdir -p software/diamond
 cd software/diamond
-curl -LO ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz
+curl -fLO https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz
 gzip -d uniprot_sprot.fasta.gz
 conda run -n orp diamond makedb --in uniprot_sprot.fasta -d swissprot
 cd ../..
@@ -138,7 +138,7 @@ python3 assembly_eval.py --assembly my.fasta --read1 R1.fq.gz --read2 R2.fq.gz -
 make clean
 ```
 
-Removes the conda install and downloaded software directories.
+Removes the five ORP environments (`orp`, `orp_spades`, `orp_trinity`, `orp_busco`, `orp_transabyss`) from whichever conda holds them, then the Anaconda install `make` bootstrapped (if it did) and the Trinity build. The Swiss-Prot and BUSCO databases are left in place.
 
 ## Known gotchas
 
