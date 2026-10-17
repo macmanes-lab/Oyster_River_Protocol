@@ -8,7 +8,7 @@ Usage:
 Runs the three evaluations an ORP run ends with, on one assembly you
 already have, and writes the same quality report:
 
-  * pytransrate  contig-level read-mapping score (TRANSRATE SCORE, OPTIMAL),
+  * pyTransRate  contig-level read-mapping score (PYTRANSRATE SCORE, OPTIMAL),
   * BUSCO        gene-set completeness (--lineage, default eukaryota_odb12.2),
   * strandeval   strand-specificity of the library against the assembly,
                  plus the proper-pair rate from the same mapping.
@@ -21,7 +21,7 @@ run at the same time, --cpu and --mem split between them.
 Output, under --outdir (default ./<runout>_eval):
 
     reports/qualreport.<run>              the report, in oyster.py's layout
-    reports/transrate_<run>/              pytransrate's output
+    reports/pytransrate_<run>/            pyTransRate's output
     reports/run_<run>.ORP/                BUSCO's output
     reports/<run>.strandeval_summary.txt  the strand histogram
     reports/<run>.flagstat                samtools flagstat of the sampled mapping
@@ -60,13 +60,13 @@ HERE = Path(__file__).resolve().parent
 STRAND_SEED = 23894
 STRAND_READS = 400000
 
-STEPS = ("transrate", "busco", "strandeval")
+STEPS = ("pytransrate", "busco", "strandeval")
 
 #: Steps whose tool output is echoed to the screen as well as logged, each
 #: line prefixed with the step so the two concurrent streams stay legible.
 #: strandeval is a handful of short bwa/samtools calls whose chatter says
 #: nothing a reader needs; it stays in its log.
-LOUD_STEPS = ("transrate", "busco")
+LOUD_STEPS = ("pytransrate", "busco")
 
 #: One lock for every echoed line, so two tools never interleave mid-line.
 _PRINT_LOCK = threading.Lock()
@@ -175,6 +175,22 @@ class Eval:
     def sentinel(self, step):
         return self.reports / f"{self.runout}.{step}.done"
 
+    def adopt_pre_rename_outputs(self):
+        """Carry a run from before the step was renamed transrate -> pytransrate.
+
+        Its output dir, sentinel and log are renamed in place, as oyster.py's
+        adopt_pre_rename_reports does, so a resumed run doesn't score the
+        assembly all over again.
+        """
+        for old, new in (
+            (self.reports / f"transrate_{self.runout}", self.reports / f"pytransrate_{self.runout}"),
+            (self.sentinel("transrate"), self.sentinel("pytransrate")),
+            (self.logs / "transrate.log", self.logs / "pytransrate.log"),
+        ):
+            if old.exists() and not new.exists():
+                old.rename(new)
+                print(f"[resume] renamed {old} to {new}")
+
     def preflight(self):
         for label, path in (("assembly", self.assembly), ("--read1", self.read1),
                             ("--read2", self.read2)):
@@ -183,7 +199,7 @@ class Eval:
         if "strandeval" in self.steps and not self.strand_script.is_file():
             sys.exit(f"examine_strand.pl not found: {self.strand_script} (--examine-strand)")
         if self.args.no_conda:
-            tools = {"transrate": ["pytransrate"], "busco": ["busco"],
+            tools = {"pytransrate": ["pytransrate"], "busco": ["busco"],
                      "strandeval": ["bwa", "seqtk", "samtools", "perl", "hist"]}
             missing = [t for s in self.steps for t in tools[s] if shutil.which(t) is None]
             if missing:
@@ -193,14 +209,14 @@ class Eval:
 
     # -- steps ---------------------------------------------------------------
 
-    def transrate(self, cpu, mem):
-        outdir = self.reports / f"transrate_{self.runout}"
+    def pytransrate(self, cpu, mem):
+        outdir = self.reports / f"pytransrate_{self.runout}"
         if outdir.exists():
             shutil.rmtree(outdir)
         mem_args = []
         if not any(a.split("=")[0] in ("--max-memory", "--mem") for a in self.pytransrate_args):
             mem_args = ["--max-memory", f"{mem}G"]
-        self.run("transrate", self.conda_cmd(self.args.env, [
+        self.run("pytransrate", self.conda_cmd(self.args.env, [
             "pytransrate", "-o", outdir, "-a", self.assembly,
             "--left", self.read1, "--right", self.read2, "-t", cpu,
             *mem_args, *self.pytransrate_args]))
@@ -302,12 +318,12 @@ class Eval:
                     busco_line = line.strip()
         emit("*****  BUSCO SCORE ~~~~~~~~~~~~~~~~~~~~~~>", busco_line)
 
-        csv_path = next((self.reports / f"transrate_{run}").rglob("assemblies.csv"), None)
+        csv_path = next((self.reports / f"pytransrate_{run}").rglob("assemblies.csv"), None)
         rows = list(csv.reader(open(csv_path))) if csv_path else []
         score = rows[1][36] if len(rows) > 1 and len(rows[1]) > 36 else ""
         optimal = rows[1][37] if len(rows) > 1 and len(rows[1]) > 37 else ""
-        emit("*****  TRANSRATE SCORE ~~~~~~~~~~~~~~~~~~>     ", score)
-        emit("*****  TRANSRATE OPTIMAL SCORE ~~~~~~~~~~>     ", optimal)
+        emit("*****  PYTRANSRATE SCORE ~~~~~~~~~~~~~~~~>     ", score)
+        emit("*****  PYTRANSRATE OPTIMAL SCORE ~~~~~~~~>     ", optimal)
 
         proper_pairs = ""
         flagstat = self.reports / f"{run}.flagstat"
@@ -337,6 +353,7 @@ class Eval:
         self.preflight()
         for d in (self.reports, self.logs, self.work):
             d.mkdir(parents=True, exist_ok=True)
+        self.adopt_pre_rename_outputs()
         if self.args.force:
             for s in STEPS:
                 # Not unlink(missing_ok=True): that is 3.8+, and this runs
@@ -353,7 +370,7 @@ class Eval:
         # that run so the box is not oversubscribed. strandeval's mapping is
         # light and BUSCO scales poorly past a few threads, so pytransrate,
         # the slow one, gets the larger share.
-        weights = {"transrate": 2, "busco": 1, "strandeval": 1}
+        weights = {"pytransrate": 2, "busco": 1, "strandeval": 1}
         total = sum(weights[s] for s in todo) or 1
         failures = []
 
@@ -397,7 +414,8 @@ def parse_args():
     p.add_argument("--mem", type=int, default=32, help="total memory in GB (default: 32)")
     p.add_argument("--lineage", default="eukaryota_odb12.2",
                    help="BUSCO lineage (default: eukaryota_odb12.2)")
-    p.add_argument("--skip", nargs="*", default=[], choices=STEPS, metavar="STEP",
+    # "transrate" is the step's name before it was renamed, still accepted.
+    p.add_argument("--skip", nargs="*", default=[], choices=STEPS + ("transrate",), metavar="STEP",
                    help=f"steps not to run: {', '.join(STEPS)}")
     p.add_argument("--force", action="store_true", help="redo steps already marked done")
     p.add_argument("--no-cleanup", action="store_true", help="keep strandeval's BAM and bwa index")
@@ -413,7 +431,9 @@ def parse_args():
     p.add_argument("--env-busco", default="orp_busco", help="conda env with busco (default: orp_busco)")
     p.add_argument("--env-trinity", default="orp_trinity",
                    help="conda env with Trinity, bwa, seqtk, hist (default: orp_trinity)")
-    return p.parse_args()
+    args = p.parse_args()
+    args.skip = ["pytransrate" if s == "transrate" else s for s in args.skip]
+    return args
 
 
 def main():

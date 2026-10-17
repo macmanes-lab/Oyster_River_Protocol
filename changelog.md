@@ -2,6 +2,30 @@
 
 ORP Version 4.1.0-dev1
 
+- **`make` works with a conda that is already installed** (`Makefile`,
+  `INSTALL.md`, 4.1.0-dev32). With `conda` on `PATH`, the diamond and BUSCO
+  targets called the bundled Anaconda's `diamond` and `busco` by path, which
+  isn't there, and the `orp` target sourced its missing `conda.sh` and went
+  on to `conda update -n base` and `conda install mamba -n base` in the
+  user's own base. Every target now finds conda at run time (the one on
+  `PATH`, else the bootstrapped one) and goes through `conda run`. An
+  existing conda is never updated or reconfigured, and channels are passed
+  per command rather than written to `~/.condarc`. Each of the five envs is
+  created separately when no env has exactly its name (`grep orp` skipped
+  all of them if any `orp_*` env existed). Swiss-Prot comes over https
+  rather than ftp, via `.part` files, and `diamond_data` counts as done only
+  with both the fasta and `swissprot.dmnd`. The PATH lines go into
+  `~/.profile`, and `~/.bash_profile` only if it exists, once each however
+  often `make` runs (it was appended to `~/.bash_profile` twice per run).
+  `make clean` removes the five envs from whichever conda holds them.
+- **`assembly_eval.py` says pyTransRate, not transrate** (`assembly_eval.py`,
+  `README.md`). The step is `pytransrate`, its output
+  `reports/pytransrate_<run>/`, its sentinel `<run>.pytransrate.done` and
+  its log `logs/pytransrate.log`, and the report lines read `PYTRANSRATE
+  SCORE`/`PYTRANSRATE OPTIMAL SCORE`, the same as `oyster.py`'s, so the two
+  reports diff cleanly again. A resumed run renames the old dir, sentinel
+  and log in place rather than scoring again, and `--skip transrate` is
+  still accepted.
 - **`--min-cov auto` is the default** (`oyster.py`, `chowder.py`,
   4.1.0-dev31, `min_cov_auto`). The coverage threshold for contigs without a
   swissprot hit now scales with the read pairs salmon quantified (its

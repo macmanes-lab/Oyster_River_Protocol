@@ -66,7 +66,7 @@ python3 assembly_eval.py --assembly my.fasta --read1 R1.fq.gz --read2 R2.fq.gz \
 
 It runs the three evaluations an ORP run ends with:
 
-- **pyTransRate**, the contig-level read-mapping score (`TRANSRATE SCORE` and `TRANSRATE OPTIMAL SCORE`)
+- **pyTransRate**, the contig-level read-mapping score (`PYTRANSRATE SCORE` and `PYTRANSRATE OPTIMAL SCORE`)
 - **BUSCO** completeness against `--lineage` (default `eukaryota_odb12.2`)
 - **strandeval**, the strand-specificity histogram, plus the proper-pair rate from the same mapping
 
@@ -76,15 +76,15 @@ Some things to know before you run it:
 
 - **The reads are used as given.** Nothing is trimmed or error-corrected, so pass the pair you want the assembly scored against, normally the one it was built from. The assembly must be uncompressed fasta.
 - **The three steps run at the same time**, with `--cpu` and `--mem` split between them: pyTransRate gets half, and BUSCO and strandeval a quarter each. pyTransRate is the slow step, and BUSCO gains little past a few threads.
-- **It prints as it goes.** The run opens with a banner, the command line, and the inputs and settings. pyTransRate and BUSCO output then streams to the screen, each line marked `[transrate]` or `[busco]` because the two run together. Every tool's full output is also kept in `logs/<step>.log`.
-- **Interrupted runs resume.** Each step that finishes leaves `reports/<run>.<step>.done`, and a re-run skips steps that have one. `--force` redoes all of them, and `--skip transrate busco strandeval` leaves out any you don't need. If a step fails, the report is still written, with that step's lines blank.
+- **It prints as it goes.** The run opens with a banner, the command line, and the inputs and settings. pyTransRate and BUSCO output then streams to the screen, each line marked `[pytransrate]` or `[busco]` because the two run together. Every tool's full output is also kept in `logs/<step>.log`.
+- **Interrupted runs resume.** Each step that finishes leaves `reports/<run>.<step>.done`, and a re-run skips steps that have one. `--force` redoes all of them, and `--skip pytransrate busco strandeval` leaves out any you don't need. If a step fails, the report is still written, with that step's lines blank.
 
 Output goes to `--outdir` (default `./<runout>_eval`):
 
 | Path | What it holds |
 |------|---------------|
 | `reports/qualreport.<run>` | the quality report |
-| `reports/transrate_<run>/` | pyTransRate's output |
+| `reports/pytransrate_<run>/` | pyTransRate's output |
 | `reports/run_<run>.ORP/` | BUSCO's output |
 | `reports/<run>.strandeval_summary.txt` | the strand histogram |
 | `reports/<run>.flagstat` | `samtools flagstat` of the sampled mapping |
@@ -254,7 +254,7 @@ There are no assembler flags — no k-mers, no `--strand`, no `--normalize-reads
 | `--cpu` | all cores | Total threads, split across the steps |
 | `--mem` | `32` | Total memory in GB, split across the steps |
 | `--lineage` | `eukaryota_odb12.2` | BUSCO lineage |
-| `--skip` | none | Steps not to run: any of `transrate`, `busco`, `strandeval` |
+| `--skip` | none | Steps not to run: any of `pytransrate`, `busco`, `strandeval` |
 | `--force` | off | Redo steps already marked done |
 | `--no-cleanup` | off | Keep strandeval's BAM and bwa index |
 | `--pytransrate-args` | none | Extra pyTransRate arguments as one quoted string (see [Tuning pyTransRate](#tuning-pytransrate)) |

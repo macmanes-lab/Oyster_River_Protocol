@@ -5,6 +5,26 @@ the other left off. Keep entries short; newest on top. Delete/trim once
 stale.
 	
 
+## 2026-10-17 -- 4.1.0-dev32: Makefile with an existing conda; pyTransRate naming
+
+- `make` now uses whatever conda is on PATH (else bootstraps Anaconda as
+  before), checks each of the five envs by exact name, fetches Swiss-Prot
+  over https, and adds PATH lines to the shell profiles once. Tested only
+  against a stub `conda`/`curl` on the laptop (existing conda with and
+  without envs, a partial install, bootstrap, re-runs, a failing create,
+  `make clean`). **Not yet run against a real conda**: do one `make` on
+  Premise (conda module) and one in a fresh container before the release.
+- `assembly_eval.py`'s step, outputs and report labels are pyTransRate's
+  (`pytransrate_<run>/`, `PYTRANSRATE SCORE`); old run dirs are adopted on
+  resume. Historical records (changelog/NOTES entries, benchmarks.md,
+  manuscript/, experiments/) still say transrate where they mean the old
+  Ruby tool or old step names.
+- Pre-release review (this session): remaining code items are chowder
+  ignoring a changed `--seed`/`--assembly-order` on resume, and
+  `--inchworm_cpu 10` above phase 1's cores at small `--cpu`. Also open: full
+  `release_check` tier on the final commit, `--min-cov auto` on real runs,
+  the version number (README says 5.0), and condensing the changelog.
+
 ## 2026-10-13 -- HANDOFF: dev26 cluster results; the grow restart breaks runs
 
 **Plan for next: `experiments/transabyss_mpi/DEV27_PLAN.md`.** In short: make
