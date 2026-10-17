@@ -143,7 +143,35 @@ Fixes
 - **Cleanup no longer deletes other runs' files.** Runs in the same
   directory share `assemblies/diamond`, `assemblies/working`, `quants` and
   `shuck`; cleanup removed each whole, and a second run's next step failed.
-  It now removes only this run's entries.
+  It now removes only this run's entries. **`--runout` now takes only
+  letters, digits, `_` and `-`**: with a `.` allowed, cleaning up `sample`
+  also matched `sample.rep2.*`. Trinity's `gene_trans_map` cleanup took
+  every run's, and now takes only its own.
+- **A resume notices changed settings and swapped inputs**, not just newer
+  files. `--strand`, the k-mers, `--normalize-reads` and chowder's
+  `--seed`/`--assembly-order` are recorded per step
+  (`assemblies/working/<run>.*.settings`), and the reads and chowder's
+  assemblies by size and mtime (`rcorr/<run>.reads.source`); a change redoes
+  the steps that depend on it. A different but older file given to
+  `--read1`, `--trimmed-corrected-reads` or `--assemblies` used to look up
+  to date (the corrected-reads symlink was never re-pointed), as did a new
+  chowder seed. Trinity's working directory is started afresh when phase 1
+  re-runs on other inputs, rather than resuming from the old checkpoints.
+- **Read paths relative to the launch directory work with `--dir`.**
+  Preflight looked for them from the launch directory but the tools ran
+  from `--dir`; they, and a `--lineage` directory, are made absolute.
+- **chowder refuses two inputs whose renamed contigs would share a name**
+  (label `a` + contig `b_c` and label `a_b` + contig `c` are both `a_b_c`),
+  checked across inputs whenever one label is another followed by `_`.
+- **`twotrack_select.py` no longer rescues a redundant copy because blastn
+  crowded out its representative.** The first search keeps 20 subjects per
+  contig; a contig that filled them without its own representative is
+  searched again without the cap, instead of being read as 0% covered.
+- strandeval's bwa mem and samtools sort share its cpu budget (each used to
+  get all of it, with a `samtools view` beside them) and sort has an
+  explicit `-m`. `assembly_eval.py` now runs the same `strand_exam` as the
+  pipeline, so paths with spaces or shell characters are quoted and its
+  hard-coded `-@10` threads are gone.
 - **pyTransRate no longer scores a rewritten assembly against the old
   one's index** after a resumed run re-filters; anything in
   `reports/pytransrate_<run>/` older than the assembly is rebuilt.

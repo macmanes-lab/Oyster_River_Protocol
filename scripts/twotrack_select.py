@@ -124,23 +124,53 @@ def cdhit(cdhit_bin, src, dst, ident, cov, threads, mem_mb=0):
     return set(fasta_lengths(dst))
 
 
+#: blastn -max_target_seqs on the first pass. Most contigs hit only their own
+#: gene's representative; coverage_by_rep searches again, uncapped, for the
+#: few that fill the cap without it.
+MAX_TARGETS = 20
+
+
+def blast_spans(blastn_bin, db, query_fa, threads, max_targets):
+    """{query: [(subject, qstart, qend), ...]}, megablast at >= 95% identity."""
+    out = subprocess.run(
+        [blastn_bin, "-task", "megablast", "-query", query_fa, "-db", db,
+         "-perc_identity", "95", "-evalue", "1e-10", "-max_target_seqs", str(max_targets),
+         "-num_threads", str(threads), "-outfmt", "6 qseqid sseqid qstart qend"],
+        check=True, stdout=subprocess.PIPE, universal_newlines=True).stdout
+    hits = defaultdict(list)
+    for line in out.splitlines():
+        q, s, qs, qe = line.split("\t")
+        hits[q].append((s, int(qs), int(qe)))
+    return hits
+
+
 def coverage_by_rep(blastn_bin, makeblastdb_bin, query_fa, rep_fa, rep_of, tmp, threads):
-    """{query contig: fraction of it covered by its own gene's representative},
-    megablast at >= 95% identity, union of HSPs on that one subject."""
+    """{query contig: bases of it covered by its own gene's representative},
+    megablast at >= 95% identity, union of HSPs on that one subject.
+
+    A query whose first search returned MAX_TARGETS subjects, none of them
+    its representative, is searched again without the cap: its
+    representative may only have been crowded out, and reading that as
+    zero coverage would rescue a redundant copy as distinct. One that
+    returned fewer really has no hit on it."""
     db = os.path.join(tmp, "reps")
     subprocess.run([makeblastdb_bin, "-in", rep_fa, "-dbtype", "nucl", "-out", db],
                    check=True, stdout=subprocess.DEVNULL)
-    out = subprocess.run(
-        [blastn_bin, "-task", "megablast", "-query", query_fa, "-db", db,
-         "-perc_identity", "95", "-evalue", "1e-10", "-max_target_seqs", "20",
-         "-num_threads", str(threads), "-outfmt", "6 qseqid sseqid qstart qend"],
-        check=True, stdout=subprocess.PIPE, universal_newlines=True).stdout
+    hits = blast_spans(blastn_bin, db, query_fa, threads, MAX_TARGETS)
+    crowded = {q for q, hs in hits.items()
+               if len({s for s, _, _ in hs}) >= MAX_TARGETS
+               and all(s != rep_of.get(q) for s, _, _ in hs)}
+    if crowded:
+        again_fa = os.path.join(tmp, "crowded.fa")
+        write_subset(query_fa, crowded, again_fa)
+        with open(rep_fa) as f:
+            n_reps = sum(1 for line in f if line.startswith(">"))
+        hits.update(blast_spans(blastn_bin, db, again_fa, threads, max(n_reps, MAX_TARGETS)))
     spans = defaultdict(list)
-    for line in out.splitlines():
-        q, s, qs, qe = line.split("\t")
-        if rep_of.get(q) == s:
-            a, b = sorted((int(qs), int(qe)))
-            spans[q].append((a, b))
+    for q, hs in hits.items():
+        for s, qs, qe in hs:
+            if rep_of.get(q) == s:
+                spans[q].append(tuple(sorted((qs, qe))))
     covered = {}
     for q, iv in spans.items():
         iv.sort()

@@ -12,7 +12,9 @@ status. Three tiers, each a superset of the cost of the one before:
 
   quick      no conda needed, seconds. Argument parsing and its rejections,
              the k-mer spec parser, chowder's label and order rules, contig
-             renaming at ingest, and tests/test_twotrack_select.py.
+             renaming at ingest, tests/test_twotrack_select.py, and
+             tests/test_run_integrity.py (cleanup keeps to its own run;
+             resume stamps; relative paths; strand_exam's commands).
   preflight  needs the conda envs, a few seconds each. The refusals that
              happen after the tool check and before any real work: missing
              reads, a k at or above read length, a missing BUSCO lineage,
@@ -438,6 +440,7 @@ def case_cli_rejections(ctx, run):
         (r + ["--spades1-kmer", "big"], "expected"),
         (r + ["--strand", "XX"], "invalid choice"),
         (r + ["--cpu", "eight"], "invalid int"),
+        (r + ["--runout", "sample.rep2"], "use only letters"),
     ]
     for args, msg in bad_oyster:
         out = run([sys.executable, OYSTER] + args, expect_rc=2)
@@ -446,6 +449,7 @@ def case_cli_rejections(ctx, run):
         (r, "--assemblies"),
         (r + ["--assemblies", "a.fa", "b.fa", "--assembly-order", "random"], "invalid choice"),
         (r + ["--assemblies", "a.fa", "b.fa", "--strand", "RF"], "unrecognized"),
+        (r + ["--assemblies", "a.fa", "b.fa", "--runout", "x/y"], "use only letters"),
     ]
     for args, msg in bad_chowder:
         out = run([sys.executable, CHOWDER] + args, expect_rc=2)
@@ -572,8 +576,8 @@ def case_twotrack_select(ctx, run):
 
 @case("quick")
 def case_filter_units(ctx, run):
-    """tests/test_filter_cov.py and tests/test_clear_pytransrate.py"""
-    for name in ("test_filter_cov.py", "test_clear_pytransrate.py"):
+    """tests/test_filter_cov.py, test_clear_pytransrate.py and test_run_integrity.py"""
+    for name in ("test_filter_cov.py", "test_clear_pytransrate.py", "test_run_integrity.py"):
         run([sys.executable, HERE / name])
 
 

@@ -97,13 +97,61 @@ def run(tmp, with_sprot=True):
     subprocess.run(cmd, check=True, stdout=subprocess.PIPE)
     return {l.strip() for l in open(out) if l.strip()}
 
+# Stands in for blastn: honours -max_target_seqs the way the crowding case
+# needs. Query `crowded` hits 25 decoys and, only when the cap allows more
+# than 20 subjects, its own representative `rep` over 1-900; query `lonely`
+# hits three decoys and nothing else. Every call's cap goes to calls.log.
+FAKE_BLASTN = r"""
+import os, sys
+a = sys.argv
+cap = int(a[a.index("-max_target_seqs") + 1])
+query = a[a.index("-query") + 1]
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "calls.log"), "a") as log:
+    log.write(f"{cap} {os.path.basename(query)}\n")
+names = [l[1:].split()[0] for l in open(query) if l.startswith(">")]
+for q in names:
+    subjects = [f"decoy{i}" for i in range(25 if q == "crowded" else 3)]
+    if q == "crowded" and cap > 20:
+        subjects = ["rep"] + subjects
+    for s in subjects[:cap]:
+        print(f"{q}\t{s}\t1\t{900 if s == 'rep' else 100}")
+"""
+
+
+def check_crowded_rep():
+    """coverage_by_rep: a representative crowded out of the first, capped
+    search is found by the second, and only a crowded query is searched
+    again. Stub tools, so this runs anywhere."""
+    sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
+    from twotrack_select import coverage_by_rep
+    with tempfile.TemporaryDirectory() as tmp:
+        blastn = os.path.join(tmp, "blastn.py")
+        with open(blastn, "w") as f:
+            f.write(FAKE_BLASTN)
+        q_fa, r_fa = os.path.join(tmp, "q.fa"), os.path.join(tmp, "r.fa")
+        write_fasta(q_fa, {"crowded": "A" * 1000, "lonely": "C" * 1000})
+        write_fasta(r_fa, {"rep": "A" * 1000, **{f"decoy{i}": "G" * 50 for i in range(25)}})
+        # blastn is called as one argv[0]: wrap the stub in a shell script.
+        wrapper = os.path.join(tmp, "blastn")
+        with open(wrapper, "w") as f:
+            f.write(f"#!/bin/sh\nexec {sys.executable} {blastn} \"$@\"\n")
+        os.chmod(wrapper, 0o755)
+        covered = coverage_by_rep(wrapper, "true", q_fa, r_fa,
+                                  {"crowded": "rep", "lonely": "rep"}, tmp, 1)
+        calls = open(os.path.join(tmp, "calls.log")).read().split("\n")
+    ok = (covered.get("crowded") == 900 and "lonely" not in covered
+          and len([c for c in calls if c]) == 2 and calls[1].endswith("crowded.fa"))
+    print(f"{'PASS' if ok else 'FAIL'}  crowded-out representative: covered {covered}, "
+          f"searches {[c for c in calls if c]}")
+    return 0 if ok else 1
+
 
 def main():
+    failures = check_crowded_rep()
     missing = [t for t in ("blastn", "makeblastdb", "cd-hit-est") if not shutil.which(t)]
     if missing:
         print(f"SKIP: {', '.join(missing)} not on PATH (try: conda run -n orp python {sys.argv[0]})")
-        return 0
-    failures = 0
+        return 1 if failures else 0
     with tempfile.TemporaryDirectory() as tmp:
         build(tmp)
         got = run(tmp)

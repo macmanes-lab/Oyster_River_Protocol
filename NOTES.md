@@ -11,11 +11,18 @@ entries by date.
 `version.txt` reads 4.1.0, the changelog has one condensed 4.1.0 section,
 and the README no longer says 5.0. Not tagged yet. Before tagging `4.1.0`:
 
-- **Fix:** chowder ignores a changed `--seed`/`--assembly-order` on resume.
-  `ingest` is skipped when `<run>.ingest.done` and the ingested copies
-  exist, so a re-run with a new seed reuses the old order while the report
-  prints the new seed. Compare `ingest.done`'s order with the requested one
-  and re-ingest when they differ.
+- ~~**Fix:** chowder ignores a changed `--seed`/`--assembly-order` on resume.~~
+  Fixed with the release review's resume findings: `ingest` now takes
+  `assemblies/working/<run>.ingest.settings` (order, seed, and each input's
+  size and mtime) as an input, as the assemblers take theirs.
+- **Release review (2026-10-17), fixed:** cleanup glob vs dotted run names,
+  chowder cross-input contig IDs, resume stamps, relative read paths,
+  assembly_eval quoting, twotrack's 20-subject cap, strandeval threads
+  (changelog Fixes; `tests/test_run_integrity.py`).
+  `tests/test_twotrack_select.py` passed on Premise in the orp env (real
+  blastn). Still unexercised: the new samtools sort line (no `samtools
+  view`, `-m 512M`) -- the full tier's `strandeval_standalone` and every
+  full run's strandeval step cover it.
 - ~~**Fix:** `--inchworm_cpu 10` hard-coded.~~ Not a real bug: Trinity
   2.15.2 caps `--inchworm_cpu` at `--CPU` itself (`Trinity` l.1232), so
   Inchworm never oversubscribed. ORP now passes `min(cpu, 10)` anyway so the

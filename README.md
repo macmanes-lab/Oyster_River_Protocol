@@ -143,7 +143,7 @@ The gzipping runs in the background, starting the moment each file is finished b
 
 Re-running `oyster.py` on a directory whose run already finished and was cleaned up is a no-op: it reports where the assembly and reports are and exits, rather than treating the reclaimed intermediates as work to redo. To assemble the same reads again, use a different `--runout`/`--dir`, or delete `reports/<run>.cleanup.done` to force a full re-run in place.
 
-Re-running on an unfinished run resumes it: a step whose outputs exist and are newer than its inputs is skipped. A step that was killed or failed partway is re-run even if it left output files behind, since tools like rcorrector and diamond write as they go and a half-written file would otherwise look finished. Each step leaves `reports/.<run>.<step>.running` while it runs and removes it when it succeeds.
+Re-running on an unfinished run resumes it: a step whose outputs exist and are newer than its inputs is skipped. A step that was killed or failed partway is re-run even if it left output files behind, since tools like rcorrector and diamond write as they go and a half-written file would otherwise look finished. Each step leaves `reports/.<run>.<step>.running` while it runs and removes it when it succeeds. Timestamps alone can't tell that a setting changed, or that a read file was swapped for a different, older one, so the settings each assembler and chowder's `ingest` depend on (`--strand`, the k-mers, `--normalize-reads`, `--seed`/`--assembly-order`) and the size and mtime of the reads and of chowder's assemblies are recorded in `assemblies/working/<run>.*.settings` and `rcorr/<run>.reads.source`. Change one and the steps built on it are redone; moving the files without changing them redoes nothing.
 
 ### The expression filter (`--min-cov`, `--tpm-filt`)
 
@@ -197,7 +197,7 @@ Because it appends, a value given here overrides the same flag ORP passes above 
 | `--mem` | `110` | Memory in GB |
 | `--cpu` | `16` | CPU threads |
 | `--busco-threads` | same as `--cpu` | BUSCO threads |
-| `--runout` | `USER_RUN` | Run name prefix |
+| `--runout` | `USER_RUN` | Run name prefix: letters, digits, `_` and `-` only |
 | `--strand` | unstranded (`""`) | Strand-specificity: `RF`, `FR`, or unset |
 | `--lineage` | `eukaryota_odb12.2` | BUSCO lineage |
 | `--normalize-reads` | off | Let Trinity normalize reads (default is `--no_normalize_reads`) |
@@ -231,7 +231,7 @@ There are no assembler flags — no k-mers, no `--strand`, no `--normalize-reads
 | `--mem` | `110` | Memory in GB |
 | `--cpu` | `16` | CPU threads |
 | `--busco-threads` | same as `--cpu` | BUSCO threads |
-| `--runout` | `USER_RUN` | Run name prefix |
+| `--runout` | `USER_RUN` | Run name prefix: letters, digits, `_` and `-` only |
 | `--lineage` | `eukaryota_odb12.2` | BUSCO lineage |
 | `--tpm-filt` | `0` | TPM filter threshold |
 | `--min-cov` | `auto` | coverage filter threshold (NumReads x mean fragment length / contig length); a contig must also pass `--tpm-filt`. `auto` scales it with read pairs, `max(1, 2 x (pairs / 60M) ^ 0.85)`; a number is used as given -- see [The expression filter](#the-expression-filter---min-cov---tpm-filt) |

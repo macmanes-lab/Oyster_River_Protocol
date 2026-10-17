@@ -75,7 +75,7 @@ from pathlib import Path
 
 from oyster import (
     ASSEMBLER_TOOLS, MIN_COV_HELP, RED, RESET, Assembly, Pipeline, line_buffer_stdio,
-    parse_min_cov,
+    file_identity, parse_min_cov, run_name,
 )
 
 HERE = Path(__file__).resolve().parent
@@ -98,6 +98,16 @@ def sanitise_label(raw):
     name = re.sub(r"\.(fa|fasta|fna|fas|seq)$", "", name, flags=re.IGNORECASE)
     name = re.sub(r"[^A-Za-z0-9]+", "_", name).strip("_")
     return name or "assembly"
+
+
+def labels_can_collide(labels):
+    """Whether two inputs' renamed contigs could share an ID.
+
+    For distinct labels a and b, a_x == b_y needs one label to be the other
+    followed by '_' (a_x starts with b, so b is a or a_...), so this is the
+    only case ingest has to check contig by contig.
+    """
+    return any(a != b and b.startswith(a + "_") for a in labels for b in labels)
 
 
 def derive_labels(paths, explicit=None):
@@ -337,13 +347,20 @@ class Chowder(Pipeline):
         TRINITY_DN0_c0_g1_i1 would be silently treated as one.
         """
         self.ingested_dir().mkdir(parents=True, exist_ok=True)
+        # <label>_<name> is unique across inputs by construction unless one
+        # label is another plus `_...`: label `a` with contig `b_c` and label
+        # `a_b` with contig `c` both come out a_b_c. Only then is every
+        # renamed ID tracked across the inputs, since that set can run to
+        # millions of names.
+        labels = [a.diamond_label for a in self.assemblies]
+        taken = {} if labels_can_collide(labels) else None
         for a, src in zip(self.assemblies, self.sources):
             dst = self.assembly_fasta(a)
             # Via a .part, so a run killed mid-file leaves no truncated copy
             # that a resume would take for finished on mtime alone.
             part = dst.with_name(dst.name + ".part")
             try:
-                n = self.ingest_one(a, src, part)
+                n = self.ingest_one(a, src, part, taken)
                 part.replace(dst)
             except BaseException:
                 if part.exists():
@@ -357,9 +374,7 @@ class Chowder(Pipeline):
         # The order is part of the result, not a detail of the invocation:
         # it decided cd-hit-est's ties and the rescue ranking, so a run has
         # to say which order it used and what produced it.
-        header = (f"# assembly order: shuffled, seed {self.seed}"
-                  if self.order_mode == "shuffled" else
-                  "# assembly order: as given on the command line")
+        header = self.ingest_order_header()
         self.ingest_done.write_text(
             header + "\n"
             + "\n".join(f"{i}\t{a.diamond_label}\t{src}"
@@ -367,10 +382,28 @@ class Chowder(Pipeline):
             + "\n"
         )
 
-    def ingest_one(self, a, src, target):
+    def ingest_order_header(self):
+        return (f"# assembly order: shuffled, seed {self.seed}"
+                if self.order_mode == "shuffled" else
+                "# assembly order: as given on the command line")
+
+    def ingest_stamp(self):
+        """The order and the identity of each input, so a resume with another
+        --seed or --assembly-order, or with an assembly swapped for a
+        different (older) file, ingests again instead of keeping the old
+        order, which decides cd-hit-est's ties and the rescue ranking."""
+        settings = self.ingest_order_header() + "\n" + "".join(
+            f"{i}\t{a.diamond_label}\t{file_identity(src)}\n"
+            for i, (a, src) in enumerate(zip(self.assemblies, self.sources), start=1))
+        return self.settings_stamp(self.settings_stamp_path("ingest"), settings,
+                                   self.assembly_fasta_paths() + [self.ingest_done])
+
+    def ingest_one(self, a, src, target, taken=None):
         """Write `src` to `target` with every contig renamed <label>_<name>.
 
-        Returns the number of contigs.
+        Returns the number of contigs. `taken`, when given, maps every
+        renamed ID written so far, from any input, to the file it came from,
+        and a repeat stops the run.
         """
         prefix = f"{a.diamond_label}_"
         seen, n = set(), 0
@@ -398,7 +431,16 @@ class Chowder(Pipeline):
                         "every stage from the merge on joins on them. ***"
                     )
                 seen.add(name)
-                out.write(f">{prefix}{name}{rest}\n")
+                renamed = prefix + name
+                if taken is not None:
+                    if renamed in taken:
+                        sys.exit(
+                            f"\n*** contig {name!r} in {src} and a contig in {taken[renamed]} "
+                            f"both become {renamed!r}: one label is another followed by '_'. "
+                            "Give --labels that are not prefixes of each other. ***"
+                        )
+                    taken[renamed] = src
+                out.write(f">{renamed}{rest}\n")
         if n == 0:
             sys.exit(f"\n*** no sequences found in {src} -- is it FASTA? ***")
         return n
@@ -420,7 +462,7 @@ class Chowder(Pipeline):
         self.assemblycheck()
         self.step(
             "ingest", self.assembly_fasta_paths() + [self.ingest_done],
-            self.sources, self.ingest,
+            self.sources + [self.ingest_stamp()], self.ingest,
         )
         self.prepare_reads()
         self.merge_and_report(pipeline_start)
@@ -474,7 +516,8 @@ def parse_args():
     p.add_argument("--mem", type=int, default=110, help="memory in GB (default: 110)")
     p.add_argument("--cpu", type=int, default=16, help="CPU threads (default: 16)")
     p.add_argument("--busco-threads", type=int, default=None, help="BUSCO threads (default: same as --cpu)")
-    p.add_argument("--runout", default="USER_RUN", help="run name prefix (default: USER_RUN)")
+    p.add_argument("--runout", type=run_name, default="USER_RUN",
+                   help="run name prefix: letters, digits, _ and - (default: USER_RUN)")
     p.add_argument("--lineage", default="eukaryota_odb12.2", help="BUSCO lineage (default: eukaryota_odb12.2)")
     p.add_argument("--tpm-filt", type=float, default=0, help="TPM filter threshold (default: 0)")
     p.add_argument("--min-cov", type=parse_min_cov, default="auto", help=MIN_COV_HELP)

@@ -701,6 +701,21 @@ def average_read_length(path: Path, n_records: int = 100) -> int:
     return read_length_stats(path, n_records)[0]
 
 
+def run_name(value):
+    """--runout: letters, digits, `_` and `-` only.
+
+    Every file a run writes into the directories it shares with other runs
+    (assemblies/working, assemblies/diamond, quants) is named <runout>.*, and
+    cleanup() finds this run's by that glob. With a `.` allowed, cleaning up
+    `sample` also matched `sample.rep2.*` and deleted another run's files.
+    """
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", value):
+        raise argparse.ArgumentTypeError(
+            f"{value!r}: use only letters, digits, '_' and '-' (no '.', '/' or "
+            "spaces) -- runs sharing a --dir are told apart by <runout>.")
+    return value
+
+
 MAX_SPADES_K = 127  # rnaSPAdes requires every k to be odd and strictly below 128
 MIN_SPADES_K = 15
 
@@ -825,6 +840,10 @@ def resolve_kmers(spec, max_read_len, label=""):
 # seqtk seed that draws them, so a rerun maps the same reads.
 STRAND_SAMPLE_PAIRS = 400000
 STRAND_SEED = 23894
+# samtools sort's share of strand_exam's cpu, and its memory per thread. The
+# sample is ~1M records; two threads at 512M sort it in memory or close to it.
+STRAND_SORT_THREADS = 2
+STRAND_SORT_MEM = "512M"
 STRAND_EXAM_DOC = "https://github.com/macmanes-lab/Oyster_River_Protocol/blob/master/docs/strandexamine.md"
 
 
@@ -838,6 +857,19 @@ def trinity_perllib_dir():
     return trinity_path.parent / "PerlLib"
 
 
+def kmer_text(kmers):
+    """A resolved --spadesN-kmer as a stamp records it."""
+    return "auto" if not kmers else ",".join(str(k) for k in kmers)
+
+
+def file_identity(path):
+    """Size and whole-second mtime: what settings stamps record of an input
+    file. Whole seconds, because copies that keep the mtime (cp -p, rsync -t)
+    don't all keep the fraction."""
+    st = Path(path).stat()
+    return f"size={st.st_size} mtime={int(st.st_mtime)}"
+
+
 def strand_exam_scratch(workdir, prefix):
     """The strand exam's working files: the sampled BAM, its bwa index, the
     per-transcript table, and the column hist was fed."""
@@ -849,8 +881,14 @@ def strand_exam_scratch(workdir, prefix):
     return paths
 
 
+def conda_wrap(env, cmd):
+    """`cmd` run in the ORP conda env `env` ("orp" or "orp_trinity")."""
+    return ["conda", "run", "--no-capture-output", "-n", env, *(str(c) for c in cmd)]
+
+
 def strand_exam(run, assembly, r1, r2, prefix, workdir, cpu, flagstat_out,
-                pairs=STRAND_SAMPLE_PAIRS, keep_scratch=False):
+                pairs=STRAND_SAMPLE_PAIRS, keep_scratch=False, wrap=conda_wrap,
+                strand_script=None, perllib=None):
     """The Oyster River Strand Exam Tool (docs/strandexamine.md).
 
     Maps `pairs` read pairs sampled from r1/r2 to `assembly` with bwa mem,
@@ -859,39 +897,47 @@ def strand_exam(run, assembly, r1, r2, prefix, workdir, cpu, flagstat_out,
     (plus - minus) / total across transcripts, inside the banner a run
     prints. The samtools flagstat of the sample goes to `flagstat_out`.
 
-    Shared by the pipeline's strandeval step and scripts/strandeval.py, so
-    the two can't drift. `run(cmd, cwd=...)` runs one command and raises on
-    failure: Pipeline.run from the pipeline, which brings its retries.
-    Working files go in `workdir` under `prefix` (strand_exam_scratch) and
-    are deleted at the end unless keep_scratch.
+    Shared by the pipeline's strandeval step, scripts/strandeval.py and
+    assembly_eval.py, so the three can't drift. `run(cmd, cwd=...)` runs one
+    command and raises on failure: Pipeline.run from the pipeline, which
+    brings its retries. `wrap(env, cmd)` puts a command in "orp" or
+    "orp_trinity" -- assembly_eval.py maps those to its --env flags, or to
+    PATH under --no-conda. Working files go in `workdir` under `prefix`
+    (strand_exam_scratch) and are deleted at the end unless keep_scratch.
+
+    `cpu` is the whole budget. bwa mem gets all but STRAND_SORT_THREADS of
+    it, and samtools sort (which reads SAM itself, so there is no samtools
+    view between them) the rest, at STRAND_SORT_MEM a thread: each used to
+    be given all of `cpu`, three times the step's share beside pyTransRate.
     """
     workdir = Path(workdir)
     base = workdir / prefix
     bam = workdir / f"{prefix}.sorted.bam"
     q = lambda p: shlex.quote(str(p))
+    shell = lambda env, cmd: " ".join(q(c) for c in wrap(env, cmd))
+    sort_threads = min(STRAND_SORT_THREADS, max(1, cpu - 1))
+    bwa_threads = max(1, cpu - sort_threads)
 
-    run(["conda", "run", "--no-capture-output", "-n", "orp_trinity",
-         "bwa", "index", "-p", str(base), str(assembly)], cwd=workdir)
+    run(wrap("orp_trinity", ["bwa", "index", "-p", base, assembly]), cwd=workdir)
 
     sample = lambda reads: f"<(seqtk sample -s {STRAND_SEED} {q(reads)} {pairs})"
-    bwa_mem = f"bwa mem -t {cpu} {q(base)} {sample(r1)} {sample(r2)}"
+    bwa_mem = f"bwa mem -t {bwa_threads} {q(base)} {sample(r1)} {sample(r2)}"
     pipeline_script = (
-        f"conda run --no-capture-output -n orp_trinity bash -c {q(bwa_mem)} "
-        f"| conda run --no-capture-output -n orp samtools view -@{cpu} -Sb - "
-        f"| conda run --no-capture-output -n orp samtools sort -T {q(base)} -O bam -@{cpu} "
-        f"-o {q(bam)} -"
+        shell("orp_trinity", ["bash", "-c", bwa_mem])
+        + " | "
+        # -@ counts threads beyond the main one.
+        + shell("orp", ["samtools", "sort", "-T", base, "-O", "bam",
+                        "-@", sort_threads - 1, "-m", STRAND_SORT_MEM, "-o", bam, "-"])
     )
     run(["bash", "-o", "pipefail", "-c", pipeline_script], cwd=workdir)
 
     with open(flagstat_out, "w") as outf:
-        subprocess.run(
-            ["conda", "run", "--no-capture-output", "-n", "orp", "samtools", "flagstat", str(bam)],
-            check=True, stdout=outf, cwd=workdir,
-        )
+        subprocess.run(wrap("orp", ["samtools", "flagstat", bam]),
+                       check=True, stdout=outf, cwd=workdir)
 
-    run(["conda", "run", "--no-capture-output", "-n", "orp_trinity",
-         "perl", "-I", str(trinity_perllib_dir()),
-         str(HERE / "scripts" / "examine_strand.pl"), str(bam), str(base)], cwd=workdir)
+    run(wrap("orp_trinity", [
+        "perl", "-I", perllib or trinity_perllib_dir(),
+        strand_script or HERE / "scripts" / "examine_strand.pl", bam, base]), cwd=workdir)
 
     dat_file = workdir / f"{prefix}.dat"
     hist_input = workdir / f"{prefix}.hist_input.txt"
@@ -903,8 +949,7 @@ def strand_exam(run, assembly, r1, r2, prefix, workdir, cpu, flagstat_out,
                 out.write(cols[4] + "\n")
 
     hist_result = subprocess.run(
-        ["conda", "run", "--no-capture-output", "-n", "orp_trinity", "bash", "-c",
-         f"hist -p '#' -c red {q(hist_input)}"],
+        wrap("orp_trinity", ["bash", "-c", f"hist -p '#' -c red {q(hist_input)}"]),
         check=True, cwd=workdir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True,
     )
 
@@ -944,10 +989,18 @@ class Pipeline:
         # settled by check_transabyss_mpi at preflight.
         self.transabyss_mpi = getattr(args, "transabyss_mpi", "off")
         self.transabyss_use_mpi = False
-        self.read1 = Path(args.read1)
-        self.read2 = Path(args.read2)
+        # Absolute, because every command runs from --dir (Pipeline.run's
+        # cwd) while the flags were typed relative to wherever oyster.py was
+        # launched: preflight found reads/r1.fq and trimmomatic then looked
+        # for it under --dir. abspath rather than resolve(), so a symlinked
+        # read file keeps the name it was given.
+        self.read1 = Path(os.path.abspath(args.read1))
+        self.read2 = Path(os.path.abspath(args.read2))
         self.runout = args.runout
-        self.lineage = args.lineage
+        # The same for a --lineage given as a directory; a dataset name stays
+        # a name for BUSCO to look up under busco_dbs/.
+        self.lineage = (os.path.abspath(args.lineage) if Path(args.lineage).is_dir()
+                        else args.lineage)
         self.strand = getattr(args, "strand", "")
         self.normalize_reads = getattr(args, "normalize_reads", False)
         self.tpm_filt = args.tpm_filt
@@ -1400,9 +1453,52 @@ class Pipeline:
         existing_inputs = [Path(i) for i in inputs if i and Path(i).exists()]
         if not existing_inputs:
             return False
-        newest_input = max(i.stat().st_mtime for i in existing_inputs)
+        # An input that is a symlink counts as new from when the link was
+        # made as well as from when its target was written: re-pointing the
+        # corrected pair at a different, older file (use_corrected_reads)
+        # has to make everything built from the old one stale.
+        newest_input = max(max(i.stat().st_mtime, i.lstat().st_mtime) for i in existing_inputs)
         oldest_output = min(o.stat().st_mtime for o in outputs)
         return newest_input > oldest_output
+
+    def settings_stamp(self, stamp, settings, anchors):
+        """Record `settings` in `stamp` and return it, for a step's inputs.
+
+        needs_run only compares mtimes, so without a stamp a resumed run
+        given a different --strand, k-mer, seed or input file -- an older
+        one, in particular -- finds the step up to date and keeps the result
+        of the old one. The stamp is rewritten, and so made newer than the
+        step's outputs, only when `settings` differs from what it holds. A
+        run directory from before the stamp existed gets one dated to the
+        oldest of `anchors` (the step's outputs) that exists, so resuming it
+        redoes nothing; what it ran with can't be known, so a change made
+        there still goes unnoticed, as before.
+        """
+        stamp = Path(stamp)
+        if stamp.exists() and stamp.read_text() == settings:
+            return stamp
+        existed = stamp.exists()
+        stamp.parent.mkdir(parents=True, exist_ok=True)
+        stamp.write_text(settings)
+        present = [Path(a) for a in anchors if Path(a).exists()]
+        if not existed and present:
+            t = min(a.stat().st_mtime for a in present)
+            os.utime(stamp, (t, t))
+        return stamp
+
+    def settings_stamp_path(self, what):
+        return self.assemblies_working / f"{self.runout}.{what}.settings"
+
+    def reads_stamp(self, anchors):
+        """The identity of --read1/--read2 (size and mtime, not path, so
+        moving the files doesn't redo days of work), and whether they came
+        in already corrected."""
+        mode = "corrected" if self.corrected_reads else "raw"
+        settings = (f"reads={mode}\n"
+                    f"read1 {file_identity(self.read1)}\n"
+                    f"read2 {file_identity(self.read2)}\n")
+        return self.settings_stamp(self.rcorr_dir / f"{self.runout}.reads.source",
+                                   settings, anchors)
 
     def tool_version(self, env, binary):
         """``<binary> --version`` in ``env``, as a bare version string or None.
@@ -1978,6 +2074,34 @@ class Pipeline:
         ]
         return cmd
 
+    def trinity_settings(self):
+        """The settings Trinity's assembly depends on, as its stamp records them."""
+        return (f"strand={self.strand or 'none'} "
+                f"normalize_reads={'yes' if self.normalize_reads else 'no'}\n")
+
+    def clear_stale_trinity_dir(self):
+        """Empty Trinity's output directory if it was started on other inputs.
+
+        Trinity resumes from the checkpoints it leaves there, which is what
+        a resume after an interruption wants -- but not a phase 1 re-run
+        because the reads, --strand or --normalize-reads changed: Trinity
+        would take Inchworm and Chrysalis as done and keep their old output.
+        What this phase 1 starts from goes in orp.inputs inside the
+        directory. A directory without one predates it and is kept, as
+        before.
+        """
+        out = self.trinity_out_dir()
+        record = out / "orp.inputs"
+        current = (self.trinity_settings()
+                   + f"left {file_identity(self.cor1())}\n"
+                   + f"right {file_identity(self.cor2())}\n")
+        if record.exists() and record.read_text() != current:
+            print(f"[run_trinity_phase1] {self._rel(out)} was started on other reads "
+                  "or settings; starting Trinity afresh")
+            shutil.rmtree(out)
+        out.mkdir(parents=True, exist_ok=True)
+        record.write_text(current)
+
     def run_trinity_phase1(self, cpu=None, mem=None):
         # Inchworm + Chrysalis prep only, via Trinity's documented staged-
         # execution flag (https://github.com/trinityrnaseq/trinityrnaseq/wiki/
@@ -1990,6 +2114,7 @@ class Pipeline:
         cpu = self.cpu if cpu is None else cpu
         mem = self.mem if mem is None else mem
         cmd = self._trinity_base_cmd(cpu, mem) + ["--no_distributed_trinity_exec"]
+        self.clear_stale_trinity_dir()
         self.conda_run("orp_trinity", *cmd, retries=0)
         self.trinity_phase1_done().touch()
 
@@ -2105,7 +2230,9 @@ class Pipeline:
         awk_first_field(out, tmp)
         tmp.replace(out)
         if not self.no_cleanup:
-            for f in self.assemblies_dir.glob("*gene_trans_map"):
+            # This run's only: a bare *gene_trans_map took the map out from
+            # under every other run finishing Trinity in the same --dir.
+            for f in self.assemblies_dir.glob(f"{self.runout}.*gene_trans_map"):
                 f.unlink()
 
     def _grow_trinity_phase2(self, proc, cpu, grow_when, start):
@@ -2620,26 +2747,13 @@ class Pipeline:
     def filter_settings_stamp(self, filter_done):
         """--tpm-filt and --min-cov, recorded so that changing either re-filters.
 
-        needs_run only compares mtimes, so without this a resumed run given a
-        new threshold would find filter.done up to date and keep the old
-        split. Rewritten only when the settings change, like
-        stamp_tool_version. A run from before this stamp existed gets one
+        See settings_stamp. A run from before this stamp existed gets one
         dated to its filter.done, so resuming it doesn't redo BUSCO and
-        pyTransRate over an identical assembly; what it ran with can't be
-        known, so a changed threshold there still goes unnoticed, as before.
+        pyTransRate over an identical assembly.
         """
-        stamp = self.assemblies_working / f"{self.runout}.filter.settings"
         min_cov = self.min_cov if self.min_cov == "auto" else f"{self.min_cov:g}"
         settings = f"tpm_filt={self.tpm_filt:g} min_cov={min_cov}\n"
-        if stamp.exists() and stamp.read_text() == settings:
-            return stamp
-        existed = stamp.exists()
-        stamp.parent.mkdir(parents=True, exist_ok=True)
-        stamp.write_text(settings)
-        if not existed and Path(filter_done).exists():
-            t = Path(filter_done).stat().st_mtime
-            os.utime(stamp, (t, t))
-        return stamp
+        return self.settings_stamp(self.settings_stamp_path("filter"), settings, [filter_done])
 
     def filter_tpm(self):
         """Split the intermediate's contigs into HIGHEXP and LOWEXP.
@@ -3017,10 +3131,12 @@ class Pipeline:
         # directory from before the sentinel existed has no sentinel and its
         # TRIM files still present, so it takes the first branch and skips
         # the same way it always did.
+        reads = [self.read1, self.read2,
+                 self.reads_stamp([p for p in (trim_done, t1, t2, c1, c2) if p.exists()])]
         trim_outputs = [t1, t2]
-        if trim_done.exists() and not self.needs_run([c1, c2], [self.read1, self.read2]):
+        if trim_done.exists() and not self.needs_run([c1, c2], reads):
             trim_outputs = [trim_done]
-        self.step("run_trimmomatic", trim_outputs, [self.read1, self.read2], self.run_trimmomatic)
+        self.step("run_trimmomatic", trim_outputs, reads, self.run_trimmomatic)
         self.step("run_rcorrector", [c1, c2], [t1, t2], self.run_rcorrector)
         self.reclaim_trimmed_reads()
         # Every stage from here through strandeval reads c1/c2, so they can't
@@ -3042,8 +3158,13 @@ class Pipeline:
         deletes the copies.
         """
         self.rcorr_dir.mkdir(parents=True, exist_ok=True)
+        stamp = self.reads_stamp([self.cor1(), self.cor2()])
         for src, dst in ((self.read1, self.cor1()), (self.read2, self.cor2())):
-            if dst.exists() and not self.needs_run([dst], [src]):
+            # The stamp catches a pair swapped for different reads that are
+            # older than the copy or link made of the old ones, which the
+            # mtimes alone took for up to date.
+            relinked = dst.is_symlink() and dst.resolve() != src.resolve()
+            if dst.exists() and not relinked and not self.needs_run([dst], [src, stamp]):
                 continue
             if dst.is_symlink() or dst.exists():
                 dst.unlink()
@@ -3108,10 +3229,29 @@ class Pipeline:
         # share from the start, and Trinity on the rest -- phase 1 beside
         # SPAdes (Stage A), then phase 2 on all of the lane (Stage B). See
         # TRANSABYSS_SHARE and TRINITY_PHASE1_SHARE above.
+        # What each assembler was run with, so that a resume with a different
+        # --strand, k or --normalize-reads redoes that assembly (and, by
+        # mtime, everything built from it) instead of keeping the old one.
+        # The sentinel is seeded first: it is what the Trinity stamp of a
+        # run directory from before either existed is dated to.
+        self.seed_trinity_phase1_sentinel()
+        strand = self.strand or "none"
+        ta_stamp = self.settings_stamp(
+            self.settings_stamp_path("transabyss"),
+            f"strand={strand} k={self.transabyss_kmer}\n", [ta])
+        trinity_stamp = self.settings_stamp(
+            self.settings_stamp_path("trinity"), self.trinity_settings(), [phase1_done])
+        spauto_stamp = self.settings_stamp(
+            self.settings_stamp_path("spadesauto"),
+            f"strand={strand} k={kmer_text(self.spades1_kmer)}\n", [spauto])
+        sphigh_stamp = self.settings_stamp(
+            self.settings_stamp_path("spadeshigh"),
+            f"strand={strand} k={kmer_text(self.spades2_kmer)}\n", [sphigh])
+
         transabyss_pending = (
             self.step_marker("run_transabyss").exists()
             or self.step_marker("diamond_transabyss").exists()
-            or self.needs_run([ta], [c1, c2])
+            or self.needs_run([ta], [c1, c2, ta_stamp])
             or self.needs_run([diamond_ta], [ta])
         )
         if transabyss_pending:
@@ -3143,8 +3283,6 @@ class Pipeline:
         if not transabyss_pending:
             transabyss_done.set()
 
-        self.seed_trinity_phase1_sentinel()
-
         def _lane_failed(lane_name, e):
             # ThreadPoolExecutor.__exit__ (below) calls shutdown(wait=True) even
             # while an exception unwinds, so the other lanes' still-running
@@ -3160,7 +3298,7 @@ class Pipeline:
         def transabyss_lane():
             try:
                 self.step(
-                    "run_transabyss", [ta], [c1, c2],
+                    "run_transabyss", [ta], [c1, c2, ta_stamp],
                     partial(self.run_transabyss, cpu=transabyss_cpu, mem=transabyss_mem),
                 )
                 self.compress_async(ta)
@@ -3176,7 +3314,7 @@ class Pipeline:
         def trinity_phase1_lane():
             try:
                 self.step(
-                    "run_trinity_phase1", [phase1_done], [c1, c2],
+                    "run_trinity_phase1", [phase1_done], [c1, c2, trinity_stamp],
                     partial(self.run_trinity_phase1, cpu=phase1_cpu, mem=phase1_mem),
                 )
             except Exception as e:
@@ -3192,8 +3330,10 @@ class Pipeline:
             # soon as its assembly is done instead of waiting for the merge.
             try:
                 for step_name, outputs, inputs, assemble, diamond_name, diamond_out in (
-                    ("run_spadesauto", [spauto], [c1, c2], self.run_spadesauto, "spadesauto", diamond_spauto),
-                    ("run_spadeshigh", [sphigh], [c1, c2], self.run_spadeshigh, "spadeshigh", diamond_sphigh),
+                    ("run_spadesauto", [spauto], [c1, c2, spauto_stamp], self.run_spadesauto,
+                     "spadesauto", diamond_spauto),
+                    ("run_spadeshigh", [sphigh], [c1, c2, sphigh_stamp], self.run_spadeshigh,
+                     "spadeshigh", diamond_sphigh),
                 ):
                     self.step(step_name, outputs, inputs, partial(assemble, cpu=spades_cpu, mem=spades_mem))
                     query = outputs[0]
@@ -3388,7 +3528,8 @@ def parse_args():
     p.add_argument("--mem", type=int, default=110, help="memory in GB (default: 110)")
     p.add_argument("--cpu", type=int, default=16, help="CPU threads (default: 16)")
     p.add_argument("--busco-threads", type=int, default=None, help="BUSCO threads (default: same as --cpu)")
-    p.add_argument("--runout", default="USER_RUN", help="run name prefix (default: USER_RUN)")
+    p.add_argument("--runout", type=run_name, default="USER_RUN",
+                   help="run name prefix: letters, digits, _ and - (default: USER_RUN)")
     p.add_argument("--strand", choices=["RF", "FR", ""], default="", help="strand-specificity (default: unstranded)")
     p.add_argument("--lineage", default="eukaryota_odb12.2", help="BUSCO lineage (default: eukaryota_odb12.2)")
     p.add_argument("--normalize-reads", action="store_true", help="let Trinity normalize reads (default: off, i.e. --no_normalize_reads)")

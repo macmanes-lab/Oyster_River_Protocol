@@ -51,14 +51,9 @@ import threading
 import time
 from pathlib import Path
 
-from oyster import RED, RESET, line_buffer_stdio
+from oyster import RED, RESET, line_buffer_stdio, strand_exam
 
 HERE = Path(__file__).resolve().parent
-
-#: The seed and read count strandeval samples with, as in oyster.py, so the
-#: strand histogram here is the one a full run would have drawn.
-STRAND_SEED = 23894
-STRAND_READS = 400000
 
 STEPS = ("pytransrate", "busco", "strandeval")
 
@@ -247,51 +242,23 @@ class Eval:
         return Path(res.stdout.strip()).resolve().parent / "PerlLib"
 
     def strandeval(self, cpu, mem):
+        """oyster.py's strand_exam, so the histogram is the one a full run
+        draws, with its paths quoted and its threads kept to `cpu`; only the
+        envs (or PATH, under --no-conda) and the script are this tool's."""
         work = self.work / "strandeval"
         if work.exists():
             shutil.rmtree(work)
         work.mkdir(parents=True)
-        run = self.runout
-        self.run("strandeval", self.conda_cmd(self.args.env_trinity, [
-            "bwa", "index", "-p", run, self.assembly]), cwd=work)
-
-        sample = lambda r: f"<(seqtk sample -s {STRAND_SEED} {r} {STRAND_READS})"
-        inner = (f"bwa mem -t {cpu} {run} {sample(self.read1)} {sample(self.read2)}")
-        mapped = " ".join(shlex.quote(c) for c in self.conda_cmd(
-            self.args.env_trinity, ["bash", "-c", inner]))
-        view = " ".join(self.conda_cmd(self.args.env, ["samtools", "view", "-@10", "-Sb", "-"]))
-        sort = " ".join(self.conda_cmd(self.args.env, [
-            "samtools", "sort", "-T", run, "-O", "bam", "-@10", "-o", f"{run}.sorted.bam", "-"]))
-        self.run("strandeval", ["bash", "-o", "pipefail", "-c",
-                                f"{mapped} | {view} | {sort}"], cwd=work)
-
-        with open(self.reports / f"{run}.flagstat", "w") as out:
-            self.run("strandeval", self.conda_cmd(self.args.env, [
-                "samtools", "flagstat", f"{run}.sorted.bam"]), cwd=work, stdout=out)
-
-        self.run("strandeval", self.conda_cmd(self.args.env_trinity, [
-            "perl", "-I", self.trinity_perllib(), self.strand_script,
-            f"{run}.sorted.bam", run]), cwd=work)
-
-        hist_input = work / f"{run}.hist_input.txt"
-        with open(work / f"{run}.dat") as f, open(hist_input, "w") as out:
-            next(f, None)
-            for line in f:
-                cols = line.rstrip("\n").split()
-                if len(cols) >= 5:
-                    out.write(cols[4] + "\n")
-
-        hist = subprocess.run(
-            self.conda_cmd(self.args.env_trinity, ["bash", "-c", f"hist -p '#' -c red {hist_input}"]),
-            check=True, cwd=work, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            universal_newlines=True)
-        summary = (
-            "\n*****  STRAND EXAMINATION HISTOGRAM ***** \n"
-            f"{hist.stdout.rstrip(chr(10))}\n"
-            "\n*****  See the following link for interpretation ***** \n"
-            "*****  https://oyster-river-protocol.readthedocs.io/en/latest/strandexamine.html ***** \n"
+        envs = {"orp": self.args.env, "orp_trinity": self.args.env_trinity}
+        summary = strand_exam(
+            lambda cmd, cwd=None: self.run("strandeval", cmd, cwd=cwd),
+            self.assembly, self.read1, self.read2, self.runout, work, cpu,
+            flagstat_out=self.reports / f"{self.runout}.flagstat",
+            keep_scratch=True,
+            wrap=lambda env, cmd: self.conda_cmd(envs[env], cmd),
+            strand_script=self.strand_script, perllib=self.trinity_perllib(),
         )
-        (self.reports / f"{run}.strandeval_summary.txt").write_text(summary)
+        (self.reports / f"{self.runout}.strandeval_summary.txt").write_text(summary)
         if not self.args.no_cleanup:
             shutil.rmtree(work, ignore_errors=True)
 
