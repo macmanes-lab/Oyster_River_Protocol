@@ -483,6 +483,21 @@ def case_kmer_specs(ctx, run):
 
 
 @case("quick")
+def case_trinity_inchworm_cpu(ctx, run):
+    """Trinity's --inchworm_cpu is capped at the cores the call gets"""
+    from types import SimpleNamespace
+    from oyster import Pipeline, TRINITY_INCHWORM_CPU
+    fake = SimpleNamespace(strand="none", normalize_reads=False,
+                           trinity_out_dir=lambda: "t", cor1=lambda: "1", cor2=lambda: "2")
+    for cpu, want in ((5, 5), (TRINITY_INCHWORM_CPU, TRINITY_INCHWORM_CPU),
+                      (40, TRINITY_INCHWORM_CPU)):
+        cmd = Pipeline._trinity_base_cmd(fake, cpu, 16)
+        got = cmd[cmd.index("--inchworm_cpu") + 1]
+        require(got == str(want), f"--CPU {cpu} gave --inchworm_cpu {got}, want {want}")
+        require(cmd[cmd.index("--CPU") + 1] == str(cpu), f"--CPU {cpu} not passed through")
+
+
+@case("quick")
 def case_chowder_labels_and_order(ctx, run):
     """chowder's labels, collisions, reserved names and seeded order"""
     from chowder import derive_labels, sanitise_label, shuffled_order

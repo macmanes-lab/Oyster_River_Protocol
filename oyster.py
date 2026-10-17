@@ -169,8 +169,8 @@ TRANSABYSS_MPI_ENV = {
 # Not OMPI_MCA_mpi_yield_when_idle: dev23 set it in case spinning ranks were
 # what slowed Trinity during MPI runs. On DRR031870 it cost Trans-ABySS ~20 min
 # beyond what its fewer cores explain, and Trinity's phase 2 stayed ~16%
-# slower than in threaded runs on a node of the same speed (NOTES.md
-# 2026-10-10).
+# slower than in threaded runs on a node of the same speed
+# (docs/notes-archive.md 2026-10-10).
 #: How long preflight's mpirun test may take before it counts as broken: a
 #: misconfigured mpirun can hang waiting for daemons rather than fail.
 TRANSABYSS_MPI_PROBE_TIMEOUT = 120
@@ -187,16 +187,17 @@ PARAFLY_SERIAL_GAP = 0.5
 #
 # Trans-ABySS lane: Trans-ABySS, then its diamond search, from the start.
 # How many cores it should hold depends on --transabyss-mpi, because the two
-# modes use cores differently (NOTES.md 2026-10-10).
+# modes use cores differently (docs/notes-archive.md 2026-10-10).
 #
 # Threaded (the default): its dominant cost, the unitig assembly, runs on one
 # thread however many cores it gets -- abyss-pe falls through to the plain
-# `ABYSS` binary without Bloom-filter mode or MPI (NOTES.md 2026-08-19) -- so
-# for hours its share is a reservation, not use. Extra cores bought nothing:
-# 10 -> 16 cores took SRR1138704 from 3h10m to 3h32m and SRR866209 from 3h52m
-# to 4h59m, while Trinity's lane, which lost those cores, still finished 1-6h
-# ahead of it on every dataset. A quarter is enough for its threaded stages
-# and leaves Trinity the rest, in case a dataset makes Trinity the long pole.
+# `ABYSS` binary without Bloom-filter mode or MPI (docs/notes-archive.md
+# 2026-08-19) -- so for hours its share is a reservation, not use. Extra cores
+# bought nothing: 10 -> 16 cores took SRR1138704 from 3h10m to 3h32m and
+# SRR866209 from 3h52m to 4h59m, while Trinity's lane, which lost those cores,
+# still finished 1-6h ahead of it on every dataset. A quarter is enough for its
+# threaded stages and leaves Trinity the rest, in case a dataset makes Trinity
+# the long pole.
 TRANSABYSS_SHARE = 0.25
 #
 # MPI: the unitig assembly runs as `mpirun -np <cores> ABYSS-P`, so both
@@ -204,12 +205,12 @@ TRANSABYSS_SHARE = 0.25
 # can't be set up front: Trans-ABySS's work follows the reads (3.5-5.6
 # core-hours per GB of uncompressed corrected R1 over 11 runs), Trinity's
 # follows the transcriptome (3.8-22.3 core-hours per GB, no trend with size),
-# and dev24's share-from-R1-size missed by up to 4h either way (NOTES.md
-# 2026-10-11). So nothing is predicted: when the Trans-ABySS lane finishes
-# first, phase 2 grows onto its cores, and the share only has to keep
-# Trans-ABySS from being the long pole. The largest balanced share measured
-# is 0.511 (DRR053698, 33 GB), so half. transabyss_share still logs the R1
-# size, for balance.py.
+# and dev24's share-from-R1-size missed by up to 4h either way
+# (docs/notes-archive.md 2026-10-11). So nothing is predicted: when the
+# Trans-ABySS lane finishes first, phase 2 grows onto its cores, and the share
+# only has to keep Trans-ABySS from being the long pole. The largest balanced
+# share measured is 0.511 (DRR053698, 33 GB), so half. transabyss_share still
+# logs the R1 size, for balance.py.
 TRANSABYSS_MPI_SHARE = 0.5
 # Its mem is reserved separately and stays at a quarter: its footprint doesn't
 # grow with its cores, and whatever it reserves comes out of SPAdes' hard cap.
@@ -222,8 +223,12 @@ TRANSABYSS_MEM_SHARE = 0.25
 # Stage A has been phase-1-bound on every dataset: SPAdes finished 30-60 min
 # ahead of phase 1 in all the dev20/dev21 runs, and phase 1 does use cores
 # (DRR031870: 1h29m on 15, 1h33m-1h43m on 12; the -t $CPU Chrysalis stages,
-# Inchworm stays at --inchworm_cpu 10). So phase 1 gets two thirds.
+# Inchworm stays at TRINITY_INCHWORM_CPU). So phase 1 gets two thirds.
 TRINITY_PHASE1_SHARE = 0.67
+# Inchworm's threads, capped at the cores the Trinity call gets. Trinity
+# 2.15.2 caps --inchworm_cpu at --CPU itself, so the cap changes nothing it
+# runs; it keeps the logged command saying what Inchworm actually used.
+TRINITY_INCHWORM_CPU = 10
 # Mem is split separately: Trinity phase 1 only needs --max_memory for
 # jellyfish and its sorts, while SPAdes treats --memory as a hard cap.
 TRINITY_PHASE1_MEM_SHARE = 0.25
@@ -233,15 +238,15 @@ TRINITY_PHASE1_MEM_SHARE = 0.25
 # Trans-ABySS lane finishes while phase 2 is still running on the Trinity
 # lane, run_trinity_phase2 stops it and relaunches it on all of --cpu
 # (once). Measured on SRR1138704 (experiments/transabyss_mpi/
-# parafly_resume.sbatch, NOTES.md 2026-10-12): stopped 1 s after SIGTERM,
-# ParaFly running again 1 s after the relaunch, exactly the unfinished
-# 54405/58463 commands rerun, the 8 components in flight at the stop
-# assembled once each, transcripts within 0.04% of an uninterrupted run.
-# The restart itself costs seconds; what it does cost is the in-flight
-# components, which start over. Near the end those are the long stragglers,
-# so only grow while at least this share of the components is still to run.
-# Their dirs are removed before the relaunch, since a component stopped at
-# the wrong moment cannot resume (clear_unfinished_trinity_components).
+# parafly_resume.sbatch, docs/notes-archive.md 2026-10-12): stopped 1 s after
+# SIGTERM, ParaFly running again 1 s after the relaunch, exactly the unfinished
+# 54405/58463 commands rerun, the 8 components in flight at the stop assembled
+# once each, transcripts within 0.04% of an uninterrupted run. The restart
+# itself costs seconds; what it does cost is the in-flight components, which
+# start over. Near the end those are the long stragglers, so only grow while at
+# least this share of the components is still to run. Their dirs are removed
+# before the relaunch, since a component stopped at the wrong moment cannot
+# resume (clear_unfinished_trinity_components).
 TRINITY_GROW_MIN_LEFT = 0.15
 # A component's dir in ParaFly's command lines (recursive_trinity.cmds).
 TRINITY_COMPONENT_OUTPUT = re.compile(r'--output "([^"]+)"')
@@ -252,8 +257,8 @@ TRINITY_STOP_GRACE = 30
 # the most phase 2's end can go unnoticed.
 TRINITY_GROW_POLL = 2
 #
-# Timings behind these: NOTES.md 2026-10-08 onwards. Re-balance from a run's
-# timing log by which lane finished last and by how much.
+# Timings behind these: docs/notes-archive.md 2026-10-08 onwards. Re-balance
+# from a run's timing log by which lane finished last and by how much.
 
 # A step that fails on a cluster is often transient (node preemption,
 # filesystem hiccup, scheduler blip) rather than a real bug, so retry before
@@ -1968,7 +1973,8 @@ class Pipeline:
             "--output", str(self.trinity_out_dir()),
             "--max_memory", f"{mem}G",
             "--left", str(self.cor1()), "--right", str(self.cor2()),
-            "--CPU", str(cpu), "--inchworm_cpu", "10",
+            "--CPU", str(cpu),
+            "--inchworm_cpu", str(min(cpu, TRINITY_INCHWORM_CPU)),
         ]
         return cmd
 
@@ -2014,10 +2020,10 @@ class Pipeline:
         stay. Stopped in between, the component can never finish -- every
         rerun skips to `cat` the deleted files and fails, and phase 2 with
         it. The steps before take well under a second on most components,
-        so a stop often lands there: 3 of the 6 dev26 runs that grew lost
-        phase 2 this way (NOTES.md 2026-10-13). A stopped component starts
-        over in any case, so its dir is worth nothing; removing it makes the
-        rerun a clean one. Finished components (in ParaFly's .completed)
+        so a stop often lands there: 3 of the 6 dev26 runs that grew lost phase
+        2 this way (docs/notes-archive.md 2026-10-13). A stopped component
+        starts over in any case, so its dir is worth nothing; removing it makes
+        the rerun a clean one. Finished components (in ParaFly's .completed)
         are left alone, cleaned up or not.
         """
         parts = self.trinity_out_dir() / "read_partitions"

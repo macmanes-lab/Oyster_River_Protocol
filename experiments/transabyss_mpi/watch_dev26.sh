@@ -1,5 +1,5 @@
 #!/bin/bash
-# Watch the dev26 MPI runs on Premise from a laptop (NOTES.md 2026-10-12).
+# Watch the dev26 MPI runs on Premise from a laptop (docs/notes-archive.md 2026-10-12).
 #
 #     experiments/transabyss_mpi/watch_dev26.sh          # status of every run
 #     experiments/transabyss_mpi/watch_dev26.sh --report # + balance.py and qualreports

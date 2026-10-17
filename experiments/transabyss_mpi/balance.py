@@ -34,7 +34,7 @@ run's balanced share means nothing and stays out of the fit; what counts is
 its TOTAL against dev24's for the same dataset (DEV24 below), and against
 what a balanced dev24 split would have given.
 
-NOTES.md 2026-10-10 has the runs behind POINTS.
+docs/notes-archive.md 2026-10-10 has the runs behind POINTS.
 """
 
 import argparse
@@ -62,11 +62,11 @@ POINTS = [
 ]
 # With the SRR runs in, no shape fits (rms ~0.05): Trinity's work per GB of
 # reads varies 5-fold between datasets while Trans-ABySS's is ~constant.
-# NOTES.md 2026-10-11, "read size does not predict it".
+# docs/notes-archive.md 2026-10-11, "read size does not predict it".
 
 #: dev24 MPI TOTAL by dataset, minutes, and what a balanced split would have
 #: given (None where not worked out), --cpu 40 --mem 500 --normalize-reads.
-#: The yardstick for dev26: NOTES.md 2026-10-11, DEV26_PLAN.md.
+#: The yardstick for dev26: docs/notes-archive.md 2026-10-11, DEV26_PLAN.md.
 DEV24 = {
     "SRR868662": (11 * 60 + 49, 10 * 60 + 2),
     "SRR802670": (15 * 60 + 27, 14 * 60 + 24),

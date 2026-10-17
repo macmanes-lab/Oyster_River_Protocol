@@ -1,11 +1,11 @@
 # Trans-ABySS under MPI
 
 Trans-ABySS is the long pole of every ORP run since Trinity's phase 2 went
-parallel (NOTES.md 2026-10-09): 8h55m on DRR031870, 3h52m on SRR866209 and
+parallel (docs/notes-archive.md 2026-10-09): 8h55m on DRR031870, 3h52m on SRR866209 and
 3h10m on SRR1138704, all at 10 cores, with Trinity's lane idle for 1-6 hours.
 Most of that time is single-threaded: `abyss-pe` only runs its unitig
 assembly in parallel in Bloom-filter mode or under MPI (`np`), and
-`oyster.py` asks for neither (NOTES.md 2026-08-19). `transabyss --mpi N`
+`oyster.py` asks for neither (docs/notes-archive.md 2026-08-19). `transabyss --mpi N`
 sets `np`, and `orp_transabyss` ships `ABYSS-P` and `mpirun`.
 
 `run.sbatch` runs the two on the same reads and the same 16 cores:
@@ -49,7 +49,7 @@ for that, but a site build can override them; resubmitting with
 core counts and R1 size) and prints the Trans-ABySS share at which the two
 assembler lanes would have finished together, then refits the line
 `transabyss_share()` in `oyster.py` uses. `POINTS` in the script holds the
-runs the current candidate fit came from; see NOTES.md 2026-10-10.
+runs the current candidate fit came from; see docs/notes-archive.md 2026-10-10.
 
 ```bash
 python3 experiments/transabyss_mpi/balance.py --points \
@@ -77,6 +77,6 @@ relaunch, whether any finished component ran again, restart overhead, and
 transcript/gene counts of both assemblies, with PASS/FAIL per check.
 `PHASE1=<OUT>/phase1/<name>.trinity` reruns the test without phase 1.
 
-Result (job 1321673, NOTES.md 2026-10-12): it resumes cleanly -- exactly
+Result (job 1321673, docs/notes-archive.md 2026-10-12): it resumes cleanly -- exactly
 the unfinished commands rerun, restart in seconds, transcripts within 0.04%
 of an uninterrupted run. dev26 builds on it.

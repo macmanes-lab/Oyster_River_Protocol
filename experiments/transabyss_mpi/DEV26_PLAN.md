@@ -3,10 +3,10 @@
 **Status 2026-10-13:** step 1 passed (Premise job 1321673), step 2 is
 4.1.0-dev26, step 3's cluster runs are done: the grow restart failed 3 of 6
 runs that grew, and phase 2 barely scales past ~20-25 cores, so TOTAL came
-out a wash. Next: DEV27_PLAN.md. Results in NOTES.md 2026-10-13.
+out a wash. Next: DEV27_PLAN.md. Results in docs/notes-archive.md 2026-10-13.
 
 Written 2026-10-11 at 4.1.0-dev25 (pipeline code = dev24). Background and
-every number below: NOTES.md, entries from 2026-10-08 to 2026-10-11.
+every number below: docs/notes-archive.md, entries from 2026-10-08 to 2026-10-11.
 
 ## Why
 
@@ -83,7 +83,7 @@ The plan rests on this. Test it on the cluster with a real phase 1:
 5. Compare with an uninterrupted phase 2 of the same phase 1 (copy the
    phase-1 dir before step 2): transcript count, and gene count after the
    ORP diamond step if convenient. Byte identity is not expected (Trinity
-   depends on run dir and JVM hash, NOTES.md 2026-10-05), so judge by
+   depends on run dir and JVM hash, docs/notes-archive.md 2026-10-05), so judge by
    counts. Also note the restart overhead: how long from relaunch to
    ParaFly running jobs again.
 
@@ -129,7 +129,7 @@ local launcher).
 ## Step 3: test
 
 - Laptop: extend the stub harness used for dev19-dev24 (drive
-  `run_assemblers` with stubbed steps; see NOTES 2026-10-08) to cover: TA
+  `run_assemblers` with stubbed steps; see docs/notes-archive.md 2026-10-08) to cover: TA
   done before Stage A ends (phase 2 starts on all cores, no restart); TA
   done mid-phase 2 with plenty left (one restart, on all cores); TA done
   near the end (no restart); relaunched phase 2 failing; threaded mode
@@ -139,4 +139,4 @@ local launcher).
   SRR802670 (TA-bound), each in a fresh `--dir`. Compare TOTAL with dev24's
   and with "if balanced" above, and the qualreports with dev24's.
 - Only then consider `--transabyss-mpi auto` as the default (quality
-  already passed on three datasets; NOTES 2026-10-10).
+  already passed on three datasets; docs/notes-archive.md 2026-10-10).

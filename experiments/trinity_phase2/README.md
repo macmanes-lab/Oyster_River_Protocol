@@ -25,7 +25,7 @@ outputs as the reference). Working tree on Premise: `~/trinity_eng/`.
    `_4`, `_5`, `_6` (May 2025 on; `orp_trinity` was created 2026-08-14 with
    `_6`) ship a ParaFly compiled without OpenMP, so `ParaFly -CPU 40` runs its
    commands serially. Builds `_0`-`_3` are fine. Every SRR1789336 benchmark
-   in NOTES.md since 2026-08-14 measured this.
+   in docs/notes-archive.md since 2026-08-14 measured this.
 2. **Trinity's per-component work can be cut ~2x** with patches that leave
    the assembly unchanged.
 3. **Trinity's output is not reproducible as shipped**: the SuperTranscripts
@@ -67,7 +67,7 @@ run: one exclusive 40-core macmanes node, GPFS, 38 slots (sample) or 40
     it. That is presumably why `trinity-plugins/Makefile` hard-codes
     `CXXFLAGS="-fopenmp"` for ParaFly.
 - This explains the earlier phase-2 observations in
-  `docs/trinity-speedup-investigation.md` and NOTES.md: ~36 jobs/min is about
+  `docs/trinity-speedup-investigation.md` and docs/notes-archive.md: ~36 jobs/min is about
   1.7 s per component run serially; `--cpu 80` could not help; 95% vs 100% of
   `--cpu` made no difference. Phase 2 was not CPU-bound on 40 cores.
 - Fixed ParaFly, same conda Trinity, all 73,737 components: 7,394 s (2h03m).

@@ -425,7 +425,7 @@ echo "-- assemblies (transcripts / genes / bases)"
 echo "resumed                          $TX_A / $GN_A / $BP_A  ($OUTN_A component outputs)"
 echo "uninterrupted                    $TX_B / $GN_B / $BP_B  ($OUTN_B component outputs, $B_DONE/$TOTAL completed, exit $ST_RC)"
 echo "resumed - uninterrupted          transcripts $(diffpct "$TX_A" "$TX_B"), genes $(diffpct "$GN_A" "$GN_B")"
-echo "(byte identity is not expected: Trinity output depends on run dir and JVM hash, NOTES.md 2026-10-05)"
+echo "(byte identity is not expected: Trinity output depends on run dir and JVM hash, docs/notes-archive.md 2026-10-05)"
 echo
 echo "-- checks"
 echo "$(pass "$c_clean")  stop leaves no Trinity/ParaFly/java/Chrysalis processes"

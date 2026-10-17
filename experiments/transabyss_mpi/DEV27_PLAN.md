@@ -1,12 +1,12 @@
 # dev27 plan: make the phase 2 restart safe, then decide whether growth pays
 
-Written 2026-10-13 from the dev26 cluster runs (NOTES.md 2026-10-13). Named
+Written 2026-10-13 from the dev26 cluster runs (docs/notes-archive.md 2026-10-13). Named
 dev27 as the follow-up to dev26; `version.txt` is already 4.1.0-dev28 from
 notes-only pushes, so the code ships as the next bump after that.
 
 ## What dev26 showed
 
-Six dev26 runs finished, three failed (table and timings in NOTES.md
+Six dev26 runs finished, three failed (table and timings in docs/notes-archive.md
 2026-10-13). In short:
 
 1. **The grow restart breaks runs.** Of the six runs whose phase 2 grew, three

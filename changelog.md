@@ -1,668 +1,186 @@
 ### CHANGELOG
 
-ORP Version 4.1.0-dev1
+ORP Version 4.1.0 <- 4.0.1
 
-- **`make` works with a conda that is already installed** (`Makefile`,
-  `INSTALL.md`, 4.1.0-dev32). With `conda` on `PATH`, the diamond and BUSCO
-  targets called the bundled Anaconda's `diamond` and `busco` by path, which
-  isn't there, and the `orp` target sourced its missing `conda.sh` and went
-  on to `conda update -n base` and `conda install mamba -n base` in the
-  user's own base. Every target now finds conda at run time (the one on
-  `PATH`, else the bootstrapped one) and goes through `conda run`. An
-  existing conda is never updated or reconfigured, and channels are passed
-  per command rather than written to `~/.condarc`. Each of the five envs is
-  created separately when no env has exactly its name (`grep orp` skipped
-  all of them if any `orp_*` env existed). Swiss-Prot comes over https
-  rather than ftp, via `.part` files, and `diamond_data` counts as done only
-  with both the fasta and `swissprot.dmnd`. The PATH lines go into
-  `~/.profile`, and `~/.bash_profile` only if it exists, once each however
-  often `make` runs (it was appended to `~/.bash_profile` twice per run).
-  `make clean` removes the five envs from whichever conda holds them.
-- **`assembly_eval.py` says pyTransRate, not transrate** (`assembly_eval.py`,
-  `README.md`). The step is `pytransrate`, its output
-  `reports/pytransrate_<run>/`, its sentinel `<run>.pytransrate.done` and
-  its log `logs/pytransrate.log`, and the report lines read `PYTRANSRATE
-  SCORE`/`PYTRANSRATE OPTIMAL SCORE`, the same as `oyster.py`'s, so the two
-  reports diff cleanly again. A resumed run renames the old dir, sentinel
-  and log in place rather than scoring again, and `--skip transrate` is
-  still accepted.
-- **`--min-cov auto` is the default** (`oyster.py`, `chowder.py`,
-  4.1.0-dev31, `min_cov_auto`). The coverage threshold for contigs without a
-  swissprot hit now scales with the read pairs salmon quantified (its
-  `num_processed`; trimmed and corrected reads, never normalized ones):
-  `max(1, 2 x (pairs / 60M) ^ 0.85)`, so 1 up to about 27M pairs, 2 at 60M,
-  3.6 at 120M, 11.7 at 480M. `--min-cov` still takes a number, used as
-  given. The rule comes from nested read subsamples of two finished
-  assemblies (tuco, 480M pairs; ERR489297, 200M;
-  `experiments/dynamic_cov/subsample.sbatch`, `depth_curve.py`): the
-  coverage where no-hit contigs' long-ORF excess over shuffled sequence
-  climbs out of the noise rose with depth at an exponent of 0.8-0.9 in
-  both. This changes the output of any run that doesn't pass `--min-cov`
-  (a library under about 27M pairs filters less than dev30's fixed 2, a
-  deeper one more). The log and `filter_candidates.tsv` (`# min_cov`,
-  `# num_processed`) say what `auto` chose. `filter.settings` records
-  `min_cov=auto`, so a resumed dev30 run re-filters. `--min-cov 2` gives
-  dev30's behaviour.
-- **`assembly_eval.py` prints what it is doing, and is documented**
-  (`assembly_eval.py`, `README.md`, `INSTALL.md`). It now starts with a
-  banner, the command line, and the inputs and settings, as `chowder.py`
-  does. pyTransRate and BUSCO output streams to the screen, each line marked
-  `[transrate]` or `[busco]`, and is still kept in `logs/<step>.log`. The
-  README has a section on what it runs, what it writes and how it resumes,
-  plus a full flag table. `--force` no longer uses `unlink(missing_ok=True)`,
-  which needs Python 3.8 and would have crashed under a cluster's system
-  python3 3.6.
-- **`--min-cov 2` is the default filter** (`oyster.py`, `chowder.py`,
-  4.1.0-dev30). A contig without a swissprot hit now needs at least 2x
-  coverage to stay in `.ORP.fasta`; before, nothing was filtered unless
-  `--tpm-filt` was given, and `--tpm-filt` still defaults to 0. On five dev29
-  libraries of 16-123M read pairs (`experiments/dynamic_cov/`), cov2 removed
-  4-6x fewer no-hit contigs than `--tpm-filt 1` on the deep ones (2-5x fewer
-  with an ORF over 149 codons), left BUSCO and unique genes unchanged, and
-  scored within 0.03 of tpm1 on pyTransRate either way. The default is a
-  floor: noise contigs gain coverage with depth, so deep libraries should
-  raise it (on the 451M-read tuco library cov2 removed 10% of no-hit
-  contigs, tpm1 91%). This changes the output of any run that doesn't pass
-  `--min-cov`. A resumed dev29.cov1 run re-filters (its `filter.settings`
-  stamp read `min_cov=0`); a run from before the stamp existed is dated to
-  its filter.done and keeps its old split, as `filter_settings_stamp`
-  documents. `--min-cov 0` restores the old behaviour.
-- **pyTransRate no longer scores a rewritten assembly against the old one's
-  index** (`oyster.py`, 4.1.0-dev29.cov1, `clear_pytransrate_outdir`). The
-  snap index, BAM and salmon quant left in `reports/pytransrate_<run>/`
-  were kept whenever they were whole, including after `.ORP.fasta` had been
-  rewritten -- which a changed `--tpm-filt`/`--min-cov` on a resumed run now
-  does. Contigs the new assembly added were never in the index, got no
-  reads, and sat at pyTransRate's 0.01 floor (SRR868662: 34,694 contigs,
-  score 0.23 instead of about 0.5). Anything older than the assembly is now
-  discarded and rebuilt.
-- **`--min-cov`, a coverage filter beside `--tpm-filt`** (`oyster.py`,
-  `chowder.py`, 4.1.0-dev29.cov1, `filter_tpm`). A contig with no swissprot
-  hit is now dropped unless its TPM is at least `--tpm-filt` *and* its
-  coverage (salmon NumReads x mean fragment length / contig length) is at
-  least `--min-cov`. TPM is a share of a million, so a fixed cutoff asks for
-  4-183 reads per kb depending on the sample (119 final assemblies of the
-  108-sample set) -- mostly a matter of depth -- and its effective-length
-  correction lets a short contig pass on a couple of reads. Coverage means
-  the same thing in every sample. (Default 0 as first added; 2 from
-  4.1.0-dev30, see above.) Every run now also writes `reports/<run>.filter_candidates.tsv`
-  (what each of a range of TPM, coverage and read-count thresholds would
-  keep) and `reports/<run>.quant.sf.gz` (cleanup removes `quants/`), and
-  changing either threshold on a resumed run re-filters
-  (`<run>.filter.settings`) rather than keeping the old split.
-- **A phase 2 grow no longer leaves a component that cannot finish**
-  (`oyster.py`, 4.1.0-dev29, `clear_unfinished_trinity_components`).
-  Trinity's per-component super-reads step deletes its `inchworm.DS.fa.SR.*`
-  files before writing the checkpoint that says it is done; a component
-  stopped in between fails on every rerun (`cat: ...SR.18: No such file`),
-  and phase 2 with it. That hit 3 of the 6 dev26 runs that grew (SRR1138704,
-  SRR796576, SRR1138707). Before every phase 2 launch -- first, after a grow,
-  or on a resumed run -- oyster.py now deletes the dir of each component that
-  started but is not in ParaFly's `.completed`, so it reruns from scratch,
-  as a stopped component did anyway.
-- **Trinity phase 2 grows onto Trans-ABySS's cores** (`oyster.py`, 4.1.0-dev26,
-  `run_trinity_phase2`). Phase 2's cores were fixed at launch, so whichever
-  assembler lane finished first left its cores idle until the other was done
-  -- about 5 h of wall time over eight dev24 runs. Now, when the Trans-ABySS
-  lane finishes while phase 2 is running with at least 15% of its components
-  left, phase 2 is stopped and relaunched on all of `--cpu`; ParaFly skips
-  the components already finished (verified on SRR1138704: restart in
-  seconds, transcripts within 0.04% of an uninterrupted run). Phase 2 runs in
-  its own session, and oyster.py passes SIGTERM/SIGINT/SIGHUP on to it. The
-  timing log gains a `run_trinity_phase2_grow` line when it happens.
-- **Under `--transabyss-mpi`, Trans-ABySS gets a fixed half of `--cpu`**
-  (`TRANSABYSS_MPI_SHARE`), replacing dev24's share fitted to read size: eight
-  more datasets showed Trinity's work doesn't follow read size (3.8-22.3
-  core-hours per GB), so the fit missed by up to 4 h either way. Half keeps
-  Trans-ABySS from being the long pole on every dataset so far, and with
-  phase 2 growing, cores it doesn't need go back to Trinity. Threaded mode
-  keeps 25%.
-- **Under `--transabyss-mpi`, Trans-ABySS's share follows read depth**
-  (`oyster.py`, `transabyss_share`). With `--normalize-reads` only Trinity's
-  reads are normalized, so Trans-ABySS's part of the work grows with depth:
-  the balanced shares on SRR1138704, SRR866209 and DRR031870 were 0.23, 0.28
-  and 0.375 against 3.6, 7.4 and 17.5 GB of uncompressed corrected R1. The
-  share is now 0.198 + 0.0103 x GB, clamped to 0.2-0.45; a fixed 0.33 without
-  `--normalize-reads`, which no run has measured. The log prints the share and
-  why. `OMPI_MCA_mpi_yield_when_idle`, added in dev23, is gone: it slowed
-  Trans-ABySS and did not speed Trinity up.
-- **The assembler split depends on `--transabyss-mpi`** (`oyster.py`).
-  Threaded, Trans-ABySS gets 25% of `--cpu` again: 40% made it no faster
-  (SRR1138704 3h10m -> 3h32m, SRR866209 3h52m -> 4h59m) while costing
-  Trinity cores. Under MPI it gets `TRANSABYSS_MPI_SHARE` = 33%
-  (provisional; DRR031870 at 40%: Trans-ABySS 3h09m, Trinity's lane 3h36m).
-  Trinity phase 1 gets two thirds of Stage A instead of half -- SPAdes
-  finished 30-60 min ahead of it on every dataset. Phase 2 takes all of
-  `--cpu` when Trans-ABySS has finished before it starts. MPI ranks now yield
-  when idle (`OMPI_MCA_mpi_yield_when_idle`) instead of spinning on cores
-  Trinity is using.
-- **`--transabyss-mpi off|auto|on`** (`oyster.py`, default `off`). Trans-
-  ABySS's unitig assembly runs on one thread unless `abyss-pe` gets MPI;
-  this passes `--mpi <its cores>` so it runs as `mpirun -np N ABYSS-P`.
-  Preflight starts two ranks in `orp_transabyss` first: `on` refuses to run
-  if that fails or hangs, `auto` falls back to threaded. mpirun gets
-  OpenMPI's oversubscribe/no-binding settings (one slurm task is one slot)
-  and run-as-root (Docker). `reports/<run>.transabyss.mode` records
-  `threads N` or `mpi N`, since ABYSS-P need not build the identical
-  assembly. Not yet validated on real data; see `experiments/transabyss_mpi/`.
-- **Trans-ABySS gets 40% of `--cpu` instead of 25%** (`oyster.py`,
-  `TRANSABYSS_SHARE`). On SRR1138704 at `--cpu 40` it took 3h14m while the
-  Trinity lane finished 1h11m earlier. Its memory reservation stays at a
-  quarter of `--mem` (new `TRANSABYSS_MEM_SHARE`), so SPAdes' cap doesn't
-  shrink with it.
-- **Cleanup no longer deletes other runs' files** (`oyster.py`).
-  `assemblies/diamond`, `assemblies/working`, `quants` and `shuck` are shared
-  by every run started in the same directory, but cleanup removed each one
-  whole. A run that finished while another was still assembling took that
-  run's `assemblies/diamond` with it, and the second run's next diamond step
-  failed with `Error opening file ... No such file or directory`. Cleanup now
-  removes only this run's `<run>.*` entries, `quants/salmon_shucked_<run>`
-  and `shuck/<run>`, and removes a shared directory only once it is empty.
-  Each step also recreates its output directories before it runs.
-- **Trans-ABySS starts at the beginning of the assembly stage** (`oyster.py`).
-  With Trinity built from source, phase 2 runs its components in parallel
-  (~2h instead of ~34h on SRR1789336), so Trans-ABySS -- about 4.5h, mostly
-  single-threaded -- became the slowest assembler, and it used to wait for
-  Trinity phase 1 (~1h20m) before starting. It now runs in its own lane on
-  `TRANSABYSS_SHARE` (25%) of `--cpu`/`--mem` from the start. The Trinity lane
-  gets the rest: phase 1 beside the two SPAdes runs (cores 50/50, mem 25/75),
-  then phase 2 on the whole lane. `TRINITY_PHASE2_SHARE` is gone. A resumed
-  run whose Trans-ABySS is already done gives the Trinity lane every core.
-  The log's first assembler banner is now `=== Assemblers: ...`.
-- **The strand exam counts every transcript, not every other one**
-  (`scripts/examine_strand.pl`, used by `oyster.py`, `chowder.py` and
-  `scripts/strandeval.py`). Inherited from Trinity's
-  `examine_strand_specificity.pl`, the script shifted the array its
-  `foreach` was walking, so half the transcripts never reached
-  `<run>.dat` or the histogram in the quality report. The histogram's
-  shape is a sample either way and should not move much, but its counts
-  roughly double. `tests/release_check.py` now checks the table against
-  the BAM.
-- **pyTransRate is called pyTransRate everywhere** (`oyster.py`,
-  `chowder.py`, docs). The quality report's lines are now `PYTRANSRATE
-  SCORE` and `PYTRANSRATE OPTIMAL SCORE`, the final scoring step is
-  `pytransrate` rather than `transrate`, and it writes
-  `reports/pytransrate_<run>/` rather than `reports/transrate_<run>/`. A
-  resumed run renames an existing `transrate_<run>/` instead of scoring
-  again. The experiment scripts that read that directory accept either
-  name.
-- **Two fewer diamond blastx searches per run** (`oyster.py`, `chowder.py`).
-  `diamond_shucked` and `orp_diamond` searched `shucked.fasta` and
-  `ORP.intermediate.fasta`, but every contig in those came whole, under its
-  own name, out of one of the assemblies, and each assembly has already
-  been searched against the same database with the same settings. Their
-  hits are now looked up from the per-assembly outputs. On the fake-tool
-  harness every downstream file is byte-identical; check UNIQUE GENES ORP
-  and the final assembly against a 4.1.0-dev8 run on real data.
-- `run_filtershort` filters all the assemblies at once instead of one
-  after another (`oyster.py`, `chowder.py`). The output is unchanged.
-- **Short jobs run beside long ones instead of splitting the cores with them**
-  (`oyster.py`, `chowder.py`). strandeval used to take half of `--cpu` from
-  pyTransRate for pyTransRate's whole run, though it finishes in minutes. Now
-  pyTransRate keeps every core, and strandeval runs beside it on a quarter of
-  `--cpu` (at most 8) plus at most 16 GB taken from pyTransRate's memory
-  budget. The diamond passes the two-track merge still needs (Trinity's
-  under oyster.py, all of them under chowder.py) used to wait for
-  `score_pool` to finish and now run beside it the same way. `--max-parallel
-  1` still runs everything one step at a time. strandeval's samtools
-  threads follow its budget instead of a fixed 10.
-- **A contig whose TPM equals `--tpm-filt` is kept** (`oyster.py`). It used
-  to fall into neither the high- nor the low-expression list and was
-  dropped from `.ORP.fasta` whenever any contig was below threshold. The
-  default `--tpm-filt 0` is unaffected.
-- **Preflight checks what a run actually uses** (`oyster.py`, `chowder.py`).
-  Added diamond, cd-hit-est, blastn, makeblastdb and samtools (`orp`) and
-  bwa, seqtk and hist (`orp_trinity`, for strandeval), and dropped `orp`'s
-  seqtk, which nothing ran. It also refuses to start without
-  `software/diamond/swissprot.dmnd`, `software/diamond/uniprot_sprot.fasta`
-  or the `--lineage` BUSCO dataset. These used to be found missing hours in
-  or at the very end. A missing swissprot fasta was never caught at all:
-  the two-track selection silently ranked contigs differently. Every missing
-  item is listed at once, and tools are checked with one `conda run` per
-  env instead of one per tool.
-- **Re-running BUSCO replaces its report instead of nesting it**
-  (`oyster.py`). A second BUSCO run in the same directory was moved to
-  `reports/run_<run>.ORP/run_<run>.ORP`, so `reportgen` could quote either
-  summary, and a third run failed. A leftover BUSCO directory from an
-  interrupted attempt is now cleared first too, since BUSCO won't start
-  over one.
-- **`posthack` and `secondfilter` overwrite their working files instead of
-  appending to them** (`oyster.py`). On a retry or resume, `newbies.fasta`
-  gained a second copy of every rescued contig, and an ID left in
-  `donotremove.list` from an earlier attempt could end up in `.ORP.fasta`
-  twice. `secondfilter` also prints a one-line count instead of every ID it
-  keeps.
-- **A step that dies partway is re-run on resume** (`oyster.py`,
-  `chowder.py`). Trimmomatic, rcorrector and diamond write their output as
-  they go, so a step that was killed, ran out of memory or used up its retries
-  left a truncated file that looked finished, and the next run skipped the
-  step and built on it. With rcorrector that meant assembling from part of
-  the reads, and the trimmed reads were deleted afterwards so the damage
-  could not be undone. Each step now leaves `reports/.<run>.<step>.running`
-  while it runs, and a step whose marker is still there is re-run. The
-  rnaSPAdes and Trans-ABySS working directories are also cleared before
-  the first attempt, not only between retries, so an interrupted assembly
-  no longer fails its first try on resume.
-- **The OrthoFinder merge is gone** (`oyster.py`, `chowder.py`): the
-  two-track merge, the default since 4.1.0-dev0, is now the only one.
-  `--merge-method`, `--orthofinder-searches`, `--orthofinder-analysis` and
-  the hidden `--orthofinder-program`, `--orthofinder-inflation` and
-  `--pick-rule` are removed, and neither the `orp_orthofinder` env nor `mcl`
-  is needed or checked at startup. `scripts/pick_best_contigs.py` moved to
-  `experiments/redundancy/`, the only place left that uses it. The 4.x
-  OrthoFinder experiment sbatch scripts in `experiments/` need a checkout
-  from before this change.
-- Removed the `bridges.psc.edu` special case for trimmomatic (a bare
-  trimmomatic-0.36 jar); trimmomatic always comes from the `orp` env.
-- **The two rnaSPAdes assemblies are `spadesauto` and `spadeshigh`**, not the
-  fixed k=55 and k=75 runs (`oyster.py`). `--spades1-kmer` now defaults to
-  `auto`: `-k` is left off and rnaSPAdes picks its documented pair, about
-  1/3 and 1/2 of the maximum read length (k=33,49 on 100 bp reads).
-  `--spades2-kmer` defaults to `60%,75%`: percentages of maximum read
-  length, resolved per dataset (59,75 on 100 bp reads; 89,113 on 150 bp).
-  Both flags take `auto`, percentages or an explicit odd list below 128.
-  The outputs are renamed `<run>.spades{auto,high}.fasta`, and the unique-gene
-  lines in the quality report are now `UNIQUE GENES SPADESAUTO` and
-  `SPADESHIGH`. A fixed k meant something different on every dataset (k=75
-  is half the read length at 150 bp but 74% of it at 101 bp).
-  **This changes the assembly**, and a run directory holding the old
-  `spades55`/`spades75` files is not reused.
-  Why: on 9 test samples run through the default two-track merge, this
-  gave 983 complete BUSCOs against 956 for the 4.0 control, duplicated
-  BUSCOs 148 against 324, 2.6% more unique genes and a higher pyTransRate
-  score (0.481 against 0.471), with proper pairs 0.020 lower (0.933 against
-  0.953). Against 4.1.0-dev0 on the same 5 samples it added 9 complete BUSCOs,
-  704 unique genes (+1.4%) and 0.014 pyTransRate score, at equal duplication. The
-  gain cannot yet be split between the auto first run and the changed
-  second run (`experiments/redundancy/README.md`).
-- **The pick stage is called "shuck", not "orthofuse"** (`oyster.py`,
-  `chowder.py`): under the default two-track merge OrthoFinder never runs,
-  so the old name described nothing. `orthofuse/<run>/` is now
-  `shuck/<run>/`; the pooled fasta `merged.fasta` is `pool.fasta` and its
-  pyTransRate output `merged/` is `pool/`; `<run>.orthomerged.fasta` (and
-  its diamond output, working copy and salmon directory) is
-  `<run>.shucked.fasta`; `<run>.ortho.idx` is `<run>.shucked.idx`. Steps:
-  `merge` -> `build_pool`, `orthotransrate` -> `score_pool`, `orthofusing`
-  -> `shuck`, `diamond_orthomerged` -> `diamond_shucked`, and the
-  OrthoFinder-only `run_orthofuser`/`orthofuser_branch`/`orthofuser.done`
-  -> `run_orthofinder`/`orthofinder_branch`/`orthofinder.done`.
-  `scripts/twotrack_select.py` takes `--pool` instead of `--merged`. A run
-  directory from before this resumes from `run_filtershort`, not where it
-  stopped; cleanup also removes its old `orthofuse/` tree.
-- **`chowder.py` never writes to its input assemblies.** Its renamed copies
-  now go to `assemblies/ingested/<runout>.<label>.fasta`, a directory of
-  their own, rather than `assemblies/<runout>.<label>.fasta` -- which is also
-  where `oyster.py` leaves an assembly it built, so a chowder run given the
-  same `--runout` and `--dir` (as `spades_branch.sbatch` does) used to
-  replace its input with the renamed copy. A second ingest of that run then
-  prefixed the names again (`a_c` -> `a_a_c`), and cleanup deleted the
-  input in favour of its .gz. An input inside `assemblies/ingested/` is
-  refused, and each copy is written via a `.part` so a killed ingest leaves
-  nothing a resume would mistake for finished. A chowder run directory from
-  before this re-ingests and re-merges on resume.
-- **Resumes notice more stale inputs** (`oyster.py`, `chowder.py`): Trinity
-  phase 1 now depends on both corrected mates, not only R1; the orthofinder
-  merge's pooled scoring re-runs when only the corrected reads changed;
-  strandeval depends on the corrected reads; and the quality report is
-  rewritten when BUSCO, pyTransRate, strandeval or the unique-gene counts are.
-- **The pooled pyTransRate scoring on the default two-track path is given
-  `--mem`** as `--max-memory`; it was getting no budget at all, and
-  pyTransRate fell back to the node's free memory. `twotrack_select.py`'s
-  cd-hit-est runs get `--mem` too (`-M` was 0, unlimited).
-- The step-timing table and cleanup's kept/removed list are no longer
-  printed at the end of a run, only written to the timing log and
-  `reports/<run>.cleanup.done`; the run ends with a pointer to each.
-- New test harness `experiments/redundancy/spades_branch.sbatch` (with
-  `spades_only.py`): the two SPAdes runs, then the default merge with a
-  sample's existing Trans-ABySS and Trinity assemblies.
+**The assembly this pipeline produces changes in this release**, in four
+ways: how the four assemblies are merged, which rnaSPAdes assemblies go in,
+a coverage filter that is now on by default, and a fixed strand exam. A 4.1
+`.ORP.fasta` and quality report are not comparable with a 4.0 one. The
+entries for each development build (4.0.1-dev2 to 4.1.0-dev32) are in this
+file's git history, e.g. `git show 3baf110:changelog.md`.
 
-ORP Version 4.1.0-dev0
-
-- **Trinity is built from source with OpenMP** (`scripts/build_trinity.sh`,
-  run by `make`) from upstream's `Trinity-v2.15.2` tag, instead of installing
-  bioconda's `trinity=2.15.2`. Builds `_4` to `_6` of that package ship a
-  ParaFly compiled without OpenMP, which makes Trinity's phase 2 run one
-  component at a time whatever `--cpu` says (34h27m against 2h03m on
-  SRR1789336). `orp_trinity` now holds only Trinity's build tools and
-  dependencies. The build fails, and `oyster.py` refuses to start, if ParaFly
-  runs its commands one at a time. Existing installs: see "Updating Trinity"
-  in INSTALL.md. The assembler itself is the same release.
+Changes to the assembly
 
 - **The assemblies are merged by Swiss-Prot gene, not by OrthoFinder
-  orthogroup** (`--merge-method twotrack`, the new default; `oyster.py` and
-  `chowder.py`). Contigs with a Swiss-Prot hit are grouped by the gene of
-  their best hit and each gene keeps one representative -- the longest
-  contig whose hit covers close to the best fraction of the protein -- plus
-  up to two copies that are distinct from it and expressed (>= 1 TPM).
-  Contigs without a hit are deduplicated with cd-hit-est on both strands and
-  left to the TPM filter. New step `twotrack_select`
-  (`scripts/twotrack_select.py`); OrthoFinder is not run.
-  Why: in 4.0 the orthogroups did not line up with genes. Some split one gene
-  (the extra duplicated BUSCOs), others mixed several (keeping one member
-  lost the rest). And since the OrthoFinder 2.5.2 -> 3.1.5 upgrade, `-d` no
-  longer meant blastn: the search silently became diamond blastp over DNA,
-  one strand only, so the same transcript in opposite orientations could
-  never share an orthogroup. Tuning the search, inflation and pick rule
-  traded duplication against gene loss without fixing it
-  (`experiments/redundancy/README.md`). On 10 test samples the gene-based
-  selection, before the copy rescue was added, cut duplicated BUSCOs from
-  307 to 36 and raised unique genes, with complete BUSCOs unchanged, but
-  about 11% fewer read pairs mapped well, mostly reads on other versions of
-  kept genes. The longest-representative rule and the copy rescue are there
-  to win those back, and are being validated end to end.
-  **This changes the assembly**: 4.1 output is not comparable with 4.0.
-  `--merge-method orthofinder` runs the 4.0 merge unchanged.
-- **Hidden options for testing the OrthoFinder merge**, all defaulting to
-  4.0's behaviour: `--orthofinder-program diamond|blastn`,
-  `--orthofinder-inflation N` and `--pick-rule
-  score|score_len|score_orf|near_best|protein|protein_len`
-  (`scripts/pick_best_contigs.py --rule`). Under a protein rule the
-  per-assembly diamond passes run before `makeorthout`.
+  orthogroup** (`oyster.py`, `chowder.py`, new step `twotrack_select`,
+  `scripts/twotrack_select.py`). Contigs with a Swiss-Prot hit are grouped by
+  the gene of their best hit and each gene keeps one representative -- the
+  longest contig whose hit covers close to the best fraction of the protein
+  -- plus up to two copies that are distinct from it and expressed
+  (>= 1 TPM). Contigs without a hit are deduplicated with cd-hit-est on both
+  strands and left to the coverage filter. Why: in 4.0 the orthogroups did
+  not line up with genes. Some split one gene (the extra duplicated BUSCOs),
+  others mixed several (keeping one member lost the rest), and since the
+  OrthoFinder 3.1.5 upgrade `-d` silently searched DNA with diamond blastp on
+  one strand. On 10 test samples the gene-based merge cut duplicated BUSCOs
+  by about 90% against 4.0 with complete BUSCOs unchanged and more unique
+  genes (`experiments/redundancy/README.md`).
+- **The OrthoFinder merge is gone.** `--merge-method`,
+  `--orthofinder-searches`, `--orthofinder-analysis` and the hidden
+  `--orthofinder-program`, `--orthofinder-inflation` and `--pick-rule` are
+  removed, and neither the `orp_orthofinder` env nor `mcl` is needed. The
+  OrthoFinder concurrency and memory work of 4.0.1-dev2 to dev12 went with
+  it. `scripts/pick_best_contigs.py` moved to `experiments/redundancy/`.
+- **The two rnaSPAdes assemblies are `spadesauto` and `spadeshigh`**, not
+  fixed k=55 and k=75. `--spades1-kmer` defaults to `auto` (rnaSPAdes picks
+  about 1/3 and 1/2 of the read length) and `--spades2-kmer` to `60%,75%` of
+  the maximum read length, resolved per dataset (59,75 at 100 bp; 89,113 at
+  150 bp). Both take `auto`, percentages or an explicit odd list below 128.
+  A fixed k meant something different on every dataset. Outputs are
+  `<run>.spades{auto,high}.fasta` and the report lines `UNIQUE GENES
+  SPADESAUTO`/`SPADESHIGH`; a run directory holding the old
+  `spades55`/`spades75` files is not reused. On 9 test samples: 983 complete
+  BUSCOs against 956 for 4.0, duplicated 148 against 324, 2.6% more unique
+  genes, pyTransRate 0.481 against 0.471.
+- **Contigs without a Swiss-Prot hit are filtered by coverage by default**
+  (`--min-cov`, default `auto`). A no-hit contig needs coverage (salmon
+  NumReads x mean fragment length / contig length) of at least
+  `max(1, 2 x (pairs / 60M) ^ 0.85)`, where pairs is the trimmed and
+  corrected read pairs salmon quantified: 1 up to about 27M pairs, 2 at 60M,
+  3.6 at 120M, 11.7 at 480M. In 4.0 nothing was filtered unless
+  `--tpm-filt` was given. Coverage rather than TPM because a fixed TPM
+  cutoff asked for 4-183 reads per kb across 119 assemblies, mostly
+  following depth; the depth scaling comes from nested subsamples of two
+  deep libraries (`experiments/dynamic_cov/`). `--min-cov` also takes a
+  number (`0` turns it off), and `--tpm-filt` still works beside it (default
+  0; a contig exactly at either threshold is now kept). Every run writes
+  `reports/<run>.filter_candidates.tsv` (what a range of thresholds would
+  keep) and `reports/<run>.quant.sf.gz`, and changing either threshold on a
+  resumed run re-filters (`assemblies/working/<run>.filter.settings`)
+  without re-assembling. See the README's section on the filter.
+- **The strand exam counts every transcript, not every other one**
+  (`scripts/examine_strand.pl`). Inherited from Trinity's script, it shifted
+  the array it was walking, so the histogram in the quality report roughly
+  doubles its counts. Its shape should barely move.
 
-ORP Version 4.0.1-dev18
+Speed and scheduling
 
-- **`chowder.py --corrected-reads` works with gzipped reads.** chowder
-  staged the corrected pair with its own copy of the read-staging code,
-  which symlinked every input into place under the `.cor.fq` name. A
-  gzipped pair therefore reached pytransrate as gzip bytes behind a FASTQ
-  name, and snap refused it on the first record ("FASTQ record larger than
-  buffer size ... :0"), failing the run at `orthotransrate`. chowder now
-  uses oyster.py's `use_corrected_reads`, which `--trimmed-corrected-reads`
-  already used: a gzipped pair is decompressed, a plain one is still
-  symlinked, and `cleanup` keeps the symlinks and deletes the decompressed
-  copies. That is what docs/pipeline-steps.md already described. Merges
-  given plain-FASTQ corrected reads behave exactly as before.
+- **Trinity is built from source with OpenMP** (`scripts/build_trinity.sh`,
+  run by `make`) from upstream's `Trinity-v2.15.2` tag, instead of
+  bioconda's package, whose recent builds ship a ParaFly without OpenMP and
+  run phase 2 one component at a time (34h27m against 2h03m on SRR1789336).
+  The build fails, and `oyster.py` refuses to start, if ParaFly is serial.
+  Existing installs: see "Updating Trinity" in INSTALL.md.
+- **The assemblers are scheduled in two lanes from the start.** Trans-ABySS,
+  now the slowest assembler, runs in its own lane on 25% of `--cpu` (half
+  under `--transabyss-mpi`) and a quarter of `--mem`. The Trinity lane runs
+  phase 1 beside the two SPAdes runs (two thirds of the cores to phase 1),
+  then phase 2 on the whole lane, or on all of `--cpu` if Trans-ABySS has
+  finished. If Trans-ABySS finishes while phase 2 still has at least 15% of
+  its components left, phase 2 is stopped and relaunched on all of `--cpu`;
+  ParaFly skips finished components, and any component that was mid-run is
+  cleared first so it reruns from scratch (Trinity deletes its super-reads
+  files before checkpointing them). Phase 2 runs in its own session, and
+  `oyster.py` passes SIGTERM/SIGINT/SIGHUP on to it.
+- **`--transabyss-mpi off|auto|on`** (default `off`) runs Trans-ABySS's
+  unitig assembly as `mpirun -np N ABYSS-P` instead of on one thread.
+  Preflight starts two ranks first: `on` refuses to run if that fails,
+  `auto` falls back to threaded. `reports/<run>.transabyss.mode` records
+  which ran, since ABYSS-P need not build the identical assembly.
+- **Two fewer diamond blastx searches per run.** The hits for
+  `shucked.fasta` and `ORP.intermediate.fasta` are looked up from the
+  per-assembly searches, since every contig in them came whole out of one
+  assembly.
+- Short jobs run beside long ones instead of splitting the cores with them:
+  strandeval runs beside pyTransRate on a quarter of `--cpu` (at most 8),
+  and the remaining diamond passes beside the pooled scoring.
+  `run_filtershort` filters all the assemblies at once.
 
-ORP Version 4.0.1-dev17
+New options and tools
 
-- **pytransrate pinned to 2.2.2** in `orp_env.yml` (was 2.2.1). 2.2.2 is
-  a logging release: the read-metrics step now reports which memory
-  budget it ran inside on every parallel run, not only when the budget
-  cut the worker count. Scores are unchanged. Preflight still accepts
-  2.2.1, so existing environments are not refused: the run carries on,
-  with a `[preflight] WARNING` that it is older than the pin. Anything
-  below 2.2.1 still stops the run, and that message's upgrade hint now
-  installs 2.2.2 to match a freshly built env. To update one in place:
+- **`assembly_eval.py`**: scores any assembly against its reads with
+  pyTransRate, BUSCO and the strand exam, without running ORP. Resumes, and
+  is documented in the README.
+- **`oyster.py --trimmed-corrected-reads`** assembles a read pair that has
+  already been trimmed and corrected, skipping trimmomatic and rcorrector.
+  `chowder.py --corrected-reads` now shares that code, so a gzipped pair
+  works (it reached pyTransRate as gzip bytes and failed).
+- **`--no-cleanup`** keeps every file a run produces, including the
+  Trinity, rnaSPAdes and Trans-ABySS working directories. It replaces
+  `--keep-intermediates`, which still works. A `--no-cleanup` run leaves
+  `cleanup.done` unwritten, so re-running without it cleans up.
+- **`scripts/strandeval.py`**, the strand exam on its own.
+- **`tests/release_check.py`** (and `release_check.sbatch` for a cluster
+  node): a test of function on `sampledata/`, with a quick tier that needs
+  no conda and a full tier that runs the pipeline, including failure, kill
+  and resume cases.
 
-      conda run -n orp pip install --upgrade --force-reinstall --no-deps \
-        'pytransrate @ git+https://github.com/macmanes-lab/pytransrate.git@v2.2.2'
+Renamed outputs (scripts that read run directories)
 
-ORP Version 4.0.1-dev16
+- The pick stage is **shuck**, not orthofuse: `orthofuse/<run>/` is
+  `shuck/<run>/`, `merged.fasta` is `pool.fasta`, `<run>.orthomerged.fasta`
+  is `<run>.shucked.fasta`, and the steps `merge`, `orthotransrate`,
+  `orthofusing` are `build_pool`, `score_pool`, `shuck`. A run directory
+  from before this resumes from `run_filtershort`.
+- **pyTransRate is called pyTransRate everywhere**, in `oyster.py`,
+  `chowder.py` and `assembly_eval.py`: the step is `pytransrate`, its output
+  `reports/pytransrate_<run>/`, and the report lines `PYTRANSRATE SCORE` and
+  `PYTRANSRATE OPTIMAL SCORE`. A resumed run renames the old directory
+  instead of scoring again.
+- `chowder.py`'s renamed copies of its inputs go to
+  `assemblies/ingested/<run>.<label>.fasta`. It used to write them where
+  `oyster.py` leaves its own assemblies, which could overwrite an input
+  given the same `--runout` and `--dir`. An input inside
+  `assemblies/ingested/` is refused.
 
-- **`--no-cleanup`** (`oyster.py` and `chowder.py`) keeps every file a
-  run produces, for debugging. It replaces `--keep-intermediates`, which
-  still works as an alias, and covers more: besides the end-of-run
-  cleanup, the trimmed-read reclaim and the background gzip, it now also
-  stops the deletions individual steps make as they finish -- Trinity
-  Phase 2 runs without `--full_cleanup`, so `<run>.trinity/` survives;
-  the rnaSPAdes (`<run>.spades_k*/`) and Trans-ABySS (`<run>.transabyss/`)
-  working directories are kept; and so are Trinity's gene_trans_map and
-  strandeval's sorted BAM and bwa index. Trinity names its output
-  `<run>.trinity.Trinity.fasta` either way (checked against the 2.15.2
-  source), so nothing downstream moves.
+Fixes
 
-- A `--no-cleanup` run leaves `cleanup.done` unwritten, so re-running the
-  same command without the flag cleans up afterwards. `cleanup` now
-  sweeps the working directories and strandeval files listed above too,
-  which also tidies runs that were interrupted mid-step.
+- **A step that dies partway is re-run on resume.** Trimmomatic, rcorrector
+  and diamond write as they go, so a killed step left a truncated file that
+  looked finished and the next run built on it (with rcorrector, an
+  assembly from part of the reads). Each step now leaves
+  `reports/.<run>.<step>.running` while it runs.
+- **Cleanup no longer deletes other runs' files.** Runs in the same
+  directory share `assemblies/diamond`, `assemblies/working`, `quants` and
+  `shuck`; cleanup removed each whole, and a second run's next step failed.
+  It now removes only this run's entries.
+- **pyTransRate no longer scores a rewritten assembly against the old
+  one's index** after a resumed run re-filters; anything in
+  `reports/pytransrate_<run>/` older than the assembly is rebuilt.
+- Resumes notice more stale inputs (both corrected mates for Trinity phase
+  1, the corrected reads for strandeval and the pooled scoring, and the
+  quality report's inputs).
+- Re-running BUSCO replaces its report instead of nesting it, and a leftover
+  BUSCO directory from an interrupted attempt is cleared first.
+- `posthack` and `secondfilter` overwrite their working files instead of
+  appending, so a retry no longer duplicates rescued contigs.
+- The pooled pyTransRate scoring gets `--mem` (it had no budget), and
+  `twotrack_select.py`'s cd-hit-est runs get `-M`.
+- Preflight checks what a run actually uses: diamond, cd-hit-est, blastn,
+  makeblastdb, samtools, bwa, seqtk and hist, plus
+  `software/diamond/swissprot.dmnd`, `uniprot_sprot.fasta` and the
+  `--lineage` BUSCO dataset, which used to be found missing hours in. Every
+  missing item is listed at once.
+- Cleanup removes cd-hit-est's `.clstr` report.
+- Trinity's `--inchworm_cpu` is capped at the call's `--CPU` (it was a
+  fixed 10). Trinity applies the same cap itself, so nothing it runs
+  changes; the logged command now says what Inchworm used.
+- `assembly_eval.py --force` works under Python 3.6.
 
-ORP Version 4.0.1-dev15
+Install
 
-- **`oyster.py --trimmed-corrected-reads`** skips trimmomatic and
-  rcorrector and assembles `--read1`/`--read2` as they are, for a pair that
-  has already been through both. A plain fastq is symlinked into `rcorr/`
-  as the corrected pair; a gzipped one is decompressed there, because
-  Trinity and SPAdes decide whether to gunzip from the extension and would
-  read gzip data under a `.cor.fq` name as garbage. Neither is compressed in
-  the background, and cleanup keeps the symlinks and deletes the
-  decompressed copies, since the originals are still where the user left
-  them. Preflight no longer requires trimmomatic or rcorrector on such a
-  run.
-
-- This shares its plumbing with `chowder.py --corrected-reads`, which now
-  also stops requiring trimmomatic and rcorrector at preflight. Its read
-  handling is otherwise unchanged: it still symlinks gzipped reads rather
-  than decompressing them.
-
-- **Cleanup now removes `assemblies/<run>.ORP.intermediate.fasta.clstr`**,
-  the cluster report cd-hit-est writes beside its output. Nothing reads
-  it, and cleanup was leaving it behind.
-
-ORP Version 4.0.1-dev13
-
-- **Writing `<run>.orthomerged.fasta` is linear now, not quadratic.**
-  `scripts/filter.py` tested each record of `merged.fasta` with
-  `seq.id in wanted`, where `wanted` was a *list* of `good.<run>.list`, so
-  every record scanned the whole list. Doubling the input quadrupled the
-  time: 3.6s, 13.5s and 53.5s at 50k, 100k and 200k records with a quarter
-  of them wanted, against 0.22s, 0.38s and 0.81s now. A real
-  `merged.fasta` holds millions of records; scaling these up puts the old
-  script near an hour on a big assembly (untimed on a real run).
-
-- It is stdlib-only as well: a set of IDs, and a plain-bytes parse that
-  skips unwanted records without building them, in place of Biopython.
-  **The output is byte-identical**, and has to be, because this file's
-  record order and text reach cd-hit-est. It keeps Biopython's rules: the
-  first word of the header is the ID, the header keeps its description with
-  trailing whitespace stripped, the sequence loses spaces, tabs and `\r` and
-  is re-wrapped at 60 columns, an empty record is written as its header
-  alone, and a duplicate ID is written each time it appears. Checked with
-  `cmp` against the old script on inputs mixing all of those plus
-  line widths of 60, 70, 80 and unwrapped, blank lines, empty headers and
-  padded or blank lines in the list.
-
-ORP Version 4.0.1-dev12
-
-- **Per-search memory is now quadratic in query size, not linear.** Three
-  self-searches measured alone on the node with `/usr/bin/time -v`:
-
-        Species0 spades55    1.61 GB  >10kb=19,387  143.0 GiB
-        Species3 trinity     1.61 GB  >10kb= 2,139  101.9 GiB
-        Species2 transabyss  1.18 GB  >10kb=   471   51.2 GiB
-
-  1.36x the bytes costs 1.99x the memory -- an exponent of 2.22, which is
-  what diamond's query x database work implies for a self-comparison. The
-  constant is `ORTHOFINDER_GB_PER_SEARCH_GB2 = 58`, GiB per GB-of-query
-  squared, and it predicts +6%, +48% and +58% against the three: always
-  conservative, tightest on the expensive one.
-
-- **The linear model it replaces was accurate only where it was fitted.**
-  +8% at 1.6 GB, +121% at 1.18 GB, and falling the dangerous way as inputs
-  grow: at 3 GB it read 288 GiB and would have planned two concurrent
-  searches wanting 522 GiB apiece.
-
-- Consequences: assemblies around 1 GB go from 6 concurrent to 11, 1.18 GB
-  from 4 to 8, and 2.5 GB and up drop to 1 concurrent with every core.
-  Nothing changes below ~0.8 GB, where `n_assemblies^2` caps concurrency
-  first, or at 1.6 GB, where both forms say 4.
-
-- **Sequence count is ruled out** as a driver: Species3 carries 77% more
-  sequences than Species0 at the same file size and costs 29% less. **The
-  long-contig tail is a real modifier** -- same bytes, 9.1x the contigs over
-  10 kb, 29% more memory -- but it is deliberately not in the formula, since
-  counting it needs a pass over the assemblies and two parameters on three
-  points is how the previous two figures here went wrong.
-
-ORP Version 4.0.1-dev11
-
-- **Says so when a single search does not fit the memory budget.**
-  `searches = max(1, min(cpu, jobs, mem // per_search))` floors to one when
-  `per_search > mem`, so the run proceeded having already computed that the
-  search would not fit, and found out hours later as an OOM. Assembly size
-  and memory are both known before anything starts, so the step now says it
-  in the first second and names the right remedy -- more memory or smaller
-  assemblies, not `--orthofinder-searches`, which is already at its floor.
-
-- Not fatal, and silent when `--orthofinder-searches` was set by hand. The
-  estimate is a conservative proxy (159 GiB predicted against 143.0
-  measured), so a budget just under it may still survive, and refusing would
-  turn a warning into a new way for a run not to start.
-
-ORP Version 4.0.1-dev10
-
-- **`-a` is capped at the number of assemblies, and `--orthofinder-analysis`
-  can pin it.** "Initial processing of each species" has one task per
-  species, so a fifth worker on a four-assembly run has nothing to do. The
-  rule is now `min(--cpu/8, 16, n_assemblies)` -- upstream's shape and its
-  documented ceiling, computed from the machine rather than from the
-  throttled `-t`.
-
-- **Deliberately no memory term on `-a`.** Sizing it by memory needs a
-  per-worker figure and there is not one: upstream documents no RAM guidance
-  for `-a`, and this phase has never been measured here. Its entire input is
-  the search output -- 523 MB gzipped, ~4 GiB of text, against 143 GiB for a
-  single search -- so it is unlikely to be what exhausts a node. That is an
-  expectation, not a measurement, which is why the override exists. A memory
-  term goes in when there is a number to fit it to.
-
-- Note the asymmetry, recorded in the code: too few searches costs wall time
-  and too many loses the step to the OOM killer, so search sizing errs low.
-  Too few analysis workers trips OrthoFinder's 200s stall watchdog and too
-  many appears to cost nothing, so `-a` errs high.
-
-ORP Version 4.0.1-dev9
-
-- **Fixes a regression dev2 introduced into OrthoFinder's algorithm phase.**
-  `-a` was computed as `searches // 8`, which was harmless only while the
-  memory cap could never bind and `searches` was therefore the whole core
-  count: `-a` came out 5. Making the cap bind dropped `searches` to 4 and
-  took `-a` down to 1 with it. That is a change to a different phase of
-  OrthoFinder entirely, it was never intended, and nothing in the log
-  mentioned it.
-
-  `-a` is now sized from `--cpu` (`cpu // 8`, OrthoFinder's own default
-  shape) and is independent of the search concurrency. The two govern
-  different phases: `-t` is concurrent diamonds during the all-vs-all, `-a`
-  is OrthoFinder's own workers afterwards, by which time the searches have
-  exited and their memory with them.
-
-- The plan line now prints `-a` alongside the search concurrency, so a
-  change to one is visible rather than implied.
-
-ORP Version 4.0.1-dev8
-
-- **"No Orthogroups.txt" no longer blames diamond before looking.** The
-  message said one thing -- diamond was OOM-killed, lower the concurrency,
-  delete the Results_* directory -- which is right when the searches died
-  and destructive when they did not. A run completed all sixteen searches in
-  4h36m and then failed in OrthoFinder's own algorithm phase; following that
-  advice would have deleted four and a half hours of good alignments to fix
-  something that was never wrong.
-
-- The searches are now audited first and decide which advice is given. When
-  they are complete the message says so, says explicitly not to delete the
-  directory, and points at the algorithm phase and Log.txt instead. When
-  they are bad it names each one, as before.
-
-- `audit_orthofinder_searches` (judges nothing, returns findings) split out
-  of `check_orthofinder_searches` (fatal), so the same audit can run where a
-  failure must not be fatal. `newest_working_dir` finds the searches without
-  needing an Orthogroups.txt to walk up from -- which is the case where they
-  most need looking at.
-
-ORP Version 4.0.1-dev7
-
-- **The per-search memory figure is now measured, not inferred.** A single
-  diamond search of this input class, run alone on the node with 40 threads,
-  peaks at **143.0 GiB** (exit 0, 36m35s, 14.8 core-hours). 670 GiB holds
-  four of them and not five. `ORTHOFINDER_GB_PER_QUERY_GB = 96` predicted
-  159 GiB and chose 4 -- 11% conservative, and right. No behaviour changes;
-  the constant's justification stops being one kernel log line.
-
-- Documented what actually drives the cost: the long-contig tail, not file
-  size and not sequence count. The two species that lost searches carry
-  9-47x more contigs over 10 kb; the species with the most sequences lost
-  none. Recorded with the caveat that bytes remain the proxy the sizing
-  uses, and what would be needed to replace it.
-
-ORP Version 4.0.1-dev6
-
-- **Preflight writes down the Slurm job ID, the host, and the diamond
-  version.** `sacct` is the only place a finished job's peak memory exists
-  and it is keyed on an ID the log never carried, so the run that raised the
-  memory question could not afterwards be asked about memory. The log now
-  carries the ID and the exact `sacct` line to run. The diamond doing the
-  all-vs-all is an unpinned orthofinder dependency rather than the
-  `diamond=2.2.5` in orp_env.yml, and several memory fixes in diamond's own
-  ChangeLog land in specific versions, so its version is printed too.
-
-ORP Version 4.0.1-dev5
-
-- **diamond's thread count is set through OrthoFinder's config.json, because
-  PATH cannot reach it.** `-p 1` is written into the `search_cmd` template in
-  `<env>/bin/src/orthofinder/run/config.json`, and OrthoFinder prepends both
-  its environment's bin and its own bundled bin at startup -- so the dev4
-  shim sat at position 9 of the searches' PATH, behind the real diamond, and
-  the searches ran `-p 1` with the shim present and unused. There is no
-  `--config` flag, so the install copy is the only place this can be said
-  from. ORP now adds a `diamond_orp_<threads>` program beside the stock one
-  and selects it with `-S`.
-
-- The stock `diamond` entry is never modified, the original file is backed up
-  once as `config.json.orp-backup`, and the entry name carries the thread
-  count so runs at different `--cpu` coexist in a file the whole cluster
-  shares. Nothing run-specific is written into it. The write is
-  temp-and-rename with a read-back and one retry, since two jobs adding
-  different entries at once is a lost update.
-
-- If the config cannot be read or written the step falls back to the stock
-  program and says what that costs in cores, rather than failing. Verified
-  against a missing orthofinder, corrupt JSON, and a config with no diamond
-  entry.
-
-ORP Version 4.0.1-dev4
-
-- **The diamond shim was never actually used, and nothing said so.** dev2 put
-  the shim on PATH by handing `env=` to subprocess, but `conda run -n X`
-  activates the environment and activation *prepends* that environment's own
-  bin -- so the shim sat behind `orp_orthofinder/bin`, the real diamond won
-  the lookup, and OrthoFinder's `-p 1` stood. Confirmed on the node: four
-  diamonds at `NLWP 2`, `%CPU 98`, `-p 1` and no `--tmpdir`, i.e. four cores
-  of forty. PATH is now exported *inside* the activated environment, which is
-  after conda has had its turn.
-
-- **The step now prints which diamond it resolved**, the same way OrthoFinder
-  will resolve it, before the run starts. The failure above was invisible in
-  the log for two hours; it is one line now, and a loud one if the shim is
-  not what comes back.
-
-ORP Version 4.0.1-dev3
-
-- **Fixes the `TypeError` dev2 introduced in `run_orthofuser`.** `conda_run`'s
-  first parameter was named `env`, which is also subprocess's name for the
-  environment block, so passing the diamond shim's PATH as `env=` handed the
-  method two values for one parameter and the step died at its own call site.
-  The parameter is `conda_env` now. Every caller passes it positionally, so
-  nothing else changes.
-
-ORP Version 4.0.1-dev2
-
-**Fixes the OrthoFinder all-vs-all losing searches to the OOM killer.**
-
-- **The diamond concurrency cap now binds.** `searches = min(cpu, mem //
-  ORTHOFINDER_GB_PER_SEARCH)` was compared against a job count of
-  `n_assemblies^2` = 16, and at `--cpu 40 --mem 670` it evaluated to 40 --
-  so all sixteen `--more-sensitive` diamonds ran at once and the cap, the
-  error messages that pointed at it, and the advice to lower `--cpu` or
-  `--max-parallel` were all describing a knob that was not connected. Per-
-  search memory is now sized from the largest search input at
-  `ORTHOFINDER_GB_PER_QUERY_GB` (96 GB per GB of query, the worst measured
-  search), with a 12 GB floor.
-
-- **Lowering concurrency no longer idles the node.** OrthoFinder hands every
-  diamond `-p 1` regardless of `-t`, so fewer concurrent searches used to
-  mean fewer cores. A generated `diamond` ahead of the real one on PATH
-  rewrites `-p` to `--cpu // searches` and points `--tmpdir` somewhere that
-  is not OrthoFinder's input directory. Four searches at ten threads is the
-  same forty cores as sixteen at one, at a quarter of the peak memory. Only
-  the search subcommands are rewritten; `makedb` is untouched.
-
-- **`--orthofinder-searches N`** pins the number of concurrent searches when
-  the memory model is wrong for a node.
-
-- The failure messages now name `--orthofinder-searches`, and say that a
-  truncated `Blast*.txt.gz` has to be deleted before a resume rather than
-  left for OrthoFinder to reuse.
+- **`make` works with a conda that is already installed.** Every target
+  finds conda at run time (the one on `PATH`, else the bundled one) and goes
+  through `conda run`; an existing conda is never updated or reconfigured,
+  and channels are passed per command rather than written to `~/.condarc`.
+  Each of the five envs is created if no env has exactly its name.
+  Swiss-Prot comes over https, and the PATH lines go into `~/.profile` (and
+  `~/.bash_profile` if it exists) once. `make clean` removes the five envs.
+- pytransrate pinned to 2.2.2 (a logging release; scores unchanged).
+  Preflight still accepts 2.2.1 with a warning.
+- The `bridges.psc.edu` special case for trimmomatic is gone.
+- The step-timing table and cleanup's file list are written to the timing
+  log and `reports/<run>.cleanup.done`, not printed at the end of a run.
 
 ORP Version 4.0.1 <- 4.0.0
 
@@ -703,7 +221,7 @@ ORP Version 4.0.0 <- 3.1.0
 - replace the bundled Ruby `orp-transrate` with [pytransrate](https://github.com/macmanes-lab/pytransrate) 2.2.0, pip-installed into the `orp` env off its pinned `v2.2.0` tag. The Ruby version is pinned to Ruby 2.2.0 (EOL since 2018), ships as an x86_64-linux-only 30MB bundle, and depends on three abandoned binaries; none of that could be carried forward. The CLI is drop-in (`-a`/`-o`/`-t`/`--left`/`--right` unchanged) and the CSV column order is preserved deliberately, so `reportgen`'s positional reads at indices 36/37 of `assemblies.csv` and `scripts/pick_best_contigs.py`'s column 9 of `contigs.csv` are untouched. **Scores are not comparable across this boundary and are not meant to be**: snap-aligner 1.0dev.96 -> 2.0.5 introduced soft clipping, and the old `bam-read` helper advanced its reference cursor over soft-clipped bases as though they consumed reference, shifting a clipped read's coverage contribution rightward -- inert under an aligner that never clipped, corrupting under one that does. Coverage now follows the SAM spec and agrees with `samtools depth`. Measured across three assemblies of one library: `bases_uncovered` rises 3.1-4.5x and the assembly score drops 0.008-0.070, while the good-mapping *rate* is unchanged to +/-0.001 -- the two implementations agree about the reads and disagree about the contigs. Because `makeorthout` keeps the highest-scoring member of each orthogroup, it is contig-score *ordering* and not level that reaches the assembly: 14.5-19% of contig pairs order oppositely, so the final `.ORP.fasta` will differ. pytransrate ships `scripts/compare_orthogroup_picks.py` to measure exactly which orthogroups change representative. The `transrate` entry in `sampledata/benchmarks.md` needs a fresh baseline for the same reason. Install-side this retires the tarball, its `make` target, the Dockerfile `ENV`/`.profile` PATH entries, and INSTALL.md steps 5 and 8 -- a console script inside the env needs none of them. `check()` gains `snap-aligner`, which pytransrate shells out to, so a missing one fails in preflight instead of hours in at `orthotransrate`. Pinned at 2.2.0 rather than 2.0.0, across two bumps whose effects are worth keeping apart. **2.1.0** is a performance release against the same score formulas, so nothing above changes: `-t/--threads` now divides the scoring step as well as snap and salmon, which both ORP call sites already pass `-t <cpu>` to, and the serial work is 1.9x faster per alignment and 5.3x faster per contig. `orthotransrate` is where that lands: it scores the pooled fasta and dominates the merge branch it runs in (26m36s of `merge_branch`'s 26m37s on the SRR1789336 benchmark, Ruby-era timings and so a scale rather than a baseline). Its one numeric change is `p_seq_true` becoming exact: it was the one accumulator carried as a running float, so a parallel run's answer depended on its thread count. It moves by up to 3.3e-15 against 2.0.0 -- the fifteenth decimal, against a `contigs.csv` rounded to six -- and stops being thread-dependent. **2.2.0** is about surviving a real merge, and it is the one that moves scores again, though not through the scorer: `src/pytransrate/score.py` and `src/pytransrate/output.py` are byte-identical across 2.1.0..2.2.0, so the formulas, the CSV column order and pytransrate's `tests/test_output.py` pinning `score`/`optimal_score` at indices 36/37 all stand -- what moves is snap's input. Contig padding drops from 2000 to 1000, which changes the index and so the alignments on every assembly; `--padding` is exposed to override it, and note that the ORP `--pytransrate-args` note below was written against a flag 2.1.0 did not actually have. Deflines containing `|` stop being cut at the pipe, which under 2.1.0 either failed outright or ran to completion with every read metric silently zero -- no concern for oyster.py, whose four assemblers emit no pipes, but a real fix for `chowder.py`, where the assemblies are whatever the user downloaded and ENA and TSA both use them. The rest is why the pin moved at all: the read-metrics step caps its forked processes at memory that actually exists (with `--max-memory`/`--mem` when the detected figure is wrong for the scheduler), `logs/snap.log` is written as snap runs rather than assembled in memory and lost when snap is killed, a snap that dies on a signal says `killed by signal 8 (SIGFPE)` and names amplab/snap#171, the `-locationSize` sweep covers every way snap runs out of genome locations, gzipped assemblies and reads are read directly, and the index survives interruption and concurrent runs behind an `<index>.index.lock`. The CLI is a strict superset of 2.1.0's -- nothing either ORP call site passes was removed -- and `requires-python` and the three runtime dependencies are unchanged, so `orp_env.yml` needed only the tag
 - upgrade salmon 2.5.1 -> 2.7.0 in the `orp` env (and add `snap-aligner=2.0.5`/`pysam` for pytransrate, which targets 2.7.0 -- so one env serves both rather than needing a separate `orp_transrate`). Every flag ORP passes was checked against the 2.x migration notes first and nothing breaks: `salmon index` keeps `-t`/`-i`/`-k`/`--threads`, `salmon quant` keeps `-p`/`-i`/`--seqBias`/`--gcBias`/`--libType`/`-1`/`-2`/`-o`, and `quant.sf`'s columns are unchanged so `filter_tpm` still reads TPM from column 4. Dropped `--validateMappings`, which 2.x ignores now that selective alignment is the default -- it was a no-op that read as though it still switched something on. Kept `--no-version-check`, also a no-op, since it stays meaningful against a 1.x salmon. The behavioral change is 2.6.0 making deterministic quantification the default, which lands entirely in the 2.5.1 -> 2.6.0 step (2.7.0 is byte-identical to 2.6.0): TPMs move, and the salmon step stops being a source of run-to-run drift. Downstream this is inert at the default `--tpm-filt 0`, where `filter_tpm` writes the LOWEXP list only when `tpm < 0` and so leaves it empty and `secondfilter` copying through unchanged; only `--tpm-filt > 0` runs see membership shift near the threshold. `orp_trinity`'s own `salmon=1.10.3` is a separate env and is untouched
 - fix a resumability hole the salmon upgrade exposed: 2.7.0 requires index format v2 and rejects any index an earlier salmon built, but `needs_run()` only ever compares mtimes -- so resuming a run started under 2.5.1 kept the stale `<run>.ortho.idx`, skipped `salmon_index`, and left `salmon quant` to fail against an index it could not read, once per retry. `stamp_tool_version()` now records the salmon version in `quants/salmon.version` and declares that file as an *input* to `salmon_index`, so a version change reads as an ordinary out-of-date input rather than a special case; the stamp is rewritten only when the version actually changes, or a rebuild would fire every run. `salmon_index` also clears the index directory before rebuilding, since a rebuild here is usually a rebuild over an index salmon has already refused
-- clear the output directory before every attempt at `orthotransrate()`/`transrate()`, not once above the retry loop. pytransrate refuses an output directory that already holds an `assemblies.csv` rather than silently overwriting it the way the Ruby did, and `needs_run()` re-runs either step whenever the corrected reads are newer than that csv -- not only when it is absent -- so a resumed run would abort in preflight instead of rescoring. Clearing once was not enough: pytransrate reuses whatever mapping it finds in `-o`, so a step killed part-way leaves a truncated BAM that every later attempt picks back up and dies on with the same missing BGZF EOF marker, having paid for the contig-metrics pass again first. What a retry must not start from, though, is a cold directory, and the first cut of this cleared far too much: everything the clear does not recognise is by definition the work the previous attempt paid for. `clear_transrate_outdir()` therefore asks of each thing in `-o` not whether it is there but whether whatever wrote it finished, and four kinds of thing survive that question. **snap's index**, the most expensive artifact the previous attempt produced -- pytransrate chdirs into `-o`, so the index of `merged.fasta` sits at `merged/merged/`, and on a 5.35M-contig merge it is the better part of an hour, twice that whenever the `-locationSize` sweep steps up from four bytes; any directory carrying snap's own `GenomeIndex` marker is kept, which is what pytransrate keys reuse on, so a partial build (no marker) is still cleared rather than trusted. **The BAM, when it is complete** -- the other multi-hour step, and 159 GB of it on the merge in NOTES.md. 2.2.0 makes the same check before reusing one, but the decision to *keep* the file is ORP's and a truncated BAM is hundreds of gigabytes nothing can use, so the check is made here too: a BAM ending in the empty BGZF block of SAM spec 4.1 was closed by a writer that reached the end and is kept, along with the `.align.done` marker pytransrate reads after 2.2.0 to decide the same thing, the `<index>.index.lock` that belongs beside the index, and the `*-read_count.txt` that saves re-counting the library; one without that block was still being written when snap was OOM-killed, hit its wall clock or died on [amplab/snap#171](https://github.com/amplab/snap/issues/171), and it is deleted, because it is exactly the file every later attempt used to pick back up and die on. **`salmon/`**, but only beside a BAM that was kept -- `quant.sf` is a completed quantification *of that BAM*, so keeping it once the BAM has gone would score the assembly off numbers belonging to a file that no longer exists -- and only when it holds one whole row per contig in the assembly, since salmon writes it in a single pass at the end of its run and pytransrate reuses it on existence alone at every version to date, 2.2.0 included, which would not fail loudly but would quietly score the assembly off whichever contigs made it into the file before the kill. **`logs/`**, by name, because `merged/logs/snap.log` is the file that says why the step failed at all, and a retry that deletes it destroys the evidence it exists to preserve. Everything else goes, including `assemblies.csv`, `contigs.csv` and the score-optimisation csv, which are the outputs being recomputed. Every one of these checks fails towards deleting, so a check that is wrong costs a recomputation and never a wrong score. The `rglob("*.bam")` cleanup loops go at the same time: pytransrate deletes its own BAM on success unless `--keep-bam` is passed
+- clear the output directory before every attempt at `orthotransrate()`/`transrate()`, not once above the retry loop. pytransrate refuses an output directory that already holds an `assemblies.csv` rather than silently overwriting it the way the Ruby did, and `needs_run()` re-runs either step whenever the corrected reads are newer than that csv -- not only when it is absent -- so a resumed run would abort in preflight instead of rescoring. Clearing once was not enough: pytransrate reuses whatever mapping it finds in `-o`, so a step killed part-way leaves a truncated BAM that every later attempt picks back up and dies on with the same missing BGZF EOF marker, having paid for the contig-metrics pass again first. What a retry must not start from, though, is a cold directory, and the first cut of this cleared far too much: everything the clear does not recognise is by definition the work the previous attempt paid for. `clear_transrate_outdir()` therefore asks of each thing in `-o` not whether it is there but whether whatever wrote it finished, and four kinds of thing survive that question. **snap's index**, the most expensive artifact the previous attempt produced -- pytransrate chdirs into `-o`, so the index of `merged.fasta` sits at `merged/merged/`, and on a 5.35M-contig merge it is the better part of an hour, twice that whenever the `-locationSize` sweep steps up from four bytes; any directory carrying snap's own `GenomeIndex` marker is kept, which is what pytransrate keys reuse on, so a partial build (no marker) is still cleared rather than trusted. **The BAM, when it is complete** -- the other multi-hour step, and 159 GB of it on the merge in docs/notes-archive.md. 2.2.0 makes the same check before reusing one, but the decision to *keep* the file is ORP's and a truncated BAM is hundreds of gigabytes nothing can use, so the check is made here too: a BAM ending in the empty BGZF block of SAM spec 4.1 was closed by a writer that reached the end and is kept, along with the `.align.done` marker pytransrate reads after 2.2.0 to decide the same thing, the `<index>.index.lock` that belongs beside the index, and the `*-read_count.txt` that saves re-counting the library; one without that block was still being written when snap was OOM-killed, hit its wall clock or died on [amplab/snap#171](https://github.com/amplab/snap/issues/171), and it is deleted, because it is exactly the file every later attempt used to pick back up and die on. **`salmon/`**, but only beside a BAM that was kept -- `quant.sf` is a completed quantification *of that BAM*, so keeping it once the BAM has gone would score the assembly off numbers belonging to a file that no longer exists -- and only when it holds one whole row per contig in the assembly, since salmon writes it in a single pass at the end of its run and pytransrate reuses it on existence alone at every version to date, 2.2.0 included, which would not fail loudly but would quietly score the assembly off whichever contigs made it into the file before the kill. **`logs/`**, by name, because `merged/logs/snap.log` is the file that says why the step failed at all, and a retry that deletes it destroys the evidence it exists to preserve. Everything else goes, including `assemblies.csv`, `contigs.csv` and the score-optimisation csv, which are the outputs being recomputed. Every one of these checks fails towards deleting, so a check that is wrong costs a recomputation and never a wrong score. The `rglob("*.bam")` cleanup loops go at the same time: pytransrate deletes its own BAM on success unless `--keep-bam` is passed
 - add `--pytransrate-args` to both entry points: extra arguments as one quoted string, `shlex`-split and appended to both pytransrate invocations, so a value here overrides the same flag passed above it. Both call sites were fixed argument lists, which put the snap index tuning a large merge needs out of reach without editing `oyster.py` -- and asking for it the obvious way got `chowder.py: error: unrecognized arguments: --location-size 5`, which reads as though the flag does not exist rather than as though it belongs to the tool one level down. The one that matters at scale is `--location-size`, which skips snap's sweep when four-byte genome locations are already known not to fit. `--padding` is *not* the second lever it looks like: snap writes padding as N and skips seeds containing N, so it grows the 1 byte/base genome array and nothing else -- measured on a 5.4M-contig, 5.7 Gbp merge, dropping it entirely saved 1% of the branch, and real sequence alone still exceeded the four-byte ceiling
 - fix `orthofuser()` writing its sentinel on an OrthoFinder run that computed nothing. OrthoFinder prints its own fatal errors and then exits 0 -- on one 5.35M-contig merge its diamonds were OOM-killed mid-search, and it reported `Blast1_1.txt is corrupted`, `worker reported fatal error` and `An error occurred`, ran for 35,816s, and returned success. `conda_run` was satisfied, `orthofuser.done` was written, and because `needs_run()` only compares mtimes, every subsequent resume skipped the ten-hour step as up to date and handed `makeorthout` whatever `find_orthogroups_txt()` turned up -- so the run went on to pick contigs and build a final assembly from an orthogroup set that was never computed, with nothing downstream able to notice. The sentinel is now gated on the artifact rather than the exit status: a marker is dropped before launching, and a non-empty `Orthogroups.txt` newer than that marker is required, which a stale result from an earlier attempt cannot satisfy. The failure message names the usual cause, since "exited 0 but produced nothing" is not self-explaining. `find_orthogroups_txt()` takes the newest by mtime rather than `rglob`'s first match, which was the same problem's other half: OrthoFinder never reuses a results directory (each invocation makes a fresh `Results_<Mon><Day>`, then `_1`, `_2`), so a working directory that has seen a failed attempt holds several and the order was the filesystem's -- on a resume after a failure, as likely to hand back the attempt that died as the one that succeeded
 - cap OrthoFinder's `-t` against memory as well as cores, and forward the branch's memory share into it. `-t` is not just a core count: it is how many `diamond` processes run at once. diamond's default block size is a fixed `-b2.0` and its manual's rule is roughly six times that in GB, so ~12 GB per process regardless of the node (`--more-sensitive` does not change it; only `--very-sensitive`/`--ultra-sensitive` do). `-a` drops to OrthoFinder's own `t/8` default, since the full core count it used to get bought nothing under `-og`, which stops at orthogroups and never reaches the work `-a` parallelises. Worth being precise about what this is and is not: concurrency is capped by the searches that exist, `n_assemblies^2`, before it is capped by anything here -- four assemblies is 16 searches, so ~192 GB, comfortably inside the orthofuser branch's share of a 720 GB node. On anything bigger than a ~200 GB node this knob is structurally incapable of being what OOMs a four-assembly run, and the comment in the code now says so, so that the next person watching a node die looks somewhere other than the searches
@@ -721,8 +239,8 @@ ORP Version 4.0.0 <- 3.1.0
 
 ORP Version 3.1.0 <- 3.0.0
 
-- split `run_trinity()` into `run_trinity_phase1()`/`run_trinity_phase2()` using Trinity's documented [multi-stage execution support](https://github.com/trinityrnaseq/trinityrnaseq/wiki/Running-Trinity#running-trinity-in-multiple-sequential-stages) (`--no_distributed_trinity_exec`, then a plain re-run that resumes from Phase 1's checkpoints); pair each phase with a different assembler instead of splitting one fixed lane for the whole run: Stage A runs Phase 1 alongside rnaSPAdes55/rnaSPAdes75 at `TRINITY_PHASE1_SHARE=0.25`, Stage B runs Phase 2 alongside Trans-ABySS at `TRINITY_PHASE2_SHARE=0.95`. Real-run evidence (`TIME2_SRR1789336_norm_py_5050parallel`, NOTES.md 2026-08-19) showed Phase 1 finishing in 90min regardless of its CPU share (confirming it's insensitive above Inchworm's own `--inchworm_cpu=10` cap), and Trans-ABySS's 4.5h runtime is ~3.2h single-threaded FASTQ read/graph-build that no CPU count can shrink (traced to `abyss-pe` falling through to the unthreaded `ABYSS` binary whenever neither Bloom-filter mode nor MPI is requested) -- so pairing Trans-ABySS with the dominant, highly-parallel Phase 2 instead of making Phase 2 wait for it reclaims most of what was previously idle Trinity-lane time, without risking SPAdes being starved of cores the way a single shared short-lane reservation would. Trans-ABySS's memory share is not cut along with its reduced CPU share, since its memory footprint doesn't shrink with core count the way SPAdes/Phase 1's do. Validated on a real run (`TIME2_SRR1789336_norm_py_955parallel`, `sampledata/benchmarks.md`): 37:06:19 TOTAL, beating both the no-split baseline (38:28:11, by 1h21m52s) and an even 50/50 split (42:28:36, by 5h22m17s)
-- fix `strandeval()`'s `examine_strand.pl` call running bare `perl` instead of going through `conda run -n orp_trinity` like every other subprocess call in the file -- it inherited whatever `PATH` the oyster.py process itself had, and `examine_strand.pl`'s `SAM_reader.pm` shells out to `samtools`, which isn't on `PATH` at all once nothing is conda-activated (see the SLURM-script fix a couple of entries back in NOTES.md). Surfaced as `Can't exec "samtools": No such file or directory` on a real cluster run
+- split `run_trinity()` into `run_trinity_phase1()`/`run_trinity_phase2()` using Trinity's documented [multi-stage execution support](https://github.com/trinityrnaseq/trinityrnaseq/wiki/Running-Trinity#running-trinity-in-multiple-sequential-stages) (`--no_distributed_trinity_exec`, then a plain re-run that resumes from Phase 1's checkpoints); pair each phase with a different assembler instead of splitting one fixed lane for the whole run: Stage A runs Phase 1 alongside rnaSPAdes55/rnaSPAdes75 at `TRINITY_PHASE1_SHARE=0.25`, Stage B runs Phase 2 alongside Trans-ABySS at `TRINITY_PHASE2_SHARE=0.95`. Real-run evidence (`TIME2_SRR1789336_norm_py_5050parallel`, docs/notes-archive.md 2026-08-19) showed Phase 1 finishing in 90min regardless of its CPU share (confirming it's insensitive above Inchworm's own `--inchworm_cpu=10` cap), and Trans-ABySS's 4.5h runtime is ~3.2h single-threaded FASTQ read/graph-build that no CPU count can shrink (traced to `abyss-pe` falling through to the unthreaded `ABYSS` binary whenever neither Bloom-filter mode nor MPI is requested) -- so pairing Trans-ABySS with the dominant, highly-parallel Phase 2 instead of making Phase 2 wait for it reclaims most of what was previously idle Trinity-lane time, without risking SPAdes being starved of cores the way a single shared short-lane reservation would. Trans-ABySS's memory share is not cut along with its reduced CPU share, since its memory footprint doesn't shrink with core count the way SPAdes/Phase 1's do. Validated on a real run (`TIME2_SRR1789336_norm_py_955parallel`, `sampledata/benchmarks.md`): 37:06:19 TOTAL, beating both the no-split baseline (38:28:11, by 1h21m52s) and an even 50/50 split (42:28:36, by 5h22m17s)
+- fix `strandeval()`'s `examine_strand.pl` call running bare `perl` instead of going through `conda run -n orp_trinity` like every other subprocess call in the file -- it inherited whatever `PATH` the oyster.py process itself had, and `examine_strand.pl`'s `SAM_reader.pm` shells out to `samtools`, which isn't on `PATH` at all once nothing is conda-activated (see the SLURM-script fix a couple of entries back in docs/notes-archive.md). Surfaced as `Can't exec "samtools": No such file or directory` on a real cluster run
 
 ORP Version 3.0.0 <- 2.4.0
 

@@ -121,7 +121,7 @@ estimate.
 
 Both runs spend more than half their time after `Done orthogroups`, on
 MSA/trees, STRIDE and hierarchical orthogroups, which ORP never uses. That
-is the "`-og` is not honoured" problem already in NOTES.md, and it applies
+is the "`-og` is not honoured" problem already in docs/notes-archive.md, and it applies
 equally to both search programs.
 
 ## `inflation_sweep.sbatch`: does a lower `-I` help?
@@ -356,7 +356,7 @@ below). BUSCO is in genes out of 125. "Δ" is candidate minus control.
   2.5.2's `-d` ran blastn (`options.search_program = "blast_nucl"` unless
   `-S` was given), and ORP's `-d -I 12` dates from 2021, under 2.5.2. The
   2026-08-14 move to 3.1.5 silently made the search one-strand diamond;
-  NOTES.md recorded the side effect (`run_orthofuser` 5:15 -> 30:57 on
+  docs/notes-archive.md recorded the side effect (`run_orthofuser` 5:15 -> 30:57 on
   SRR1789336) without the cause. Fixing it is justified on correctness
   alone.
 - **blastn `-I 3` + `score_orf` is not ready to be the default.** It wins
@@ -553,7 +553,7 @@ rescued copies. The no-hit contigs are untouched by the rescue: they are
 kept after cd-hit-est and left to `--tpm-filt`, which keeps every one above
 1 TPM. **`--tpm-filt` defaults to 0 (no filter); the test runs all pass
 1.** The end-to-end validation of 4.1.0-dev0 through `chowder.py` on 5 of
-the 10 samples is described in NOTES.md.
+the 10 samples is described in docs/notes-archive.md.
 
 ## SPAdes with auto k (`spades_branch.sbatch`, 2026-10-03)
 

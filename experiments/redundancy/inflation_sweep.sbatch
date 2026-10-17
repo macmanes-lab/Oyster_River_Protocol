@@ -14,7 +14,7 @@
 # usage: sbatch inflation_sweep.sbatch [TIMING_DIR]
 #   TIMING_DIR  default ~/redundancy_tests/search_timing/SRR1139197
 #
-# -og is not honoured by OrthoFinder 3.1.5 (NOTES.md): it goes on to
+# -og is not honoured by OrthoFinder 3.1.5 (docs/notes-archive.md): it goes on to
 # MSA/trees after writing the orthogroups. This is a benchmark, not an ORP
 # run, so the task stops OrthoFinder once its log says "Done orthogroups"
 # rather than paying for work nothing reads.

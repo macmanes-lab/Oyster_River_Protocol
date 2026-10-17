@@ -14,7 +14,7 @@ oversubscription run (`sampledata/benchmarks.md`, 2026-08-24). Section 3.3 is
 now **falsified** and 3.4 is **downgraded** on the strength of that run; 2d
 gained a confirmation. Everything else in here remains untested source-reading.
 
-**This investigation was closed on 2026-08-22 with ORP 3.1.0** (NOTES.md), which
+**This investigation was closed on 2026-08-22 with ORP 3.1.0** (notes-archive.md), which
 ruled out 3.1 (`--grid_exec`) on the grounds that it needs cluster-specific
 setup and so would not generalize to ORP's end users. The 2026-08-24 updates
 were folded in afterwards because the run was already in flight; they record a
@@ -133,7 +133,7 @@ consume them, which kmers win as seeds depends on thread interleaving. So
 inchworm contig output is thread-count-dependent.
 
 **This is the mechanism behind the open reproducibility question in
-[NOTES.md](../NOTES.md) 2026-08-16 (5)** (2.4.0 vs 3.0.0 giving slightly
+[notes-archive.md](notes-archive.md) 2026-08-16 (5)** (2.4.0 vs 3.0.0 giving slightly
 different Trinity output, theory being "Trinity isn't perfectly reproducible
 across thread counts"). That theory is correct and this is the reason. It also
 means changing `--inchworm_cpu` would perturb our BUSCO / unique-gene numbers
@@ -220,7 +220,7 @@ payoff.
 
 ### 3.1 `--grid_exec` -- the only order-of-magnitude lever
 
-> **Ruled out by decision, 2026-08-22** (NOTES.md, ORP 3.1.0): not being
+> **Ruled out by decision, 2026-08-22** (notes-archive.md, ORP 3.1.0): not being
 > pursued. It needs HpcGridRunner plus a scheduler-specific config tuned to a
 > particular cluster, so it would not generalize to ORP's end users, each of
 > whom would need their own setup rather than a flag that just works. That is a
@@ -256,7 +256,7 @@ taking 1.8x longer. At 160 slots instead of 38 this is roughly 34h -> ~9h.
 Open questions: whether we can `sbatch` from inside an allocation on Premise, and
 what the fair-share cost of a 73k-job campaign is.
 
-### 3.2 Our normalization result is a no-op -- and NOTES.md has it wrong
+### 3.2 Our normalization result is a no-op -- and notes-archive.md has it wrong
 
 `Trinity:214`:
 
@@ -268,7 +268,7 @@ Trinity 2.15's in-silico normalization defaults to a **200x** coverage cap, whic
 for typical RNA-seq depth discards almost nothing. That is very likely why
 Trinity came out flat in the `--normalize-reads` comparison.
 
-Worse, the record is wrong: [NOTES.md](../NOTES.md) 2026-08-17 describes the
+Worse, the record is wrong: [notes-archive.md](notes-archive.md) 2026-08-17 describes the
 38:28:11 run as the "no `--normalize-reads`" baseline, but
 [sampledata/benchmarks.md](../sampledata/benchmarks.md) line 9 shows its command
 line *did* include `--normalize-reads`. So did all four SRR1789336 runs
@@ -301,7 +301,7 @@ never exceed `--cpu`.
 
 **This is testable against a live run in ~20 minutes** by comparing ParaFly's
 `succeeded(N) ...% completed` rate at two different `-CPU` values -- we already
-read that counter for progress monitoring (NOTES.md 2026-08-20 (1)).
+read that counter for progress monitoring (notes-archive.md 2026-08-20 (1)).
 
 > **Result: wrong. Tested 2026-08-24 at `--cpu 80` (76 ParaFly slots on 40
 > physical cores).**
@@ -376,7 +376,7 @@ Like 3.2, this changes the assembly and needs the quality battery to sign off.
 - **`--max_reads_per_graph`** (default 200000, `Trinity:144`): caps the biggest
   components. Our observed rate profile doesn't show a long slow tail -- the
   final 24.5% of the 50/50 run ran at ~87/min vs a 28.6/min run average
-  (NOTES.md 2026-08-20 (1)) -- so the big jobs aren't stranded at the end. Not a
+  (notes-archive.md 2026-08-20 (1)) -- so the big jobs aren't stranded at the end. Not a
   priority.
 - **Butterfly JVM tuning** (`-Xmx10G -Xms1G -Xss1G`, `Trinity:2373`, defaults at
   `Trinity:102-103`): 38 concurrent JVMs each committing 1 GB init heap is
@@ -385,7 +385,7 @@ Like 3.2, this changes the assembly and needs the quality battery to sign off.
   risk. Skip.
 - **Dynamic core handoff when Trans-ABySS finishes**: Trans-ABySS completes 5h09m
   into Stage B, leaving 5% of cores idle for the remaining ~29h. Same class of
-  problem as the one fixed in NOTES.md 2026-08-16 (2). But measured Phase 2
+  problem as the one fixed in notes-archive.md 2026-08-16 (2). But measured Phase 2
   throughput at 95% vs 100% `--cpu` was within noise (38.3 vs 36.2 jobs/min), so
   the recoverable time is small. Would fall out for free from 3.1 or from an
   oyster-controlled dispatcher anyway.
