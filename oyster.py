@@ -2379,7 +2379,7 @@ class Pipeline:
                     shutil.copyfileobj(inf, outf)
 
     @staticmethod
-    def clear_pytransrate_outdir(outdir, assembly):
+    def clear_pytransrate_outdir(outdir, assembly, reads=()):
         """Clear pyTransRate's -o of what a retry must not reuse, and only that.
 
         A retry has to start from a directory pyTransRate can work in:
@@ -2426,11 +2426,11 @@ class Pipeline:
         belongs to the index either way.
 
         **The read count** that goes with it, `*-read_count.txt`. It is
-        keyed on the read filenames and depends only on the reads, so it
-        cannot go stale while those names hold. Keeping it matters more
-        than its size suggests: it is what pyTransRate reads when it reuses
-        a BAM, and without it that path falls back to counting lines in the
-        fastq itself.
+        keyed on the read filenames, not their contents, so it is only as
+        current as the BAM beside it and goes whenever that does. Keeping it
+        matters more than its size suggests: it is what pyTransRate reads
+        when it reuses a BAM, and without it that path falls back to
+        counting lines in the fastq itself.
 
         **salmon/**, but only beside a BAM that was kept, and only when
         quant.sf is whole. quant.sf is a completed quantification *of that
@@ -2458,21 +2458,33 @@ class Pipeline:
         contig the new assembly added got no reads and the 0.01 score floor
         (the first dynamic_cov sweep, SRR868662: 34,694 such contigs, score
         0.23 where 0.50 was due).
+
+        **Nor does a BAM survive newer `reads`.** The mapping, its read count
+        and salmon's quant.sf are all of the reads as well as the assembly,
+        and the filenames of the corrected pair never change, so a resumed
+        run given a different --read1/--read2 against an unchanged assembly
+        -- a Chowder pool, typically -- would otherwise score it off the old
+        library's alignments. The snap index is of the assembly alone and
+        keeps its own check. A read that is a symlink counts from when the
+        link was made as well as from its target, as in needs_run().
         """
         outdir = Path(outdir)
         assembly = Path(assembly)
         if not outdir.is_dir():
             return
         assembly_mtime = assembly.stat().st_mtime if assembly.is_file() else None
+        reads_mtime = max((max(r.stat().st_mtime, r.lstat().st_mtime)
+                           for r in map(Path, reads) if r.exists()), default=None)
 
-        def current(path):
-            return assembly_mtime is None or path.stat().st_mtime >= assembly_mtime
+        def current(path, *also):
+            newest = [t for t in (assembly_mtime, *also) if t is not None]
+            return not newest or path.stat().st_mtime >= max(newest)
 
         keep = {outdir / "logs"}
         keep.update(outdir.glob("*.index.lock"))
         kept_bam = False
         for bam in outdir.glob("*.bam"):
-            if bam_is_complete(bam) and current(bam):
+            if bam_is_complete(bam) and current(bam, reads_mtime):
                 kept_bam = True
                 keep.add(bam)
                 keep.add(bam.with_name(bam.name + ".align.done"))
@@ -2556,14 +2568,15 @@ class Pipeline:
         # first. retry_cleanup repeats the clear before each retry, because
         # the one below happens once, outside run()'s retry loop. See
         # clear_pytransrate_outdir for what survives it and why.
-        self.clear_pytransrate_outdir(outdir, pool)
+        reads = (self.cor1(), self.cor2())
+        self.clear_pytransrate_outdir(outdir, pool, reads)
         self.conda_run(
             "orp", "pytransrate",
             "-o", outdir, "-t", cpu, "-a", pool,
             "--left", self.cor1(), "--right", self.cor2(),
             *self.pytransrate_memory_args(mem),
             *self.pytransrate_args,
-            retry_cleanup=partial(self.clear_pytransrate_outdir, outdir, pool),
+            retry_cleanup=partial(self.clear_pytransrate_outdir, outdir, pool, reads),
         )
 
     def twotrack_select(self):
@@ -2986,14 +2999,15 @@ class Pipeline:
         orp_fasta = self.assemblies_dir / f"{self.runout}.ORP.fasta"
         outdir = self.reports_dir / f"pytransrate_{self.runout}"
         # See score_pool() and clear_pytransrate_outdir.
-        self.clear_pytransrate_outdir(outdir, orp_fasta)
+        reads = (self.cor1(), self.cor2())
+        self.clear_pytransrate_outdir(outdir, orp_fasta, reads)
         self.conda_run(
             "orp", "pytransrate",
             "-o", outdir, "-a", orp_fasta,
             "--left", self.cor1(), "--right", self.cor2(), "-t", cpu,
             *self.pytransrate_memory_args(mem),
             *self.pytransrate_args,
-            retry_cleanup=partial(self.clear_pytransrate_outdir, outdir, orp_fasta),
+            retry_cleanup=partial(self.clear_pytransrate_outdir, outdir, orp_fasta, reads),
         )
 
     def strandeval_scratch(self):
@@ -3172,7 +3186,18 @@ class Pipeline:
             # older than the copy or link made of the old ones, which the
             # mtimes alone took for up to date.
             relinked = dst.is_symlink() and dst.resolve() != src.resolve()
-            if dst.exists() and not relinked and not self.needs_run([dst], [src, stamp]):
+            if dst.is_symlink():
+                # A link is as old as when it was made, not as its target:
+                # needs_run() dates an output by its target, which is older
+                # than the stamp written just before the link, so every
+                # resume relinked, and the fresh link made every assembly
+                # built from it stale. A target rewritten in place needs no
+                # new link -- what reads it already sees the new mtime.
+                current = (dst.exists() and not relinked
+                           and dst.lstat().st_mtime >= stamp.stat().st_mtime)
+            else:
+                current = dst.exists() and not self.needs_run([dst], [src, stamp])
+            if current:
                 continue
             if dst.is_symlink() or dst.exists():
                 dst.unlink()

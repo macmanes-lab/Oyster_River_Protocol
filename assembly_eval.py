@@ -32,8 +32,11 @@ diamond searches, and a lone assembly has no assemblers to compare. Everything
 else is the line oyster.py writes, in the same order, so reports from the two
 diff cleanly.
 
-A step whose reports/<run>.<step>.done sentinel exists is skipped, so an
-interrupted run resumes where it stopped; --force starts over. Tools run in
+A step whose reports/<run>.<step>.done sentinel records the inputs it would
+run on now (the assembly and reads by size and mtime, the BUSCO lineage, the
+--pytransrate-args) is skipped, so an interrupted run resumes where it
+stopped; a step whose inputs changed since is redone, and --force redoes
+everything. Tools run in
 the same conda envs as oyster.py (orp, orp_busco, orp_trinity); --env-* flags
 rename them, or --no-conda runs whatever is on PATH.
 """
@@ -51,7 +54,7 @@ import threading
 import time
 from pathlib import Path
 
-from oyster import RED, RESET, line_buffer_stdio, strand_exam
+from oyster import RED, RESET, file_identity, line_buffer_stdio, strand_exam
 
 HERE = Path(__file__).resolve().parent
 
@@ -169,6 +172,41 @@ class Eval:
 
     def sentinel(self, step):
         return self.reports / f"{self.runout}.{step}.done"
+
+    def step_settings(self, step):
+        """What `step`'s result depends on, as its sentinel records it.
+
+        Sizes and mtimes rather than paths (see oyster.file_identity), so
+        moving the inputs doesn't redo hours of scoring; cpu and mem are
+        left out because they change how fast a step runs, not its answer.
+        """
+        lines = [f"assembly {file_identity(self.assembly)}"]
+        if step in ("pytransrate", "strandeval"):
+            lines += [f"read1 {file_identity(self.read1)}",
+                      f"read2 {file_identity(self.read2)}"]
+        if step == "pytransrate":
+            # Not shlex.join: that is 3.8+, and this runs under the
+            # cluster's system python3, 3.6.
+            lines.append("args " + " ".join(shlex.quote(a) for a in self.pytransrate_args))
+        if step == "busco":
+            lines.append(f"lineage {self.lineage}")
+        return "\n".join(lines) + "\n"
+
+    def is_done(self, step):
+        """Whether `step`'s sentinel vouches for a result from today's inputs.
+
+        A sentinel from before they recorded anything is empty; it is
+        trusted only if it is newer than the assembly and the reads, which
+        is all it can be checked against.
+        """
+        sentinel = self.sentinel(step)
+        if not sentinel.is_file():
+            return False
+        recorded = sentinel.read_text()
+        if recorded:
+            return recorded == self.step_settings(step)
+        inputs = [self.assembly, self.read1, self.read2]
+        return sentinel.stat().st_mtime >= max(p.stat().st_mtime for p in inputs)
 
     def adopt_pre_rename_outputs(self):
         """Carry a run from before the step was renamed transrate -> pytransrate.
@@ -328,10 +366,17 @@ class Eval:
                 if self.sentinel(s).exists():
                     self.sentinel(s).unlink()
 
-        todo = [s for s in self.steps if not self.sentinel(s).exists()]
+        todo = []
         for s in self.steps:
-            if s not in todo:
+            if self.is_done(s):
                 print(f"[{s}] already done, skipping (--force to redo)")
+                continue
+            if self.sentinel(s).exists():
+                # Dropped before the step starts, so a redo that fails
+                # leaves nothing behind vouching for the old result.
+                print(f"[{s}] done before on other inputs or settings; redoing it")
+                self.sentinel(s).unlink()
+            todo.append(s)
 
         # The steps are independent; --cpu and --mem are split across the ones
         # that run so the box is not oversubscribed. strandeval's mapping is
@@ -349,7 +394,7 @@ class Eval:
             print(f"[{step}] started (cpu {cpu}, mem {mem}G); log: {self.logs / (step + '.log')}")
             try:
                 getattr(self, step)(cpu, mem)
-                self.sentinel(step).touch()
+                self.sentinel(step).write_text(self.step_settings(step))
                 print(f"[{step}] finished in {int(time.time() - t0)}s")
             except (subprocess.CalledProcessError, OSError) as e:
                 failures.append((step, e))

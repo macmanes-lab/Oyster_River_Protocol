@@ -15,6 +15,8 @@ temporary --dir and calls the method under test directly:
   reads_stamp      a read file swapped for a different, older one is noticed
   corrected_relink --trimmed-corrected-reads pointed at another, older file
                    relinks, and what was built from the old link goes stale
+  corrected_resume a plain resume leaves the links alone; a read replaced in
+                   place by an older file relinks
   trinity_dir      Trinity's checkpoints are cleared when phase 1 is re-run
                    on other inputs, kept on a plain resume
   chowder_ids      label `a` + contig `b_c` and label `a_b` + contig `c`
@@ -183,6 +185,26 @@ def check_corrected_relink(tmp):
           "an assembly from the old reads stayed up to date after the relink")
 
 
+def check_corrected_resume(tmp):
+    work = tmp / "resume"
+    work.mkdir()
+    for r in ("a1.fq", "a2.fq"):
+        (work / r).write_text(FASTQ)
+        age(work / r, 7200)
+    reads = (work / "a1.fq", work / "a2.fq")
+    p = pipeline(work, "--trimmed-corrected-reads", reads=reads)
+    quiet(p.use_corrected_reads)
+    linked = p.cor1().lstat().st_mtime_ns
+    p = pipeline(work, "--trimmed-corrected-reads", reads=reads)
+    quiet(p.use_corrected_reads)
+    check(p.cor1().lstat().st_mtime_ns == linked, "a plain resume remade the cor1 link")
+    (work / "a1.fq").write_text(FASTQ * 2)
+    age(work / "a1.fq", 3600)  # different reads, still older than the link
+    p = pipeline(work, "--trimmed-corrected-reads", reads=reads)
+    quiet(p.use_corrected_reads)
+    check(p.cor1().lstat().st_mtime_ns > linked, "read1 replaced in place but cor1 was not relinked")
+
+
 def check_trinity_dir(tmp):
     work = tmp / "trinity"
     p = pipeline(work)
@@ -276,6 +298,7 @@ def main():
                          ("settings_stamp", check_settings_stamp),
                          ("reads_stamp", check_reads_stamp),
                          ("corrected_relink", check_corrected_relink),
+                         ("corrected_resume", check_corrected_resume),
                          ("trinity_dir", check_trinity_dir), ("chowder_ids", check_chowder_ids),
                          ("chowder_order", check_chowder_order),
                          ("strand_exam", check_strand_exam)):

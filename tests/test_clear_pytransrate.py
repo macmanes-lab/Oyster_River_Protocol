@@ -7,7 +7,9 @@ A pyTransRate -o with a finished snap index, a complete BAM, its salmon
 quant and logs. Cleared for a retry against the same assembly, all of it is
 kept. Cleared after the assembly was rewritten (a re-filter), the index, BAM
 and quant go -- they were built from the old assembly -- and logs and the
-index lock stay. Exits non-zero on a failure.
+index lock stay. Cleared after the reads changed under an unchanged assembly,
+the BAM, its read count and quant go and the index stays. Exits non-zero on a
+failure.
 """
 
 import os
@@ -30,6 +32,9 @@ def check(cond, msg):
 
 def build(tmp):
     tmp = Path(tmp)
+    for r in ("r1.fq", "r2.fq"):
+        (tmp / r).write_text("@r\nACGT\n+\nIIII\n")
+        os.utime(tmp / r, (time.time() - 7200,) * 2)
     assembly = tmp / "run.ORP.fasta"
     assembly.write_text(">a\nACGT\n>b\nACGT\n")
     old = time.time() - 3600
@@ -57,7 +62,7 @@ def build(tmp):
 
 with tempfile.TemporaryDirectory() as tmp:
     assembly, out = build(tmp)
-    Pipeline.clear_pytransrate_outdir(out, assembly)
+    Pipeline.clear_pytransrate_outdir(out, assembly, (Path(tmp) / "r1.fq", Path(tmp) / "r2.fq"))
     for name in ("run.ORP", "reads.bam", "reads.bam.align.done", "salmon", "logs",
                  "run.ORP.index.lock", "r1-r2-read_count.txt"):
         check((out / name).exists(), f"retry against the same assembly keeps {name}")
@@ -71,6 +76,16 @@ with tempfile.TemporaryDirectory() as tmp:
         check(not (out / name).exists(), f"a newer assembly clears {name}")
     for name in ("logs", "run.ORP.index.lock"):
         check((out / name).exists(), f"a newer assembly keeps {name}")
+
+with tempfile.TemporaryDirectory() as tmp:
+    assembly, out = build(tmp)
+    # A resumed run given different reads: same assembly, same filenames.
+    (Path(tmp) / "r1.fq").write_text("@r\nTTTT\n+\nIIII\n" * 2)
+    Pipeline.clear_pytransrate_outdir(out, assembly, (Path(tmp) / "r1.fq", Path(tmp) / "r2.fq"))
+    for name in ("reads.bam", "reads.bam.align.done", "salmon", "r1-r2-read_count.txt"):
+        check(not (out / name).exists(), f"newer reads clear {name}")
+    for name in ("run.ORP", "logs", "run.ORP.index.lock"):
+        check((out / name).exists(), f"newer reads keep {name}")
 
 if failures:
     print(f"{len(failures)} failure(s)")
