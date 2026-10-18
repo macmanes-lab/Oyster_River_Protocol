@@ -25,6 +25,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import textwrap
 import threading
 import time
 import concurrent.futures
@@ -1920,6 +1921,13 @@ class Pipeline:
         print(f"                 '-.___________.-'         version {self.version}")
         print("                     '-.___.-'")
         print("    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + RESET + "\n")
+        # The same quoted line the timing log opens with, on screen too, so a
+        # slurm .out is enough to see (and repeat) exactly what was run.
+        print(textwrap.fill(
+            self.run_cmd, width=78, break_long_words=False, break_on_hyphens=False,
+            initial_indent="    command   ", subsequent_indent=" " * 14,
+        ))
+        print(f"    workdir   {Path.cwd()}\n")
 
     def readcheck(self):
         if not self.read1.exists():
