@@ -20,9 +20,7 @@ and the README no longer says 5.0. Not tagged yet. Before tagging `4.1.0`:
   assembly_eval quoting, twotrack's 20-subject cap, strandeval threads
   (changelog Fixes; `tests/test_run_integrity.py`).
   `tests/test_twotrack_select.py` passed on Premise in the orp env (real
-  blastn). Still unexercised: the new samtools sort line (no `samtools
-  view`, `-m 512M`) -- the full tier's `strandeval_standalone` and every
-  full run's strandeval step cover it.
+  blastn), and the full tier (job 1323780) passed with them.
 - ~~**Fix:** `--inchworm_cpu 10` hard-coded.~~ Not a real bug: Trinity
   2.15.2 caps `--inchworm_cpu` at `--CPU` itself (`Trinity` l.1232), so
   Inchworm never oversubscribed. ORP now passes `min(cpu, 10)` anyway so the
@@ -30,8 +28,11 @@ and the README no longer says 5.0. Not tagged yet. Before tagging `4.1.0`:
   `trinity_inchworm_cpu`).
 - **Test:** one `make` against a real conda on Premise (conda module) and
   one in a fresh container. The dev32 Makefile was only tested with stubs.
-- **Test:** `tests/release_check.sbatch` full tier on the final commit.
-  The quick tier passes on the laptop (9 pass, 1 skip without conda).
+- ~~**Test:** `tests/release_check.sbatch` full tier on the final commit.~~
+  Done: job 1323780 (submitted 2026-10-17) on Premise (node139), all tiers 25/25 on
+  e88d037, in `~/orp_release_check_410`. The strandeval steps ran the new
+  `samtools sort -@ N -m 512M` line with no `samtools view` before it. A
+  later code change needs another run; this NOTES edit doesn't.
 - **Test:** `--min-cov auto` end to end on real data.
 - **Test:** the dev29 phase 2 grow fix (`clear_unfinished_trinity_components`)
   on the cluster; the three dev26 runs it would have saved weren't re-run.
