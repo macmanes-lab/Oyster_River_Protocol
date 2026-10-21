@@ -1,7 +1,8 @@
 # ORP development notes, 2026-08-16 to 2026-10-17
 
 The dated working notes from the 3.0.0, 3.1.0, 4.0 and 4.1.0 development
-cycles, moved out of `NOTES.md` unchanged on 2026-10-17. Code comments,
+cycles, moved out of `NOTES.md` unchanged on 2026-10-17. The release prepared as 4.1.0 was
+tagged 4.0.0 instead (2026-10-21), so "4.0" and "4.1" below are development builds. Code comments,
 `experiments/` and `docs/` cite entries here by date (e.g. "notes-archive.md
 2026-10-12"). Newest on top. Mentions of "NOTES.md" below mean this file.
 

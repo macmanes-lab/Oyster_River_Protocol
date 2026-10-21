@@ -1,16 +1,29 @@
 ### CHANGELOG
 
-ORP Version 4.1.0 <- 4.0.1
+ORP Version 4.0.0 <- 3.1.0
 
-**The assembly this pipeline produces changes in this release**, in four
-ways: how the four assemblies are merged, which rnaSPAdes assemblies go in,
-a coverage filter that is now on by default, and a fixed strand exam. A 4.1
-`.ORP.fasta` and quality report are not comparable with a 4.0 one. The
-entries for each development build (4.0.1-dev2 to 4.1.0-dev32) are in this
-file's git history, e.g. `git show 3baf110:changelog.md`.
+**The assembly this pipeline produces changes in this release**, in five
+ways: the contig scorer, how the four assemblies are merged, which rnaSPAdes
+assemblies go in, a coverage filter that is now on by default, and a fixed
+strand exam. A 4.0.0 `.ORP.fasta` and quality report are not comparable with
+a 3.x one.
+
+This release was developed as 4.0.0 (the pyTransRate swap, merged
+2026-09-17), 4.0.1, and 4.0.1-dev2 to 4.1.0-dev32, none of them tagged. It
+was prepared as 4.1.0 and renumbered 4.0.0 before tagging, since no 4.0
+release came before it. The two first builds' entries are kept below this
+section; every development build's entry is in this file's git history,
+e.g. `git show 3baf110:changelog.md`. Where those entries say "4.0", they
+mean the first 4.0.0 build, which still merged by OrthoFinder orthogroup.
 
 Changes to the assembly
 
+- **pyTransRate replaces the bundled Ruby `orp-transrate`**, for both the
+  pooled contig scoring and the final assembly score (pinned in
+  `orp_env.yml`; salmon goes from 2.5.1 to 2.7.0 with it). The score
+  formulas are the Ruby's, but their inputs changed, so contig scores move
+  and reorder, and the `PYTRANSRATE SCORE` lines are on a new scale. See
+  the first 4.0.0 build's entry below.
 - **The assemblies are merged by Swiss-Prot gene, not by OrthoFinder
   orthogroup** (`oyster.py`, `chowder.py`, new step `twotrack_select`,
   `scripts/twotrack_select.py`). Contigs with a Swiss-Prot hit are grouped by
@@ -18,12 +31,12 @@ Changes to the assembly
   longest contig whose hit covers close to the best fraction of the protein
   -- plus up to two copies that are distinct from it and expressed
   (>= 1 TPM). Contigs without a hit are deduplicated with cd-hit-est on both
-  strands and left to the coverage filter. Why: in 4.0 the orthogroups did
-  not line up with genes. Some split one gene (the extra duplicated BUSCOs),
+  strands and left to the coverage filter. Why: the orthogroups did not
+  line up with genes. Some split one gene (the extra duplicated BUSCOs),
   others mixed several (keeping one member lost the rest), and since the
   OrthoFinder 3.1.5 upgrade `-d` silently searched DNA with diamond blastp on
   one strand. On 10 test samples the gene-based merge cut duplicated BUSCOs
-  by about 90% against 4.0 with complete BUSCOs unchanged and more unique
+  by about 90% against the OrthoFinder merge with complete BUSCOs unchanged and more unique
   genes (`experiments/redundancy/README.md`).
 - **The OrthoFinder merge is gone.** `--merge-method`,
   `--orthofinder-searches`, `--orthofinder-analysis` and the hidden
@@ -40,15 +53,15 @@ Changes to the assembly
   `<run>.spades{auto,high}.fasta` and the report lines `UNIQUE GENES
   SPADESAUTO`/`SPADESHIGH`; a run directory holding the old
   `spades55`/`spades75` files is not reused. On 9 test samples: 983 complete
-  BUSCOs against 956 for 4.0, duplicated 148 against 324, 2.6% more unique
+  BUSCOs against 956 for k=55/75, duplicated 148 against 324, 2.6% more unique
   genes, pyTransRate 0.481 against 0.471.
 - **Contigs without a Swiss-Prot hit are filtered by coverage by default**
   (`--min-cov`, default `auto`). A no-hit contig needs coverage (salmon
   NumReads x mean fragment length / contig length) of at least
   `max(1, 2 x (pairs / 60M) ^ 0.85)`, where pairs is the trimmed and
   corrected read pairs salmon quantified: 1 up to about 27M pairs, 2 at 60M,
-  3.6 at 120M, 11.7 at 480M. In 4.0 nothing was filtered unless
-  `--tpm-filt` was given. Coverage rather than TPM because a fixed TPM
+  3.6 at 120M, 11.7 at 480M. Through 3.1.0 nothing was filtered
+  unless `--tpm-filt` was given. Coverage rather than TPM because a fixed TPM
   cutoff asked for 4-183 reads per kb across 119 assemblies, mostly
   following depth; the depth scaling comes from nested subsamples of two
   deep libraries (`experiments/dynamic_cov/`). `--min-cov` also takes a
@@ -98,6 +111,11 @@ Speed and scheduling
 
 New options and tools
 
+- **`chowder.py`** merges assemblies you already have: two or more
+  transcriptomes and the read pair they were built from go through
+  everything `oyster.py` does after its assemblers, with the same code.
+- **`--pytransrate-args`** (`oyster.py`, `chowder.py`) appends extra
+  arguments to both pyTransRate runs, as one quoted string.
 - **`assembly_eval.py`**: scores any assembly against its reads with
   pyTransRate, BUSCO and the strand exam, without running ORP. Resumes, and
   is documented in the README.
@@ -135,6 +153,12 @@ Renamed outputs (scripts that read run directories)
 
 Fixes
 
+- **`--mem` reaches pyTransRate** as `--max-memory`, so its read-metrics
+  workers are capped against the run's budget rather than the node's free
+  memory (a 5.8 Gbp merge was OOM-killed asking for 928 GB).
+- **A finished, cleaned-up run is a no-op on re-invocation**
+  (`already_complete()`), and Trinity no longer re-runs both phases on a
+  resume after `--full_cleanup` removed its checkpoint.
 - **A step that dies partway is re-run on resume.** Trimmomatic, rcorrector
   and diamond write as they go, so a killed step left a truncated file that
   looked finished and the next run built on it (with rcorrector, an
@@ -197,6 +221,8 @@ Fixes
 
 Install
 
+- **Preflight refuses a pytransrate older than 2.2.1** and prints the
+  version it found.
 - **`make` works with a conda that is already installed.** Every target
   finds conda at run time (the one on `PATH`, else the bundled one) and goes
   through `conda run`; an existing conda is never updated or reconfigured,
@@ -210,7 +236,7 @@ Install
 - The step-timing table and cleanup's file list are written to the timing
   log and `reports/<run>.cleanup.done`, not printed at the end of a run.
 
-ORP Version 4.0.1 <- 4.0.0
+4.0.0 development build: 4.0.1 (never tagged)
 
 **No change to the assembly or to any score.** Two fixes about the
 read-metrics step surviving a real merge, and one about knowing which
@@ -241,7 +267,7 @@ pytransrate produced a log.
   way to refuse to start.
 
 
-ORP Version 4.0.0 <- 3.1.0
+4.0.0 development build: the first 4.0.0 (the pyTransRate swap, merged 2026-09-17; never tagged)
 
 **The assembly this pipeline produces changes in this release.** The new scorer computes the four score components, the contig score and the assembly score from the same formulas as the Ruby, but its inputs changed, so contig scores move and -- more importantly -- reorder. `makeorthout` keeps the highest-scoring member of each orthogroup, so that reordering reaches the assembled `.ORP.fasta` itself, not just the reported number: 14.5-19% of contig pairs order oppositely across the boundary. The `TRANSRATE SCORE` lines in `reports/qualreport.<run>` are not comparable to any earlier ORP release's, and the `transrate` entry in `sampledata/benchmarks.md` needs a fresh baseline. pytransrate's `scripts/compare_orthogroup_picks.py` measures exactly which orthogroups change representative between two runs.
 

@@ -94,12 +94,12 @@ Output goes to `--outdir` (default `./<runout>_eval`):
 
 ### How the assemblies are merged
 
-From 4.1.0 the four assemblies are merged by Swiss-Prot gene, not by OrthoFinder orthogroup:
+From 4.0.0 the four assemblies are merged by Swiss-Prot gene, not by OrthoFinder orthogroup:
 
 - **Contigs with a Swiss-Prot hit** are grouped by the gene of their best hit -- the same gene names the qualreport's UNIQUE GENES counts. Each gene keeps one representative (the longest of the contigs whose hit covers close to the best fraction of the protein), plus up to two more copies that are both distinct from it (it covers under half of them) and expressed (at least 1 TPM): other isoforms, paralogs under the same name.
 - **Contigs without a hit** are deduplicated with cd-hit-est on both strands, and the expression filter (`--tpm-filt`, `--min-cov`) later drops those below threshold.
 
-Everything after that -- the diamond rescue, cd-hit-est, salmon, BUSCO, pyTransRate -- works as before; the expression filter is now a coverage filter, described below. On 10 test samples this cut duplicated BUSCOs by about 90% against ORP 4.0 while keeping complete BUSCOs and raising unique genes; the experiments behind it are in `experiments/redundancy/`. The OrthoFinder merge ORP used through 4.0 was removed in 4.1, so a 4.1 assembly is not directly comparable with a 4.0 one.
+Everything after that -- the diamond rescue, cd-hit-est, salmon, BUSCO, pyTransRate -- works as before; the expression filter is now a coverage filter, described below. On 10 test samples this cut duplicated BUSCOs by about 90% against the OrthoFinder merge while keeping complete BUSCOs and raising unique genes; the experiments behind it are in `experiments/redundancy/`. The OrthoFinder merge ORP used through 3.1.0 is gone, so a 4.0.0 assembly is not directly comparable with a 3.x one.
 
 ### Parallel task management
 
@@ -152,7 +152,7 @@ After salmon quantifies the merged assembly, contigs **without a Swiss-Prot hit*
 - **`--min-cov`** (default `auto`): coverage, salmon's NumReads x mean fragment length / contig length -- the average number of read-pair fragments over each base of the contig. `auto` picks the threshold from sequencing depth (below); a number is used as given.
 - **`--tpm-filt`** (default `0`, off): TPM.
 
-Before 4.1.0 nothing was filtered unless you gave `--tpm-filt` (1 was the usual value); now coverage is filtered by default. Coverage rather than TPM because TPM is a share of a million, so a fixed TPM cutoff means something different in every library: across the 119 final assemblies of the 108-sample test set, 1 TPM was anywhere from 4 to 183 reads per kb, mostly following sequencing depth. On a deep library `--tpm-filt 1` removes far more than intended (on a 451M-read tuco library, 1 TPM is 41x coverage, and it removed 91% of the contigs without a hit); on a shallow one it removes almost nothing. TPM also divides by salmon's effective length, which lets a short contig pass on a couple of reads. Coverage means the same thing in every library.
+Through 3.1.0 nothing was filtered unless you gave `--tpm-filt` (1 was the usual value); now coverage is filtered by default. Coverage rather than TPM because TPM is a share of a million, so a fixed TPM cutoff means something different in every library: across the 119 final assemblies of the 108-sample test set, 1 TPM was anywhere from 4 to 183 reads per kb, mostly following sequencing depth. On a deep library `--tpm-filt 1` removes far more than intended (on a 451M-read tuco library, 1 TPM is 41x coverage, and it removed 91% of the contigs without a hit); on a shallow one it removes almost nothing. TPM also divides by salmon's effective length, which lets a short contig pass on a couple of reads. Coverage means the same thing in every library.
 
 **`--min-cov auto` scales the threshold with sequencing depth.** The same share of noise fragments becomes more coverage the deeper you sequence: on the 451M-read tuco library a fixed `--min-cov 2` removed only 10% of the no-hit contigs. So `auto` (the default) counts the read pairs salmon quantified -- the trimmed and corrected reads, never Trinity's normalized ones -- and applies
 

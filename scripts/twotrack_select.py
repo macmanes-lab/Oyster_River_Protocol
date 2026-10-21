@@ -5,7 +5,7 @@
 #           [--sprot uniprot_sprot.fasta] [--table selection.tsv] [--threads N]
 #
 #The two-track merge, which replaces OrthoFinder plus the per-orthogroup pick
-#(ORP 4.1.0). It writes the list of pooled contigs (pool.fasta) to carry
+#(ORP 4.0.0). It writes the list of pooled contigs (pool.fasta) to carry
 #forward, in the format of makeorthout's good.<run>.list, so everything
 #downstream -- the diamond rescue, cd-hit-est, salmon and the TPM filter --
 #runs unchanged.
@@ -14,7 +14,7 @@
 #(each part keeps a contig: the duplicated BUSCOs), others mix several genes
 #(keeping one member drops the rest: the lost genes). Grouping by swissprot
 #gene makes the groups the very thing BUSCO and UNIQUE GENES count. Tested on
-#10 samples against ORP 4.0 (experiments/redundancy/README.md).
+#10 samples against the OrthoFinder merge (experiments/redundancy/README.md).
 #
 #Track 1, contigs with a swissprot hit (ORP's per-assembly diamond blastx). A
 #contig belongs to the gene of its best hit (highest bitscore), the gene being

@@ -2,14 +2,15 @@
 
 Cross-machine scratchpad so a session on either machine can pick up where
 the other left off. Keep entries short; newest on top. Delete/trim once
-stale. The dated history through the 4.1.0 release prep is in
+stale. The dated history through the 4.0.0 release prep (prepared as 4.1.0) is in
 [docs/notes-archive.md](docs/notes-archive.md); code comments cite its
 entries by date.
 
-## 4.1.0 release checklist (2026-10-17)
+## 4.0.0 release checklist (2026-10-17, renumbered 2026-10-21)
 
-`version.txt` reads 4.1.0, the changelog has one condensed 4.1.0 section,
-and the README no longer says 5.0. Not tagged yet. Before tagging `4.1.0`:
+Prepared as 4.1.0, then renumbered 4.0.0 on 2026-10-21 because no 4.0 was
+ever tagged: `version.txt` reads 4.0.0 and the changelog has one 4.0.0 <- 3.1.0
+section. Before tagging `4.0.0`:
 
 - ~~**Fix:** chowder ignores a changed `--seed`/`--assembly-order` on resume.~~
   Fixed with the release review's resume findings: `ingest` now takes
@@ -36,7 +37,7 @@ and the README no longer says 5.0. Not tagged yet. Before tagging `4.1.0`:
 - **Test:** `--min-cov auto` end to end on real data.
 - **Test:** the dev29 phase 2 grow fix (`clear_unfinished_trinity_components`)
   on the cluster; the three dev26 runs it would have saved weren't re-run.
-- Then tag `4.1.0` on that commit.
+- Then tag `4.0.0` on that commit.
 
 ## Premise ops
 
