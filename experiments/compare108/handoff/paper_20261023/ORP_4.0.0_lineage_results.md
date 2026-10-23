@@ -108,6 +108,19 @@ Best single assembler, by metric: completeness rnaSPAdes auto-k 34, Trinity 24, 
 
 Exceptions on completeness: ORP is beaten in four runs, each by 0.4 points or less and each by an assembly two to five times more duplicated: *Nicotiana tabacum* (Trinity 97.6% vs 97.4%; D 88.2% vs 30.0%), *Avena sativa* (Trinity 91.8% vs 91.6%; D 78.3% vs 15.7%), *Echinogammarus veneris* (rnaSPAdes auto-k 53.9% vs 53.7%; D 12.2% vs 5.1%) and GAGE (Trinity 32.4% vs 32.0%; D 13.0% vs 2.9%). It ties Trinity on *Kerria lacca* (88.3%; D 57.1% vs 15.0%) and *Heterorhabditis indica* (93.0%; D 74.5% vs 29.6%). Trans-ABySS recovers more genes than ORP in *Patiria miniata* (+134) and *Anopheles gambiae* (+77).
 
+### Genes missing from the ORP count (merge trace, 59 runs; S1 sheet Gene_masking)
+
+Genes among some component's DIAMOND hits but not ORP's: median 798 per run (155–1,821), 45,699 in all. Decision (2026-10-23): report as a property of the gene count, not a merge bug.
+
+| Cause | Genes | Share |
+|---|---|---|
+| Masked: sequence inside an ORP contig whose best hit beats the gene's by >10% (--top 0.1) | 35,426 | 78% |
+| Inside an ORP contig with no hit (marginal hit fails -e 1e-8 on the longer query) | 1,718 | 4% |
+| Inside an ORP contig, gene within 10% but not reported (unresolved) | 3,231 | 7% |
+| No ORP match at ≥95% identity over ≥90% of the contig (upper bound on sequence lost) | 5,324 | 12% |
+
+No match per run: median 77 (9–303); land plants median 149, other groups 16–80; *Avena sativa* 267 (second of 59, after ERR1016675 at 303). *P. miniata*: 1,094 of 1,329 masked, 91 no match. *A. gambiae*: 963 of 1,136 masked, 88 no match. Two-track selection keeps every best-hit gene; the removal is the final cd-hit-est -c .98, which clusters across genes. BUSCO side of the trace (1,061 BUSCOs complete in a component, F/M in ORP: 79% copy_selection, 20% seq_present, 12 gene_dropped, 3 nohit_path) is not yet written into the draft.
+
 ### Land plants and polyploidy
 
 In all 14 land plants ORP recovered more distinct genes than any component, and it was the most complete assembly in 12 and within 0.2 points in the other two (*A. sativa*, *N. tabacum*). Concordant mapping trailed the best single assembler by 15.5 points in *Avena sativa* (79.2% vs 94.7%, rnaSPAdes high-k), 8.7 in *Brassica juncea*, 5.0 in *Musa* ABB and 4.8 in *Nicotiana tabacum*, against a median of 3.0 across plants and 0.8 outside them. Outside plants the largest gap is *Stegodyphus mimosarum* (7.3). Trinity and rnaSPAdes are 51–91% duplicated in *B. juncea*, *N. tabacum* and *A. sativa*; Trans-ABySS stays at 3.7–11.0% with the weakest read support (60.4% good mappings in *B. juncea*). The diploid *Thlaspi arvense* is 24.4% duplicated (Trinity and rnaSPAdes 56–73%). The four plants added in this round (*Vigna*, *Cephalotus*, *Hevea*, *Aeginetia*) fit the same pattern at lower amplitude (gaps 1.6–3.4 points; ORP duplication 10.5–23.9%).
@@ -128,4 +141,5 @@ Median 7.1 h wall (IQR 4.7–11.3; range 2.1–33.5), median peak memory 46 GB (
 - Rename "ORP version 5" / "ORP v5" in the handoff figure and workbook; the Figure 1 here already reads 4.0.0.
 - Decide whether Trinity normalization should stay off by default (+8% wall time, no quality gain).
 - Optional: rerun the merge on the polyploid plants with a higher per-gene copy cap (twotrack_select.py --max-per-gene, default 3).
+- Resolved 2026-10-23: genes missing from the ORP count are reported as a property of the count (Section 4.3, Table 2 caption, polyploid paragraph, S1 sheet Gene_masking).
 - Resolved: previous assemblies rescored with pyTransRate 2.2.2; v4.0.0 tag is b9459aa, functionally identical to e88d037.
