@@ -26,6 +26,10 @@ case "${1:-}" in
 submit)
     [ "$(grep -c . "$RUNS/manifest.tsv")" -eq 59 ] || {
         echo "$RUNS/manifest.tsv does not have 59 lines; lines 51-59 must be the nine orp_ additions" >&2; exit 1; }
+    # Two copies of either array run the same samples in the same directories
+    # and wreck each other's files (2026-10-23: 1325601/1325631, 1325602/1325632).
+    queued=$(squeue -u "$USER" -h -o '%i %j' | grep -E ' (orp_dev30set|orp_trace)$' || true)
+    [ -z "$queued" ] || { echo "already queued or running, not submitting again:" >&2; echo "$queued" >&2; exit 1; }
     mkdir -p "$COMPARE/dev30_settings/logs" "$RUNS/merge_trace/logs"
     sbatch "$HERE/orp_dev30set.sbatch"
     sbatch "$HERE/trace_merge_losses.sbatch"
