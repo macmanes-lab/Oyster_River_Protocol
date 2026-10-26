@@ -18,7 +18,7 @@ Rebuilt 2026-10-23 from the compare108 handoff (experiments/compare108/handoff/)
 | ORP vs ORP 2018: read support | good mappings 89.6% vs 88.9% (higher in 9/15, q = 0.85); optimal score lower in 10/15 (q = 0.36) |
 | ORP vs best single assembler (59 runs) | more complete in 53 (2 ties), more genes in 57; pyTransRate score higher in only 20 |
 | Run time (ORP 4.0.0) | median 7.1 h wall (IQR 4.7–11.3; range 2.1–33.5), 46 GB median peak; 32 cores, 190 GB allocated |
-| dev30 vs 4.0.0 (first 50 datasets) | BUSCO complete within 0.4 points; total wall time 409 → 442 h (+8%) |
+| Normalization on + `--min-cov 2` vs 4.0.0 (59 datasets) | BUSCO complete within 0.4 points; total wall time 498 → 540 h (+9%) |
 
 ## What changed since 21 October
 
@@ -125,9 +125,9 @@ No match per run: median 77 (9–303); land plants median 149, other groups 16�
 
 In all 14 land plants ORP recovered more distinct genes than any component, and it was the most complete assembly in 12 and within 0.2 points in the other two (*A. sativa*, *N. tabacum*). Concordant mapping trailed the best single assembler by 15.5 points in *Avena sativa* (79.2% vs 94.7%, rnaSPAdes high-k), 8.7 in *Brassica juncea*, 5.0 in *Musa* ABB and 4.8 in *Nicotiana tabacum*, against a median of 3.0 across plants and 0.8 outside them. Outside plants the largest gap is *Stegodyphus mimosarum* (7.3). Trinity and rnaSPAdes are 51–91% duplicated in *B. juncea*, *N. tabacum* and *A. sativa*; Trans-ABySS stays at 3.7–11.0% with the weakest read support (60.4% good mappings in *B. juncea*). The diploid *Thlaspi arvense* is 24.4% duplicated (Trinity and rnaSPAdes 56–73%). The four plants added in this round (*Vigna*, *Cephalotus*, *Hevea*, *Aeginetia*) fit the same pattern at lower amplitude (gaps 1.6–3.4 points; ORP duplication 10.5–23.9%).
 
-## Settings: dev30 vs 4.0.0 (first 50 datasets)
+## Settings: normalization and fixed `--min-cov 2` vs 4.0.0 (59 datasets)
 
-Unchanged; dev30 was run only on the original 50. Trinity normalization on and fixed `--min-cov 2` in dev30. BUSCO completeness moved at most 0.4 points; unique genes −24 to +72; pyTransRate score median −0.005. Trinity time 291 → 343 h and total wall time 409 → 442 h (+8%; longer in 39 of 50). On the nine of those libraries above 60 million read pairs the depth-scaled filter (2.1–5.6) removed up to 35% of contigs with BUSCO within 0.2 points.
+Now all 59. The comparison run has Trinity normalization on and a fixed `--min-cov 2`; for the first 50 it is the dev30 build, for the nine ORP 2018 additions it is the 4.0.0 release with those two settings (job 1325601, 2026-10-23; column `dev30-settings run` in S1). BUSCO completeness moved at most 0.4 points (median 0.0); unique genes −43 to +72; pyTransRate score −0.036 to +0.008, median −0.004, lower with the release in 46 of 59. Where the depth-scaled threshold was below 2 (44 libraries, 1–1.96) the release kept 1–23% more contigs (median 3.6%); where it was 2.09–5.58 (15) it removed 1–35% in 14 of them (median 3.6%; *Mus musculus* 35%, *Anopheles* 33%, *Thlaspi* 25%) and kept 0.5% more in *Entamoeba*, with BUSCO within 0.4 points. Trinity time 347 → 419 h (+21%; longer in 49 of 59), total wall time 498 → 540 h (+9%; longer in 48), CPU-hours 9,891 → 11,418 (+15%; longer in 49). The first 50 alone reproduce the previous numbers (genes −24 to +72, score lower in 41 of 50, Trinity 291 → 343 h, wall 409 → 442 h). Source: `lineage_410/settings_dev30_vs_400.csv` and `settings_summary.txt` from `submit_dev30set_trace.sh collect`.
 
 ## Run time (ORP 4.0.0, 32 cores, 59 runs)
 
@@ -139,7 +139,8 @@ Median 7.1 h wall (IQR 4.7–11.3; range 2.1–33.5), median peak memory 46 GB (
 - Restore bases-uncovered and low-coverage-contig columns for the rescored previous assemblies if the paper should keep those two metrics.
 - CPU-hours and per-step times for the 9 new runs (sacct for job 1324733) if the paper reports CPU-hours.
 - Rename "ORP version 5" / "ORP v5" in the handoff figure and workbook; the Figure 1 here already reads 4.0.0.
-- Decide whether Trinity normalization should stay off by default (+8% wall time, no quality gain).
+- Decide whether Trinity normalization should stay off by default (off costs +9% wall time and +15% CPU-hours over 59 datasets, no quality gain).
+- Resolved 2026-10-26: Section 4.4 and S1 sheet Settings_dev30_vs_400 now cover all 59 datasets.
 - Optional: rerun the merge on the polyploid plants with a higher per-gene copy cap (twotrack_select.py --max-per-gene, default 3).
 - Resolved 2026-10-23: genes missing from the ORP count are reported as a property of the count (Section 4.3, Table 2 caption, polyploid paragraph, S1 sheet Gene_masking).
 - Resolved: previous assemblies rescored with pyTransRate 2.2.2; v4.0.0 tag is b9459aa, functionally identical to e88d037.

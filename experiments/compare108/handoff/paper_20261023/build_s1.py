@@ -142,9 +142,9 @@ rt = pd.DataFrame({"Pair": o.pair_id, "Organism": o.organism, "Group": o.group, 
 extra = [x for x in oldrt.columns if x.endswith("(h)") and x != "Wall time (h)"] + ["CPU-hours", "Node"]
 rt = rt.join(oldrt[extra], on="Pair").sort_values("Wall time (h)")
 
-# ---- Settings (dev30 vs 4.0.0): unchanged, first 50 datasets only
-sett = pd.read_excel(oldwb, sheet_name="Settings_dev30_vs_410")
-sett.columns = [x.replace("4.1.0", "4.0.0") for x in sett.columns]
+# ---- Settings (dev30 vs 4.0.0): all 59, from settings_compare.py (copy its
+# settings_dev30_vs_400.csv from lineage_410/ into the handoff directory)
+sett = pd.read_csv(f"{hd}/settings_dev30_vs_400.csv")
 
 # ---- headline numbers
 h = o.orp_hours
@@ -171,7 +171,7 @@ readme = pd.DataFrame([
     ("Unique genes", "Distinct Swiss-Prot gene names among DIAMOND blastx hits (E ≤ 1e-8, --top 0.1), counted as ORP counts them."),
     ("Statistics", "Two-sided Wilcoxon signed-rank tests on paired values; Benjamini-Hochberg q within each Table 1 panel (11 metrics) or within each assembler (11 metrics)."),
     ("Values", "All cells are values computed in Python."),
-    ("Sheets", "Summary; Table1a; Table1b; Datasets; Groups; ORP_vs_assembler; ORP_vs_best_single; Components; Settings_dev30_vs_400 (first 50 datasets only); RunTime (per-step hours and CPU-hours for the first 50 only)."),
+    ("Sheets", "Summary; Table1a; Table1b; Datasets; Groups; ORP_vs_assembler; ORP_vs_best_single; Components; Settings_dev30_vs_400 (Section 4.4, all 59 datasets: ORP 4.0.0 against a run with read normalization on and a fixed --min-cov 2; column 'dev30-settings run' says whether that run was the dev30 build (first 50) or ORP 4.0.0 with those two settings (last nine)); RunTime (per-step hours and CPU-hours for the first 50 only)."),
     ("Known caveats", "tsa_GAGE reads are Apiospora malaysiana (ascomycete) but both assemblies were scored against agaricales_odb12.2. TSA assemblies are curated (no contigs < 200 bp). tsa_GAQK excluded (R2 reads 62 bp)."),
 ], columns=["Item", "Detail"])
 

@@ -1,0 +1,12 @@
+wrote 59 rows to settings_dev30_vs_400.csv
+
+Section 4.4 numbers (n = 59)
+  BUSCO complete: max |diff| 0.4, median 0.0
+  unique genes: -43 to +72
+  pyTransRate score: -0.036 to +0.008, median -0.004, lower in 46 of 59
+  threshold < 2: 44 libraries, contigs +1% to +23% (median +3.6%), max |BUSCO diff| 0.4, thresholds 1-1.96
+  threshold >= 2: 15 libraries, contigs -35% to +1% (median -3.6%), max |BUSCO diff| 0.4, thresholds 2.09-5.58
+  Trinity time (h): total 347 -> 419 h (+21%), longer in 49 of 59
+  Total wall time (h): total 498 -> 540 h (+9%), longer in 48 of 59
+  CPU-hours: total 9891 -> 11418 h (+15%), longer in 49 of 59
+  rows by dev30-settings run: dev30 build 50, 4.0.0 with dev30 settings 9

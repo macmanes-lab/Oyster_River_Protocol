@@ -41,7 +41,9 @@ collect)
     # dev30 metrics for the first 50 (keep an existing table if there is one)
     [ -s dev30_metrics.csv ] || python3 "$HERE/collect_lineage410.py" \
         --runs '$COMPARE/orp_{group}' --runout-tag v4_1_0-dev30 -o dev30_metrics.csv
-    python3 "$HERE/collect_lineage410.py" --runs '$COMPARE/dev30_settings' -o dev30set_metrics.csv
+    # 1325631, a duplicate of 1325601, rewrote the per-sample logs (2026-10-23)
+    python3 "$HERE/collect_lineage410.py" --runs '$COMPARE/dev30_settings' \
+        --slurm-array "${DEV30SET_JOB:-1325601}" -o dev30set_metrics.csv
     python3 "$HERE/settings_compare.py" --release lineage410_metrics.csv \
         --dev30 dev30_metrics.csv --dev30set dev30set_metrics.csv \
         -o settings_dev30_vs_400.csv 2>&1 | tee settings_summary.txt

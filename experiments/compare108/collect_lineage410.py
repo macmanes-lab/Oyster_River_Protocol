@@ -265,13 +265,16 @@ def main():
     ap.add_argument("--orig-unique-genes", type=Path, default=compare / "orig_unique_genes")
     ap.add_argument("--pairs", type=Path, default=compare / "pairs")
     ap.add_argument("--no-sacct", action="store_true", help="skip the sacct lookups")
+    ap.add_argument("--slurm-array", default=None,
+                    help="take each run's Slurm job as <this>_<manifest line> instead of "
+                         "from its task log, for when a duplicate array rewrote the logs")
     ap.add_argument("-o", "--out", type=Path, default=Path("lineage410_metrics.csv"))
     args = ap.parse_args()
 
     runs_template = args.runs.replace("$COMPARE", str(compare))
     records, tr_cols, problems = [], [], []
 
-    for line in args.manifest.read_text().splitlines():
+    for lineno, line in enumerate(args.manifest.read_text().splitlines(), 1):
         if not line.strip():
             continue
         pair, orig_fasta, r1, r2, srr, group, lineage = line.split("\t")
@@ -302,6 +305,8 @@ def main():
 
         notes = []
         rec.update(read_task_log(runs / "logs" / f"{srr}.log"))
+        if args.slurm_array:
+            rec["slurm_job"] = f"{args.slurm_array}_{lineno}"
         rec.update(read_qualreport(reports / f"qualreport.{runout}"))
         rec.update(read_timing(reports / f"{runout}.timing.log"))
         rec.update(read_filter_candidates(reports / f"{runout}.filter_candidates.tsv"))

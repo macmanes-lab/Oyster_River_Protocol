@@ -39,6 +39,14 @@ def load(path):
         return {r["pair_id"]: r for r in csv.DictReader(fh)}
 
 
+def finished(r):
+    """True when the ORP run finished; notes about the original (published)
+    assembly, such as 'no original pytransrate', do not matter here."""
+    notes = (r or {}).get("status", "")
+    return notes == "complete" or (bool(notes) and all(
+        n.strip().startswith("no original") for n in notes.split(";")))
+
+
 def num(x):
     try:
         return float(x)
@@ -57,9 +65,9 @@ def main():
 
     rows, missing = [], []
     for pair, r in rel.items():
-        if d30.get(pair, {}).get("status") == "complete":
+        if finished(d30.get(pair)):
             dev, src = d30[pair], "dev30 build"
-        elif d30s.get(pair, {}).get("status") == "complete":
+        elif finished(d30s.get(pair)):
             dev, src = d30s[pair], "4.0.0 with dev30 settings"
         else:
             missing.append(pair)
